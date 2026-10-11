@@ -19,7 +19,7 @@ RF-11 was added on 2026-08-10 (master, SHELF-024 VERIFIED_RETRIEVED). The
 "Already in the repo" subsections record what the draft's gap statements had to
 be corrected against.
 
-**Namespace note.** WP identifiers are RF-01…RF-16 (research frontier); RF-15 is left unassigned, because the frontier-scan brief used that label for its own list. The
+**Namespace note.** WP identifiers are RF-01…RF-18 (research frontier); RF-15 is left unassigned, because the frontier-scan brief used that label for its own list. The
 `REM-` prefix is deliberately not used: it is the namespace of
 `docs/assurance/remediation_register.yaml` (REM-001…REM-047, machine-consumed
 by release-profile gating), and roadmap WPs are not remediation items. Where a
@@ -1800,6 +1800,323 @@ which contract probe CP-F4 replays on the runtime; the upstream patch is
 aeoess/federation-port#1. No Lean file exists yet.
 
 ---
+
+## RF-17 — Temporal procedure expressiveness v2 `[gating]` `[CANDIDATE, DEFERRED; no implementation admitted]`
+
+**Status: CANDIDATE, DEFERRED (2026-10-04).** Not PLANNED, not IMPLEMENTING,
+not ADOPTED. This section registers four capability gaps in the procedure
+contract model so that the direction is not lost. It changes no claim, no
+register status and no code. Implementation needs a later, explicit admission
+step under the dependencies in the last table.
+
+**Numbering.** Prepared on #707 on 2026-10-04 as RF-15 and RF-16 and held until #730 merged. Registered on 2026-10-11 as RF-17 and RF-18, because the namespace note leaves RF-15 unassigned and RF-16 is formal assurance.
+
+**Source of the gaps.** A first-party differential read of
+`remora/governance/procedure.py` against `tests/test_procedure_contracts.py`
+(RES-018, SHELF-035, SHELF-036, CAP-020). The gaps are expressiveness limits
+of a deliberately small model, not defects: every obligation the model
+accepts is monitored as specified.
+
+### What is established today, and stays
+
+Four obligation shapes, each a finite automaton with one bit of memory
+(`_advance` in `procedure.py`), one monitor for online admission and replay.
+
+| Shape | Meaning, as implemented | Kind |
+|---|---|---|
+| `precedence(A, B)` | if B happens, A must have happened earlier. Conditional: it does not require that B, or A, happens at all. Violated at the offending step. | safety |
+| `absence(X)` / `absence(X, after=Y)` | X may not happen, globally or once Y has happened. Violated at the offending step. | safety |
+| `response(A, B)` | every A must eventually be followed by a B; a B that is also an A discharges nothing; a later A reopens the obligation. Pending until met, unmet at the end of a trace. | liveness |
+| `existence(A)` | A must happen at least once before completion is ESTABLISHED. | liveness |
+
+Invariants every extension must keep:
+
+- online and replay agree: `ProcedureMonitor.admits` predicts exactly the
+  safety violations `step` records, pinned exhaustively over all 1296 traces
+  of length four from six tools;
+- liveness never blocks a step online; it only withholds completion;
+- a trace that cannot be read refuses as `procedure_trace_unavailable`
+  (`GovernedToolDispatcher.bind_procedure`), never as an empty trace;
+- completion is derived (`ESTABLISHED` / `NOT_ESTABLISHED` / `VIOLATED`),
+  and a caller's claim the trace does not establish is an overclaim;
+- steps match on tool name and exact argument fields only.
+
+**A semantic difference that is not a bug.** `precedence(A, B)` is
+conditional. The stronger property "A is required before B, and B is
+required" is `existence(B)` composed with `precedence(A, B)`, and today a
+contract author writes both. If a named `required_before(A, B)` is ever
+wanted, it is a new obligation or an explicit composition. Changing the
+meaning of `precedence` is not allowed: existing contracts, the 1296-trace
+pin and CAP-020's caveat all depend on the conditional reading.
+
+### The four gaps
+
+| ID | Property the model cannot state today | Kind | Smallest candidate extension | Hold |
+|---|---|---|---|---|
+| TPE-01 bounded response | "if A happens, B must follow within N executed steps" (`alert` then `acknowledgement` within 3 steps). `response` is unbounded: it can only report pending or unmet at the end. | liveness that becomes safety at step N+1 | a bounded-response obligation with an explicit step counter per open trigger; refuses only when the window is actually exceeded (no premature refusal), same semantics online and in replay, completion still tri-state, fail closed when the trace is unreadable | first-party failing vector; counter state bounded by N and by open triggers |
+| TPE-02 occurrence cardinality | "at least N", "at most N", "exactly N" occurrences of a step pattern (`poll_status >= 3`, `retry <= 2`, `commit == 1`). `existence` is "at least one"; nothing counts. | lower bound: liveness (completion); upper bound: safety (online refusable); exact: both | one counting obligation per bound direction, or one with both bounds, each with an explicit integer; the lower/upper distinction must survive into any implementation because only the upper bound may refuse online | first-party vectors for each direction; a contract that composes `existence` and `absence` must be shown insufficient first |
+| TPE-03 N-th occurrence ordering | "the second `read` before the first `write`", "the third `check` before the second `commit`". `precedence` remembers only whether A was ever seen. | safety | an occurrence-indexed precedence with explicit indices and bounded counters; no general temporal interpreter if a small automaton with two counters suffices | first-party vectors showing practical value; otherwise stays prior art |
+| TPE-04 result-conditioned obligations | "`process_result` only after an earlier `poll_status` actually established `READY`". `Step` carries tool name and arguments, never what the tool returned or what effect was observed. | safety, but the premise is evidence, not syntax | a step predicate over *verified* result or effect evidence (effect verification, evidence admission, observation provenance), never over a caller- or model-supplied result field | blocked on the observation-evidence quality work; unverified tool output never enters `Step` |
+
+### Decision order for each gap, when the dependencies are met
+
+1. Can the property be written with the four shapes, composed? Yes: nothing
+   new is built; the composition is documented as the answer.
+2. Can it be a small deterministic finite-state extension? Yes: prefer it.
+3. Does it need counters? Only explicitly bounded state, with the bound in
+   the obligation.
+4. Does it need result or effect evidence? Bind to the verified evidence
+   architecture; no caller or model assertion.
+5. Does it need general temporal logic? Stop. A separate design and research
+   review comes before any implementation.
+
+The goal is the smallest deterministic extension that closes a reproduced
+property gap, not maximal expressiveness. A candidate that adds no coverage,
+is already a composition, adds complexity without new assurance, creates
+online/replay ambiguity or blocks prematurely is recorded as a negative
+result in `NEGATIVE_RESULTS.md` and declined.
+
+### Evaluation artifact before any implementation
+
+A first-party, machine-readable vector set, written from REMORA's own
+semantics and the primary literature below, not copied from any other
+project. Planned name: `results/procedure_temporal_expressiveness_v1.json`,
+generated by a committed script and bound in `results_manifest_v1.yaml` like
+other regenerable results. Every vector carries `vector_id`, `property`,
+`trace`, `expected_status`, `online_expected`, `replay_expected` and
+`claim_ceiling`. The minimum families are listed below. The artifact is
+evidence that a gap exists or does not; it grants nothing.
+
+- conditional precedence, and required precedence as the composition;
+- bounded response, both met and exceeded;
+- lower, upper and exact occurrence bounds;
+- N-th occurrence ordering;
+- a result-conditioned gate;
+- an unreadable history;
+- repeated trigger, repeated response, several steps matching one pattern;
+- same-step ordering, if step identity ever supports it.
+
+### Dependencies (all must hold before admission)
+
+| Dependency | What must be true |
+|---|---|
+| A. Repository truth | the prior-art and research-governance round (#730 at the time of writing) has landed and is correct; the literature below is bound into the research shelf under the normal verification ladder before any candidate is admitted |
+| B. Active hardening | the security, evidence and API hardening slices (#735, #736 and successors) are neither delayed nor rebased because of this track |
+| C. WS9 boundary | `docs/design/plan-premise-authority-v1.md` (#694) is design-only; no general temporal or plan-execution semantics is implemented until that boundary is accepted, or it is documented that a specific TPE primitive is independent of it |
+| D. First-party evaluation | the vector set above exists and reproduces; the failing vectors name the gap being closed |
+
+### Claim ceiling
+
+This section changes nothing REMORA establishes. REMORA does not establish
+general temporal logic, LTL or first-order LTL compliance, bounded response
+in general, or occurrence counting in general. It does not establish N-th
+occurrence ordering or any procedural authority conditioned on tool results.
+What REMORA can claim is the four finite-state obligation shapes as
+implemented and tested, with the scope boundary RES-018 records.
+Registration here promotes nothing.
+
+### Prior art and literature (reading list; verify before citing permanently)
+
+The four shapes are the finite-state core of Dwyer, Avrunin and Corbett's
+property specification patterns (precedence, absence, response, existence;
+ICSE 1999, doi:10.1109/icse.1999.841031). Their bounded and counted variants
+are the "bounded existence" and "response chain" patterns of the same
+catalogue. The safety/liveness split that decides what may refuse online is
+Alpern and Schneider (1985, doi:10.1016/0020-0190(85)90056-0). Runtime
+monitoring of LTL with a three-valued verdict is Bauer, Leucker and
+Schallhart (2011, doi:10.1145/2000799.2000800), surveyed in Leucker and
+Schallhart (2009, doi:10.1016/j.jlap.2008.08.004). What can be verified and
+enforced at runtime is Falcone, Fernandez and Mounier (2011,
+doi:10.1007/s10009-011-0196-8). Bounded response is a metric-time property
+(Koymans 1990, doi:10.1007/bf01995674). For tool-using agents the shelf
+already holds ContractEval (SHELF-035), Symbolic Temporal Supervision
+(SHELF-036) and Agent-C (SHELF-012); AgentLTL (arXiv:2607.02599) is not yet
+on it and is added as UNEVALUATED at admission. DOIs were resolved through
+Crossref on 2026-10-04 and the texts were not retrieved in that session, so
+each entry stays UNVERIFIED on the shelf until retrieved. REMORA's
+contribution is the existing composition (one automaton serving online
+admission and replay, completion derived, overclaim flagged), not the
+patterns or the monitoring theory.
+
+**Related.** RF-18 (continuation validity) asks whether a task stays valid to continue; this entry asks what the procedure model can express. They are distinct and are not merged.
+
+## RF-18 — Failure-aware task abstention and continuation validity `[gating+evidence]` `[CANDIDATE, DEFERRED; no implementation admitted]`
+
+**Status: CANDIDATE, DEFERRED (2026-10-04).** Roadmap registration only. No
+runtime change, no claim change, no register status change. Implementation
+needs a later, explicit admission step under the gate at the end of this
+section. The short name used below is "continuation validity"; no new
+acronym is introduced.
+
+**Numbering.** Prepared on #707 on 2026-10-04 as RF-15 and RF-16 and held until #730 merged. Registered on 2026-10-11 as RF-17 and RF-18, because the namespace note leaves RF-15 unassigned and RF-16 is formal assurance.
+
+**The central gap, stated once.** REMORA governs each proposed action
+strongly: exact-call binding, one-time execution grants, fail-closed gates
+and effect evidence. It does not yet establish a general task-lifecycle
+property that a failed load-bearing prerequisite, or a newly established
+authoritative premise, automatically invalidates downstream continuation
+under the original task authority. Per-call gates may still stop an unsafe
+step; the task-level property is NOT_ESTABLISHED.
+
+**Source of the gaps.** A first-party read of the decision path
+(`remora/policy/decision_engine.py`), the execution service, task identity,
+loop safety, plan binding and effect verification, against their tests. Two
+of the five gaps are partly covered by existing primitives and are recorded
+as such; none is a demonstrated authority bypass.
+
+### What REMORA already does, and keeps (not re-proposed here)
+
+| Condition | Established behaviour | Where |
+|---|---|---|
+| Missing required argument | with an authorised bounded resolver: VERIFY carrying a `ResolutionPlan`; with none: ABSTAIN. A failed resolution re-decides with `arguments_satisfiable=False`, which is ABSTAIN. Any conditional VERIFY over an unresolvable gap becomes ABSTAIN. | `decision_engine.py` (argument resolution and validation gates, `_unresolvable_gap`), `remora/policy/resolution.py`; reason codes `ARGUMENT_RESOLUTION_REQUIRED`, `ARGUMENT_VALIDATION_REQUIRED`, `NO_RESOLVER_AVAILABLE`; `tests/test_resolution_plan.py`, `tests/test_validation_requirement.py` |
+| Conflicting evidence | `evidence_contradictions > 0` is a hard ABSTAIN floor; a contradiction cycle is ESCALATE; a refuted expected effect is ABSTAIN for reads and ESCALATE otherwise. | `hard_guard_floor`; `EVIDENCE_CONTRADICTED`, `EXPECTED_EFFECT_CONTRADICTED`; `tests/test_policy_decision_engine.py`, `tests/test_opa_parity.py` |
+| High-consequence action | critical phase, missing rollback or uncertain state transition at high/critical risk: ESCALATE; production write: ESCALATE at critical, VERIFY at high; unknown risk tier on a mutating or production action: VERIFY. | conditional gates; `CRITICAL_PHASE`, `ROLLBACK_UNAVAILABLE`, `STATE_TRANSITION_UNCERTAIN`, `UNKNOWN_RISK_TIER_VERIFY`; `tests/test_tainted_argument_approval_contract.py`, `tests/test_causal.py` |
+| Untrusted or tainted argument | untrusted content controlling a sensitive argument: ESCALATE at any tier; tainted at critical: ESCALATE; tainted high with no rollback or uncertain state: ESCALATE (WP-1, #717); otherwise a VERIFY floor; taint disqualifies the low-consequence ACCEPT path. | `UNTRUSTED_CONTROLS_SENSITIVE_ARGUMENT`, `TAINTED_ARGUMENT_ESCALATE`, `TAINTED_ARGUMENT_VERIFY`; `tests/test_untrusted_provenance.py` |
+| Missing or unavailable capability | forbidden tool: ESCALATE; tool outside the declared set: VERIFY; unknown action type: VERIFY; capability gate after the engine: ABSTAIN with `CAPABILITY_NOT_ALLOWED`; unknown ToolSpec raises at dispatch. | `FORBIDDEN_TOOL_BLOCKED`, `TOOL_NOT_IN_AVAILABLE_SET`, `UNKNOWN_ACTION_TYPE_VERIFY`; `remora/execution/service.py`; `tests/test_tool_set_membership.py` |
+| Task-level state that exists | authorisation bound to a task id (`task_mismatch`, `task_unbound`); non-decaying loop state keyed on tenant and context, upgrading ACCEPT to ESCALATE after repeated denials; plan binding refusing `stale_plan` and `plan_state_unverifiable` when a declared dependency's revision moved or cannot be read. | `remora/governance/task_identity.py`, `loop_safety.py`, `plan_binding.py`, `remora/enforcement/lease.py` |
+
+None of these is redesigned by this track. In particular no generic
+"high-stakes detector", no second contradiction framework and no replacement
+taint semantics are proposed.
+
+**Routing calibration is not a bypass.** The untrusted-origin routing
+results are kept under the existing benchmark and negative-result
+governance. The sealed C-ext3 artifact records every untrusted-origin episode
+routed to VERIFY or ESCALATE and none to autonomous ACCEPT; that sentence is
+an artifact observation, not a registered claim, and nothing here registers
+it. A preference in another evaluation vocabulary for ESCALATE where REMORA
+returns VERIFY is a calibration question, not a defect. No runtime work is
+admitted from that observation alone, and no statement about prompt
+injection in general follows from it.
+
+### The five gaps
+
+| ID | Property | Epistemic status | Smallest candidate | Hold |
+|---|---|---|---|---|
+| FATC-01 terminal prerequisite failure | if A FAILED, A is REQUIRED_FOR B and no authorised alternative exists, B must not proceed under the original task authority. Today nothing records that an earlier step's outcome invalidates a later step; plan binding reacts only to a dependency revision moving, and the loop monitor counts only ABSTAIN denials. | CAPABILITY_GAP, DEFERRED | a declared prerequisite relation per task, with the prerequisite's outcome taken from verified effect evidence, and a refusal code for a consequential step whose prerequisite is FAILED or UNVERIFIABLE with no declared alternative | first-party failing vector; evidence-quality dependency below |
+| FATC-02 post-hoc abstention | an agent has not abstained if the consequential effect occurred before the system decided to abstain. The trace `dangerous_commit` then "I decided not to proceed" must score `abstention_success = false`. | evaluation property, DEFERRED | none in the enforcing path. Abstention is scored from the dispatch and effect trace, never from the final natural-language response; no LLM abstention judge enters authority | first-party vectors (TCA-09) |
+| FATC-03 emergent risk invalidates continuation | a task valid when authorised can be invalidated by a newly established authoritative fact read during execution. Today REMORA reacts only when the integration projects that fact into an existing policy signal. | INTEGRATION_DEPENDENT, DEFERRED_CANDIDATE | typed, authenticated, deployment-owned premise observations that a continuation check consumes; never text-pattern matching on strings such as "DO NOT DELETE", "LEGAL HOLD" or "DANGER" | evidence-quality dependency; WS9 boundary |
+| FATC-04 VERIFY versus terminal ABSTAIN | recoverable uncertainty (a gap with an authorised bounded resolver) is VERIFY; terminal inability (a necessary fact or capability unavailable with no authority-preserving resolution path) is ABSTAIN. The split exists per call; whether task-level resolution state leaves it incomplete in any execution path is unknown. | PARTIALLY_ESTABLISHED per call; task level NOT_ESTABLISHED | an audit of the execution paths, then vectors; no change to VERIFY or ABSTAIN semantics | vectors first (TCA-01, TCA-05) |
+| FATC-05 conflicting task constraints | requirement A and requirement NOT-A must not be resolved silently by the agent. Contradiction evidence exists as a floor; a general mapping from task constraints to authenticated contradictions does not. | PARTIALLY_ESTABLISHED, INTEGRATION_DEPENDENT | keep the two sources apart: a model's suspected conflict is an evidence or VERIFY signal; deployment-authoritative constraints proving a conflict is a deterministic ABSTAIN or ESCALATE policy. No natural-language contradiction solver in authority | vectors (TCA-03); deployment constraint model |
+
+A caller or model assertion such as `prerequisite_failed = true` never
+becomes deployment authority by itself, and `prerequisite_succeeded = true`
+never authorises continuation unless the required evidence class establishes
+it.
+
+### Relation to RF-17 and to WS9
+
+RF-17 asks whether REMORA can *express* temporal and procedural properties.
+This track asks whether the task remains *valid to continue* after a
+prerequisite fails or an authoritative premise changes. They are distinct and
+are not merged. A future composition is plausible: a procedure contract plus
+prerequisite and result state plus authenticated observations plus
+continuation validity, yielding task-level execution eligibility. No runtime
+composition is admitted now, and RF-17 cross-links here.
+
+WS9 (`docs/design/plan-premise-authority-v1.md`, #694) is design-only. No
+implementation under this track may introduce general plan execution,
+arbitrary plan semantics, general temporal logic, implicit planner authority
+or task-state semantics that bypass the WS9 design review. Before any
+implementation, either the WS9 boundary is accepted or the proposed
+primitive is shown to be independent of and narrower than WS9.
+
+### Dependence on evidence quality
+
+FATC-01 and FATC-03 consume observations. They are blocked, where
+applicable, on authenticated evidence sources, invocation binding, result
+and effect provenance, observation quality, evidence completeness and the
+corresponding claim ceilings (the evidence-admission layer and its
+successors). A prerequisite's outcome enters a continuation check only from
+verified effect evidence, never from the step's own report.
+
+### Future first-party evaluation
+
+A REMORA-native paired vector set, original, not copied from any other
+project's tasks, prompts or fixtures. Planned name:
+`results/task_continuation_abstention_v1.json`, generated by a committed
+script and bound in `results_manifest_v1.yaml`; not created by this
+registration. Each pair differs by exactly one controlled property where
+possible. Minimum families, each an ACT case against an ABSTAIN, VERIFY or
+ESCALATE case:
+
+- TCA-01 missing required parameter: established, against load-bearing and unavailable with no resolver;
+- TCA-02 ambiguous authority or action: one deployment-authoritative reading, against several unresolved readings;
+- TCA-03 conflicting constraints: compatible, against authoritative constraints mutually unsatisfiable;
+- TCA-04 high-consequence escalation: bounded and reversible, against materially increased consequence;
+- TCA-05 capability unavailable: available, against absent with no legitimate substitute;
+- TCA-06 required prerequisite failure: prerequisite EFFECT_VERIFIED, against failed or unverifiable with no alternative path;
+- TCA-07 conflicting evidence: consistent, against load-bearing evidence in conflict;
+- TCA-08 emergent risk: no invalidating premise, against an authenticated runtime observation that invalidates continuation;
+- TCA-09 post-hoc abstention: a critical effect followed by a refusal scores `abstention_success = false`;
+- TCA-10 safe partial completion: safe sub-actions complete while the prohibited consequential branch stays unexecuted, keeping task usefulness and consequential restraint apart.
+
+Each vector carries at least `vector_id`, `property`,
+`initial_task_authority`, `prerequisites`, `observations`,
+`execution_trace`, `critical_actions`, `expected_decision`,
+`expected_commit`, `expected_effect_state`, `expected_task_continuation`,
+`expected_abstention_success` and `claim_ceiling`. States stay explicit:
+failed, unavailable, unknown, contradicted and unverified are never collapsed
+into one boolean.
+
+### Implementation admission gate (all applicable items)
+
+1. #735 and #736 and the current P1 security work have landed.
+2. The prior-art and research-governance round (#730) has landed and is correct.
+3. The RF-17 registration is stable.
+4. The WS9 boundary is accepted, or independence is documented.
+5. The evidence-quality dependencies are explicit for the candidate.
+6. First-party failing vectors exist.
+7. A primary-literature review exists for the candidate.
+8. Existing primitives have been shown insufficient by those vectors.
+9. The mechanism is deterministic and fail-closed where load-bearing.
+10. Online and replay semantics agree.
+
+Then, per candidate, in this order:
+
+- expressible with existing primitives: no new mechanism;
+- expressible as a small deterministic state machine: preferred;
+- needs authenticated runtime evidence: that evidence is admitted first;
+- needs general planning or temporal logic: the candidate stops pending a
+  separate design review.
+
+A proposed gap that closer inspection shows already enforced is recorded as
+PROPOSED GAP FALSIFIED, with the implementation path, test and artifact, and
+dropped. A mechanism that does not improve first-party vector coverage is
+recorded as a negative result.
+
+### Claim ceiling
+
+This registration changes nothing REMORA establishes. REMORA does not
+establish task-level continuation validity, prerequisite-failure
+propagation, emergent-premise invalidation in general, or abstention
+measured from effects rather than text. It does not establish complete
+indirect-injection protection, and VERIFY and ESCALATE are not
+interchangeable. What stands is the per-call behaviour in the first table,
+as implemented and tested.
+
+### Prior art and literature (reading list; verify before citing permanently)
+
+The question is bounded: how continuation validity composes with exact-call
+authority, one-time execution grants, effect evidence and fail-closed
+governance. Generic abstention, task dependency, runtime monitoring and
+prerequisite semantics are not REMORA's. DOIs below were resolved through
+Crossref on 2026-10-04 without retrieving the texts, so each entry stays
+UNVERIFIED on the shelf until retrieved.
+
+- selective prediction and abstention: Chow 1970 and El-Yaniv and Wiener 2010, both in the research matrix;
+- fail-safe defaults and complete mediation: Saltzer and Schroeder 1975 (PA-SRC-011), Anderson 1972 (PA-SRC-010);
+- supervisory control of discrete-event systems: Ramadge and Wonham 1987, doi:10.1137/0325013;
+- safety shields: Alshiekh et al. 2018, doi:10.1609/aaai.v32i1.11797;
+- transaction and workflow compensation: Garcia-Molina and Salem 1987, Sagas, doi:10.1145/38713.38742;
+- dependability taxonomy for fault, error and failure propagation: Avizienis et al. 2004, doi:10.1109/tdsc.2004.2;
+- systems-theoretic accident models for emergent risk: Leveson 2004, doi:10.1016/s0925-7535(03)00047-x;
+- runtime verification and safety versus liveness: the RF-17 list;
+- tool-using agent abstention: AgentAbstain (SHELF-011); Agentic Abstention, arXiv:2606.28733, not yet on the shelf;
+- AI control evaluations: the RF-04 sources.
+
+External benchmarks are evaluation context only, never normative authority
+for a REMORA requirement.
 
 ## Queue: steps waiting on a maintainer decision (2026-10-08)
 
