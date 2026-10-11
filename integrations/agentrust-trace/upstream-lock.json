@@ -1,0 +1,23 @@
+{
+  "schema_version": "remora-trace-upstream-lock-v1",
+  "trace_spec": {
+    "repository": "https://github.com/agentrust-io/trace-spec",
+    "commit": "4c7d6eccc468c87f2d00e02118b29164a4a5479b",
+    "schema_path": "schema/trace-claim.json",
+    "vendored_as": "upstream/trace-claim.json",
+    "schema_sha256": "sha256:289293315d5a480cebcb8962b4d2937738421040e4bb8dcd13c1540073443ae5",
+    "eat_profile": "tag:agentrust-io.com,2026:trace-v0.2",
+    "license": "Community Specification License 1.0 (schema/trace-claim.json, per the upstream LICENSE)"
+  },
+  "integrations": {
+    "repository": "https://github.com/agentrust-io/integrations",
+    "commit": "e6998d8883ae1328995f4d0d38f6816a5d6bbdc8",
+    "role_precedents": [
+      "integrations/aeoess-aps/integration.yaml",
+      "integrations/nobulex/integration.yaml",
+      "integrations/probityai-observed-effect/integration.yaml"
+    ],
+    "role_ruling": "https://github.com/agentrust-io/integrations/issues/170"
+  },
+  "retrieved_at": "2026-10-11"
+}

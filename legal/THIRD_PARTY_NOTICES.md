@@ -24,6 +24,7 @@ and `frontend/package-lock.json` for the exact resolved versions).
 | TruthfulQA | Lin et al. 2022 | QA benchmark subset (n=85) | Apache License 2.0 (upstream dataset's own license); not relicensed |
 | ARC-Challenge / MMLU-Pro | AI2 / TIGER-Lab | Referenced benchmark materials | Respective dataset licenses; not relicensed |
 | Open Policy Agent (OPA) | openpolicyagent.org | Pinned binary in CI; Rego adapter target | Apache License 2.0 (upstream project's own license); not bundled |
+| TRACE v0.2 JSON Schema | agentrust-io/trace-spec `schema/trace-claim.json` at `4c7d6ec` | Vendored unchanged as `integrations/agentrust-trace/upstream/trace-claim.json` to validate the REMORA mapping offline | Community Specification License 1.0 (upstream project's own license); not relicensed |
 | Business Source License text | MariaDB Corporation Ab | License text in `LICENSE` / `LICENSES/BUSL-1.1.txt` | Used under MariaDB's permission subject to the Covenants of Licensor |
 | Model outputs (Groq/Cloudflare-hosted Llama, Qwen, Mistral) | Respective providers | Stored oracle responses in committed result artifacts | Provider terms of service; review before commercial redistribution |
 
