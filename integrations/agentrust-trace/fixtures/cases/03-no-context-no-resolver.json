@@ -1,0 +1,104 @@
+{
+  "description": "No execution context and no resolver: model absent, no reference emitted.",
+  "expected": {
+    "mapping": {
+      "absent_required": {
+        "build_provenance": "no_build_provenance_in_native_evidence",
+        "cnf": "export_signing_not_part_of_mapping",
+        "data_class": "no_data_classification_in_native_evidence",
+        "model": "no_execution_context_bound_to_subject",
+        "policy": "no_policy_bundle_digest_in_native_evidence",
+        "runtime": "no_workload_measurement_software_only_semantics_unresolved",
+        "subject": "no_verified_workload_identity_in_native_evidence"
+      },
+      "is_trust_record": false,
+      "remora": {
+        "evidence_selection": {
+          "eligible": 1,
+          "selected_digest": "sha256:aa09ebcc5fc33cafa318e7df95a708ce3f91c16e40502a685341190790f15832",
+          "selected_ref": "attempt-1",
+          "selection_rule": "explicit_digest"
+        },
+        "native_claim": "remora.exact_call_binding",
+        "native_result": {
+          "reason_code": "lease_binds_exact_call",
+          "status": "ESTABLISHED",
+          "vocabulary": "remora-claim-result-v1"
+        },
+        "non_claims": [
+          "not_a_trace_trust_record",
+          "no_trace_conformance_level",
+          "references_are_pointers_not_evidence",
+          "native_result_is_remora_verifier_output_not_re_evaluated",
+          "independent_verification_not_established",
+          "runtime_capability_surface_completeness_not_established",
+          "effect_not_established_by_this_mapping"
+        ],
+        "reference_emitted": false,
+        "result_evidence_digest": "sha256:eaae5f9e31f2ab122b1fe406c01bc8258a89536e1e5565ad2a9d56f05a449f66",
+        "result_signer_kid": "ed25519-730a5edc28c2f8daf2d9dce3a01d5f205e35e55582eed2ba26219fabdd4cc9a8",
+        "subject": {
+          "kind": "execution_attempt",
+          "operation_id": "op-trace-fixture-1",
+          "report_digest": "sha256:aa09ebcc5fc33cafa318e7df95a708ce3f91c16e40502a685341190790f15832",
+          "report_id": "attempt-1",
+          "sequence": 1
+        }
+      },
+      "schema_version": "remora-trace-mapping-v1",
+      "trace": {
+        "appraisal": {
+          "status": "none",
+          "verifier": "urn:remora:federation-result-signer:ed25519-730a5edc28c2f8daf2d9dce3a01d5f205e35e55582eed2ba26219fabdd4cc9a8"
+        },
+        "eat_profile": "tag:agentrust-io.com,2026:trace-v0.2",
+        "iat": 1791000000,
+        "origin": {
+          "ingested_at": 1790999940,
+          "kind": "third-party-control-plane",
+          "producer": "remora:deploy.example.test",
+          "source_event_id": "op-trace-fixture-1/attempt-1"
+        }
+      },
+      "trace_canonicalization": "remora/jcs-rfc8785-v0",
+      "trace_conformance_level": null,
+      "trace_digest": "sha256:9003f0ddd18ebe48160ffdfd3f6eb3ddb404b6e7a6fbf158ceae46c9bb691b5b",
+      "trace_role": "external-evidence-source"
+    }
+  },
+  "input": {
+    "evidence_b64": "eyJmb3JtYXQiOiJyZW1vcmEtZmVkZXJhdGlvbi1yZXN1bHQtZXZpZGVuY2UtdjEiLCJyZXN1bHRfYjY0IjoiZXlKbGRtbGtaVzVqWlY5elpXeGxZM1JwYjI0aU9uc2laV3hwWjJsaWJHVWlPakVzSW5ObGJHVmpkR1ZrWDJScFoyVnpkQ0k2SW5Ob1lUSTFOanBoWVRBNVpXSmpZelZtWXpNelkyRm1ZVE14T0dVM1pHWTVOV0UzTURoalpUTm1PVEZqTVRabE5EQTFNREpoTmpnMU16UXhNVGt3Tnprd1pqRTFPRE15SWl3aWMyVnNaV04wWldSZmNtVm1Jam9pWVhSMFpXMXdkQzB4SWl3aWMyVnNaV04wYVc5dVgzSjFiR1VpT2lKbGVIQnNhV05wZEY5a2FXZGxjM1FpZlN3aWJtRjBhWFpsWDJOc1lXbHRJam9pY21WdGIzSmhMbVY0WVdOMFgyTmhiR3hmWW1sdVpHbHVaeUlzSW01aGRHbDJaVjl5WlhOMWJIUWlPbnNpY21WaGMyOXVYMk52WkdVaU9pSnNaV0Z6WlY5aWFXNWtjMTlsZUdGamRGOWpZV3hzSWl3aWMzUmhkSFZ6SWpvaVJWTlVRVUpNU1ZOSVJVUWlMQ0oyYjJOaFluVnNZWEo1SWpvaWNtVnRiM0poTFdOc1lXbHRMWEpsYzNWc2RDMTJNU0o5TENKelkyaGxiV0ZmZG1WeWMybHZiaUk2SW5KbGJXOXlZUzFtWldSbGNtRjBhVzl1TFhKbGMzVnNkQzEyTVNJc0luTjFZbXBsWTNRaU9uc2lhMmx1WkNJNkltVjRaV04xZEdsdmJsOWhkSFJsYlhCMElpd2liM0JsY21GMGFXOXVYMmxrSWpvaWIzQXRkSEpoWTJVdFptbDRkSFZ5WlMweElpd2ljbVZ3YjNKMFgyUnBaMlZ6ZENJNkluTm9ZVEkxTmpwaFlUQTVaV0pqWXpWbVl6TXpZMkZtWVRNeE9HVTNaR1k1TldFM01EaGpaVE5tT1RGak1UWmxOREExTURKaE5qZzFNelF4TVRrd056a3daakUxT0RNeUlpd2ljbVZ3YjNKMFgybGtJam9pWVhSMFpXMXdkQzB4SWl3aWMyVnhkV1Z1WTJVaU9qRjlmUT09Iiwic2lnbmF0dXJlIjp7ImFsZ29yaXRobSI6IkVkMjU1MTkiLCJkb21haW4iOiJSRU1PUkEvRkVERVJBVElPTi1SRVNVTFQvdjEiLCJraWQiOiJlZDI1NTE5LTczMGE1ZWRjMjhjMmY4ZGFmMmQ5ZGNlM2EwMWQ1ZjIwNWUzNWU1NTU4MmVlZDJiYTI2MjE5ZmFiZGQ0Y2M5YTgiLCJzaWduYXR1cmUiOiJDeTFlV3ZBSm83UjJncGdjMTdhakY5VFpYSW1pbkxkblNTZkZrcWY1enN2eVNuaEt5ek1lbTZLYmgzTGNWdFZEU1JXbytZYlhhMXlRMWZRMW82Z1BEUT09In19",
+    "execution_context": null,
+    "reports": [
+      {
+        "body": {
+          "observed": "dispatch_bound_to_lease"
+        },
+        "kind": "execution_attempt",
+        "operation_id": "op-trace-fixture-1",
+        "report_id": "attempt-1",
+        "sequence": 1
+      }
+    ],
+    "request": {
+      "expected_principal": null,
+      "expected_tenant": null,
+      "ingested_at": 1790999940,
+      "issued_at": 1791000000,
+      "native_claim": "remora.exact_call_binding",
+      "producer": "remora:deploy.example.test",
+      "resolver": null,
+      "retention": null,
+      "subject": {
+        "kind": "execution_attempt",
+        "operation_id": "op-trace-fixture-1",
+        "report_digest": "sha256:aa09ebcc5fc33cafa318e7df95a708ce3f91c16e40502a685341190790f15832",
+        "report_id": "attempt-1",
+        "sequence": 1
+      }
+    },
+    "trusted_keys": [
+      "bc7cbcb5636375fa1d82434d466724d92377f53b980695dd49d26d0ce12205a5"
+    ]
+  }
+}

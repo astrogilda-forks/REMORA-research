@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Interop (AgenTrust TRACE, experimental)
+
+- `remora.interop.trace.map_result` maps one verified REMORA federation
+  result into TRACE v0.2 record shape as an `external-evidence-source`
+  (agentrust-io/integrations#170). It is not a Trust Record and claims no
+  TRACE level: `subject`, `runtime`, `policy`, `data_class`,
+  `build_provenance` and `cnf` are left out with reasons, `model` only from
+  a digest-bound execution context. 12 fixture cases and the pinned
+  trace-spec schema in `integrations/agentrust-trace/`.
+
 ### Security (code review of 898758f)
 
 - An effect execution has one deadline, recorded in the ledger by its first
