@@ -22,7 +22,9 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
+from remora.toolcall.callable_digest import source_digest  # noqa: E402
 from remora.toolcall.toolspec import sign_bundle  # noqa: E402
+from servers import tool_registry_research  # noqa: E402
 
 KEY = "wiring-toolspec-key"
 IDENTITY = "wiring-signer-v1"
@@ -39,7 +41,8 @@ def _spec(**overrides) -> dict:
     spec = {
         "tool_id": "store_artifact",
         "version": 1,
-        "callable_digest": "sha256:" + "a" * 64,
+        # What the API path measures at registration (verify_callable).
+        "callable_digest": source_digest(tool_registry_research.store_artifact),
         "implementation_identity": "research-profile@test",
         "description": "Persist an artifact under the sandboxed directory.",
         "argument_schema": {

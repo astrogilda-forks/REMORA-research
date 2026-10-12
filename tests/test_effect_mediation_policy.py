@@ -316,8 +316,11 @@ def test_an_unmediated_registry_refuses_the_executor_at_startup(executor) -> Non
     """The API refuses to start, not to serve: the registration is checked eagerly."""
     env, root = executor
     (root / "unmediated_registry.py").write_text(
+        # The signed function, registered without mediation: the digest
+        # matches, so what refuses is the effect policy.
+        "from remora_registry import send_notification\n"
         "def register_tools(register):\n"
-        "    register('send_notification', lambda arguments: {'status': 'direct'})\n",
+        "    register('send_notification', send_notification)\n",
         encoding="utf-8")
     child = {**os.environ, **env, "REMORA_TOOL_REGISTRY_MODULE": "unmediated_registry",
              "PYTHONPATH": os.pathsep.join([str(ROOT), env["PYTHONPATH"]])}
@@ -363,8 +366,11 @@ def api_executor(executor, monkeypatch):
 def test_the_api_refuses_an_unmediated_registration(api_executor, monkeypatch) -> None:
     exec_mod, root = api_executor
     (root / "unmediated_registry_inproc.py").write_text(
+        # The signed function, registered without mediation: the digest
+        # matches, so what refuses is the effect policy.
+        "from remora_registry import send_notification\n"
         "def register_tools(register):\n"
-        "    register('send_notification', lambda arguments: {'status': 'direct'})\n",
+        "    register('send_notification', send_notification)\n",
         encoding="utf-8")
     monkeypatch.setenv("REMORA_TOOL_REGISTRY_MODULE", "unmediated_registry_inproc")
     with pytest.raises(RuntimeProfileError, match="effect_mediation_not_registered"):

@@ -18,7 +18,9 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from remora.enforcement.outbox import OutboxState  # noqa: E402
+from remora.toolcall.callable_digest import source_digest  # noqa: E402
 from remora.toolcall.toolspec import sign_bundle  # noqa: E402
+from servers import tool_registry_research  # noqa: E402
 
 KEY = "async-regate-toolspec-key"
 IDENTITY = "async-regate-signer-v1"
@@ -35,7 +37,7 @@ def _spec(version: int, allowed_targets: list[str] | None = None) -> dict:
     return {
         "tool_id": "store_artifact",
         "version": version,
-        "callable_digest": "sha256:" + ("a" if version == 1 else "b") * 64,
+        "callable_digest": source_digest(tool_registry_research.store_artifact),
         "implementation_identity": f"regate-runtime-v{version}",
         "description": "Persist an artifact.",
         "argument_schema": {

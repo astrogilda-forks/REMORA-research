@@ -27,6 +27,8 @@ import pytest
 
 pytest.importorskip("fastapi")
 
+from remora.toolcall.callable_digest import source_digest  # noqa: E402
+from servers import tool_registry_research  # noqa: E402
 from tests.test_toolspec_execution_wiring import (  # noqa: E402
     _bundle_file,
     _client,
@@ -36,6 +38,7 @@ from tests.test_toolspec_execution_wiring import (  # noqa: E402
 
 READ_SPEC = dict(
     tool_id="read_telemetry",
+    callable_digest=source_digest(tool_registry_research.read_telemetry),
     action_type="read",
     risk_tier="low",
     description="Read telemetry for one asset.",

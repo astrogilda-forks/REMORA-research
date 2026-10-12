@@ -203,8 +203,19 @@ def test_verify_callable_still_has_no_non_test_caller():
     runtime verifies whichever kind the spec declares. A changed dependency
     then fails (tests/test_callable_closure_digest.py). Host integrity is
     still not measured, and the caller is still the reference module only.
+
+    2026-10-13 (REST callable verification): the API path is the second
+    caller. ``remora/execution/authorization.py`` (``verified_registration``)
+    measures each callable the deployment's registry module registers, with
+    the same digest kinds, before the dispatcher is built; a mismatch refuses
+    startup (tests/test_rest_callable_verification.py). ``init-review`` now
+    signs the digest the runtime measures; it used to sign a whole-module hash
+    nothing measured. Still Python only: an external process or binary the
+    callable starts is not measured, and host integrity is not either.
     """
-    _assert_no_production_caller("verify_callable", allowed=_REFERENCE_RUNTIME)
+    _assert_no_production_caller(
+        "verify_callable",
+        allowed=_REFERENCE_RUNTIME + ("remora/execution/authorization.py",))
 
 
 def test_verify_credential_scope_still_has_no_non_test_caller():
