@@ -20,6 +20,7 @@ This file lists externally relevant changes by release. Fine-grained development
   regenerated (`init-review --force`) before an executor will start.
 - The digest functions moved to `remora.toolcall.callable_digest` (CORE) and
   are re-exported from `signed_surface_runtime`.
+
 ### Security (idempotency takeover fencing)
 
 - An assess request slower than the 300 s stale window could have its
