@@ -219,10 +219,13 @@ jobs:
         # file joined 2026-08-05 (FT-02): its multi-worker adapter carries
         # the crash-consistency contract, so "verified against a real
         # service" must not depend on a developer remembering to run it.
+        # The idempotency reservation contract joined 2026-10-13: claim,
+        # complete, release and takeover across separate connections.
         run: |
           python -m pytest tests/test_execution_api.py tests/test_execution_outbox.py \
             tests/test_postgres_outbox_fault_injection.py \
             tests/conformance/test_execution_boundary_process_split.py \
+            tests/test_assess_idempotency_reservation.py \
             -q -rs -k "postgres" | tee out.txt
           if grep -qiE "skipped|no tests ran" out.txt; then
             echo "ERROR: Postgres contract tests skipped despite service DSN" >&2
