@@ -662,6 +662,7 @@ from remora.execution.authorization import (
     load_toolspec_bundle as _authz_load_bundle,
     reset_toolspec_bundle_cache,
     resolve_toolspec as _authz_resolve_toolspec,
+    verified_registration as _authz_verified_registration,
 )
 
 #: Re-exported under the name the tests reload this module for. An assignment
@@ -1312,7 +1313,10 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                     import importlib
 
                     registry = importlib.import_module(spec)
-                    registry.register_tools(dispatcher.register)
+                    # Each callable is measured against its signed spec before
+                    # it can execute (verified_registration); a mismatch refuses here.
+                    registry.register_tools(
+                        _authz_verified_registration(_toolspec_bundle(), dispatcher.register))
                     if policy is not None and policy.required("effect_mediation"):
                         # CR-005: a registration that breaks the signed effect
                         # policy refuses the dispatcher, not the first call.

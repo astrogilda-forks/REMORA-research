@@ -37,7 +37,9 @@ from remora.sdk import (  # noqa: E402
     content_digest,
     verify_effect,
 )
+from remora.toolcall.callable_digest import source_digest  # noqa: E402
 from remora.toolcall.toolspec import sign_bundle  # noqa: E402
+from servers import tool_registry_research  # noqa: E402
 
 KEY = "vertical-toolspec-key"
 IDENTITY = "vertical-signer/v1"
@@ -54,7 +56,7 @@ def _spec(**overrides) -> dict:
     spec = {
         "tool_id": "store_artifact",
         "version": 1,
-        "callable_digest": "sha256:" + "a" * 64,
+        "callable_digest": source_digest(tool_registry_research.store_artifact),
         "implementation_identity": "research-profile@vertical",
         "description": "Persist an artifact under the sandboxed directory.",
         "argument_schema": {

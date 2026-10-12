@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from remora.toolcall.callable_digest import callable_digest_for
 from remora.toolcall.toolspec import ToolSpecBundle
 
 #: Comma-separated Ed25519 public keys (hex or base64) trusted to sign ToolSpec
@@ -77,6 +78,39 @@ def load_toolspec_bundle(environ: Any) -> ToolSpecBundle | None:
                 strict=policy["strict"],
             )
     return _TOOLSPECS
+
+
+def verified_registration(
+    bundle: ToolSpecBundle | None, register: Callable[..., None]
+) -> Callable[..., None]:
+    """``register``, measuring each callable against its signed spec first.
+
+    The signed spec attests a ``callable_digest``, and until 2026-10-13 only the
+    opt-in ``SignedSurfaceRuntime`` compared it with the callable actually
+    registered. On the API path the deployment's registry module registered
+    whatever it imported: the spec identity bound every lease, but nothing
+    showed that the code behind it was the code the spec names. Now a
+    callable whose measured digest differs refuses registration
+    (``toolspec_callable_digest_mismatch``), so the dispatcher is never built
+    around it.
+
+    A tool with no spec in the bundle is registered unmeasured: it has no
+    attested digest to compare, and assessment already refuses it
+    (``toolspec_unknown_tool``). With no bundle configured nothing is measured,
+    as before; that path is reported unenforced, not silently equivalent.
+    The digest measures Python source or its import closure, never an
+    external process or binary the callable starts.
+    """
+    if bundle is None:
+        return register
+
+    def measured(tool_name: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
+        if tool_name in bundle:
+            bundle.verify_callable(
+                tool_name, callable_digest_for(bundle.get(tool_name), fn))
+        register(tool_name, fn, *args, **kwargs)
+
+    return measured
 
 
 def toolspec_trust_policy(environ: Any) -> dict[str, Any]:

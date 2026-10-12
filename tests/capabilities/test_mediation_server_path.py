@@ -17,6 +17,7 @@ import pytest
 pytest.importorskip("fastapi")
 
 from remora.toolcall.toolspec import sign_bundle  # noqa: E402
+from remora.toolcall.callable_digest import source_digest  # noqa: E402
 from tests.capabilities import mediated_registry  # noqa: E402
 from tests.capabilities.test_capability_server_path import READ, _mod, _token  # noqa: E402
 from tests.capabilities.test_capability_server_path import client as _client  # noqa: E402,F401
@@ -27,6 +28,7 @@ from tests.test_toolspec_runtime import IDENTITY, KEY, _spec  # noqa: E402
 def client(monkeypatch, tmp_path, request):
     spec = _spec(
         tool_id="read_telemetry", action_type="read", credential_scope=["telemetry:read"],
+        callable_digest=source_digest(mediated_registry.read_telemetry),
         allowed_targets=["staging"],
         argument_schema={"type": "object", "properties": {"asset": {"type": "string"}},
                          "required": ["asset"], "additionalProperties": False},

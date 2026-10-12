@@ -161,8 +161,26 @@ tools: {}
 """
 
 
-def _callable_digest(source: str) -> str:
-    return "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
+def _callable_digest(registry_path: Path) -> str:
+    """The digest the runtime will measure for the demo tool.
+
+    The v1 contract attests the callable's source span
+    (``callable_digest_basis: source_span``), and the API path compares it with
+    the registered function at startup. Until 2026-10-13 this hashed the whole
+    registry module instead, a value no runtime measures, so the demo bundle
+    attested nothing that was ever checked. Loading the written file and
+    measuring the function is the same computation the runtime performs.
+    """
+    import importlib.util
+
+    from remora.toolcall.callable_digest import source_digest
+
+    spec = importlib.util.spec_from_file_location("_remora_scaffold_registry", registry_path)
+    if spec is None or spec.loader is None:  # pragma: no cover - a path we just wrote
+        raise RuntimeError(f"cannot load {registry_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return source_digest(module.send_notification)
 
 
 def _demo_spec(callable_digest: str) -> dict[str, Any]:
@@ -333,7 +351,7 @@ def init_review(
     policy_path = put("binding-policy.yaml", _BINDING_POLICY)
     capability_path = put("capability-policy.json",
                           json.dumps(_capability_policy(), indent=2, sort_keys=True) + "\n")
-    digest = _callable_digest(inspect.cleandoc(_REGISTRY_SOURCE))
+    digest = _callable_digest(registry_path)
     # RMR-CR-001: the bundle is signed here, at authoring time, with an Ed25519
     # seed that goes only to keys/. Neither runtime half receives it; both get
     # the public key and the pinned digest, so neither can author a bundle.

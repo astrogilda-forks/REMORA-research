@@ -4,6 +4,23 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (callable measurement on the API path)
+
+- `/v1/execution/*` now measures each callable the deployment's registry
+  module registers against its signed spec (`verify_callable`) before the
+  dispatcher is built. A mismatch refuses with
+  `toolspec_callable_digest_mismatch`. Until now only the opt-in
+  `SignedSurfaceRuntime` measured, so the spec identity bound every lease but
+  nothing showed the code behind it was the code the spec names. A tool with
+  no spec is registered unmeasured; assessment already refuses it.
+- `remora init-review` signed a SHA-256 of the whole registry module as the
+  demo tool's `callable_digest`. No runtime measures that value. It now signs
+  the source span of the function, which is what the v1 contract attests and
+  what the runtime measures. Bundles from older scaffolds must be
+  regenerated (`init-review --force`) before an executor will start.
+- The digest functions moved to `remora.toolcall.callable_digest` (CORE) and
+  are re-exported from `signed_surface_runtime`.
+
 ### Security (ToolSpec argument schema profile)
 
 - `ToolSpecBundle.validate_arguments` enforced `required`,
