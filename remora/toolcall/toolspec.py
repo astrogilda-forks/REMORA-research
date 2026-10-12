@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Sequence
 
-from remora.toolcall import argument_schema
+from remora.toolcall.argument_schema import check_schema, validate
 
 if TYPE_CHECKING:
     from remora.capabilities.ceiling import DownstreamCeiling
@@ -264,7 +264,7 @@ class ToolSpec:
                 f"fields (declare null explicitly): {missing}"
             )
         description = str(raw["description"])
-        schema_problems = argument_schema.check_schema(raw["argument_schema"])
+        schema_problems = check_schema(raw["argument_schema"])
         if schema_problems:
             # Signed is not enough: a keyword nothing enforces would be a
             # constraint the author believes in and the runtime ignores.
@@ -608,7 +608,7 @@ class ToolSpecBundle:
         keyword this does not enforce, so nothing in it is decorative.
         """
         spec = self.get(tool_id)
-        problems = argument_schema.validate(spec.argument_schema, arguments)
+        problems = validate(spec.argument_schema, arguments)
         if problems:
             raise ToolSpecRefused(
                 "toolspec_arguments_schema_invalid",

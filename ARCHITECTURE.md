@@ -543,7 +543,8 @@ selective routing is phase-aware rather than a single global threshold. See
 | `remora/sdk/` | **STABLE** | The only namespace with an external backward-compatibility guarantee. Snapshot-gated against `artifacts/sdk/public_api_v1.json` and re-checked against the installed wheel in CI |
 | `remora/observability/` | **CORE** | OTel tracer (degrades to a documented no-op) + structured governance events |
 | `remora/toolcall/` | **EXPERIMENTAL** | Tool-call routing, semantic contracts and the benchmark harnesses |
-| `remora/toolcall/toolspec.py` | **CORE** | Signed ToolSpec bundle, verified at the PEP for every lease (RMR-004) and by `remora/execution/authorization.py`. Its only `remora` import is `remora/crypto` (CORE), for Ed25519 bundle signatures (RMR-CR-001) |
+| `remora/toolcall/toolspec.py` | **CORE** | Signed ToolSpec bundle, verified at the PEP for every lease (RMR-004) and by `remora/execution/authorization.py`. Its `remora` imports are `remora/crypto` (CORE), for Ed25519 bundle signatures (RMR-CR-001), and `remora/toolcall/argument_schema.py` (CORE) |
+| `remora/toolcall/argument_schema.py` | **CORE** | The closed JSON Schema profile a signed ToolSpec's `argument_schema` may use: a keyword outside it refuses at load, every keyword in it is enforced at assessment. No `remora` imports |
 | `remora/toolcall/toolspec_sign.py` | **CORE** | Offline Ed25519 signer for ToolSpec bundles (`python -m remora.toolcall.toolspec_sign`), used by `remora init-review`. Signing is an authoring act: a strict runtime refuses to hold ToolSpec signing material |
 | `remora/shadow/` | **EXPERIMENTAL** | Counterfactual replay of an agent action log |
 | `remora/integrations/` | **EXPERIMENTAL** | Outbound integrations (GO-STAR MCP bridge) |
