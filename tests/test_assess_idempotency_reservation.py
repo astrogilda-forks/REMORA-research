@@ -164,6 +164,83 @@ def test_a_failed_assessment_releases_the_key(api_world, monkeypatch):
     assert retry.status_code == 200 and retry.json()["decision"] == "accept"
 
 
+def test_an_owner_that_lost_its_reservation_returns_no_grant(api_world, monkeypatch):
+    """A request slower than the stale window is taken over; it must not then
+    hand out its own grant beside the new owner's (one key, one grant).
+
+    Time is simulated: request A stops before its answer is stored, request B
+    arrives as if more than 300 s had passed and takes the key over, then A
+    finishes.
+    """
+    from remora.persistence import idempotency as idem_mod
+
+    client, execution, _store, calls = api_world
+    real = execution._assess_proposal_with_loop_state
+    clock = {"skew": 0.0}
+    real_time = idem_mod.time.time
+    monkeypatch.setattr(idem_mod.time, "time", lambda: real_time() + clock["skew"])
+    taken_over: list = []
+
+    def slow_then_overtaken(**kwargs):
+        answer = real(**kwargs)
+        if clock["skew"] == 0.0:  # only A pauses; B runs straight through
+            clock["skew"] = 301.0
+            taken_over.append(client.post("/v1/execution/assess", json=_proposal(),
+                                          headers=_as("operator")))
+        return answer
+
+    monkeypatch.setattr(execution, "_assess_proposal_with_loop_state", slow_then_overtaken)
+    late = client.post("/v1/execution/assess", json=_proposal(), headers=_as("operator"))
+    winner = taken_over[0]
+    assert winner.status_code == 200 and winner.json()["decision"] == "accept", winner.text
+    assert late.status_code == 409
+    assert "reservation_lost" in late.json()["detail"]
+    assert "execution_token" not in late.text
+
+    retry = client.post("/v1/execution/assess", json=_proposal(), headers=_as("operator"))
+    assert retry.status_code == 200 and retry.json() == winner.json()
+
+    events = [e.payload for e in execution._CHAIN.entries("idem-tenant")
+              if e.payload.get("event") == "idempotency_reservation_lost"]
+    assert len(events) == 1 and events[0]["withheld_grant_jti"]
+    assert events[0]["withheld_grant_jti"] != winner.json()["execution_token"]["jti"]
+
+    # Positive control: the one grant that came out still executes.
+    run = client.post("/v1/execution/execute-accepted", headers=_as("operator"),
+                      json={"execution_token": winner.json()["execution_token"],
+                            "tool_call": _proposal()})
+    assert run.status_code == 200 and run.json()["tool_execution"]["executed"]
+    assert len(calls) == 1
+
+
+def test_the_research_surface_withholds_an_answer_after_takeover(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from servers import api
+
+    store = SQLiteIdempotencyStore(str(tmp_path / "r.db"))
+    monkeypatch.setattr(api, "_assess_idempotency_store", lambda: store)
+    monkeypatch.setattr(api, "_TOKEN_TABLE", {"idem-operator": ("idem-tenant", "operator")})
+    api._rate_limiter._buckets.clear()
+
+    def decide_while_overtaken(req, request, **kwargs):
+        # Another owner replaces the reservation while this one decides.
+        scoped, fingerprint = idempotency_scope(
+            kwargs["_principal"], req.idempotency_key,
+            req.model_dump(mode="json", exclude={"idempotency_key"}))
+        key = f"assess:{scoped}"
+        held = store._read_raw(kwargs["tenant_id"], key)
+        assert store._swap_raw(kwargs["tenant_id"], key, held, held.replace('"pending"', '"pending" ', 1))
+        return api.AssessResponse.model_construct()
+
+    monkeypatch.setattr(api, "_assess_decide", decide_while_overtaken)
+    reply = TestClient(api.app).post(
+        "/v1/assess", headers=_as("operator"),
+        json={"question": "q", "idempotency_key": "k" * 8})
+    assert reply.status_code == 409
+    assert "reservation_lost" in reply.json()["detail"]
+
+
 # ── the store's reservation, on both backends ─────────────────────────────────
 
 @pytest.fixture(params=["memory", "sqlite"])

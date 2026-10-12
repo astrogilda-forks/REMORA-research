@@ -1892,8 +1892,23 @@ def assess(req: ToolCallRequest, request: Request) -> dict[str, Any]:
         raise
     api_mod.record_execution_assess(response["decision"])
 
-    if claim is not None:
-        _idempotency_store().complete(claim, response)
+    if claim is not None and not _idempotency_store().complete(claim, response):
+        # The reservation went stale and another request took the key over
+        # while this one was still assessing. That request answers the key;
+        # this answer, and the token in it, is withheld. The token exists
+        # nowhere else (the chain records only its jti), so withholding it
+        # leaves one usable grant per key instead of two.
+        _CHAIN.append(tenant, {
+            "event": "idempotency_reservation_lost",
+            "proposal_id": response.get("proposal_id"),
+            "actor": principal,
+            "decision": response.get("decision"),
+            "withheld_grant_jti": (response.get("execution_token") or {}).get("jti"),
+        })
+        raise HTTPException(
+            status_code=409,
+            detail="idempotency_key reservation_lost: another request took "
+                   "this key over; retry to receive its answer")
     return response
 
 

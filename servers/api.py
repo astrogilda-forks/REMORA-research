@@ -2411,8 +2411,14 @@ def assess(req: AssessRequest, request: Request) -> AssessResponse | JSONRespons
     if _claim is not None:
         if isinstance(_answer, JSONResponse):  # an error answer is not stored
             _assess_idempotency_store().release(_claim)
-        else:
-            _assess_idempotency_store().complete(_claim, _answer.model_dump(mode="json"))
+        elif not _assess_idempotency_store().complete(
+                _claim, _answer.model_dump(mode="json")):
+            # Taken over while this request was deciding: the key has one
+            # answer, and it is the other request's.
+            raise HTTPException(
+                status_code=409,
+                detail="idempotency_key reservation_lost: another request took "
+                       "this key over; retry to receive its answer")
     return _answer
 
 

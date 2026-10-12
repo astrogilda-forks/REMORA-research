@@ -20,6 +20,16 @@ This file lists externally relevant changes by release. Fine-grained development
   regenerated (`init-review --force`) before an executor will start.
 - The digest functions moved to `remora.toolcall.callable_digest` (CORE) and
   are re-exported from `signed_surface_runtime`.
+### Security (idempotency takeover fencing)
+
+- An assess request slower than the 300 s stale window could have its
+  idempotency reservation taken over by a retry, and still return its own
+  answer when it finished. `complete()` reported the lost reservation, but
+  both routes ignored it. On `/v1/execution/assess` that meant two
+  executable ACCEPT tokens under one key. The late request now answers 409
+  (`idempotency_key reservation_lost`) and withholds its answer and token.
+  The execution route records `idempotency_reservation_lost` with the
+  withheld jti. A retry receives the new owner's stored answer.
 
 ### Security (ToolSpec argument schema profile)
 
