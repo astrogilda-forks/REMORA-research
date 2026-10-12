@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Sequence
 
+from remora.toolcall import argument_schema
+
 if TYPE_CHECKING:
     from remora.capabilities.ceiling import DownstreamCeiling
     from remora.crypto import SigningKey, VerificationKey
@@ -262,6 +264,15 @@ class ToolSpec:
                 f"fields (declare null explicitly): {missing}"
             )
         description = str(raw["description"])
+        schema_problems = argument_schema.check_schema(raw["argument_schema"])
+        if schema_problems:
+            # Signed is not enough: a keyword nothing enforces would be a
+            # constraint the author believes in and the runtime ignores.
+            raise ToolSpecRefused(
+                "toolspec_argument_schema_unsupported",
+                f"tool spec {raw.get('tool_id')!r}: "
+                + "; ".join(schema_problems),
+            )
         return cls(
             tool_id=str(raw["tool_id"]),
             version=int(raw["version"]),
@@ -592,42 +603,12 @@ class ToolSpecBundle:
         nothing validated it. Once validation is computed, a computed
         failure that merely lowers trust would let a malformed call run.
 
-        The subset of JSON Schema enforced here is deliberately small and
-        explicit — required, additionalProperties, and scalar types — so
-        that what is checked is legible. A spec relying on constructs
-        outside it would be validated less strictly than its author
-        expects, which is why the loader is the place to widen this, not
-        the caller.
+        The schema is in the closed profile of
+        :mod:`remora.toolcall.argument_schema`: the loader refused any
+        keyword this does not enforce, so nothing in it is decorative.
         """
         spec = self.get(tool_id)
-        schema = spec.argument_schema
-        problems: list[str] = []
-
-        properties = schema.get("properties", {}) or {}
-        for name in schema.get("required", []) or []:
-            if name not in arguments:
-                problems.append(f"missing required argument {name!r}")
-        if schema.get("additionalProperties") is False:
-            for name in arguments:
-                if name not in properties:
-                    problems.append(f"unexpected argument {name!r}")
-        _TYPES: dict[str, type | tuple[type, ...]] = {
-            "string": str, "integer": int, "number": (int, float),
-            "boolean": bool, "object": dict, "array": (list, tuple),
-        }
-        for name, value in arguments.items():
-            declared = (properties.get(name) or {}).get("type")
-            expected = _TYPES.get(str(declared)) if declared else None
-            if expected is None:
-                continue
-            if declared == "integer" and isinstance(value, bool):
-                problems.append(f"{name!r}: expected integer, got boolean")
-                continue
-            if not isinstance(value, expected):
-                problems.append(
-                    f"{name!r}: expected {declared}, got "
-                    f"{type(value).__name__}"
-                )
+        problems = argument_schema.validate(spec.argument_schema, arguments)
         if problems:
             raise ToolSpecRefused(
                 "toolspec_arguments_schema_invalid",

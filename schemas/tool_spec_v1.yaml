@@ -210,6 +210,9 @@ reason_codes:
     meaning: a spec declares effect_mode or credential_policy in a bundle older than schema_version 3
   - code: toolspec_effect_policy_invalid
     meaning: effect_mode is not MEDIATED or NONE, or credential_policy is malformed
+  # Additive (2026-10-12; see remora/toolcall/argument_schema.py).
+  - code: toolspec_argument_schema_unsupported
+    meaning: the argument_schema uses a keyword or value outside the enforced profile, so part of it would be signed but never checked
 
 # ── Binding chain (handoff gate §1.3/§1.5) ─────────────────────────────────
 # The same ToolSpec hash must appear at every stage. Any difference means
