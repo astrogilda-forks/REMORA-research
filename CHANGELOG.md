@@ -4,6 +4,23 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (ToolSpec argument schema profile)
+
+- `ToolSpecBundle.validate_arguments` enforced `required`,
+  `additionalProperties` and top-level scalar types and skipped every other
+  keyword without saying so. `True` also passed a `number` declaration,
+  because `bool` is an `int` in Python. The validator now enforces a closed
+  profile (`remora.toolcall.argument_schema`): types in the JSON domain,
+  `enum`, `const`, numeric bounds, string lengths, nested `properties`,
+  `required`, `additionalProperties`, `dependentRequired`, `items`, item
+  counts, `anyOf` and `oneOf`.
+- A signed spec whose schema uses a keyword outside the profile no longer
+  loads (`toolspec_argument_schema_unsupported`, additive). `pattern`,
+  `format` and `$ref` are outside it on purpose. This is a stricter load: a
+  bundle that relied on an unenforced keyword now refuses instead of
+  under-validating. Found while reviewing an external MCP adapter; no bypass
+  of the authorization chain is shown, the gap was in argument validation.
+
 ### Interop (E7 external verification)
 
 - `runtime-surface-e7-v0.1` records two Probity run records (self-service

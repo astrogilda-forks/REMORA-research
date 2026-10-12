@@ -165,6 +165,8 @@ EXPECTED_REASON_CODES = {
     # Additive 2026-10-07 (CR-005): the signed effect policy of schema version 3.
     "toolspec_effect_policy_requires_v3",
     "toolspec_effect_policy_invalid",
+    # Additive 2026-10-12: a schema keyword nothing enforces does not load.
+    "toolspec_argument_schema_unsupported",
 }
 
 
