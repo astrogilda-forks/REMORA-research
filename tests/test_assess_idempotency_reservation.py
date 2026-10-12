@@ -11,8 +11,9 @@ came back to anyone in the tenant who sent the same key.
 """
 from __future__ import annotations
 
+import os
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from threading import Barrier
 
 import pytest
@@ -20,14 +21,34 @@ import pytest
 from remora.persistence.idempotency import (
     IdempotencyConflict,
     IdempotencyStore,
+    PostgresIdempotencyStore,
     SQLiteIdempotencyStore,
     idempotency_scope,
 )
 
 
-@pytest.fixture
-def api_world(monkeypatch, tmp_path):
-    import os
+_PG_DSN = os.environ.get("REMORA_PG_DSN", "").strip()
+
+
+def _postgres_store():
+    """A Postgres-backed store on a clean table, or a skip without a DSN.
+
+    The CI jobs that provide a real service select these with ``-k postgres``
+    and fail on any skip, so on those jobs this cannot pass by not running.
+    """
+    if not _PG_DSN:
+        pytest.skip("REMORA_PG_DSN not set")
+    import psycopg  # type: ignore
+
+    store = PostgresIdempotencyStore(_PG_DSN)
+    with psycopg.connect(_PG_DSN) as conn:
+        conn.execute("DELETE FROM assess_idempotency")
+        conn.commit()
+    return store
+
+
+@pytest.fixture(params=["sqlite", "postgres"])
+def api_world(request, monkeypatch, tmp_path):
 
     from fastapi.testclient import TestClient
 
@@ -63,7 +84,8 @@ def api_world(monkeypatch, tmp_path):
     monkeypatch.setattr(execution, "_OUTBOX", SQLiteExecutionOutbox(db))
     monkeypatch.setattr(execution, "_ENGINE", RemoraDecisionEngine(
         execution_profile=True, low_consequence_accept=True))
-    store = SQLiteIdempotencyStore(db)
+    store = (SQLiteIdempotencyStore(db) if request.param == "sqlite"
+             else _postgres_store())
     monkeypatch.setattr(execution, "_idempotency_store", lambda: store)
     calls: list[dict] = []
     dispatcher = GovernedToolDispatcher(
@@ -243,11 +265,70 @@ def test_the_research_surface_withholds_an_answer_after_takeover(tmp_path, monke
 
 # ── the store's reservation, on both backends ─────────────────────────────────
 
-@pytest.fixture(params=["memory", "sqlite"])
+@pytest.fixture(params=["memory", "sqlite", "postgres"])
 def store(request, tmp_path):
     if request.param == "memory":
         return IdempotencyStore()
+    if request.param == "postgres":
+        return _postgres_store()
     return SQLiteIdempotencyStore(str(tmp_path / "s.db"))
+
+
+@pytest.fixture(params=["sqlite", "postgres"])
+def two_workers(request, tmp_path):
+    """Two store instances over one durable backend: separate connections,
+    as two API workers would hold them."""
+    if request.param == "postgres":
+        return _postgres_store(), PostgresIdempotencyStore(_PG_DSN)
+    db = str(tmp_path / "w.db")
+    return SQLiteIdempotencyStore(db), SQLiteIdempotencyStore(db)
+
+
+def test_two_workers_missing_together_reserve_once(two_workers):
+    first, second = two_workers
+    both_missed = Barrier(2)
+
+    def claim(store):
+        original = store._insert_raw
+
+        def together(tenant, key, raw):
+            both_missed.wait(timeout=10)
+            store._insert_raw = original
+            return original(tenant, key, raw)
+
+        store._insert_raw = together
+        return store.claim("t", "k", "fp", wait_s=5, poll_s=0.01)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        racing = {pool.submit(claim, st): st for st in (first, second)}
+        done, waiting = wait(racing, timeout=5, return_when=FIRST_COMPLETED)
+        assert len(done) == 1 and len(waiting) == 1  # one owns, one waits
+        owned = next(iter(done))
+        assert owned.result().owned
+        assert racing[owned].complete(owned.result(), {"proposal_id": "p-1"}) is True
+        answer = next(iter(waiting)).result(timeout=10)
+    assert not answer.owned and answer.response == {"proposal_id": "p-1"}
+
+
+def test_a_takeover_by_another_worker_fences_the_first(two_workers):
+    first, second = two_workers
+    stale = first.claim("t", "k", "fp")
+    time.sleep(0.05)
+    fresh = second.claim("t", "k", "fp", stale_after_s=0.01)
+    assert fresh.owned
+    assert first.complete(stale, {"proposal_id": "late"}) is False
+    first.release(stale)  # a late release must not free the new owner's key
+    assert second.complete(fresh, {"proposal_id": "p-2"}) is True
+    assert first.claim("t", "k", "fp").response == {"proposal_id": "p-2"}
+
+
+def test_an_unreachable_store_refuses_rather_than_reserving(tmp_path):
+    """A database outage is an error, never an owned reservation."""
+    store = SQLiteIdempotencyStore(str(tmp_path / "o.db"))
+    (tmp_path / "gone").mkdir()
+    store._db_path = str(tmp_path / "gone")  # a directory cannot be opened as a database
+    with pytest.raises(Exception):
+        store.claim("t", "k", "fp", wait_s=0)
 
 
 def test_the_first_claim_owns_and_the_next_sees_the_answer(store):
