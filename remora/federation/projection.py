@@ -40,9 +40,13 @@ _STRENGTH = {UNSUPPORTED: 0, NOT_ESTABLISHED: 1, NARROWED: 2, PRESERVED: 3}
 
 #: Which action losses take away which dimensions. An integer that changes
 #: value takes the argument values with it; a float that becomes an integer
-#: takes only its lexical type.
+#: takes only its lexical type. A key order a JavaScript reader does not keep
+#: takes no dimension: the values survive and V0 compares by value. It is still
+#: recorded in ``action_losses``, because a reader that rebuilds the canonical
+#: text instead of hashing the one it was given gets other bytes.
 _LOSS_DIMENSIONS = {"integer_precision": ("argument_values", "lexical_numeric_type"),
-                    "lexical_numeric_type": ("lexical_numeric_type",)}
+                    "lexical_numeric_type": ("lexical_numeric_type",),
+                    "key_order": ()}
 
 
 class ProjectionError(ValueError):
