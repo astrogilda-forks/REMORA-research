@@ -313,12 +313,15 @@ class EnforcementGate:
     def _check_unlogged(
         self,
         token: PolicyDecisionToken,
-        expected_observation_hash: str | None = None,
-        consume: bool = False,
-        now: str | None = None,
-        context: "AuthorizationContext | None" = None,
+        expected_observation_hash: str | None,
+        consume: bool,
+        now: str | None,
+        context: "AuthorizationContext | None",
     ) -> EnforcementResult:
         """The decision logic behind :meth:`check`, with no logging.
+
+        No defaults: :meth:`check` is the only caller and passes every
+        argument, and a default here could only ever disagree with check()'s.
 
         Args:
             token: PolicyDecisionToken from the PDP layer.
