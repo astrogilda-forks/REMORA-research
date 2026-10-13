@@ -85,6 +85,20 @@ def test_javascript_losses_are_named_by_pointer() -> None:
     assert javascript_losses({"id": 2 ** 53}) == {"integer_precision": ["/id"]}
 
 
+def test_a_key_order_javascript_does_not_keep_is_a_named_loss() -> None:
+    """Array-index keys enumerate first in JavaScript; RFC 8785 sorts UTF-16 code units."""
+    assert javascript_losses({"a": 1, "b": {"c": 2}}) == {}
+    assert javascript_losses({"x": {"10": 1, "2": 2}}) == {"key_order": ["/x"]}
+    assert javascript_losses({"￿": 1, "😀": 2}) == {"key_order": [""]}
+    # Not array indices: a leading zero, a sign, past 2^32 - 2, non-ASCII digits.
+    for keys in (("01", "1x"), ("-1", "a"), ("4294967295", "a"), ("١", "a")):
+        assert "key_order" not in javascript_losses(dict.fromkeys(keys, 0)), keys
+    # The values survive, so no projection dimension is taken away.
+    from remora.federation.projection import _LOSS_DIMENSIONS
+
+    assert _LOSS_DIMENSIONS["key_order"] == ()
+
+
 def test_unavailable_fields_are_listed_never_invented() -> None:
     envelope = _native().to_dict()
     assert envelope["authority"]["target"] is None
