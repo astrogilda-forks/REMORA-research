@@ -374,6 +374,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_enforcement_gate_contract.py",
     "tests/test_enforcement_gate_timestamps.py",
     "tests/test_enforcement_ledger_sqlite.py",
+    "tests/test_enforcement_ledgers_postgres.py",
     "tests/test_enforcement_properties.py",
     "tests/test_error_taxonomy.py",
     "tests/test_execute_accepted.py",

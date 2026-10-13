@@ -176,9 +176,7 @@ class DurableNonceStore:
         if self._ready:
             return
         conn.execute(_CREATE)
-        commit = getattr(conn, "commit", None)
-        if commit is not None:
-            commit()
+        conn.commit()
         self._ready = True
 
     # ── the interface ───────────────────────────────────────────────────────
@@ -201,25 +199,19 @@ class DurableNonceStore:
         # returns False, which the dispatcher refuses permanently as
         # nonce_already_consumed. That destroys an unspent grant on a
         # transient fault, the exact outcome this handler exists to prevent.
-        duplicate = False
         try:
             with self._connect() as conn:
                 self._ensure_table(conn)
                 try:
                     conn.execute(sql, (tenant_id, nonce))
-                    commit = getattr(conn, "commit", None)
-                    if commit is not None:
-                        commit()
+                    conn.commit()
                 except Exception as exc:  # noqa: BLE001 — re-raised below
                     if not self._is_duplicate(exc):
                         raise
-                    duplicate = True
-                    # Leave the connection usable for the context manager's
-                    # exit: on psycopg the failed statement has aborted the
-                    # transaction, and committing an aborted one raises.
-                    rollback = getattr(conn, "rollback", None)
-                    if rollback is not None:
-                        rollback()
+                    # End the failed transaction before the context manager's
+                    # exit commits: on psycopg the failed statement aborted it.
+                    conn.rollback()
+                    return False
         except NonceStoreUnavailable:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -230,7 +222,7 @@ class DurableNonceStore:
             raise NonceStoreUnavailable(
                 f"lease nonce store unreachable: {exc}"
             ) from exc
-        return not duplicate
+        return True
 
     def consumed(self, nonce: str, *, tenant_id: str) -> bool:
         """Whether (tenant_id, nonce) has been consumed. Never consumes.

@@ -23,7 +23,8 @@ Enforcement levels:
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC
 import logging
@@ -46,14 +47,22 @@ class EnforcementResult:
 
 
 
-def _scalar(row: "tuple[Any, ...] | None", default: Any) -> Any:
-    """First column of a single-row result, or *default* when there is none.
-
-    COUNT(*) always returns a row, but the type checker cannot know that,
-    and an unguarded subscript here is the same latent defect fixed in
-    tenant_chain.py: an opaque 'NoneType' failure instead of a usable one.
-    """
-    return default if row is None else row[0]
+# The consumed-grant ledger's schema. SQLite and D1 (SQLite underneath) share
+# one dialect; Postgres differs only in its timestamp and counter types.
+_POSTGRES_SCHEMA = (
+    "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, "
+    "consumed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, "
+    "issued_count BIGINT NOT NULL DEFAULT 0, "
+    "last_reset_at TIMESTAMP WITH TIME ZONE, last_reset_reason TEXT)",
+)
+_SQLITE_SCHEMA = (
+    "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, "
+    "consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, "
+    "issued_count INTEGER NOT NULL DEFAULT 0, "
+    "last_reset_at TIMESTAMP, last_reset_reason TEXT)",
+)
 
 
 class EnforcementGate:
@@ -97,40 +106,44 @@ class EnforcementGate:
         self._consumed: set[str] = set()
         self._consume_lock = threading.Lock()
         from remora.persistence.sqlite_path import refuse_memory_db
-        refuse_memory_db(self._db_path or "", what="PEP consumed-jti ledger")
+        refuse_memory_db(self._db_path, what="PEP consumed-jti ledger")
         self._ensure_table()
 
-    def _ensure_table(self) -> None:
+    @contextmanager
+    def _ledger(self) -> Iterator[tuple[Any, str]]:
+        """A connection to the durable ledger and its placeholder.
+
+        One place that knows the three backends. ``verify_ledger`` and
+        ``reset_ledger_watermark`` each used to carry their own copy of every
+        branch, and that is how the D1 reset branch went missing until
+        2026-10-13. Callers check :meth:`_durable` first.
+        """
         if self._dsn:
             import psycopg  # type: ignore
+
             with psycopg.connect(self._dsn) as conn:
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, consumed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"
-                )
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, issued_count BIGINT NOT NULL DEFAULT 0, last_reset_at TIMESTAMP WITH TIME ZONE, last_reset_reason TEXT)"
-                )
-                conn.commit()
+                yield conn, "%s"
         elif self._db_path:
             import sqlite3
+
             with sqlite3.connect(self._db_path) as conn:
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-                )
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, issued_count INTEGER NOT NULL DEFAULT 0, last_reset_at TIMESTAMP, last_reset_reason TEXT)"
-                )
-                conn.commit()
-        elif self._state_endpoint:
+                yield conn, "?"
+        else:
             from remora.persistence.d1_connection import connect
+
             with connect(self._state_endpoint) as conn:
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-                )
-                conn.execute(
-                    "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, issued_count INTEGER NOT NULL DEFAULT 0, last_reset_at TIMESTAMP, last_reset_reason TEXT)"
-                )
-                conn.commit()
+                yield conn, "?"
+
+    def _durable(self) -> bool:
+        return bool(self._dsn or self._db_path or self._state_endpoint)
+
+    def _ensure_table(self) -> None:
+        if not self._durable():
+            return
+        with self._ledger() as (conn, _):
+            for ddl in _POSTGRES_SCHEMA if self._dsn else _SQLITE_SCHEMA:
+                conn.execute(ddl)
+            conn.commit()
 
     # -- ledger integrity (architect review 2026-08-05) --------------------
     #
@@ -168,39 +181,7 @@ class EnforcementGate:
         *fine*, because an in-process ledger loses everything on restart
         and reporting it as intact would be a false comfort.
         """
-        if self._dsn:
-            import psycopg  # type: ignore
-
-            with psycopg.connect(self._dsn) as conn:
-                rows = _scalar(
-                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
-                )
-                mark = conn.execute(
-                    "SELECT issued_count, last_reset_reason FROM "
-                    "pep_ledger_watermark WHERE id = 1"
-                ).fetchone()
-        elif self._db_path:
-            import sqlite3
-
-            with sqlite3.connect(self._db_path) as conn:
-                rows = _scalar(
-                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
-                )
-                mark = conn.execute(
-                    "SELECT issued_count, last_reset_reason FROM "
-                    "pep_ledger_watermark WHERE id = 1"
-                ).fetchone()
-        elif self._state_endpoint:
-            from remora.persistence.d1_connection import connect
-            with connect(self._state_endpoint) as conn:
-                rows = _scalar(
-                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
-                )
-                mark = conn.execute(
-                    "SELECT issued_count, last_reset_reason "
-                    "FROM pep_ledger_watermark WHERE id = 1"
-                ).fetchone()
-        else:
+        if not self._durable():
             return {
                 "durable": False,
                 "intact": None,
@@ -213,6 +194,13 @@ class EnforcementGate:
                     "REMORA_CHAIN_DB."
                 ],
             }
+        with self._ledger() as (conn, _):
+            # COUNT(*) always returns exactly one row.
+            rows = conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone()[0]
+            mark = conn.execute(
+                "SELECT issued_count, last_reset_reason FROM "
+                "pep_ledger_watermark WHERE id = 1"
+            ).fetchone()
 
         issued = int(mark[0]) if mark else 0
         reason = mark[1] if mark else None
@@ -243,65 +231,23 @@ class EnforcementGate:
         """
         if not reason or not reason.strip():
             raise ValueError("resetting the ledger watermark requires a reason")
-        if self._dsn:
-            import psycopg  # type: ignore
-
-            with psycopg.connect(self._dsn) as conn:
-                count = _scalar(
-                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
-                )
-                conn.execute(
-                    "INSERT INTO pep_ledger_watermark "
-                    "(id, issued_count, last_reset_at, last_reset_reason) "
-                    "VALUES (1, %s, CURRENT_TIMESTAMP, %s) "
-                    "ON CONFLICT (id) DO UPDATE SET issued_count = EXCLUDED.issued_count, "
-                    "last_reset_at = EXCLUDED.last_reset_at, "
-                    "last_reset_reason = EXCLUDED.last_reset_reason",
-                    (count, reason),
-                )
-                conn.commit()
-        elif self._db_path:
-            import sqlite3
-
-            with sqlite3.connect(self._db_path) as conn:
-                count = _scalar(
-                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
-                )
-                conn.execute(
-                    "INSERT INTO pep_ledger_watermark "
-                    "(id, issued_count, last_reset_at, last_reset_reason) "
-                    "VALUES (1, ?, CURRENT_TIMESTAMP, ?) "
-                    "ON CONFLICT (id) DO UPDATE SET issued_count = excluded.issued_count, "
-                    "last_reset_at = excluded.last_reset_at, "
-                    "last_reset_reason = excluded.last_reset_reason",
-                    (count, reason),
-                )
-                conn.commit()
-        elif self._state_endpoint:
-            # D1 was reported by verify_ledger but could not be re-baselined
-            # (mutation sweep 2026-10-13): a Cloudflare deployment saw the
-            # watermark and had no authorized way to reset it after a prune.
-            from remora.persistence.d1_connection import connect
-
-            with connect(self._state_endpoint) as conn:
-                count = _scalar(
-                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
-                )
-                conn.execute(
-                    "INSERT INTO pep_ledger_watermark "
-                    "(id, issued_count, last_reset_at, last_reset_reason) "
-                    "VALUES (1, ?, CURRENT_TIMESTAMP, ?) "
-                    "ON CONFLICT (id) DO UPDATE SET issued_count = excluded.issued_count, "
-                    "last_reset_at = excluded.last_reset_at, "
-                    "last_reset_reason = excluded.last_reset_reason",
-                    (count, reason),
-                )
-                conn.commit()
-        else:
+        if not self._durable():
             raise RuntimeError(
                 "no durable ledger to re-baseline; the in-process ledger has "
                 "no watermark"
             )
+        with self._ledger() as (conn, ph):
+            count = conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone()[0]
+            conn.execute(
+                "INSERT INTO pep_ledger_watermark "
+                "(id, issued_count, last_reset_at, last_reset_reason) "
+                f"VALUES (1, {ph}, CURRENT_TIMESTAMP, {ph}) "
+                "ON CONFLICT (id) DO UPDATE SET issued_count = excluded.issued_count, "
+                "last_reset_at = excluded.last_reset_at, "
+                "last_reset_reason = excluded.last_reset_reason",
+                (count, reason),
+            )
+            conn.commit()
 
     def _ledger_unavailable(
         self, token: PolicyDecisionToken, vr: Any, backend: str, exc: BaseException
@@ -448,9 +394,9 @@ class EnforcementGate:
         # the aware clock; coerce both sides to UTC like token.verify does).
         from datetime import datetime
         try:
-            issued = datetime.fromisoformat(token.issued_at.replace("Z", "+00:00"))
+            issued = datetime.fromisoformat(token.issued_at)
             current = (
-                datetime.fromisoformat(now.replace("Z", "+00:00"))
+                datetime.fromisoformat(now)
                 if now is not None else datetime.now(UTC)
             )
             if issued.tzinfo is None:

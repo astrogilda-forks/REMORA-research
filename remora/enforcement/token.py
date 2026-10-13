@@ -425,7 +425,7 @@ class PolicyDecisionToken:
         import uuid as _uuid
         from datetime import datetime, timedelta
 
-        issued_dt = datetime.fromisoformat(issued_at.replace("Z", "+00:00"))
+        issued_dt = datetime.fromisoformat(issued_at)
         if expires_at is None:
             # Expiry is mandatory (closes the legacy no-expiry replay window):
             # compute the default TTL when the issuer does not set one.
@@ -433,7 +433,7 @@ class PolicyDecisionToken:
                 issued_dt + timedelta(seconds=DEFAULT_TOKEN_TTL_SECONDS)
             ).isoformat()
         else:
-            expiry_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            expiry_dt = datetime.fromisoformat(expires_at)
             ttl = (expiry_dt - issued_dt).total_seconds()
             if ttl <= 0 or ttl > MAX_TOKEN_TTL_SECONDS:
                 raise ValueError(
@@ -742,10 +742,10 @@ class PolicyDecisionToken:
             from datetime import datetime
 
             try:
-                issued = datetime.fromisoformat(self.issued_at.replace("Z", "+00:00"))
-                expiry = datetime.fromisoformat(self.expires_at.replace("Z", "+00:00"))
+                issued = datetime.fromisoformat(self.issued_at)
+                expiry = datetime.fromisoformat(self.expires_at)
                 current = (
-                    datetime.fromisoformat(now.replace("Z", "+00:00"))
+                    datetime.fromisoformat(now)
                     if now is not None
                     else datetime.now(UTC)
                 )
