@@ -33,9 +33,36 @@ ones marked `"added_in": "v1.1"`. They were written with the faults known, so
 they are repair cases, not independent evidence. v1 stays published with its
 records; its blind spots are a preserved negative result.
 
+## The hash rule's preimage (added 2026-10-13)
+
+The `hash` comparison rule declares a SHA-256 and compares it with the hash of
+the observed field. Neither v1 nor the first v1.1 draft said what is hashed,
+so an outside reader could not recompute it and left the rule unsupported. The
+Probity reader treated it so. `fixtures.json` now defines it under
+`hash_preimage`:
+
+- encode the observed value as compact JSON, with object members sorted by
+  key as Unicode code points, and hash the UTF-8 bytes with SHA-256 (lowercase
+  hex);
+- escape every non-ASCII character as `\uXXXX`, a character above U+FFFF as
+  its surrogate pair, and the usual short escapes for control characters;
+- write integers in decimal and a float as the shortest round-trip decimal
+  with a `.` or an exponent, so `10` and `10.0` hash differently;
+- NaN and the infinities do not hash.
+
+It is the encoding of Python's `json.dumps(value, sort_keys=True,
+separators=(",", ":"), allow_nan=False)`, which is what REMORA has always
+computed. It is not RFC 8785: JCS writes `10.0` as `10`, keeps non-ASCII
+unescaped and orders keys by UTF-16 code units. The eleven vectors give the
+canonical text and digest for each tricky kind of value, and where an RFC 8785
+reading would differ they say so (`rfc8785_like_sha256`). Six cases added with
+it (`hash_preimage_*`) are written so that a reader using any of those three
+alternatives reaches the other outcome. They were written with the encoding
+known, so they are repair cases and not independent evidence.
+
 ## Purpose
 
-Let a verifier maintained by another project reproduce twenty-six bounded outcomes about what an execution's evidence establishes, from pinned bytes, without importing REMORA code.
+Let a verifier maintained by another project reproduce thirty-two bounded outcomes about what an execution's evidence establishes, from pinned bytes, without importing REMORA code.
 
 ## Claims and result vocabulary
 
@@ -71,7 +98,7 @@ That run is an L0 self-test under `interop-result-v1`. Its record lives under
 
 ## Files
 
-- `fixtures.json`: 26 machine-readable cases with expected outcomes and claim results.
+- `fixtures.json`: 32 machine-readable cases with expected outcomes and claim results, and the `hash_preimage` definition with its vectors.
 - `reference_verifier.py`: author implementation of the contract. It imports no REMORA code.
 - `manifest.json`: source revision, SHA-256 of every package file, `package_digest` and the independence boundary.
 - `claim-packet.json`, `verifier-request.json`: the producer claims and the request to external verifiers; both are package files and are pinned by the manifest.

@@ -13,11 +13,11 @@
   "inputs": {
     "fixtures": {
       "path": "artifacts/interop/effect-evidence-v1.1/fixtures.json",
-      "sha256": "fb8e4df5309f8d442ec1b8ca544eaff7fe0fdd4a71d73e3277f57f955374d6a5"
+      "sha256": "f9df583eec64effd8fde63032ed25a47f091ec7c6deddd089c9e3460bc09bf76"
     },
     "claim_packet": {
       "path": "artifacts/interop/effect-evidence-v1.1/claim-packet.json",
-      "sha256": "0f43f8e46309c9eacaeb3e502f1361de999fff3ae278952f6e4bafe2e5c4b009"
+      "sha256": "77e6409fbd3e2bc10a27b684f34b9af153284be4792774de4f430e3fbf9b625b"
     }
   },
   "run_record_schema": "artifacts/interop/schemas/external-run-record-v1.schema.json",
