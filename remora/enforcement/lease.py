@@ -123,7 +123,8 @@ def _get_signing_key() -> bytes | None:
 
 
 def _parse_utc(ts: str) -> datetime:
-    parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    # Python >= 3.11 (requires-python) reads a trailing "Z" as UTC itself.
+    parsed = datetime.fromisoformat(ts)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed
@@ -348,8 +349,7 @@ class ExecutionLease:
                 "cannot issue authority; issuing requires the PDP private key"
             )
         else:
-            lease = cls(**fields, sig_alg=_signing.ALG_HMAC, kid="",
-                        signature="", is_signed=False)
+            lease = cls(**fields, signature="", is_signed=False)
         governance_event(
             "lease.issued",
             decision=lease.decision,
@@ -1266,7 +1266,7 @@ class GovernedToolDispatcher:
             proposal_id=lease.proposal_id, policy_bundle_hash=lease.policy_bundle_hash,
             toolspec_hash=lease.toolspec_hash, lease_digest=lease.digest(),
             context_id=lease.context_id, task_id=lease.task_id,
-            runtime_identity_hash=getattr(lease, "runtime_identity_hash", "") or "")
+            runtime_identity_hash=lease.runtime_identity_hash)
         executors = (self._effect_domain.executors_for(
                          lease, capability_set, [c.capability for c in ceiling.capabilities])
                      if self._effect_domain is not None else self._effect_executors)
@@ -1420,7 +1420,7 @@ class GovernedToolDispatcher:
         # spent.
         with self._registry_lock:
             fn = self._tools.get(tool_name)
-            fn_generation = self._registry_versions.get(tool_name, 0)
+            fn_generation = self._registry_versions.get(tool_name)
         if fn is None:
             governance_event(
                 "dispatch.refused", level=logging.WARNING,
@@ -1570,7 +1570,7 @@ class GovernedToolDispatcher:
         with self._registry_lock:
             registry_moved = (
                 self._tools.get(tool_name) is not fn
-                or self._registry_versions.get(tool_name, 0) != fn_generation
+                or self._registry_versions.get(tool_name) != fn_generation
             )
         final_hop_refusal: str | None = None
         if registry_moved:

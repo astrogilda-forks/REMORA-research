@@ -29,7 +29,7 @@ from typing import Any
 import pytest
 
 from remora.enforcement import token as token_mod
-from remora.enforcement.gate import EnforcementGate, EnforcementResult, _scalar
+from remora.enforcement.gate import EnforcementGate, EnforcementResult
 from remora.enforcement.nonce_store import DurableNonceStore, NonceStoreUnavailable
 from remora.enforcement.token import (
     MAX_TOKEN_TTL_SECONDS,
@@ -139,12 +139,6 @@ def fake_d1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SqliteD1:
 
 
 # ══ EnforcementGate ════════════════════════════════════════════════════════
-
-
-def test_scalar_returns_the_default_only_when_there_is_no_row() -> None:
-    """An absent row yields the caller's default, never a NoneType subscript."""
-    assert _scalar(None, 7) == 7
-    assert _scalar((3, 9), 7) == 3
 
 
 def test_a_default_gate_is_strict() -> None:
