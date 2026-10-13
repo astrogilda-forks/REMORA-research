@@ -1,6 +1,7 @@
 # Effect contract verification v1
 
-Status: open proposal, 2026-10-13. Nothing here is implemented.
+Status: open proposal, 2026-10-13. Slice 1 (the observer,
+`remora/toolcall/effect_observation.py`) is implemented; slices 2 to 5 are not.
 Origin: reviewing an external MCP adapter against REMORA at `1f2622dc`
 (the same review that produced the closed argument-schema profile, #829).
 

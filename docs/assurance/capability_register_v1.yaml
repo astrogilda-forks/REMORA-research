@@ -46,6 +46,22 @@ unestablished_properties:
       the reference runtime; the property stays NOT_ESTABLISHED until Q3.1 runs
       the observer inside a named external host.
 
+  - id: implementation_effect_conformance
+    phase: RESEARCH
+    status: NOT_ESTABLISHED
+    evidence: tests/test_effect_observation.py
+    caveat: >-
+      Effect contract verification (docs/design/effect-contract-verification-v1.md).
+      Slice 1, 2026-10-13: an observer runs a tool in a fresh interpreter
+      under Python audit hooks and reports file, process, network and
+      environment effects for the import and for each case, with native code,
+      a tool's own audit hook, timeouts and crashes reported as blinding.
+      Nothing compares the observations with a signed spec yet (slice 2), so
+      no verdict exists. Even with one, a MATCH would mean only that no
+      undeclared effect was observed on the cases run; effects below the
+      Python standard library, in child processes, or conditioned on time or
+      on detecting the harness stay outside this vantage.
+
   - id: implementation_effect_non_transitivity
     phase: RESEARCH
     status: NOT_ESTABLISHED
