@@ -245,6 +245,64 @@ added, which gives 114. `tests/test_mutation_baseline.py` now requires the
 baseline and the argued set to be the same set in both directions, so a flaky
 sandbox status cannot reopen the gap.
 
+### Resolving the argued survivors (2026-10-13, evening)
+
+Argued is not resolved. Of the 114 baseline entries, most were not equivalent
+in the strict sense: they survived because no test could reach the code, or
+because the code they changed did nothing.
+
+- **Postgres was never executed.** The PEP consumed-grant ledger and the lease
+  nonce store run on Postgres in production, and the sweep had no server.
+  `tests/test_enforcement_ledgers_postgres.py` now runs both against one.
+  It covers spend-once across gate instances, a peek that never spends, the
+  watermark and a deleted row it reports. It also covers the reset, the
+  named outage refusal, per-tenant nonces and replay. The scheduled
+  sweep has a Postgres service and fails if that module skips; CI's
+  `postgres-contract` job runs it on every push. Each test process works in
+  its own schema, so the sweep's parallel workers cannot race.
+- **Dead code.** `.replace("Z", "+00:00")` before `fromisoformat` does nothing
+  on Python 3.11 and later; it is gone from token, lease and gate.
+- **Unreachable defaults.** These were `getattr` on a dataclass field,
+  registry generation defaults that `register()` always overwrites, and
+  arguments equal to the dataclass default. So were a `_scalar` default
+  around `COUNT(*)`, `getattr` for `commit` and `rollback` (all three
+  backends implement both), a duplicate flag and a guard `partition` already
+  covers. Each is now written as what it is.
+- **Triplicated SQL.** `EnforcementGate` held one copy of every ledger
+  statement per backend. That is how the D1 reset branch went missing. One
+  `_ledger()` helper and one schema now serve Postgres, SQLite and D1.
+
+| Step (local sweep, Postgres service) | Mutants | Killed | Survived |
+|---|---:|---:|---:|
+| Postgres contract, dead code and defaults removed, ledger helper | 3,456 | 3,431 | 25 |
+| `_scalar`, commit/rollback `getattr`, duplicate flag removed | 3,412 | 3,393 | 19 |
+| One ledger schema, redundant key-list guard removed | 3,404 | 3,387 | 17 |
+
+The baseline holds 24, not 17. Equivalent mutants flipped between killed and
+survived from one local sweep to the next: the SQL-case variants of the same
+statement survived in one run and were killed in the next, with identical
+mutant bodies. Running one of them alone, six times, it survived every time.
+Run eight at a time, the Docker VM OOM-killed workers. The local sandbox
+under memory pressure reports noise in both directions, which is also how
+the 13 segfault/timeout entries fell out of the earlier baseline. The
+baseline is therefore the union of survivors over three sweeps of unchanged
+code, and `tests/test_mutation_baseline.py` keeps it equal to the argued set.
+
+| Reason the remaining 24 cannot be killed | Count |
+|---|---:|
+| SQL keyword or name case; SQLite, D1 and Postgres fold unquoted names | 12 |
+| `stacklevel` of a warning, killed by tests the trampoline forces the sweep to deselect | 3 |
+| `None` for `False` where the value is only tested for truth (`live`, `require_expiry`) | 3 |
+| `state_reader` on a mediator whose derived authority has no state condition | 2 |
+| `or` for `and` behind a verify() refusal that admits only both or neither | 1 |
+| A string default that no comparison can tell from `""` | 2 |
+| `select count(*) as n` in lower case; the alias is unchanged | 1 |
+| **Total** | **24** |
+
+Not equivalent, and so not in the list: `consumed_count` with `AS N` in upper
+case, because D1 returns the row as a dict keyed `N` and the count reads `n`.
+A D1 test kills it.
+
 Agent-written tests were part of this pass: three parallel agents and one
 second-round agent, each in its own worktree, with every kill verified by
 applying the mutant. The verification is what makes them evidence here, not
