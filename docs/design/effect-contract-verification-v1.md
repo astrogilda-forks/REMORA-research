@@ -7,10 +7,10 @@ Origin: reviewing an external MCP adapter against REMORA at `1f2622dc`
 ## The gap
 
 A signed ToolSpec says what a tool's implementation reaches. REMORA checks
-that the declaration is authentic, that it has not moved since assessment,
-that the callable is the one it names (`callable_digest`, now on the API path
-too, #832) and that mediated effects stay inside the declared ceiling. It
-never checks that the implementation behaves as declared.
+that the declaration is authentic and has not moved since assessment. It
+checks that the callable is the one the spec names (`callable_digest`, now on
+the API path too, #832), and that mediated effects stay inside the declared
+ceiling. It never checks that the implementation behaves as declared.
 
 The adapter that prompted this note shows the difference. One of its tools
 declared no process start and no file write. Its implementation started a
@@ -35,10 +35,10 @@ REMORA has the same blind spot, and its own documents already say so:
   (`docs/interop/remora-capabilities-v1.yaml`). Postcondition verification
   looks at the target. This note is about the implementation's footprint.
 
-So the question this note answers is: can REMORA observe, for a bounded set of
-calls in a bounded environment, whether an implementation reached an effect
-its signed spec does not declare, and say exactly how far that observation
-reaches?
+The question this note answers: for a bounded set of calls in a bounded
+environment, can REMORA observe whether an implementation reached an effect
+its signed spec does not declare? And can it say exactly how far that
+observation reaches?
 
 ## What it can and cannot establish
 
@@ -174,9 +174,9 @@ results.
 A case is an argument set the signed `argument_schema` accepts. Cases come from
 two places:
 
-1. **Author cases**: a case file shipped with the bundle and bound to it by
+1. Author cases: a case file shipped with the bundle and bound to it by
    digest.
-2. **Profile cases**: generated from the closed argument-schema profile (#829).
+2. Profile cases: generated from the closed argument-schema profile (#829).
    The profile is small enough to enumerate: each `enum` value, each
    `anyOf`/`oneOf` branch, numeric bounds and their neighbours, each optional
    property present and absent. A schema outside the profile does not load, so
@@ -188,11 +188,11 @@ observed an undeclared effect. Then it is a `MISMATCH`.
 
 Coverage is reported on two axes and never folded into one number:
 
-- **code**: line and branch coverage of the callable's closure. The closure is
+- code: line and branch coverage of the callable's closure. The closure is
   already computed for `closure-sha256` digests (`closure_members` in
   `remora/toolcall/callable_digest.py`), so the denominator is the same file set
   the digest attests;
-- **input**: the fraction of profile partitions (enum values, branches,
+- input: the fraction of profile partitions (enum values, branches,
   optional-property presence) that some case exercised.
 
 The threshold that `MATCH` requires is stated in the record and chosen before
@@ -202,18 +202,18 @@ the run. A threshold chosen after seeing the coverage is not a threshold.
 
 `effect-conformance-evidence-v1`, one per tool and observer run:
 
-- **binding**: `toolspec_hash`, `toolspec_version`, `callable_digest`, bundle
+- binding: `toolspec_hash`, `toolspec_version`, `callable_digest`, bundle
   digest and case-file digest. A record for another digest is a record about
   another tool;
-- **observer**: vantage (`python_audit_hook` in v1), interpreter version,
+- observer: vantage (`python_audit_hook` in v1), interpreter version,
   platform, verifier version and the pinned event table digest;
-- **per case**: arguments hash, phase, normalised observed effects, raw event
+- per case: arguments hash, phase, normalised observed effects, raw event
   count, blinding events, completion and duration;
-- **comparison**: declared profile, undeclared observations with their case,
+- comparison: declared profile, undeclared observations with their case,
   `declared_unobserved`;
-- **coverage**: both axes, the threshold and the closure file set;
-- **verdict** and named reasons, plus the claim ceiling text;
-- **vantage independence**: `AUTHOR` when the tool's author ran it.
+- coverage: both axes, the threshold and the closure file set;
+- verdict and named reasons, plus the claim ceiling text;
+- vantage independence: `AUTHOR` when the tool's author ran it.
   `INDEPENDENT` needs a separate control domain, under the same rule E7 used.
   A self-declared flag is never read;
 - `content_sha256` over the canonical record.
@@ -272,19 +272,19 @@ One PR per slice. Each adds tests and a capability-register entry at `RESEARCH`
 unchanged. That property is about the agent host's surface, not about one
 implementation's footprint.
 
-1. **Observer** (`remora/toolcall/effect_observation.py`): a fresh-interpreter
+1. Observer (`remora/toolcall/effect_observation.py`): a fresh-interpreter
    harness, the pinned event table with a test per supported platform, mode
    normalisation, blinding events, and the `load` and `call` phases.
-2. **Comparison and record** (`remora/toolcall/effect_contract.py`): the
+2. Comparison and record (`remora/toolcall/effect_contract.py`): the
    declared profile from the signed spec, the comparison, verdicts, the
    `effect-conformance-evidence-v1` schema and a CLI
    (`remora verify-effects --bundle --registry --cases`). Seeded-fault corpus
    rows 1 to 6 and 8 to 11.
-3. **Cases and coverage**: profile-case generation from the closed schema
+3. Cases and coverage: profile-case generation from the closed schema
    profile, code coverage over `closure_members`, and the row 7 known miss.
-4. **Gate**: `effect_conformance` in a v3 BindingPolicy contract, after owner
+4. Gate: `effect_conformance` in a v3 BindingPolicy contract, after owner
    decision 2.
-5. **Vantage 2**: OS-level tracing on Linux CI, reported beside vantage 1.
+5. Vantage 2: OS-level tracing on Linux CI, reported beside vantage 1.
 
 Both new modules are CORE candidates and need stability-index rows in
 `ARCHITECTURE.md`. Neither may import an EXPERIMENTAL module.
