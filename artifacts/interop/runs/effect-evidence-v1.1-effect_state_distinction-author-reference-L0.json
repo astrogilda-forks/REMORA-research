@@ -17,8 +17,8 @@
   },
   "fixture": {
     "path": "artifacts/interop/effect-evidence-v1.1/fixtures.json",
-    "digest": "sha256:fb8e4df5309f8d442ec1b8ca544eaff7fe0fdd4a71d73e3277f57f955374d6a5",
-    "package_digest": "sha256:a09ac49137a6a94990fcdb52663cce25e4ecf8e35469f0f45e8274f09949ec31"
+    "digest": "sha256:f9df583eec64effd8fde63032ed25a47f091ec7c6deddd089c9e3460bc09bf76",
+    "package_digest": "sha256:b74a7055b63aa6f62ec8dd402d9967dca5b1f89310f901cf1f1d2add1040d3cc"
   },
   "evaluator": {
     "project": "REMORA",
@@ -38,8 +38,8 @@
     "revision": "58ebc0b2fec241056a362977adcf59e05e88674e"
   },
   "environment": "Python 3.14.0, Windows AMD64",
-  "started_at": "2026-10-06T00:52:51+00:00",
-  "completed_at": "2026-10-06T00:52:51+00:00",
+  "started_at": "2026-10-13T12:12:40+00:00",
+  "completed_at": "2026-10-13T12:12:40+00:00",
   "cases": [
     {
       "case_id": "verified_declared_delta",
@@ -468,6 +468,108 @@
     },
     {
       "case_id": "declared_version_as_string",
+      "claim_id": "effect_state_distinction",
+      "expected": {
+        "value": {
+          "effect_status": "EFFECT_MISMATCH",
+          "highest_established_state": "DISPATCHED"
+        }
+      },
+      "observed": {
+        "value": {
+          "effect_status": "EFFECT_MISMATCH",
+          "highest_established_state": "DISPATCHED"
+        }
+      },
+      "result": "ESTABLISHED"
+    },
+    {
+      "case_id": "hash_preimage_nested_object_verified",
+      "claim_id": "effect_state_distinction",
+      "expected": {
+        "value": {
+          "effect_status": "EFFECT_VERIFIED",
+          "highest_established_state": "EFFECT_VERIFIED"
+        }
+      },
+      "observed": {
+        "value": {
+          "effect_status": "EFFECT_VERIFIED",
+          "highest_established_state": "EFFECT_VERIFIED"
+        }
+      },
+      "result": "ESTABLISHED"
+    },
+    {
+      "case_id": "hash_preimage_float_is_not_the_integer",
+      "claim_id": "effect_state_distinction",
+      "expected": {
+        "value": {
+          "effect_status": "EFFECT_MISMATCH",
+          "highest_established_state": "DISPATCHED"
+        }
+      },
+      "observed": {
+        "value": {
+          "effect_status": "EFFECT_MISMATCH",
+          "highest_established_state": "DISPATCHED"
+        }
+      },
+      "result": "ESTABLISHED"
+    },
+    {
+      "case_id": "hash_preimage_non_ascii_escaped_verified",
+      "claim_id": "effect_state_distinction",
+      "expected": {
+        "value": {
+          "effect_status": "EFFECT_VERIFIED",
+          "highest_established_state": "EFFECT_VERIFIED"
+        }
+      },
+      "observed": {
+        "value": {
+          "effect_status": "EFFECT_VERIFIED",
+          "highest_established_state": "EFFECT_VERIFIED"
+        }
+      },
+      "result": "ESTABLISHED"
+    },
+    {
+      "case_id": "hash_preimage_raw_utf8_digest_refused",
+      "claim_id": "effect_state_distinction",
+      "expected": {
+        "value": {
+          "effect_status": "EFFECT_MISMATCH",
+          "highest_established_state": "DISPATCHED"
+        }
+      },
+      "observed": {
+        "value": {
+          "effect_status": "EFFECT_MISMATCH",
+          "highest_established_state": "DISPATCHED"
+        }
+      },
+      "result": "ESTABLISHED"
+    },
+    {
+      "case_id": "hash_preimage_key_order_by_code_point_verified",
+      "claim_id": "effect_state_distinction",
+      "expected": {
+        "value": {
+          "effect_status": "EFFECT_VERIFIED",
+          "highest_established_state": "EFFECT_VERIFIED"
+        }
+      },
+      "observed": {
+        "value": {
+          "effect_status": "EFFECT_VERIFIED",
+          "highest_established_state": "EFFECT_VERIFIED"
+        }
+      },
+      "result": "ESTABLISHED"
+    },
+    {
+      "case_id": "hash_preimage_utf16_key_order_refused",
       "claim_id": "effect_state_distinction",
       "expected": {
         "value": {

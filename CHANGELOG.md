@@ -4,6 +4,17 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Interop (the effect hash rule's preimage)
+
+- `effect-evidence-v1.1` (DRAFT) now defines what the `hash` comparison rule
+  hashes, so an outside reader can recompute it instead of leaving the rule
+  unsupported. It is compact JSON with code-point key order, `\uXXXX`
+  escapes and shortest round-trip floats (Python's `json.dumps` with
+  `sort_keys` and compact separators), not RFC 8785. Eleven vectors pin the
+  canonical text and digest, and six new cases tell the defined encoding from
+  RFC 8785, raw UTF-8 and UTF-16 key order. The frozen `effect-evidence-v1` is
+  unchanged.
+
 ### Formal models (reconciliation, TLC pin)
 
 - `formal/tla/LeaseReconcile.tla` models the v1 reconciliation candidate for

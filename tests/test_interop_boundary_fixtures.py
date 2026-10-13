@@ -185,3 +185,32 @@ def test_contract_rejected_maps_only_the_rule_map_refusal(monkeypatch: pytest.Mo
     (ok_case,) = [c for c in _fixtures("effect-evidence-v1.1")["cases"] if c["id"] == "verified_declared_delta"]
     with pytest.raises(ValueError, match="something_else"):
         bf.evaluate_effect_evidence_v1_1(ok_case)
+
+
+def test_the_hash_rule_preimage_is_the_one_remora_computes() -> None:
+    """effect-evidence-v1.1 defines the hash rule's preimage (2026-10-13).
+
+    Every vector's canonical text and digest must be what
+    ``effect_digest`` produces, or the definition an outside reader
+    implements is not the rule REMORA applies. Where a vector names an
+    RFC 8785-like digest, it must differ: those are the readings the
+    definition exists to rule out.
+    """
+    import hashlib
+    import json
+
+    from remora.governance.effect_verification import effect_digest
+
+    fixtures = json.loads((ROOT / "artifacts/interop/effect-evidence-v1.1/fixtures.json")
+                          .read_text(encoding="utf-8"))
+    vectors = fixtures["hash_preimage"]["vectors"]
+    assert len(vectors) == 11
+    for vector in vectors:
+        assert hashlib.sha256(vector["canonical"].encode("utf-8")).hexdigest() == vector["sha256"]
+        assert effect_digest(vector["value"]) == vector["sha256"], vector["name"]
+        if "rfc8785_like_sha256" in vector:
+            assert vector["rfc8785_like_sha256"] != vector["sha256"], vector["name"]
+    preimage_cases = [c for c in fixtures["cases"] if c["id"].startswith("hash_preimage_")]
+    assert {c["expected"]["effect_status"] for c in preimage_cases} == {
+        "EFFECT_VERIFIED", "EFFECT_MISMATCH"}
+    assert len(preimage_cases) == 6
