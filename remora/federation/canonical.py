@@ -96,16 +96,54 @@ def _walk(value: Any, path: list[str]):
         yield _pointer(path), value
 
 
+_ARRAY_INDEX_MAX = 2 ** 32 - 2
+
+
+def _is_array_index(key: str) -> bool:
+    """A key a JavaScript object orders first, numerically (ECMA-262 array index)."""
+    return key == "0" or (key[:1] in "123456789" and key.isdigit() and key.isascii()
+                          and int(key) <= _ARRAY_INDEX_MAX)
+
+
+def _javascript_key_order(keys: list[str]) -> list[str]:
+    """The order a JavaScript object enumerates these keys after JSON.parse."""
+    indices = sorted((k for k in keys if _is_array_index(k)), key=int)
+    return indices + [k for k in keys if not _is_array_index(k)]
+
+
+def _key_order_changes(value: Any, path: list[str]):
+    """Pointers of objects whose canonical key order a JavaScript reader would not keep."""
+    if isinstance(value, dict):
+        keys = sorted(str(k) for k in value)
+        if (_javascript_key_order(keys) != keys
+                or sorted(keys, key=lambda k: k.encode("utf-16-be")) != keys):
+            yield _pointer(path)
+        for key in sorted(value):
+            yield from _key_order_changes(value[key], [*path, str(key)])
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _key_order_changes(item, [*path, str(index)])
+
+
 def javascript_losses(arguments: Any) -> dict[str, list[str]]:
     """What a transport carrying ``arguments`` as JavaScript values would lose.
 
     - ``lexical_numeric_type``: an integral float (``1.0``, ``-0.0``) arrives
       as an integer, so the native int/float distinction does not survive;
-    - ``integer_precision``: an integer beyond 2^53 - 1 changes value.
+    - ``integer_precision``: an integer beyond 2^53 - 1 changes value;
+    - ``key_order``: an object whose canonical key order a JavaScript reader
+      does not keep. A parsed object enumerates array-index keys (``"2"``,
+      ``"10"``) first in numeric order, and RFC 8785 sorts by UTF-16 code
+      unit, so a key above U+FFFF and one in U+E000-U+FFFF swap. The values
+      survive; re-serialising them yields other bytes, so a reader must hash
+      the canonical text it was given, not one it rebuilt (2026-10-13).
 
     Keys map to the JSON pointers affected; an empty dict means nothing is lost.
     """
     losses: dict[str, list[str]] = {}
+    order = list(_key_order_changes(arguments, []))
+    if order:
+        losses["key_order"] = order
     for pointer, value in _walk(arguments, []):
         if isinstance(value, bool):
             continue
