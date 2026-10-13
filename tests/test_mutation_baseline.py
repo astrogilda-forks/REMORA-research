@@ -123,3 +123,21 @@ def test_the_committed_baseline_exists_and_is_sorted() -> None:
     lines = [ln for ln in baseline.read_text(encoding="utf-8").splitlines() if ln]
     assert lines == sorted(lines)
     assert all("__mutmut_" in ln for ln in lines)
+
+
+def test_the_baseline_and_the_written_arguments_are_the_same_set() -> None:
+    """Every baseline survivor has a written reason, and every reason is in
+    the baseline. The second half is not redundant: the local sandbox can
+    record a surviving mutant as segfault or timeout, so ``--update`` from such
+    a run leaves out mutants that are argued and that the runner later reports
+    as survived. That gap failed the first runner sweep after 2026-10-13 with
+    13 "new" survivors, every one already argued."""
+    baseline = ROOT / "docs" / "assurance" / "mutation_baseline_v1.txt"
+    baselined = {ln for ln in baseline.read_text(encoding="utf-8").splitlines() if ln}
+    argued: set[str] = set()
+    for path in sorted((ROOT / "tests" / "data").glob("mutation_equivalent_*.txt")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip() and not line.startswith("#"):
+                argued.add(line.split()[0])
+    assert sorted(baselined - argued) == [], "baseline entries without a written reason"
+    assert sorted(argued - baselined) == [], "argued survivors missing from the baseline"
