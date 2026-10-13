@@ -70,6 +70,9 @@ class SignatureDomain(str, Enum):
     #: PolicyDecisionToken v2. Never used to sign anything under a /v1 tag:
     #: the reserved /v1 values were unused, and v1 tokens are untagged.
     POLICY_GRANT = "REMORA/POLICY-GRANT/v2"
+    #: PolicyDecisionToken v3: Ed25519, so a verifier holds no material that
+    #: can mint a grant (RMR-CR-002). v2 stays HMAC in its own domain.
+    POLICY_GRANT_ASYMMETRIC = "REMORA/POLICY-GRANT/v3"
     #: ExecutionLease v2 (v1 leases are untagged and frozen).
     EXECUTION_LEASE = "REMORA/EXECUTION-LEASE/v2"
     #: Tenant audit chain entries from the AUDIT_VERSION_TRANSITION record on.

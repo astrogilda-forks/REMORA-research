@@ -80,7 +80,7 @@ status in `capability_register_v1.yaml` for how far each one is actually wired.
 
 | Control area | Grade | REMORA evidence / caveat |
 |--------------|-------|--------------------------|
-| Policy-as-code + PDP/PEP separation | 🟡 | CAP-001/003; signed PDP→PEP token (mandatory expiry, one-time jti, issuer compared when configured). On the execution API the PDP and PEP share one process and one HMAC key, so the token is a one-time grant record, not a trust boundary between decision and enforcement (RMR-CR-002, 2026-10-07). |
+| Policy-as-code + PDP/PEP separation | 🟡 | CAP-001/003; signed PDP→PEP token (mandatory expiry, one-time jti, issuer compared when configured). On the execution API the PDP and PEP share one process and one HMAC key, so the token is a one-time grant record, not a trust boundary between decision and enforcement (RMR-CR-002, 2026-10-07). Since 2026-10-13 token v3 (Ed25519, verify-only redeemer) makes the split available to a deployment that runs `/assess` and `/execute-accepted` in different custody domains; co-located deployments are unchanged, so the grade stays 🟡. |
 | Human-approval workflow | ✅ | CAP-007 review queue, TTL-to-ABSTAIN, approval-freshness re-gate. |
 | Audit ledger (hash-chained) | ✅ | CAP-005 (`PERSISTED_ATOMIC` when a durable store is configured). Tamper-evident, not tamper-proof (no WORM). |
 | Fail-closed degradation | ✅ | CAP-008 G0–G4 ladder with tamper-evident transition log. |

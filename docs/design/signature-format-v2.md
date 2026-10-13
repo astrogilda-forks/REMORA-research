@@ -42,6 +42,44 @@ A v1 token presented as live authority is refused as `token_format_legacy`;
 decision/enforcement trust boundary RMR-CR-002 describes, which would need an
 asymmetric issuer in a separate custody domain.
 
+### Token v3: the asymmetric grant (RMR-CR-002, 2026-10-13)
+
+Token v3 is that issuer. It is Ed25519 over
+`REMORA/POLICY-GRANT/v3 || 0x00 || payload`, with `format: v3` in the payload
+and a `kid` derived from the public key. Its golden vector is
+`vectors/v3/policy_grant.json`.
+
+| Process holds | It can |
+|---|---|
+| `REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE` (the PDP) | mint v3 grants and verify them |
+| `REMORA_PDP_VERIFY_KEYS_ED25519` only (a redeemer) | verify v3 grants; minting raises `GrantMintingRefused`, and the API answers 503 `grant_minting_refused` |
+| neither | v1/v2 as before |
+
+The format is chosen by the material, not by the contract: a process with the
+seed issues v3 in any profile, and a strict v2 contract accepts v3 as live
+authority. A redeemer cannot mint even an unsigned token, because an unsigned
+token from it would be the forgery the split exists to prevent.
+
+Downgrade follows the lease's rule. Once a process holds Ed25519 grant
+material, a live v1 or v2 grant is refused (`token_hmac_refused`) unless
+`REMORA_PDP_ACCEPT_HMAC` is set; set it for one token TTL during a migration.
+`REMORA_PDP_REVOKED_KIDS` revokes derived kids too. The executor domain may not
+hold the seed (`custody.py`).
+
+What v3 establishes, and what it does not:
+
+- It makes a decision/enforcement split possible. Run `/assess` on a PDP
+  replica with the seed and `/execute-accepted` on a redeemer with only the
+  verify keys, and the redeemer cannot mint a grant
+  (`tests/test_token_v3_custody.py`, including the regression the finding
+  asked for).
+- One process holding the seed is still one custody domain. The review path
+  mints and consumes on consecutive lines, so its grant remains an
+  in-process, one-time record whatever the format. A redeemer refuses that
+  path rather than half-running it.
+- The routing that keeps `/assess` off a redeemer is deployment
+  configuration, not something REMORA checks.
+
 Lease v2 has no symmetric form. A strict v2 authority therefore requires
 `REMORA_LEASE_SIGNING_KEY_ED25519_PRIVATE`, and the HMAC fallback to the PDP
 key is unreachable under it.
@@ -81,7 +119,8 @@ live authority after it, so wait out the longest TTL in flight first.
 
 `vectors/v1/` is immutable: the v1 formats, generated once from the code on
 master before any v2 change, and pinned byte for byte by
-`tests/test_signature_vectors.py`. `vectors/v2/` holds the v2 formats.
+`tests/test_signature_vectors.py`. `vectors/v2/` holds the v2 formats, and
+`vectors/v3/` the asymmetric token.
 `scripts/generate_signature_vectors.py --check` recomputes both, and the
 generator refuses to overwrite a v1 file. Every vector carries its (test-only)
 key material, payload and expected signature, so an independent implementation

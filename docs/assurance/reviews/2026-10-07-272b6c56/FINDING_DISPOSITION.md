@@ -8,7 +8,7 @@ change and stay reachable (merge commits).
 | Finding | Disposition | PR | Merged as |
 |---|---|---|---|
 | RMR-CR-001 ToolSpec HMAC trust root | FIXED (strict profiles) | #768 | 2412d61 |
-| RMR-CR-002 PDP token co-located | PARTIAL (minimal fix; architecture open) | #773 | 14a2fb5 |
+| RMR-CR-002 PDP token co-located | PARTIAL (minimal fix; architecture open). 2026-10-13: token v3 makes the split available; co-located deployments unchanged | #773, see below | 14a2fb5 |
 | RMR-CR-003 tenant from header | FIXED | #769 | merge commit |
 | RMR-CR-004 role-only SoD | FIXED (strict profiles; opt-in elsewhere) | #770 | merge commit |
 | RMR-CR-005 mediation opt-in | FIXED under strict v2 (declared mediation); deployment non-bypassability NOT_ESTABLISHED | #777 | c8cc91d |
@@ -35,6 +35,7 @@ change and stay reachable (merge commits).
 - New: issuer compared when `REMORA_PDP_ISSUER` is set (`issuer_mismatch`); token documented as an in-process one-time grant record; gap audit graded Partial.
 - Tests: `tests/test_token_issuer_and_topology.py` (5).
 - Remaining: no decision/enforcement separation on the execution API. Migration to lease semantics or asymmetric cross-boundary signing needs a consumer analysis.
+- 2026-10-13 (follow-up, the preferred fix's asymmetric half): PolicyDecisionToken v3, Ed25519 in `REMORA/POLICY-GRANT/v3` with a derived kid. A process with only `REMORA_PDP_VERIFY_KEYS_ED25519` verifies grants and cannot mint one, not even unsigned; once Ed25519 material is held, HMAC grants are refused unless `REMORA_PDP_ACCEPT_HMAC` opens a migration window; the executor domain may not hold the seed. The finding's regression test is `tests/test_token_v3_custody.py::test_a_grant_minted_by_anyone_but_the_pdp_is_refused_by_a_verify_only_pep`. Still open: a deployment that runs `/assess` and `/execute-accepted` in one process is one custody domain, and dropping the token on the co-located review path (the other half of the preferred fix) is not done. Status stays PARTIAL.
 
 ### RMR-CR-003: FIXED
 - New: one parser (`remora.profiles.deployment_environment`), development|production, unknown and set-but-blank refused at startup and per request; single-token mode development only; token-table tenant cannot be widened by header (403); strict profiles require `REMORA_API_TOKENS`.

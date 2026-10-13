@@ -11,15 +11,27 @@ allowing any action execution. This prevents:
   - Token forgery by a party without the signing key
   - Decision substitution (observation_hash binds the token to the specific call)
 
-What it does NOT establish (RMR-CR-002): a trust boundary between decision
-and enforcement. On the execution API the PDP and the PEP run in one process
-and share REMORA_PDP_SIGNING_KEY; the token is minted and consumed in the
-same call path (or minted at /assess and redeemed at /execute-accepted by the
-same process). It is an in-process, one-time grant record: jti, expiry,
-audience, context and observation bindings are real and tested, but any code
-that can reach the gate can also mint a token. Separation of decision
-authority from enforcement would need the issuer and verifier in different
-custody domains with asymmetric keys, as the ExecutionLease already supports.
+What a symmetric token does NOT establish (RMR-CR-002): a trust boundary
+between decision and enforcement. With v1 or v2 the PDP and the PEP share
+REMORA_PDP_SIGNING_KEY, so any code that can verify a grant can also mint
+one. Where the PDP and the PEP run in one process (the review path mints and
+consumes on consecutive lines) the token is an in-process,
+one-time grant record: jti, expiry, audience, context and observation
+bindings are real and tested, and the signature adds no separation.
+
+Format v3 (2026-10-13) is the boundary. It is Ed25519 over
+``REMORA/POLICY-GRANT/v3 || 0x00 || payload``, its ``kid`` is derived from the
+public key, and a process configured with only
+``REMORA_PDP_VERIFY_KEYS_ED25519`` can redeem every grant it is shown and mint
+none: ``issue()`` refuses in such a process rather than producing an unsigned
+token. A deployment that runs ``/assess`` and ``/execute-accepted`` in
+different custody domains therefore has a real decision/enforcement split.
+Running both in one process with the private key is still one domain, and v3
+does not pretend otherwise.
+
+Downgrade: once Ed25519 material is configured, a live v1 or v2 (HMAC) token
+is refused (``token_hmac_refused``) unless ``REMORA_PDP_ACCEPT_HMAC`` is set
+for a migration window, the rule the lease already follows.
 
 Signature formats (RMR-CR-011): v1 is HMAC-SHA256 over the untagged
 canonical payload, frozen with its vector in ``vectors/v1``. v2 is
@@ -70,6 +82,11 @@ _ENV_KID = "REMORA_PDP_SIGNING_KID"
 _ENV_PREVIOUS = "REMORA_PDP_PREVIOUS_KEYS"
 _ENV_REVOKED = "REMORA_PDP_REVOKED_KIDS"
 _ENV_ISSUER = "REMORA_PDP_ISSUER"
+# Format v3 (RMR-CR-002). The seed belongs to the PDP only; the verify keys
+# (comma-separated, for rotation) are safe in any process that redeems grants.
+_ENV_ED25519_PRIVATE = "REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE"
+_ENV_ED25519_PUBLIC = "REMORA_PDP_VERIFY_KEYS_ED25519"
+_ENV_ACCEPT_HMAC = "REMORA_PDP_ACCEPT_HMAC"
 
 # Every token now carries a signed expiry (review finding: replayable
 # no-expiry tokens). Default TTL when the issuer does not set one; hard cap
@@ -104,6 +121,60 @@ def _revoked_kids() -> frozenset[str]:
     return frozenset(
         k.strip() for k in os.environ.get(_ENV_REVOKED, "").split(",") if k.strip()
     )
+
+
+def _ed25519_seed() -> str:
+    return os.environ.get(_ENV_ED25519_PRIVATE, "").strip()
+
+
+def _ed25519_public_keys() -> list[str]:
+    return [k.strip() for k in os.environ.get(_ENV_ED25519_PUBLIC, "").split(",") if k.strip()]
+
+
+def asymmetric_configured() -> bool:
+    """Whether this process holds any v3 (Ed25519) grant material."""
+    return bool(_ed25519_seed() or _ed25519_public_keys())
+
+
+def verify_only() -> bool:
+    """True when this process can redeem v3 grants and cannot mint any.
+
+    The decision/enforcement boundary of RMR-CR-002, as something a deployment
+    can assert about itself and a test can attack.
+    """
+    return bool(_ed25519_public_keys()) and not _ed25519_seed()
+
+
+def hmac_accepted() -> bool:
+    """Whether a live v1 or v2 (HMAC) grant may still authorize.
+
+    Without Ed25519 material: yes, every deployment before the migration. With
+    it: only while ``REMORA_PDP_ACCEPT_HMAC`` is explicitly set. A process that
+    can verify asymmetric grants and still honours symmetric ones has a
+    downgrade window, and a downgrade window should be a decision someone made.
+    """
+    explicit = os.environ.get(_ENV_ACCEPT_HMAC, "").strip().lower()
+    if explicit:
+        return explicit in {"1", "true", "yes", "on"}
+    return not asymmetric_configured()
+
+
+def _v3_signing_key() -> Any:
+    from remora.crypto import SignatureDomain, SigningKey
+
+    return SigningKey.from_text(_ed25519_seed(), {SignatureDomain.POLICY_GRANT_ASYMMETRIC})
+
+
+def _v3_verification_keys() -> list[Any]:
+    from remora.crypto import SignatureDomain, VerificationKey
+
+    domain = {SignatureDomain.POLICY_GRANT_ASYMMETRIC}
+    keys = [VerificationKey.from_text(k, domain) for k in _ed25519_public_keys()]
+    if not keys and _ed25519_seed():
+        # A PDP holding only its seed can still verify what it minted; it
+        # could mint anyway, so this weakens nothing.
+        keys = [_v3_signing_key().verification_key()]
+    return keys
 
 
 @dataclass(frozen=True)
@@ -249,7 +320,20 @@ def _canonical_payload(
 #: The token formats. "" is v1, frozen: no format field, untagged preimage.
 FORMAT_V1 = ""
 FORMAT_V2 = "v2"
-_FORMATS = (FORMAT_V1, FORMAT_V2)
+#: Ed25519 in REMORA/POLICY-GRANT/v3, with a derived kid (RMR-CR-002).
+FORMAT_V3 = "v3"
+_FORMATS = (FORMAT_V1, FORMAT_V2, FORMAT_V3)
+
+
+class GrantMintingRefused(RuntimeError):
+    """This process holds verification material only and must not mint grants.
+
+    Raised instead of issuing an unsigned token: an unsigned token from a
+    verify-only redeemer would be exactly the forgery the split exists to
+    prevent, merely labelled honestly.
+    """
+
+    code = "grant_minting_refused"
 
 
 def _compute_signature(payload_bytes: bytes, key: bytes, format: str = FORMAT_V1) -> str:
@@ -313,7 +397,8 @@ class PolicyDecisionToken:
     #: existed, which verify unchanged.
     context_hash: str = ""
     #: Signature format (RMR-CR-011): "" is v1 (frozen), "v2" is the
-    #: REMORA/POLICY-GRANT/v2 domain. Signed when set, so it cannot be stripped.
+    #: REMORA/POLICY-GRANT/v2 domain (HMAC), "v3" is Ed25519 in
+    #: REMORA/POLICY-GRANT/v3 (RMR-CR-002). Signed when set, so it cannot be stripped.
     format: str = ""
 
     @classmethod
@@ -358,10 +443,31 @@ class PolicyDecisionToken:
         context_hash = context.hash() if context is not None else ""
         from remora.crypto.formats import signature_format
 
+        issuer = os.environ.get(_ENV_ISSUER, "").strip()
+        if _ed25519_seed():
+            from remora.crypto import SignatureDomain, sign
+
+            signing_key = _v3_signing_key()
+            payload = _canonical_payload(
+                action, observation_hash, request_id, issued_at, expires_at,
+                jti, audience, signing_key.kid, issuer, context_hash, FORMAT_V3,
+            )
+            return cls(
+                action=action, observation_hash=observation_hash,
+                request_id=request_id, issued_at=issued_at,
+                signature=sign(SignatureDomain.POLICY_GRANT_ASYMMETRIC, payload,
+                               signing_key).value,
+                is_signed=True, expires_at=expires_at, jti=jti, audience=audience,
+                kid=signing_key.kid, issuer=issuer, context_hash=context_hash,
+                format=FORMAT_V3,
+            )
+        if verify_only():
+            raise GrantMintingRefused(
+                "this process holds only REMORA_PDP_VERIFY_KEYS_ED25519: it redeems "
+                "decision grants and cannot mint them (RMR-CR-002)")
         token_format = FORMAT_V2 if signature_format() == "v2" else FORMAT_V1
         key = _get_signing_key()
         kid = _current_kid()
-        issuer = os.environ.get(_ENV_ISSUER, "").strip()
         if key:
             payload = _canonical_payload(
                 action, observation_hash, request_id, issued_at, expires_at,
@@ -462,6 +568,16 @@ class PolicyDecisionToken:
         strict v2 contract a live v1 token is refused (``token_format_legacy``)
         without being read further.
         """
+        if self.format == FORMAT_V3:
+            return self._v3_refusal(live=live)
+        if self.format not in _FORMATS:
+            return TokenVerificationResult(
+                verified=False, reason="token_format_unknown", is_signed=True)
+        if live and not hmac_accepted():
+            # Refused as policy, not as a signature verdict, so the audit trail
+            # tells a downgrade attempt or a stale issuer from a forgery.
+            return TokenVerificationResult(
+                verified=False, reason="token_hmac_refused", is_signed=self.is_signed)
         key = _get_signing_key()
         if not key:
             return TokenVerificationResult(
@@ -475,9 +591,6 @@ class PolicyDecisionToken:
                 reason="token_not_signed",
                 is_signed=False,
             )
-        if self.format not in _FORMATS:
-            return TokenVerificationResult(
-                verified=False, reason="token_format_unknown", is_signed=True)
         if live and self.format == FORMAT_V1:
             from remora.crypto.formats import v1_live_refused
 
@@ -545,6 +658,42 @@ class PolicyDecisionToken:
                 is_signed=True,
             )
         return None
+
+    def _v3_refusal(self, *, live: bool) -> TokenVerificationResult | None:
+        """The v3 signature: Ed25519 against the configured verify keys only.
+
+        No HMAC key is read or needed, which is what lets a redeemer hold
+        nothing that can mint.
+        """
+        if not self.is_signed or not self.signature:
+            return TokenVerificationResult(
+                verified=False, reason="token_not_signed", is_signed=False)
+        from remora.crypto import ALGORITHM, Signature, SignatureDomain, verify
+
+        try:
+            keys = _v3_verification_keys()
+        except (ValueError, RuntimeError):
+            # A configured key that cannot be decoded is "cannot check", never
+            # "checked and fine", and never a crash in the gate.
+            return TokenVerificationResult(
+                verified=False, reason="verification_key_unusable", is_signed=True)
+        if not keys:
+            return TokenVerificationResult(
+                verified=False, reason="no_verification_key", is_signed=True)
+        payload = _canonical_payload(
+            self.action, self.observation_hash, self.request_id, self.issued_at,
+            self.expires_at, self.jti, self.audience, self.kid, self.issuer,
+            self.context_hash, self.format,
+        )
+        domain = SignatureDomain.POLICY_GRANT_ASYMMETRIC
+        result = verify(domain, payload,
+                        Signature(ALGORITHM, domain.value, self.kid, self.signature),
+                        keys, revoked=_revoked_kids() if live else ())
+        if result.ok:
+            return None
+        reason = {"key_revoked": "kid_revoked", "unknown_kid": "unknown_kid"}.get(
+            result.reason, "signature_invalid")
+        return TokenVerificationResult(verified=False, reason=reason, is_signed=True)
 
     def check_bindings(
         self,
@@ -650,7 +799,7 @@ class PolicyDecisionToken:
     def to_dict(self) -> dict[str, Any]:
         """Complete serialisation — every signed field round-trips.
 
-        ``format`` appears only on v2 tokens, so a v1 token serialises
+        ``format`` appears only on v2 and v3 tokens, so a v1 token serialises
         exactly as it did before v2 existed.
         """
         out = {

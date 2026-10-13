@@ -1,0 +1,18 @@
+{
+  "artifact": "PolicyDecisionToken",
+  "cases": [
+    {
+      "name": "policy-grant-v3-ed25519",
+      "payload": "{\"action\":\"accept\",\"audience\":\"pep://remora-execution\",\"context_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"expires_at\":\"2026-10-13T12:05:00+00:00\",\"format\":\"v3\",\"issued_at\":\"2026-10-13T12:00:00+00:00\",\"issuer\":\"pdp-1\",\"jti\":\"00000000-0000-4000-8000-000000000004\",\"kid\":\"ed25519-730a5edc28c2f8daf2d9dce3a01d5f205e35e55582eed2ba26219fabdd4cc9a8\",\"observation_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"request_id\":\"req-1\"}",
+      "preimage_b64": "UkVNT1JBL1BPTElDWS1HUkFOVC92MwB7ImFjdGlvbiI6ImFjY2VwdCIsImF1ZGllbmNlIjoicGVwOi8vcmVtb3JhLWV4ZWN1dGlvbiIsImNvbnRleHRfaGFzaCI6ImRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQiLCJleHBpcmVzX2F0IjoiMjAyNi0xMC0xM1QxMjowNTowMCswMDowMCIsImZvcm1hdCI6InYzIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0xM1QxMjowMDowMCswMDowMCIsImlzc3VlciI6InBkcC0xIiwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDA0Iiwia2lkIjoiZWQyNTUxOS03MzBhNWVkYzI4YzJmOGRhZjJkOWRjZTNhMDFkNWYyMDVlMzVlNTU1ODJlZWQyYmEyNjIxOWZhYmRkNGNjOWE4Iiwib2JzZXJ2YXRpb25faGFzaCI6ImVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWUiLCJyZXF1ZXN0X2lkIjoicmVxLTEifQ==",
+      "signature": "+VxSlm1RNWLNxsOJE18eN+VDG3D2WXfy/MJOg6rlHkIgw4J1G+B3Qyv4Md1p31uICWe2lVEVP/WEyyhHt4+1AA=="
+    }
+  ],
+  "domain": "REMORA/POLICY-GRANT/v3",
+  "format": "v3",
+  "keys": {
+    "ed25519_public_hex": "bc7cbcb5636375fa1d82434d466724d92377f53b980695dd49d26d0ce12205a5",
+    "ed25519_seed_hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+  },
+  "preimage": "domain tag || 0x00 || canonical JSON (sorted keys, compact, with format=v3); Ed25519, signature base64; kid = 'ed25519-' + sha256(public key)"
+}

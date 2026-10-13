@@ -358,6 +358,17 @@ def _custom_openapi() -> dict:
 app.openapi = _custom_openapi  # type: ignore[method-assign]
 
 
+def _grant_minting_refused_handler(request: Request, exc: Exception) -> JSONResponse:
+    """A redeemer asked to mint a grant (RMR-CR-002): a routing error, not a crash.
+
+    503 with the fixed reason code: the request belongs on the PDP, and the
+    redeemer holds nothing that could serve it.
+    """
+    return JSONResponse(status_code=503, content={
+        "detail": "grant_minting_refused: this replica redeems decision grants "
+                  "and cannot mint them; route this request to the PDP"})
+
+
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch-all handler: converts any unhandled exception to a safe JSON 500.
@@ -367,6 +378,11 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
     sanitised response with the full stack trace in server logs.
     """
     return _safe_error_response(exc, status_code=500)
+
+
+from remora.enforcement.token import GrantMintingRefused as _GrantMintingRefused  # noqa: E402
+
+app.add_exception_handler(_GrantMintingRefused, _grant_minting_refused_handler)
 
 _START_TIME = time.time()
 _METRICS: dict[str, Any] = {
@@ -653,10 +669,13 @@ def _validate_production_prerequisites() -> None:
             "REMORA_ENVELOPE_SIGNING_KEY (audit records are written unsigned "
             "without it)"
         )
-    if not os.getenv("REMORA_PDP_SIGNING_KEY", "").strip():
+    if not (os.getenv("REMORA_PDP_SIGNING_KEY", "").strip()
+            or os.getenv("REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE", "").strip()
+            or os.getenv("REMORA_PDP_VERIFY_KEYS_ED25519", "").strip()):
         missing.append(
-            "REMORA_PDP_SIGNING_KEY (PDP decision tokens are unsigned without "
-            "it; the PEP cannot verify their origin)"
+            "REMORA_PDP_SIGNING_KEY or REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE "
+            "(PDP decision tokens are unsigned without it; the PEP cannot verify "
+            "their origin), or REMORA_PDP_VERIFY_KEYS_ED25519 on a redeemer"
         )
     # The same argument, applied to the object that actually authorises a side
     # effect. Found by the unsigned-issuance audit (NEGATIVE_RESULTS section 44):
