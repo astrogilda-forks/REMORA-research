@@ -4,6 +4,23 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (decision grants a redeemer cannot mint, RMR-CR-002)
+
+- `PolicyDecisionToken` format v3: Ed25519 over `REMORA/POLICY-GRANT/v3`,
+  `kid` derived from the public key. The PDP holds
+  `REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE`; a redeemer holds only
+  `REMORA_PDP_VERIFY_KEYS_ED25519`. It verifies every grant it is shown and
+  mints none, not even an unsigned one (`GrantMintingRefused`, HTTP 503
+  `grant_minting_refused`). Before this, the grant was HMAC under a key the
+  PEP shared with the PDP, so verifying and minting were the same capability.
+- Once a process holds Ed25519 grant material, a live v1 or v2 (HMAC) grant is
+  refused as `token_hmac_refused` unless `REMORA_PDP_ACCEPT_HMAC` is set for a
+  migration window. Derived kids are revocable through
+  `REMORA_PDP_REVOKED_KIDS`. The executor domain may not hold the seed.
+- Golden vector: `vectors/v3/policy_grant.json`.
+- Not changed: a deployment that runs `/assess` and `/execute-accepted` in one
+  process is still one custody domain, and the review path still mints and
+  consumes in-process. RMR-CR-002 stays PARTIAL.
 ### Quality (mutation sweep over the enforcement modules)
 
 - The weekly mutation sweep failed on 528 survivors absent from its baseline,

@@ -425,6 +425,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_token_hardening.py",
     "tests/test_token_issuer_and_topology.py",
     "tests/test_token_key_lifecycle.py",
+    "tests/test_token_v3_custody.py",
     "tests/test_toolspec_binding_chain.py",
     "tests/test_toolspec_bound_at_dispatch.py",
     "tests/test_unsigned_issuance_family.py",

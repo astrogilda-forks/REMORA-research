@@ -47,6 +47,17 @@ from remora.governance.execution_identity import (
 logger = logging.getLogger(__name__)
 
 
+
+def _refuse_minting_on_a_redeemer() -> None:
+    """Refuse a flow that mints a decision grant in a verify-only process."""
+    from remora.enforcement.token import GrantMintingRefused, verify_only
+
+    if verify_only():
+        raise GrantMintingRefused(
+            "this process holds only REMORA_PDP_VERIFY_KEYS_ED25519: it redeems "
+            "decision grants and cannot mint them; route this request to the PDP "
+            "(RMR-CR-002)")
+
 def _bind_execution_context(
     obs: Any, semantic: dict[str, Any], context: ExecutionContextV1 | None,
     *, proposal_id: str, tenant: str, principal: str,
@@ -391,6 +402,7 @@ def assess_proposal(
 
     item = None
     if report.action is DecisionAction.ACCEPT:
+        _refuse_minting_on_a_redeemer()
         # This is the token a caller holds and later redeems at
         # /execute-accepted, which deliberately does not re-run the engine. The
         # conditions the decision was made under are therefore signed into it,
@@ -514,6 +526,10 @@ def execute_approved_item(
     records (authorized-for-execution and actually-executed are distinct
     states - external review 2026-07-27).
     """
+    # RMR-CR-002: the review path mints and consumes in this process. A
+    # redeemer holding only verify keys cannot do the first half, so it refuses
+    # here, before anything is claimed, rather than halfway through.
+    _refuse_minting_on_a_redeemer()
     # FT-03: the spec in force NOW, compared with the hash the assessment
     # recorded - an approval granted under one spec must never execute
     # under another. Refused BEFORE authorizing.
@@ -1047,6 +1063,7 @@ def dispatch_pending_intent(
       same equal-or-safer rule the 202 applied. Anything else refuses as
       ``fresh_regate_refused``.
     """
+    _refuse_minting_on_a_redeemer()
     if row.state is not OutboxState.DISPATCH_PENDING:
         return None
     if not row.tool_call_json:

@@ -113,8 +113,14 @@ def validate_runtime_profile_prerequisites() -> str:
     # violation. The single list this replaced assumed one process did both,
     # which is the assumption the custody split removes.
     if role == DOMAIN_AUTHORITY:
-        if not _configured("REMORA_PDP_SIGNING_KEY"):
-            missing.append("REMORA_PDP_SIGNING_KEY")
+        # Either grant material counts: the HMAC key (v1/v2), the Ed25519 seed
+        # of a PDP (v3), or the verify keys of a redeemer that mints nothing
+        # (v3, RMR-CR-002). An authority with none issues unsigned grants.
+        if not _configured("REMORA_PDP_SIGNING_KEY",
+                           "REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE",
+                           "REMORA_PDP_VERIFY_KEYS_ED25519"):
+            missing.append("REMORA_PDP_SIGNING_KEY (or REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE, "
+                           "or REMORA_PDP_VERIFY_KEYS_ED25519 on a redeemer)")
 
     if missing:
         raise RuntimeProfileError(

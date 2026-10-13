@@ -86,6 +86,9 @@ _SIGNING_ENVS = (
     "REMORA_LEASE_SIGNING_KEY_ED25519_PRIVATE",
     "REMORA_LEASE_SIGNING_KEY",
     "REMORA_PDP_SIGNING_KEY",
+    # PolicyDecisionToken v3 (RMR-CR-002): the PDP's Ed25519 seed. Its
+    # REMORA_PDP_VERIFY_KEYS_ED25519 counterpart is verification only.
+    "REMORA_PDP_SIGNING_KEY_ED25519_PRIVATE",
 )
 
 #: Verification material the executor is supposed to hold instead.

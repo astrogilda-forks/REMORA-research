@@ -196,6 +196,37 @@ def policy_grant_v2() -> dict[str, Any]:
                                              hashlib.sha256).hexdigest()}]}
 
 
+# -- v3 ----------------------------------------------------------------------------------
+
+def policy_grant_v3() -> dict[str, Any]:
+    """PolicyDecisionToken v3 (RMR-CR-002): Ed25519, verify keys only at the PEP."""
+    from remora.crypto import SignatureDomain, derive_kid, preimage
+
+    payload = _canonical({
+        "action": "accept",
+        "audience": "pep://remora-execution",
+        "context_hash": "d" * 64,
+        "expires_at": "2026-10-13T12:05:00+00:00",
+        "format": "v3",
+        "issued_at": "2026-10-13T12:00:00+00:00",
+        "issuer": "pdp-1",
+        "jti": "00000000-0000-4000-8000-000000000004",
+        "kid": derive_kid(bytes.fromhex(_ed25519_public())),
+        "observation_hash": "e" * 64,
+        "request_id": "req-1",
+    })
+    signed = preimage(SignatureDomain.POLICY_GRANT_ASYMMETRIC, payload)
+    return {"artifact": "PolicyDecisionToken", "format": "v3",
+            "domain": SignatureDomain.POLICY_GRANT_ASYMMETRIC.value,
+            "preimage": "domain tag || 0x00 || canonical JSON (sorted keys, compact, with "
+                        "format=v3); Ed25519, signature base64; kid = 'ed25519-' + "
+                        "sha256(public key)",
+            "keys": {"ed25519_seed_hex": ED25519_SEED, "ed25519_public_hex": _ed25519_public()},
+            "cases": [{"name": "policy-grant-v3-ed25519", "payload": payload.decode(),
+                       "preimage_b64": base64.b64encode(signed).decode(),
+                       "signature": base64.b64encode(_ed25519_sign(signed)).decode()}]}
+
+
 def audit_v2() -> dict[str, Any]:
     """A v1 entry, the AUDIT_VERSION_TRANSITION record, and a v2 entry."""
     from remora.crypto import SignatureDomain
@@ -230,6 +261,9 @@ V1 = {"execution_lease.json": lease_v1, "policy_grant.json": policy_grant_v1,
       "audit_chain.json": audit_v1}
 V2 = {"execution_lease.json": lease_v2, "policy_grant.json": policy_grant_v2,
       "audit_chain.json": audit_v2}
+#: v3 is the token's asymmetric format only; the lease and the audit chain stay on v2.
+V3 = {"policy_grant.json": policy_grant_v3}
+BUILDERS = {"v1": V1, "v2": V2, "v3": V3}
 
 
 def _render(builder: Any) -> str:
@@ -245,7 +279,7 @@ def _manifest(directory: Path, names: list[str]) -> str:
 def write(version: str) -> None:
     directory = VECTORS / version
     directory.mkdir(parents=True, exist_ok=True)
-    builders = V1 if version == "v1" else V2
+    builders = BUILDERS[version]
     for name, builder in builders.items():
         path = directory / name
         if version == "v1" and path.exists():
@@ -257,7 +291,7 @@ def write(version: str) -> None:
 
 def check() -> list[str]:
     problems = []
-    for version, builders in (("v1", V1), ("v2", V2)):
+    for version, builders in BUILDERS.items():
         directory = VECTORS / version
         for name, builder in builders.items():
             path = directory / name
@@ -275,7 +309,7 @@ def check() -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--write", choices=["v1", "v2"])
+    group.add_argument("--write", choices=["v1", "v2", "v3"])
     group.add_argument("--check", action="store_true")
     args = parser.parse_args()
     if args.write:
