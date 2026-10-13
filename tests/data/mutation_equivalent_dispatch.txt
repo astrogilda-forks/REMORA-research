@@ -3,10 +3,12 @@
 # dispatch is killed by tests/test_dispatch_refusal_contract.py.
 # An entry here is an argument a reviewer can test, not a waiver: if the code it reasons
 # about changes, the argument must be re-read. Format: <mutant name>  <reason>.
+# Numbers follow the second sweep of the same day (after the first round's tests
+# covered new lines), which renumbered the registry re-check mutants 415/417/418.
 remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_126  get(tool_name, 0)->get(tool_name, None) for fn_generation: register() writes _tools and _registry_versions under one lock and nothing deletes either, so whenever fn is not None the key exists and the default is never read (fn None returns before fn_generation is used).
 remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_128  get(tool_name, 0)->get(tool_name) for fn_generation: same as _126, the default is unreachable while fn is not None.
 remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_129  get(tool_name, 0)->get(tool_name, 1) for fn_generation: same as _126, the default is unreachable while fn is not None.
-remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_415  get(tool_name, 0)->get(tool_name, None) in the registry_moved re-check: the key is present for any registered tool, and if the tool were gone `_tools.get(tool_name) is not fn` is already True and short-circuits before the default is read.
-remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_417  get(tool_name, 0)->get(tool_name) in the registry_moved re-check: same as _415.
-remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_418  get(tool_name, 0)->get(tool_name, 1) in the registry_moved re-check: same as _415.
+remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_438  get(tool_name, 0)->get(tool_name, None) in the registry_moved re-check: the key is present for any registered tool, and if the tool were gone `_tools.get(tool_name) is not fn` is already True and short-circuits before the default is read.
+remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_440  get(tool_name, 0)->get(tool_name) in the registry_moved re-check: same as _438.
+remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_441  get(tool_name, 0)->get(tool_name, 1) in the registry_moved re-check: same as _438.
 remora.enforcement.lease.xǁGovernedToolDispatcherǁdispatch__mutmut_306  (context_id or task_id)->(context_id and task_id) in the task_unchecked condition: verify() refuses a lease carrying only one half as task_identity_malformed (each half is signed when set), so the branch only sees both or neither, where or and and agree; test_a_lease_signed_with_half_a_task_never_reaches_the_task_check pins that premise.

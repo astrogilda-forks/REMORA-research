@@ -24,6 +24,8 @@ one decides and records on its own. Mutants argued equivalent are listed in
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -214,6 +216,35 @@ def test_the_ttl_cap_is_inclusive() -> None:
         _issue(expires_at=over_cap)
     with pytest.raises(ValueError, match="lease TTL must be in"):
         _issue(expires_at=ISSUED_AT)
+
+
+def test_the_ttl_floor_is_exclusive_at_zero_not_at_one() -> None:
+    """A one-second lease is short, not empty: it issues."""
+    one_second = (_parse_utc(ISSUED_AT) + timedelta(seconds=1)).isoformat()
+    assert _issue(expires_at=one_second).expires_at == one_second
+
+
+# -- ExecutionLease.digest ------------------------------------------------------------
+
+
+def test_the_digest_is_the_signed_fields_then_the_signature() -> None:
+    """The digest is the parent identity a nested execution and its graph
+    record, so its preimage is a format: canonical signed fields, '.', the
+    signature. Pinned against an independent recomputation."""
+    lease = _issue()
+    expected = hashlib.sha256(
+        json.dumps(lease._signed_fields(), sort_keys=True, separators=(",", ":")).encode()
+        + b"." + lease.signature.encode()).hexdigest()
+    assert lease.digest() == expected
+
+
+def test_the_digest_changes_with_a_signed_field_under_the_same_signature() -> None:
+    """Two leases carrying one signature are still two leases if a signed
+    field differs; the digest must not collapse them."""
+    lease = _issue()
+    other = dataclasses.replace(lease, target_environment="prod")
+    assert other.signature == lease.signature
+    assert other.digest() != lease.digest()
 
 
 def test_without_any_key_the_lease_is_unsigned_with_the_default_scheme(

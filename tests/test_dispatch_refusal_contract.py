@@ -38,7 +38,7 @@ from typing import Any
 import pytest
 
 from remora.audit.recorder import RecorderUnavailable
-from remora.capabilities.model import EffectiveCapabilitySet
+from remora.capabilities.model import CapabilityEpochs, EffectiveCapabilitySet
 from remora.enforcement import lease_signing
 from remora.enforcement.lease import (
     DispatchResult,
@@ -248,6 +248,19 @@ class _ActorPolicy:
 
     def state(self, binding: str, tool_name: str | None = None) -> str:
         return "REQUIRED" if binding == "actor" else "UNVERIFIABLE"
+
+
+class _Revocations:
+    """An epoch source whose revocation list can change mid-execution."""
+
+    def __init__(self) -> None:
+        self.revoked_ids: set[str] = set()
+
+    def current(self, tenant_id: str, principal_id: str) -> CapabilityEpochs:
+        return CapabilityEpochs()
+
+    def revoked(self, capability_set_id: str) -> bool:
+        return capability_set_id in self.revoked_ids
 
 
 # ── refusals before a lease is verified ───────────────────────────────────
@@ -478,6 +491,49 @@ def test_the_capability_check_sees_the_target_the_lease_was_verified_against() -
     assert result.refusal_reason == "capability_environment_mismatch"
 
 
+#: A scope whose condition is a fact only the deployment's state reader knows.
+OPEN_ORDER = {TOOL: {"conditions": [{"argument": "id", "equals_state": "wo.open_id"}]}}
+
+
+def test_a_state_condition_is_read_through_the_bound_reader() -> None:
+    """The dispatcher hands its trusted-state reader to the capability check;
+    without it a state condition is unverifiable and refuses."""
+    reads: list[tuple[str, Any]] = []
+    cs = _capability_set(constraints=OPEN_ORDER)
+    d = _dispatcher()
+
+    def reader(source: str, args: Any) -> str:
+        reads.append((source, args))
+        return "WO-1"
+
+    d.bind_capability_state(reader)
+    result = _dispatch(d, _lease(capability_set=cs), capability_set=cs)
+    assert result.executed is True, result.refusal_reason
+    assert reads == [("wo.open_id", ARGS)]
+
+
+def test_a_revoked_set_refuses_at_dispatch(events) -> None:
+    """Revocation is read from the bound epoch source for the presented set."""
+    cs = _capability_set()
+    source = _Revocations()
+    source.revoked_ids.add(cs.capability_set_id)
+    d = _dispatcher()
+    d.bind_capability_epochs(source)
+    _assert_refused(_dispatch(d, _lease(capability_set=cs), capability_set=cs), events,
+                    reason="capability_revoked", level=logging.WARNING,
+                    payload=_refusal_payload("capability_revoked"), execution_id=JTI)
+
+
+def test_a_current_set_under_a_bound_epoch_source_executes() -> None:
+    """A source that answers and revokes nothing lets the call run; the
+    revocation check must be asked about the set, not about nothing."""
+    cs = _capability_set()
+    d = _dispatcher()
+    d.bind_capability_epochs(_Revocations())
+    result = _dispatch(d, _lease(capability_set=cs), capability_set=cs)
+    assert result.executed is True, result.refusal_reason
+
+
 # ── mediation ──────────────────────────────────────────────────────────────
 
 
@@ -499,6 +555,8 @@ def test_a_mediated_tool_receives_the_arguments_and_the_real_mediator() -> None:
     assert seen["arguments"] == ARGS
     assert isinstance(seen["mediator"], CapabilityMediator)
     assert seen["mediator"].context.parent_lease_digest == lease.digest()
+    # A lease naming no runtime gives the context none, not a placeholder.
+    assert seen["mediator"].context.runtime_identity_hash == ""
     assert result.nested_effects["mediated"] is True
     assert result.nested_effects["count"] == 0
     assert result.effect_graph is not None
@@ -513,6 +571,204 @@ def test_a_mediated_tool_without_a_capability_set_refuses(events) -> None:
                     level=logging.WARNING,
                     payload=_refusal_payload("capability_set_required"))
     assert calls == []
+
+
+def test_a_mediated_tool_needs_the_set_bound_into_the_lease(events) -> None:
+    """A set presented at dispatch is not enough: effect authority derives
+    from the set the lease signed, so a lease that signed none refuses."""
+    calls: list[Any] = []
+    d = _dispatcher(lambda a, m: calls.append(a), mediated=True,
+                    require_downstream_declaration=False)
+    result = _dispatch(d, _lease(), capability_set=_capability_set())
+    _assert_refused(result, events, reason="capability_set_required",
+                    level=logging.WARNING,
+                    payload=_refusal_payload("capability_set_required"))
+    assert calls == []
+
+
+REPORT = "database://reporting/monthly"
+TASK = TaskIdentity(context_id="ctx-m", task_id="task-m")
+SPEC = ("spec-m", 3)
+
+
+def _ceiling(tool: str = TOOL) -> Any:
+    from remora.capabilities.ceiling import DownstreamCeiling
+
+    return DownstreamCeiling.from_dict(tool, [{
+        "capability": "database.read", "resources": ["database://reporting/*"],
+        "purpose": "read the monthly report"}])
+
+
+def _reading_tool(seen: dict[str, Any]) -> Callable[[Any, Any], str]:
+    """A mediated tool that asks for one read and keeps what it got."""
+    def tool(arguments: Any, mediator: Any) -> str:
+        seen["mediator"] = mediator
+        seen["effect"] = mediator.invoke("database.read", REPORT, {"query": "q"})
+        return "done"
+
+    return tool
+
+
+def _mediated(seen: dict[str, Any], *, ceilings_asked: list[Any] | None = None,
+              **kwargs: Any) -> GovernedToolDispatcher:
+    """A dispatcher for a mediated tool with a declared ceiling and a local
+    executor whose answer names it as local."""
+    d = _dispatcher(_reading_tool(seen), mediated=True, **kwargs)
+    asked = ceilings_asked if ceilings_asked is not None else []
+
+    def ceilings(name: str) -> Any:
+        asked.append(name)
+        return _ceiling() if name == TOOL else None
+
+    d.bind_downstream_ceilings(ceilings)
+    d.bind_effect_executors({"database.read": lambda resource, args: ("local", resource,
+                                                                      dict(args))})
+    return d
+
+
+def _live() -> tuple[EffectiveCapabilitySet, datetime]:
+    """A set valid around the wall clock, and that instant.
+
+    Mediated tests run on the real clock: the mediator checks each effect
+    against ``datetime.now``, so effect authority derived at the fixed NOW
+    (sixty seconds long) has expired by the time an effect asks.
+    """
+    current = datetime.now(UTC)
+    cs = dataclasses.replace(_capability_set(),
+                             issued_at=(current - timedelta(minutes=5)).isoformat(),
+                             expires_at=(current + timedelta(minutes=5)).isoformat())
+    return cs, current
+
+
+def _fully_bound_lease(cs: EffectiveCapabilitySet, issued_at: datetime, runtime: str,
+                       ) -> tuple[ExecutionLease, ResolvedEffect]:
+    effect = ResolvedEffect(TOOL, "impl/v1", f"env:{TARGET}", "write")
+    lease = _lease(capability_set=cs, task_identity=TASK, resolved_effect=effect,
+                   toolspec_hash=SPEC[0], toolspec_version=SPEC[1],
+                   runtime_identity_hash=runtime, issued_at=issued_at)
+    return lease, effect
+
+
+@pytest.fixture()
+def declared_runtime(monkeypatch) -> Iterator[str]:
+    """A process that declares its runtime, so a lease can bind a real one."""
+    monkeypatch.setenv("REMORA_RUNTIME_KIND", "test-worker")
+    monkeypatch.setenv("REMORA_DEPLOYMENT_GENERATION", "generation-1")
+    reset_runtime_identity()
+    runtime = current_runtime_identity_hash()
+    assert runtime
+    yield runtime
+    reset_runtime_identity()
+
+
+def test_the_mediator_carries_every_identity_the_lease_signed(
+        events, declared_runtime: str) -> None:
+    """The context a mediated effect runs under is built from the verified
+    lease, field by field: the proposal, bundle, spec, parent lease, task and
+    runtime. Each one is what an effect record and the effect domain key
+    on; a blank or swapped field attributes the effect to something else."""
+    from remora.enforcement.capability_mediator import EffectState
+    from remora.enforcement.execution_context import ExecutionContext
+
+    seen: dict[str, Any] = {}
+    asked: list[Any] = []
+    cs, current = _live()
+    lease, effect = _fully_bound_lease(cs, current, declared_runtime)
+    d = _mediated(seen, ceilings_asked=asked)
+    d.bind_toolspec_identity(lambda name: SPEC)
+    d.bind_effect_resolver(_Resolver(lambda _args: None))
+    result = _dispatch(d, lease, capability_set=cs, task_identity=TASK,
+                       now=current.isoformat())
+    assert result.executed is True, result.refusal_reason
+
+    context = seen["mediator"].context
+    assert context == ExecutionContext(
+        execution_id=context.execution_id, proposal_id=PROPOSAL, tenant_id=TENANT,
+        principal_id=ACTOR, target_environment=TARGET, context_id="ctx-m",
+        task_id="task-m", tool_name=TOOL, toolspec_hash="spec-m",
+        policy_bundle_hash=BUNDLE, capability_digest=cs.digest,
+        runtime_identity_hash=declared_runtime, parent_lease_digest=lease.digest())
+    # The declared ceiling was asked for this tool and granted the read.
+    assert asked == [TOOL]
+    assert seen["effect"].state is EffectState.EXECUTED
+    assert seen["effect"].refusal is None
+    assert seen["effect"].result == ("local", REPORT, {"query": "q"})
+    # The graph hangs off the effect the lease resolved to.
+    assert result.effect_graph.root_effect_digest == effect.digest()
+    # No effect domain is bound, so there is none to close.
+    assert events("dispatch.effect_domain_close_failed") == []
+
+
+class _EffectDomain:
+    """A remote effect domain double: hands out executors, records the close."""
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[Any, Any, list[str]]] = []
+        self.closed: list[Any] = []
+
+    def executors_for(self, lease: Any, capability_set: Any,
+                      capabilities: list[str]) -> dict[str, Callable[..., Any]]:
+        self.asked.append((lease, capability_set, capabilities))
+        return {c: (lambda resource, args: ("remote", resource, dict(args)))
+                for c in capabilities}
+
+    def close(self, lease: Any) -> None:
+        self.closed.append(lease)
+
+
+def test_a_bound_effect_domain_runs_the_effects_and_is_closed() -> None:
+    """With an effect domain bound, the local executors are not used: the
+    domain is asked for executors for this lease, this set and the ceiling's
+    capabilities, and is told when the execution ends."""
+    seen: dict[str, Any] = {}
+    cs, current = _live()
+    lease = _lease(capability_set=cs, issued_at=current)
+    d = _mediated(seen)
+    domain = _EffectDomain()
+    d.bind_effect_domain(domain)
+    result = _dispatch(d, lease, capability_set=cs, now=current.isoformat())
+    assert result.executed is True, result.refusal_reason
+    assert seen["effect"].result == ("remote", REPORT, {"query": "q"})
+    assert domain.asked == [(lease, cs, ["database.read"])]
+    assert domain.asked[0][0] is lease and domain.asked[0][1] is cs
+    assert domain.closed == [lease]
+
+
+def test_a_mediated_dispatch_without_a_clock_reads_utc_now() -> None:
+    """``now`` is optional; without it the effect authority is derived at the
+    current UTC instant, inside a set valid now."""
+    from remora.enforcement.capability_mediator import EffectState
+
+    cs, current = _live()
+    seen: dict[str, Any] = {}
+    lease = _lease(capability_set=cs, issued_at=current - timedelta(seconds=5))
+    result = _dispatch(_mediated(seen), lease, capability_set=cs, now=None)
+    assert result.executed is True, result.refusal_reason
+    assert seen["effect"].state is EffectState.EXECUTED
+
+
+def test_a_set_revoked_while_the_tool_runs_refuses_its_next_effect() -> None:
+    """The mediator re-reads revocation at every effect, so a set revoked
+    after dispatch began stops the effects still to come (Q8.6 cascade)."""
+    from remora.enforcement.capability_mediator import EffectState
+
+    cs, current = _live()
+    source = _Revocations()
+    seen: dict[str, Any] = {}
+
+    def tool(arguments: Any, mediator: Any) -> str:
+        source.revoked_ids.add(cs.capability_set_id)
+        seen["effect"] = mediator.invoke("database.read", REPORT, {"query": "q"})
+        return "done"
+
+    d = _mediated({})
+    d.register(TOOL, tool, mediated=True)
+    d.bind_capability_epochs(source)
+    result = _dispatch(d, _lease(capability_set=cs, issued_at=current), capability_set=cs,
+                       now=current.isoformat())
+    assert result.executed is True, result.refusal_reason
+    assert seen["effect"].state is EffectState.REFUSED
+    assert seen["effect"].refusal == "capability_revoked"
 
 
 # ── the final hop: the call that runs is the call that verified ─────────────

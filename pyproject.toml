@@ -336,6 +336,8 @@ pytest_add_cli_args = [
     "--deselect",
     "tests/test_gate_token_nonce_mutation_contract.py::test_the_unsigned_token_warning_names_the_caller_of_check",
     "--deselect",
+    "tests/test_gate_token_nonce_mutation_contract.py::test_the_deprecated_enforce_warning_names_its_caller",
+    "--deselect",
     "tests/test_toolspec_bound_at_dispatch.py::test_verify_callable_still_has_no_non_test_caller",
     "--deselect",
     "tests/test_toolspec_bound_at_dispatch.py::test_verify_credential_scope_still_has_no_non_test_caller",

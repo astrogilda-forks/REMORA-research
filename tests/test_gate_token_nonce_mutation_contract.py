@@ -326,6 +326,32 @@ def test_a_d1_peek_or_a_refused_decision_never_spends(fake_d1: SqliteD1) -> None
     assert gate.verify_ledger()["consumed_rows"] == 1
 
 
+def test_a_d1_double_spend_is_refused_in_full(fake_d1: SqliteD1) -> None:
+    """The second spend reaches D1's UNIQUE violation at commit, a branch of
+    its own. Its refusal must carry the decision and the verified signature
+    like every other refusal: a settlement or audit reader keys on them, and
+    a None there reads as "never verified"."""
+    gate = EnforcementGate(strict=True, state_endpoint=ENDPOINT)
+    grant = _grant()
+    assert gate.check(grant, consume=True).allowed is True
+    assert gate.check(grant, consume=True) == EnforcementResult(
+        allowed=False, action="accept", token_verified=True,
+        reason="token_already_consumed", strict_mode=True)
+
+
+def test_the_gate_holds_a_grant_to_the_context_it_was_minted_for() -> None:
+    """A signed grant bound to one tenant's context is refused under another's:
+    the context the caller hands check() must reach the token's verification."""
+    minted = AuthorizationContext(tenant="acme", principal="agent-1")
+    grant = _grant(context=minted)
+    gate = EnforcementGate(strict=True)
+    assert gate.check(grant, context=minted).allowed is True
+    foreign = dataclasses.replace(minted, tenant="globex")
+    assert gate.check(grant, context=foreign) == EnforcementResult(
+        allowed=False, action="accept", token_verified=False,
+        reason="token_verification_failed:context_mismatch", strict_mode=True)
+
+
 def test_a_d1_ledger_can_be_rebaselined_after_an_authorized_prune(fake_d1: SqliteD1) -> None:
     """verify_ledger reported D1 but reset_ledger_watermark had no D1 branch
     (found by this sweep): a Cloudflare deployment could see the watermark and
@@ -419,6 +445,15 @@ def test_previous_keys_parse_skips_malformed_entries(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("REMORA_PDP_PREVIOUS_KEYS",
                        " a = k1 ,,junk, =orphan, empty= ,b=k2")
     assert token_mod._previous_keys() == {"a": b"k1", "b": b"k2"}
+
+
+def test_a_previous_key_may_end_in_base64_padding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only the first '=' separates kid from key. A base64 key ends in '='
+    padding; splitting at the last one would drop the rotated key and
+    refuse every token it signed."""
+    monkeypatch.setenv("REMORA_PDP_PREVIOUS_KEYS", "old=YQ==")
+    assert token_mod._previous_keys() == {"old": b"YQ=="}
+    assert _hand_signed(key=b"YQ==", kid="old").verify(OBS).verified is True
 
 
 def test_a_kid_with_an_empty_previous_key_does_not_verify(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -627,3 +662,61 @@ def test_the_d1_schema_is_created_once_per_store(
     store.consumed("n-1", tenant_id="acme")
     store.consumed_count(tenant_id="acme")
     assert sum(s.startswith("CREATE TABLE") for s in fake_d1.sql()) == 1
+
+
+# ── third sweep (2026-10-13): survivors on lines the second round covered ──
+
+def test_a_sqlite_peek_never_spends_the_grant(tmp_path: Path) -> None:
+    """``allowed and consume`` guards the INSERT. Were it ``or``, a check without
+    consume would spend the grant and the real redemption would be refused."""
+    gate = EnforcementGate(strict=True, db_path=str(tmp_path / "pep.db"))
+    grant = _grant()
+    assert gate.check(grant).allowed is True
+    assert gate.verify_ledger()["consumed_rows"] == 0
+    assert (gate.check(grant, consume=True).allowed, gate.verify_ledger()["consumed_rows"]) == (True, 1)
+
+
+def test_a_bad_signature_is_a_signed_refusal() -> None:
+    """``signature_invalid`` reports is_signed=True: the token claims a signature
+    that does not hold, which is a forgery signal, not an unsigned token."""
+    forged = _hand_signed(key=b"another-key")
+    assert forged.verify() == TokenVerificationResult(
+        verified=False, reason="signature_invalid", is_signed=True)
+
+
+def test_issue_defaults_to_no_audience_and_accepts_a_one_second_ttl() -> None:
+    issued = datetime.now(UTC)
+    one_second = (issued + timedelta(seconds=1)).isoformat()
+    grant = _grant(issued_at=issued.isoformat(), expires_at=one_second)
+    assert grant.audience == ""
+    assert grant.expires_at == one_second
+
+
+def _enforce_warning():
+    gate = EnforcementGate(strict=True)
+    with pytest.warns(DeprecationWarning) as caught:
+        gate.enforce(_grant(), action_fn=lambda: None)
+    (warning,) = [w for w in caught if w.category is DeprecationWarning]
+    return warning
+
+
+def test_the_deprecated_enforce_names_itself() -> None:
+    assert str(_enforce_warning().message).startswith(
+        "EnforcementGate.enforce() checks a token without its authorization context")
+
+
+def test_the_deprecated_enforce_warning_names_its_caller() -> None:
+    """Deselected inside the mutation sweep: mutmut's trampoline adds frames."""
+    assert _enforce_warning().filename == __file__
+
+
+def test_a_peek_at_a_spent_grant_reports_it_spent(tmp_path: Path, fake_d1: SqliteD1) -> None:
+    """A check without consume still reads the ledger: a spent grant must not
+    look redeemable to the caller who asks before redeeming (SQLite and D1)."""
+    for gate in (EnforcementGate(strict=True, db_path=str(tmp_path / "pep.db")),
+                 EnforcementGate(strict=True, state_endpoint=ENDPOINT)):
+        grant = _grant()
+        assert gate.check(grant, consume=True).allowed is True
+        assert gate.check(grant) == EnforcementResult(
+            allowed=False, action="accept", token_verified=True,
+            reason="token_already_consumed", strict_mode=True)

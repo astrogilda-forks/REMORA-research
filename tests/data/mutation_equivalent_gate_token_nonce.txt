@@ -3,23 +3,23 @@
 # Format: <mutant name>  <one-sentence reason>. Equivalent unless the reason says Postgres-only or LOW VALUE.
 # Every name here was applied to the source by hand and survived that module; the sweep's other
 # survivors in these three files were each applied the same way and killed.
+# Numbers follow the second sweep of the same day, which renumbered try_consume and the
+# Postgres branch of _check_unlogged. _ensure_table_8/_23 and _check_unlogged_1/_149/_169
+# segfaulted or timed out in that sandbox run rather than surviving; their arguments stand.
 
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_2  Dropping the DDL commit is invisible: sqlite3, psycopg and D1Connection all commit on clean context exit, and D1 flushes pending writes before any read.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_3  Dropping the DDL commit is invisible: sqlite3, psycopg and D1Connection all commit on clean context exit, and D1 flushes pending writes before any read.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_7  Dropping the DDL commit is invisible: sqlite3, psycopg and D1Connection all commit on clean context exit, and D1 flushes pending writes before any read.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_8  Dropping the DDL commit is invisible: sqlite3, psycopg and D1Connection all commit on clean context exit, and D1 flushes pending writes before any read.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_9  Dropping the DDL commit is invisible: sqlite3, psycopg and D1Connection all commit on clean context exit, and D1 flushes pending writes before any read.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_10  Dropping the DDL commit is invisible: sqlite3, psycopg and D1Connection all commit on clean context exit, and D1 flushes pending writes before any read.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_8  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_9  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_10  duplicate=None is falsy exactly like False, so 'return not duplicate' is unchanged.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_22  getattr without a default differs only when the connection lacks commit; all three backends have one.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_30  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_31  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_35  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_36  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
-remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_37  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_11  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_12  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_13  duplicate=None is falsy exactly like False, so 'return not duplicate' is unchanged.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_25  getattr without a default differs only when the connection lacks commit; all three backends have one.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_33  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_34  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_38  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_39  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_40  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_41  Postgres-only: the rollback matters for psycopg's aborted transaction; D1 already cleared its pending batch in the failed flush and sqlite3 needs none.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁconsumed__mutmut_4  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁconsumed__mutmut_5  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁconsumed_count__mutmut_3  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
@@ -66,17 +66,47 @@ remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_17  C
 remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_23  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
 remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_24  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_1  Private default; the only caller, check(), always passes consume explicitly.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_16  LOW VALUE: stacklevel of the non-strict development warning only moves its reported location (stacklevel=2 already points inside gate.py's check(), not at the caller).
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_17  LOW VALUE: stacklevel of the non-strict development warning only moves its reported location (stacklevel=2 already points inside gate.py's check(), not at the caller).
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_16  Killed outside the sweep by test_the_unsigned_token_warning_names_the_caller_of_check, which pyproject deselects inside the sandbox because mutmut's trampoline adds call frames; stacklevel=3 is deliberate (check() -> _check_unlogged() -> warn names check()'s caller).
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_17  Killed outside the sweep by test_the_unsigned_token_warning_names_the_caller_of_check, which pyproject deselects inside the sandbox because mutmut's trampoline adds call frames; stacklevel=3 is deliberate (check() -> _check_unlogged() -> warn names check()'s caller).
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_74  On Python >=3.11 (requires-python) fromisoformat parses a trailing 'Z' itself, so the replace() never changes the result.
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_75  On Python >=3.11 (requires-python) fromisoformat parses a trailing 'Z' itself, so the replace() never changes the result.
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_85  On Python >=3.11 (requires-python) fromisoformat parses a trailing 'Z' itself, so the replace() never changes the result.
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_86  On Python >=3.11 (requires-python) fromisoformat parses a trailing 'Z' itself, so the replace() never changes the result.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_136  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_137  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_147  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_150  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_161  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_162  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_167  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_168  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_138  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_139  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_149  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_152  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_163  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_169  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_ensure_table__mutmut_1  Postgres-only branch (self._dsn); unreachable without REMORA_PG_DSN and not faked here.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_22  require_expiry=None is falsy exactly like False, and check_bindings reads it only in `expires_at is None and require_expiry`.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_179  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords.
+remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_28  COUNT(*) always returns one row, so the _scalar default is never used. (D1 branch)
+remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_33  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords. (D1 branch)
+remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_34  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords. (D1 branch)
+remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_35  COUNT(*) always returns one row, so the _scalar default is never used. (D1 branch)
+remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_41  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords. (D1 branch)
+remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_42  SQL keyword/identifier case only; SQLite, D1 (SQLite) and Postgres all fold unquoted identifiers and keywords. (D1 branch)
+# Added after the third sweep of 2026-10-13 (numbers from that sweep).
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_8  getattr(conn, "XXcommitXX", None): with no commit called, sqlite3 and the D1 connection still persist the CREATE TABLE IF NOT EXISTS when the connection closes cleanly, and every store re-runs it on open.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_9  getattr(conn, "COMMIT", None): same as _8.
+remora.enforcement.nonce_store.xǁDurableNonceStoreǁ_ensure_table__mutmut_10  "if commit is not None" -> "is None": commit is never called, which is _8's case.
+remora.enforcement.token.xǁPolicyDecisionTokenǁissue__mutmut_8  issued_at.replace("Z", ...) -> "XXZXX": fromisoformat reads a trailing Z itself on Python >= 3.11 (requires-python).
+remora.enforcement.token.xǁPolicyDecisionTokenǁissue__mutmut_21  expires_at.replace("Z", ...) -> "XXZXX": same as issue_8.
+remora.enforcement.token.xǁPolicyDecisionTokenǁissue__mutmut_22  expires_at.replace("Z", ...) -> "z": same as issue_8; a lowercase z never occurs in an ISO timestamp issue() accepts.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_150  token_verified=None in the Postgres replay branch: Postgres-only; the sweep runs without REMORA_PG_DSN.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_164  _ledger_unavailable(..., "postgres", None): Postgres-only, as _150.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_170  backend label "POSTGRES": Postgres-only, as _150.
+# Added after the fourth sweep of 2026-10-13 (numbers from that sweep; it renumbered _check_unlogged).
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_187  lowercase SELECT in the SQLite peek: SQLite, D1 and Postgres ignore the case of keywords and unquoted names.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_188  uppercase table and column names in the SQLite peek: as _187.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_228  lowercase SELECT in the D1 peek: as _187.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_229  uppercase names in the D1 peek: as _187.
+remora.enforcement.gate.xǁEnforcementGateǁenforce__mutmut_6  stacklevel dropped from the deprecation warning: killed by test_the_deprecated_enforce_warning_names_its_caller, which the sweep deselects because mutmut's trampoline adds frames.
+remora.enforcement.gate.xǁEnforcementGateǁenforce__mutmut_10  stacklevel=3 on the deprecation warning: as enforce_6.
+remora.enforcement.token.xǁPolicyDecisionTokenǁissue__mutmut_9  issued_at.replace("Z", ...) -> "z": fromisoformat reads a trailing Z on Python >= 3.11, and a lowercase z never occurs in a timestamp issue() accepts.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_178  lowercase INSERT in the SQLite consume: SQLite, D1 and Postgres ignore the case of keywords and unquoted names.
+# Added after the fifth (confirming) sweep of 2026-10-13. NOT equivalent: open.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_231  OPEN, not equivalent: action=None in the D1 already-consumed result. Applied by hand, test_a_d1_peek_or_a_refused_decision_never_spends and test_a_peek_at_a_spent_grant_reports_it_spent fail; inside the mutmut sandbox it survived. Why the sandbox differs (the D1 fake patches d1._post) is not yet explained.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_232  OPEN, as _231 (token_verified=None).
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_234  OPEN, as _231 (strict_mode=None).
