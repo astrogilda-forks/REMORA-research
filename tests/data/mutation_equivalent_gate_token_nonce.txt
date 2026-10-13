@@ -106,7 +106,3 @@ remora.enforcement.gate.xǁEnforcementGateǁenforce__mutmut_6  stacklevel droppe
 remora.enforcement.gate.xǁEnforcementGateǁenforce__mutmut_10  stacklevel=3 on the deprecation warning: as enforce_6.
 remora.enforcement.token.xǁPolicyDecisionTokenǁissue__mutmut_9  issued_at.replace("Z", ...) -> "z": fromisoformat reads a trailing Z on Python >= 3.11, and a lowercase z never occurs in a timestamp issue() accepts.
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_178  lowercase INSERT in the SQLite consume: SQLite, D1 and Postgres ignore the case of keywords and unquoted names.
-# Added after the fifth (confirming) sweep of 2026-10-13. NOT equivalent: open.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_231  OPEN, not equivalent: action=None in the D1 already-consumed result. Applied by hand, test_a_d1_peek_or_a_refused_decision_never_spends and test_a_peek_at_a_spent_grant_reports_it_spent fail; inside the mutmut sandbox it survived. Why the sandbox differs (the D1 fake patches d1._post) is not yet explained.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_232  OPEN, as _231 (token_verified=None).
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_234  OPEN, as _231 (strict_mode=None).
