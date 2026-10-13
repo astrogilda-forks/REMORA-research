@@ -232,8 +232,10 @@ class EnforcementGate:
             )
         with self._ledger() as (conn, ph):
             count = conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone()[0]
+            # ph is the backend's parameter marker ("%s" or "?"), never data;
+            # count and reason travel as parameters.
             conn.execute(
-                "INSERT INTO pep_ledger_watermark "
+                "INSERT INTO pep_ledger_watermark "  # noqa: S608
                 "(id, issued_count, last_reset_at, last_reset_reason) "
                 f"VALUES (1, {ph}, CURRENT_TIMESTAMP, {ph}) "
                 "ON CONFLICT (id) DO UPDATE SET issued_count = excluded.issued_count, "
