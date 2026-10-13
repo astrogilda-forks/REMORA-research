@@ -300,6 +300,9 @@ mutate_only_covered_lines = true
 # the code; the startup refusals they pin stay covered by the regular suite.
 # tests/test_wheel_excludes_datasets.py's size check is deselected too: mutmut
 # inflates each mutated module past the 300 KB dataset threshold.
+# So is the warning-attribution test (2026-10-13): it pins warnings.warn's
+# stacklevel, and mutmut's trampoline adds call frames, so inside the sandbox
+# the warning is attributed to the trampoline whatever the code says.
 # They are deselected by node id rather than by dropping their module, so the
 # rest of each module still kills mutants.
 # tests/test_mutation_sweep_selection.py fails if a deselected node id stops
@@ -331,6 +334,10 @@ pytest_add_cli_args = [
     "--deselect",
     "tests/test_wheel_excludes_datasets.py::test_no_other_shipped_module_is_dataset_sized",
     "--deselect",
+    "tests/test_gate_token_nonce_mutation_contract.py::test_the_unsigned_token_warning_names_the_caller_of_check",
+    "--deselect",
+    "tests/test_gate_token_nonce_mutation_contract.py::test_the_deprecated_enforce_warning_names_its_caller",
+    "--deselect",
     "tests/test_toolspec_bound_at_dispatch.py::test_verify_callable_still_has_no_non_test_caller",
     "--deselect",
     "tests/test_toolspec_bound_at_dispatch.py::test_verify_credential_scope_still_has_no_non_test_caller",
@@ -360,6 +367,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_direct_accept_authority_binding.py",
     "tests/test_dispatch_clock_consistency.py",
     "tests/test_dispatch_leased_endpoint.py",
+    "tests/test_dispatch_refusal_contract.py",
     "tests/test_dispatcher_contract.py",
     "tests/test_effect_mediation_policy.py",
     "tests/test_effect_vantage_scope.py",
@@ -378,6 +386,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_gate_d1_endpoint_arg.py",
     "tests/test_gate_d1_ledger.py",
     "tests/test_gate_replay_properties.py",
+    "tests/test_gate_token_nonce_mutation_contract.py",
     "tests/test_governance_event_contract.py",
     "tests/test_grant_ledger_tamper_evidence.py",
     "tests/test_hostile_review_2026_10_08.py",
@@ -385,6 +394,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_interop_boundary_fixtures.py",
     "tests/test_lease_authority_custody.py",
     "tests/test_lease_nonce_durability.py",
+    "tests/test_lease_refusal_hooks_contract.py",
     "tests/test_lease_runtime_binding_without_context.py",
     "tests/test_lease_signing_contracts.py",
     "tests/test_lease_verification_completeness.py",
