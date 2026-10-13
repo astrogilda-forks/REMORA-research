@@ -70,8 +70,8 @@ def test_every_configuration_names_a_module_that_exists() -> None:
 def test_the_reconciliation_rule_holds_and_each_weakening_is_violated() -> None:
     """federation-port#2: the candidate holds, and every assumption it rests on is shown load-bearing."""
     results = {n: c["result"] for n, c in EXPECTED["configs"].items() if n.startswith("reconcile_")}
-    assert results.pop("reconcile_final") == "holds"
-    assert results.pop("reconcile_misreport_contradiction") == "holds"
+    holds = {n: results.pop(n) for n in ("reconcile_final", "reconcile_misreport_contradiction")}
+    assert holds == {"reconcile_final": "holds", "reconcile_misreport_contradiction": "holds"}
     assert results and set(results.values()) == {"violated"}
     # The two failure cases asked for on #2 come first in their traces.
     assert EXPECTED["configs"]["reconcile_naive_absent"]["trace"][0] == "Lookup"
