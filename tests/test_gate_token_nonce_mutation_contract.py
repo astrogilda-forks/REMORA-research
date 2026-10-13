@@ -326,6 +326,33 @@ def test_a_d1_peek_or_a_refused_decision_never_spends(fake_d1: SqliteD1) -> None
     assert gate.verify_ledger()["consumed_rows"] == 1
 
 
+def test_a_d1_ledger_can_be_rebaselined_after_an_authorized_prune(fake_d1: SqliteD1) -> None:
+    """verify_ledger reported D1 but reset_ledger_watermark had no D1 branch
+    (found by this sweep): a Cloudflare deployment could see the watermark and
+    never re-baseline it, and was told its ledger was in-process."""
+    gate = EnforcementGate(strict=True, state_endpoint=ENDPOINT)
+    for _ in range(2):
+        assert gate.check(_grant(), consume=True).allowed is True
+    with sqlite3.connect(fake_d1.path) as conn:
+        conn.execute("DELETE FROM pep_consumed WHERE rowid = (SELECT MIN(rowid) FROM pep_consumed)")
+    assert gate.verify_ledger()["intact"] is False
+    gate.reset_ledger_watermark(reason="pruned grants older than 90 days")
+    assert gate.verify_ledger() == {
+        "durable": True, "intact": True, "consumed_rows": 1, "high_water_mark": 1,
+        "last_reset_reason": "pruned grants older than 90 days", "problems": [],
+    }
+
+
+def test_the_unsigned_token_warning_names_the_caller_of_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The warning used stacklevel=2 from _check_unlogged and so pointed at
+    check() inside gate.py; it must point at the code that called check()."""
+    monkeypatch.delenv("REMORA_PDP_SIGNING_KEY", raising=False)
+    gate = EnforcementGate(strict=False)
+    with pytest.warns(UserWarning, match="unsigned token accepted") as caught:
+        gate.check(_grant())
+    assert caught[0].filename == __file__
+
+
 # ── fail closed on an unavailable ledger ───────────────────────────────────
 
 
