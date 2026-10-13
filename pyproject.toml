@@ -300,6 +300,9 @@ mutate_only_covered_lines = true
 # the code; the startup refusals they pin stay covered by the regular suite.
 # tests/test_wheel_excludes_datasets.py's size check is deselected too: mutmut
 # inflates each mutated module past the 300 KB dataset threshold.
+# So is the warning-attribution test (2026-10-13): it pins warnings.warn's
+# stacklevel, and mutmut's trampoline adds call frames, so inside the sandbox
+# the warning is attributed to the trampoline whatever the code says.
 # They are deselected by node id rather than by dropping their module, so the
 # rest of each module still kills mutants.
 # tests/test_mutation_sweep_selection.py fails if a deselected node id stops
@@ -330,6 +333,8 @@ pytest_add_cli_args = [
     "tests/test_strict_v2_three_domain_e2e.py",
     "--deselect",
     "tests/test_wheel_excludes_datasets.py::test_no_other_shipped_module_is_dataset_sized",
+    "--deselect",
+    "tests/test_gate_token_nonce_mutation_contract.py::test_the_unsigned_token_warning_names_the_caller_of_check",
     "--deselect",
     "tests/test_toolspec_bound_at_dispatch.py::test_verify_callable_still_has_no_non_test_caller",
     "--deselect",
