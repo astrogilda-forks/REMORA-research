@@ -47,6 +47,7 @@ def connects_socket(args):
         s.settimeout(0.5)
         s.connect(("127.0.0.1", args["port"]))
     except OSError:
+        # The port is closed on purpose: the attempt is the effect under test.
         pass
     finally:
         s.close()
@@ -56,6 +57,7 @@ def resolves_name(args):
     try:
         socket.getaddrinfo("localhost", 80)
     except OSError:
+        # A host without a resolver still made the lookup the observer reports.
         pass
 
 
