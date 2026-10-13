@@ -379,6 +379,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_gate_d1_endpoint_arg.py",
     "tests/test_gate_d1_ledger.py",
     "tests/test_gate_replay_properties.py",
+    "tests/test_gate_token_nonce_mutation_contract.py",
     "tests/test_governance_event_contract.py",
     "tests/test_grant_ledger_tamper_evidence.py",
     "tests/test_hostile_review_2026_10_08.py",
