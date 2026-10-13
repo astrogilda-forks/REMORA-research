@@ -21,6 +21,7 @@ This file lists externally relevant changes by release. Fine-grained development
 - Not changed: a deployment that runs `/assess` and `/execute-accepted` in one
   process is still one custody domain, and the review path still mints and
   consumes in-process. RMR-CR-002 stays PARTIAL.
+
 ### Quality (mutation sweep over the enforcement modules)
 
 - The weekly mutation sweep failed on 528 survivors absent from its baseline,
@@ -33,6 +34,10 @@ This file lists externally relevant changes by release. Fine-grained development
   were a verification error (wrong mutant bodies applied by hand); with the
   right bodies they are killed, and the correction is recorded in
   `docs/assurance/mutation_testing_v1.md`.
+- The first runner sweep after that failed on 13 survivors that were already
+  argued but missing from the baseline: the local sandbox had recorded them
+  as segfault or timeout, and `--update` keeps survivors only. The baseline
+  now holds 114, and a test requires it to equal the argued set.
 - Fixed on the way: `EnforcementGate.reset_ledger_watermark` had no D1 branch,
   so a Cloudflare deployment could not re-baseline its ledger watermark; the
   non-strict unsigned-token warning now names `check()`'s caller.

@@ -211,17 +211,18 @@ for a lease bound to none must refuse. A caller mutating its own nested
 arguments mid-dispatch must not change what runs. A peek at the SQLite ledger
 must not spend a grant. A peek at a spent grant must report it spent.
 
-The baseline now records 101 survivors. Every one has a written argument in
+The baseline now records 114 survivors (see the note on the first runner
+sweep below for why not 101). Every one has a written argument in
 `tests/data/mutation_equivalent_{dispatch,lease,gate_token_nonce}.txt`:
 
 | Reason | Count |
 |---|---:|
-| Postgres-only branches, including their SQL text; the sweep runs without `REMORA_PG_DSN` | 42 |
-| Unreachable defaults and arguments that cannot change behaviour | 36 |
-| `"Z"` replacement before `fromisoformat`, a no-op on Python 3.11 and later | 12 |
-| SQL keyword or name case on SQLite and D1, which ignore it | 7 |
+| Postgres-only branches, including their SQL text; the sweep runs without `REMORA_PG_DSN` | 45 |
+| Unreachable defaults and arguments that cannot change behaviour | 38 |
+| `"Z"` replacement before `fromisoformat`, a no-op on Python 3.11 and later | 13 |
+| SQL keyword or name case on SQLite and D1, which ignore it | 14 |
 | Killed by a test the sweep deselects (warning `stacklevel` under the trampoline) | 4 |
-| **Total** | **101** |
+| **Total** | **114** |
 
 A correction, recorded rather than erased: #839 merged three entries
 (`_check_unlogged` 231, 232 and 234, fields of the D1 already-consumed result)
@@ -232,6 +233,17 @@ took effect. With the right bodies, the tightened peek test kills all three;
 the fifth sweep had simply run before that test was tightened. They are
 removed from the baseline. Every other hand verification of rounds 3 and 4 was
 repeated with the right bodies and holds.
+
+The first runner sweep after the merge (2026-10-13, master `553c5d91`,
+3,581 mutants with token v3 included) failed on 13 survivors absent from the
+baseline. None was new: all 13 already had a written argument (ten in
+`EnforcementGate._ensure_table`, two in `DurableNonceStore._ensure_table`, one
+`"Z"` replacement in `check_bindings`). The local sandbox had recorded them as
+segfault or timeout rather than survived, and `--update` writes survivors
+only, so the baseline left them out while the reasons file kept them. They are
+added, which gives 114. `tests/test_mutation_baseline.py` now requires the
+baseline and the argued set to be the same set in both directions, so a flaky
+sandbox status cannot reopen the gap.
 
 Agent-written tests were part of this pass: three parallel agents and one
 second-round agent, each in its own worktree, with every kill verified by
