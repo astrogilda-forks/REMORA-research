@@ -10,11 +10,12 @@ This file lists externally relevant changes by release. Fine-grained development
   mostly in code written since the baseline (the dispatcher's refusal hooks,
   lease authenticity, token signature refusals). Three new contract modules
   pin every refusal as a whole result and every governance event by name,
-  level and payload. Survivors went from 704 of 3,115 mutants to 104 of 3,358.
-  Each of the 104 has a written argument in
-  `tests/data/mutation_equivalent_*.txt`; three of those are open (killed when
-  applied by hand, survived in the sandbox) and say so. The re-measurement is
-  in `docs/assurance/mutation_testing_v1.md`.
+  level and payload. Survivors went from 704 of 3,115 mutants to 101 of 3,358.
+  Each of the 101 has a written argument in
+  `tests/data/mutation_equivalent_*.txt`. Three entries first merged as "open"
+  were a verification error (wrong mutant bodies applied by hand); with the
+  right bodies they are killed, and the correction is recorded in
+  `docs/assurance/mutation_testing_v1.md`.
 - Fixed on the way: `EnforcementGate.reset_ledger_watermark` had no D1 branch,
   so a Cloudflare deployment could not re-baseline its ledger watermark; the
   non-strict unsigned-token warning now names `check()`'s caller.

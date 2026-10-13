@@ -184,6 +184,7 @@ construction, or in logic), and every one was then killed or argued.
 | Three new contract modules (round 1) | 3,332 | 3,165 | 141 |
 | Newly covered lines killed (round 2) | 3,337 | 3,218 | 110 |
 | Fourth and fifth sweeps (round 3) | 3,358 | 3,245 | 104 |
+| Peek test tightened after the fifth sweep (applied by hand) | 3,358 | 3,248 | 101 |
 
 The pool grows each round because `mutate_only_covered_lines` mutates lines
 the new tests reach for the first time: round 1 covered `_prepare_mediation`
@@ -210,7 +211,7 @@ for a lease bound to none must refuse. A caller mutating its own nested
 arguments mid-dispatch must not change what runs. A peek at the SQLite ledger
 must not spend a grant. A peek at a spent grant must report it spent.
 
-The baseline now records 104 survivors. Every one has a written argument in
+The baseline now records 101 survivors. Every one has a written argument in
 `tests/data/mutation_equivalent_{dispatch,lease,gate_token_nonce}.txt`:
 
 | Reason | Count |
@@ -220,13 +221,17 @@ The baseline now records 104 survivors. Every one has a written argument in
 | `"Z"` replacement before `fromisoformat`, a no-op on Python 3.11 and later | 12 |
 | SQL keyword or name case on SQLite and D1, which ignore it | 7 |
 | Killed by a test the sweep deselects (warning `stacklevel` under the trampoline) | 4 |
-| **Open**: killed when applied by hand, survived in the sandbox | 3 |
-| **Total** | **104** |
+| **Total** | **101** |
 
-The three open entries are `_check_unlogged` 231, 232 and 234, which are fields
-of the D1 already-consumed result. Applied by hand, two tests fail; inside
-mutmut they survived. The difference is not yet explained, and the entries
-say so rather than calling them equivalent.
+A correction, recorded rather than erased: #839 merged three entries
+(`_check_unlogged` 231, 232 and 234, fields of the D1 already-consumed result)
+as open, "killed when applied by hand, survived in the sandbox". Both halves
+were wrong. The hand application had used the second sweep's mutant bodies
+under the third sweep's numbers, because a path edit to the apply script never
+took effect. With the right bodies, the tightened peek test kills all three;
+the fifth sweep had simply run before that test was tightened. They are
+removed from the baseline. Every other hand verification of rounds 3 and 4 was
+repeated with the right bodies and holds.
 
 Agent-written tests were part of this pass: three parallel agents and one
 second-round agent, each in its own worktree, with every kill verified by
