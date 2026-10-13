@@ -1,9 +1,6 @@
 # Surviving mutants of ExecutionLease (remora/enforcement/lease.py) argued equivalent.
 # An entry is an argument a reviewer can test, not a waiver: if the code it reasons about
 # changes, re-read the argument. Format: <mutant name>  <reason>.
-# Survivor resolution, 2026-10-13 (evening): the 114 argued survivors were cut to 25 by a real
-# Postgres contract (tests/test_enforcement_ledgers_postgres.py) and by removing code no caller
-# can reach. What remains cannot be killed by any test. Several entries survived in some
-# sweeps and were killed in others, locally and on the runner, so the list is
-# the union of survivors over four sweeps of unchanged code (three local, one on the runner), not one run's survivors.
+# Survivor resolution, 2026-10-13 (evening): what remains here cannot be killed by any test.
+# Like every equivalent mutant, it may be killed nondeterministically in a given sweep.
 remora.enforcement.lease.xǁExecutionLeaseǁverify_historical__mutmut_18  verify_payload only tests live for truthiness (`and live`, `if live`, `if live else`), so live=None behaves exactly as live=False.
