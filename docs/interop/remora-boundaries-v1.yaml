@@ -19,7 +19,7 @@ provenance:
       sha256: cd9216054822b3d14457f00a92d2c85a7f3a5046ce5d446202e192d778b58d10
       role: implementation maturity and freshness source
     - path: artifacts/interop/index.json
-      sha256: 2388a4f59c6b7bd5e7524dbaf25c9380f0b8907ef97458f2a01badfbfc8adf6d
+      sha256: 6e1172cabf33ca2f141cdb02e28210ca93e66873389a133285620fafeec86d28
       role: Federation contract and run-record index
     - path: artifacts/interop/FEDERATION.yaml
       sha256: 498257148e9051632c127064364ee7cd5c2df132f6f588badc2964d41ce7ee27
