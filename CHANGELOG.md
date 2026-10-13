@@ -38,12 +38,12 @@ This file lists externally relevant changes by release. Fine-grained development
   argued but missing from the baseline: the local sandbox had recorded them
   as segfault or timeout, and `--update` keeps survivors only. The baseline
   now holds 114, and a test requires it to equal the argued set.
-- Argued is not resolved: 114 -> 24. The ledger and nonce store now run
+- Argued is not resolved: 114 -> 25. The ledger and nonce store now run
   against a real Postgres (`tests/test_enforcement_ledgers_postgres.py`, in
   CI's postgres-contract job and in the scheduled sweep, which gained a
   Postgres service). Dead code (`"Z"` replacement on Python 3.11+) and
   unreachable defaults are gone, and the gate's three per-backend copies of
-  every ledger statement are one helper and one schema. The 24 left are
+  every ledger statement are one helper and one schema. The 25 left are
   equivalent by construction, listed with reasons; the details are in
   `docs/assurance/mutation_testing_v1.md`.
 - Fixed on the way: `EnforcementGate.reset_ledger_watermark` had no D1 branch,

@@ -1,11 +1,11 @@
 # Surviving mutants of remora/enforcement/{gate,token,nonce_store}.py argued equivalent.
 # An entry is an argument a reviewer can test, not a waiver: if the code it reasons about
 # changes, re-read the argument. Format: <mutant name>  <reason>.
-# Survivor resolution, 2026-10-13 (evening): the 114 argued survivors were cut to 24 by a real
+# Survivor resolution, 2026-10-13 (evening): the 114 argued survivors were cut to 25 by a real
 # Postgres contract (tests/test_enforcement_ledgers_postgres.py) and by removing code no caller
-# can reach. What remains cannot be killed by any test. Several entries survived in some local
-# sweeps and were killed in others under memory pressure (OOM-killed workers), so the list is
-# the union of survivors over three sweeps of unchanged code, not one run's survivors.
+# can reach. What remains cannot be killed by any test. Several entries survived in some
+# sweeps and were killed in others, locally and on the runner, so the list is
+# the union of survivors over four sweeps of unchanged code (three local, one on the runner), not one run's survivors.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_11  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁtry_consume__mutmut_12  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
 remora.enforcement.nonce_store.xǁDurableNonceStoreǁconsumed__mutmut_4  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
@@ -17,11 +17,12 @@ remora.enforcement.gate.xǁEnforcementGateǁ_bump_watermark__mutmut_4  SQL keywo
 remora.enforcement.gate.xǁEnforcementGateǁverify_ledger__mutmut_27  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
 remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_15  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
 remora.enforcement.gate.xǁEnforcementGateǁreset_ledger_watermark__mutmut_22  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_17  Killed by the test that pins this warning's stacklevel, which the sweep deselects because mutmut's trampoline adds call frames. (stacklevel 3 -> 4)
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_22  require_expiry=None is falsy exactly like False, and check_bindings reads it only in `expires_at is None and require_expiry`.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_15  Killed by the test that pins this warning's stacklevel, which the sweep deselects because mutmut's trampoline adds call frames. (stacklevel dropped)
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_16  Killed by the test that pins this warning's stacklevel, which the sweep deselects because mutmut's trampoline adds call frames. (stacklevel 3 -> 4)
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_21  require_expiry=None is falsy exactly like False, and check_bindings reads it only in `expires_at is None and require_expiry`.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_171  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
 remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_172  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_173  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_181  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
-remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_223  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_180  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
+remora.enforcement.gate.xǁEnforcementGateǁ_check_unlogged__mutmut_222  SQL keyword or identifier case only: SQLite, D1 (SQLite) and Postgres fold unquoted keywords and names, and no test can tell the statements apart.
 remora.enforcement.gate.xǁEnforcementGateǁenforce__mutmut_6  Killed by the test that pins this warning's stacklevel, which the sweep deselects because mutmut's trampoline adds call frames. (stacklevel dropped)
 remora.enforcement.gate.xǁEnforcementGateǁenforce__mutmut_10  Killed by the test that pins this warning's stacklevel, which the sweep deselects because mutmut's trampoline adds call frames. (stacklevel 2 -> 3)

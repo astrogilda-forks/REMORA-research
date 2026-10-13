@@ -278,26 +278,29 @@ because the code they changed did nothing.
 | `_scalar`, commit/rollback `getattr`, duplicate flag removed | 3,412 | 3,393 | 19 |
 | One ledger schema, redundant key-list guard removed | 3,404 | 3,387 | 17 |
 
-The baseline holds 24, not 17. Equivalent mutants flipped between killed and
-survived from one local sweep to the next: the SQL-case variants of the same
+The baseline holds 25, not 17. Equivalent mutants flipped between killed and
+survived from one sweep to the next. The SQL-case variants of the same
 statement survived in one run and were killed in the next, with identical
-mutant bodies. Running one of them alone, six times, it survived every time.
-Run eight at a time, the Docker VM OOM-killed workers. The local sandbox
-under memory pressure reports noise in both directions, which is also how
-the 13 segfault/timeout entries fell out of the earlier baseline. The
-baseline is therefore the union of survivors over three sweeps of unchanged
-code, and `tests/test_mutation_baseline.py` keeps it equal to the argued set.
+mutant bodies, locally and on the runner alike. Running one of them alone,
+six times, it survived every time. Run eight at a time locally, the Docker VM
+OOM-killed workers, so memory pressure is one source of the noise; what kills
+them on the runner is not established. The baseline is therefore the union
+of survivors over three local sweeps and one runner sweep of unchanged code.
+`tests/test_mutation_baseline.py` keeps it equal to the argued set. The
+runner sweep also surfaced `consume`'s default on the private
+`_check_unlogged`, which its only caller always passes; the defaults are
+gone.
 
-| Reason the remaining 24 cannot be killed | Count |
+| Reason the remaining 25 cannot be killed | Count |
 |---|---:|
 | SQL keyword or name case; SQLite, D1 and Postgres fold unquoted names | 12 |
-| `stacklevel` of a warning, killed by tests the trampoline forces the sweep to deselect | 3 |
+| `stacklevel` of a warning, killed by tests the trampoline forces the sweep to deselect | 4 |
 | `None` for `False` where the value is only tested for truth (`live`, `require_expiry`) | 3 |
 | `state_reader` on a mediator whose derived authority has no state condition | 2 |
 | `or` for `and` behind a verify() refusal that admits only both or neither | 1 |
 | A string default that no comparison can tell from `""` | 2 |
 | `select count(*) as n` in lower case; the alias is unchanged | 1 |
-| **Total** | **24** |
+| **Total** | **25** |
 
 Not equivalent, and so not in the list: `consumed_count` with `AS N` in upper
 case, because D1 returns the row as a dict keyed `N` and the count reads `n`.
