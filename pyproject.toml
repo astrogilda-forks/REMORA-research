@@ -360,6 +360,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_direct_accept_authority_binding.py",
     "tests/test_dispatch_clock_consistency.py",
     "tests/test_dispatch_leased_endpoint.py",
+    "tests/test_dispatch_refusal_contract.py",
     "tests/test_dispatcher_contract.py",
     "tests/test_effect_mediation_policy.py",
     "tests/test_effect_vantage_scope.py",
