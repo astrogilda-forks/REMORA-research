@@ -11,8 +11,11 @@ summary is generated at
 The boundary summary keeps internal trust boundaries, external interfaces,
 Federation edges, role mappings and claim ceilings distinct. Its statuses do
 not imply production evidence, owner confirmation, independent observation or
-Federation adoption. E7 remains externally unrun, and
-`runtime_capability_surface_completeness` remains `NOT_ESTABLISHED`.
+Federation adoption. E7 has two externally operated Probity reproductions recorded in
+`artifacts/interop/index.json` under REMORA's narrower independence rule;
+these are not blind studies or independent under the Federation boundary
+map's stricter rule. `runtime_capability_surface_completeness` remains
+`NOT_ESTABLISHED`.
 
 ## Participation manifest
 
@@ -219,7 +222,11 @@ its implementation. The public self-service default and separate admission
 step follow @aeoess's
 [proposal](https://github.com/aeoess/agent-governance-vocabulary/issues/177#issuecomment-5986386137).
 
-E7 still needs its external result. E8 still needs counterpart agreement on
+E7 has two pinned external Probity run records (2026-10-08 self-service and
+2026-10-09 pip), each matching the five frozen fixture outcomes. The Federation
+boundary map still lists field mappings as unrecorded and independence under
+its stricter rule as not established. These records do not establish runtime
+completeness, production enforcement, or external effects. E8 still needs counterpart agreement on
 the signed field and digest semantics: an aggregate
 `scan.toolManifestDigest` is not assumed equivalent to a per-tool
 `toolspec_hash`. Identity continuity, downstream idempotency and hardware

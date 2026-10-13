@@ -46,6 +46,22 @@ unestablished_properties:
       the reference runtime; the property stays NOT_ESTABLISHED until Q3.1 runs
       the observer inside a named external host.
 
+  - id: implementation_effect_conformance
+    phase: RESEARCH
+    status: NOT_ESTABLISHED
+    evidence: tests/test_effect_observation.py
+    caveat: >-
+      Effect contract verification (docs/design/effect-contract-verification-v1.md).
+      Slice 1, 2026-10-13: an observer runs a tool in a fresh interpreter
+      under Python audit hooks and reports file, process, network and
+      environment effects for the import and for each case, with native code,
+      a tool's own audit hook, timeouts and crashes reported as blinding.
+      Nothing compares the observations with a signed spec yet (slice 2), so
+      no verdict exists. Even with one, a MATCH would mean only that no
+      undeclared effect was observed on the cases run; effects below the
+      Python standard library, in child processes, or conditioned on time or
+      on detecting the harness stay outside this vantage.
+
   - id: implementation_effect_non_transitivity
     phase: RESEARCH
     status: NOT_ESTABLISHED
@@ -1150,8 +1166,9 @@ capabilities:
   - id: CAP-026
     name: "Federation Bridge: native federation envelope, transport capability declarations, loss-aware claim projection and projection records"
     status: IMPLEMENTED_LIBRARY
-    verified_at_sha: c70c413ce9773b9040bd4b57363ae41b2cd78083
+    verified_at_sha: ad24650ecd9111b2f26d864316ea9251e44036c2
     verified_by: >-
+      re-audited 2026-10-13 at ad24650 (FEDERATION-KEY-ORDER), from c70c413: javascript_losses() also reports key_order for objects whose canonical key order a JavaScript reader does not keep (array-index keys enumerate first; RFC 8785 sorts by UTF-16 code unit). The loss takes no projection dimension (_LOSS_DIMENSIONS maps it to ()), so every projection result is unchanged; it is recorded in action_losses. Evidence: tests/test_federation_bridge.py. The capability's mechanism is unchanged; status unchanged.
       re-audited 2026-10-07 at c70c413 (FEDERATION-REPORT-SELECTION), from 86f2b8b: report-specific binding: projection records v2, subject, selection and native result. The capability's mechanism is unchanged; status, scope and caveats unchanged.
       audit 2026-10-07 at registration: remora/federation builds the native
       envelope (REMORA canonical bytes, digest and typed scalars; unavailable

@@ -7,15 +7,15 @@
   "package_files": [
     {
       "path": "artifacts/interop/effect-evidence-v1.1/README.md",
-      "sha256": "0e5f7f17aa33c8a14e549a3feecceab11b3c966eb9c2c97f586c58613ff858b4"
+      "sha256": "d108450813073d289c9e1203ae561018832234d3f8253cc8fb4da30bd72f802e"
     },
     {
       "path": "artifacts/interop/effect-evidence-v1.1/claim-packet.json",
-      "sha256": "0f43f8e46309c9eacaeb3e502f1361de999fff3ae278952f6e4bafe2e5c4b009"
+      "sha256": "77e6409fbd3e2bc10a27b684f34b9af153284be4792774de4f430e3fbf9b625b"
     },
     {
       "path": "artifacts/interop/effect-evidence-v1.1/fixtures.json",
-      "sha256": "fb8e4df5309f8d442ec1b8ca544eaff7fe0fdd4a71d73e3277f57f955374d6a5"
+      "sha256": "f9df583eec64effd8fde63032ed25a47f091ec7c6deddd089c9e3460bc09bf76"
     },
     {
       "path": "artifacts/interop/effect-evidence-v1.1/reference_verifier.py",
@@ -23,10 +23,10 @@
     },
     {
       "path": "artifacts/interop/effect-evidence-v1.1/verifier-request.json",
-      "sha256": "197c50f264d646a08edaa780689beacf758af76c6d92c85e1e4e2b67358b5378"
+      "sha256": "4542482ca90b62b8cd071fb21ba634cabb6be5eb3b6f111fafadf40e5ce17211"
     }
   ],
-  "package_digest": "sha256:a09ac49137a6a94990fcdb52663cce25e4ecf8e35469f0f45e8274f09949ec31",
+  "package_digest": "sha256:b74a7055b63aa6f62ec8dd402d9967dca5b1f89310f901cf1f1d2add1040d3cc",
   "package_digest_rule": "sha256 over the UTF-8 text formed by one line per package_files entry, '<path> <sha256>\\n', sorted by path. manifest.json and index.json are outside the package and are never hashed into it.",
   "independence_boundary": "The reference verifier is author-produced and is not independent verification. A second implementation is implementation diversity, not independence. L3_INDEPENDENT_RECOMPUTATION requires a second implementation maintained outside REMORA, run by an external operator, importing neither REMORA code nor this verifier (interop-result-v1).",
   "global_property": {

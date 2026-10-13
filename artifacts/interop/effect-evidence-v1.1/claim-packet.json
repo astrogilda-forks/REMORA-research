@@ -14,7 +14,7 @@
   "artifact_refs": [
     {
       "path": "artifacts/interop/effect-evidence-v1.1/fixtures.json",
-      "sha256": "fb8e4df5309f8d442ec1b8ca544eaff7fe0fdd4a71d73e3277f57f955374d6a5",
+      "sha256": "f9df583eec64effd8fde63032ed25a47f091ec7c6deddd089c9e3460bc09bf76",
       "role": "producer fixture contract"
     },
     {
