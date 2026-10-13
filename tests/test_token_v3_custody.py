@@ -32,6 +32,7 @@ from remora.enforcement.token import (  # noqa: E402
     FORMAT_V3,
     GrantMintingRefused,
     PolicyDecisionToken,
+    TokenVerificationResult,
     asymmetric_configured,
     hmac_accepted,
     verify_only,
@@ -405,3 +406,68 @@ def test_the_api_answers_a_misrouted_mint_with_503_not_a_crash() -> None:
         handler) else handler(None, GrantMintingRefused("x"))
     assert response.status_code == 503
     assert json.loads(response.body)["detail"].startswith("grant_minting_refused:")
+
+
+# ── whole results (mutation sweep 2026-10-13) ──────────────────────────────
+
+def _refusal(reason: str, *, signed: bool = True) -> TokenVerificationResult:
+    return TokenVerificationResult(verified=False, reason=reason, is_signed=signed)
+
+
+def test_every_v3_refusal_is_a_whole_result(_clean: pytest.MonkeyPatch) -> None:
+    """``verified`` and ``is_signed`` are part of the verdict: a refusal that
+    reported a stripped signature as signed, or a missing key as verified,
+    would mislead the gate's audit even with the right reason code."""
+    _as_pdp(_clean)
+    grant = _issue()
+    _as_redeemer(_clean)
+    assert dataclasses.replace(grant, signature="").verify() == _refusal(
+        "token_not_signed", signed=False)
+    assert dataclasses.replace(grant, request_id="other").verify() == _refusal("signature_invalid")
+    _clean.setenv("REMORA_PDP_REVOKED_KIDS", PDP.kid)
+    assert grant.verify() == _refusal("kid_revoked")
+    _clean.delenv("REMORA_PDP_REVOKED_KIDS")
+    _clean.setenv("REMORA_PDP_VERIFY_KEYS_ED25519", "not-a-key")
+    assert grant.verify() == _refusal("verification_key_unusable")
+    _clean.delenv("REMORA_PDP_VERIFY_KEYS_ED25519")
+    _clean.setenv("REMORA_PDP_SIGNING_KEY", "only-hmac")
+    assert grant.verify() == _refusal("no_verification_key")
+
+
+def test_an_hmac_refusal_is_a_whole_result(_clean: pytest.MonkeyPatch) -> None:
+    _clean.setenv("REMORA_PDP_SIGNING_KEY", "shared")
+    legacy = _issue()
+    _clean.setenv("REMORA_PDP_VERIFY_KEYS_ED25519", _public(PDP))
+    assert legacy.verify() == _refusal("token_hmac_refused")
+
+
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "Yes", "on", "ON"])
+def test_every_documented_spelling_opens_the_hmac_window(
+        _clean: pytest.MonkeyPatch, value: str) -> None:
+    _clean.setenv("REMORA_PDP_VERIFY_KEYS_ED25519", _public(PDP))
+    _clean.setenv("REMORA_PDP_ACCEPT_HMAC", value)
+    assert hmac_accepted() is True
+
+
+def test_a_pdp_holding_only_its_seed_verifies_what_it_minted(
+        _clean: pytest.MonkeyPatch) -> None:
+    _as_pdp(_clean)
+    assert _issue().verify(OBS).reason == "ok"
+
+
+def test_the_minting_refusal_names_the_material_it_found(_clean: pytest.MonkeyPatch) -> None:
+    _as_redeemer(_clean)
+    with pytest.raises(GrantMintingRefused,
+                       match=r"^this process holds only REMORA_PDP_VERIFY_KEYS_ED25519: it redeems "):
+        _issue()
+
+
+def test_the_issuer_is_signed_into_a_v3_grant(_clean: pytest.MonkeyPatch) -> None:
+    _clean.setenv("REMORA_PDP_ISSUER", "pdp-1")
+    _as_pdp(_clean)
+    grant = _issue()
+    assert grant.issuer == "pdp-1"
+    _as_redeemer(_clean)
+    assert grant.verify().reason == "ok"
+    assert dataclasses.replace(grant, issuer="pdp-2").verify().reason in (
+        "issuer_mismatch", "signature_invalid")
