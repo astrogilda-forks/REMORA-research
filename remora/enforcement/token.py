@@ -108,10 +108,8 @@ def _previous_keys() -> dict[str, bytes]:
     """Verify-only keys from prior rotations, as {kid: key}."""
     out: dict[str, bytes] = {}
     for pair in os.environ.get(_ENV_PREVIOUS, "").split(","):
-        pair = pair.strip()
-        if not pair or "=" not in pair:
-            continue
-        kid, _, key = pair.partition("=")
+        # An empty or "="-less entry partitions to an empty kid or key.
+        kid, _, key = pair.strip().partition("=")
         if kid.strip() and key.strip():
             out[kid.strip()] = key.strip().encode()
     return out

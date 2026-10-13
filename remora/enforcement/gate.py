@@ -47,21 +47,15 @@ class EnforcementResult:
 
 
 
-# The consumed-grant ledger's schema. SQLite and D1 (SQLite underneath) share
-# one dialect; Postgres differs only in its timestamp and counter types.
-_POSTGRES_SCHEMA = (
+# The consumed-grant ledger's schema, one for all three backends: SQLite and D1
+# (SQLite underneath) read Postgres's TIMESTAMP WITH TIME ZONE and BIGINT with
+# the same column affinity as TIMESTAMP and INTEGER.
+_LEDGER_SCHEMA = (
     "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, "
     "consumed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, "
     "issued_count BIGINT NOT NULL DEFAULT 0, "
     "last_reset_at TIMESTAMP WITH TIME ZONE, last_reset_reason TEXT)",
-)
-_SQLITE_SCHEMA = (
-    "CREATE TABLE IF NOT EXISTS pep_consumed (jti TEXT PRIMARY KEY, "
-    "consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    "CREATE TABLE IF NOT EXISTS pep_ledger_watermark (id INTEGER PRIMARY KEY, "
-    "issued_count INTEGER NOT NULL DEFAULT 0, "
-    "last_reset_at TIMESTAMP, last_reset_reason TEXT)",
 )
 
 
@@ -141,7 +135,7 @@ class EnforcementGate:
         if not self._durable():
             return
         with self._ledger() as (conn, _):
-            for ddl in _POSTGRES_SCHEMA if self._dsn else _SQLITE_SCHEMA:
+            for ddl in _LEDGER_SCHEMA:
                 conn.execute(ddl)
             conn.commit()
 
