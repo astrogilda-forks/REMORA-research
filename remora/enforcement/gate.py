@@ -277,6 +277,26 @@ class EnforcementGate:
                     (count, reason),
                 )
                 conn.commit()
+        elif self._state_endpoint:
+            # D1 was reported by verify_ledger but could not be re-baselined
+            # (mutation sweep 2026-10-13): a Cloudflare deployment saw the
+            # watermark and had no authorized way to reset it after a prune.
+            from remora.persistence.d1_connection import connect
+
+            with connect(self._state_endpoint) as conn:
+                count = _scalar(
+                    conn.execute("SELECT COUNT(*) FROM pep_consumed").fetchone(), 0
+                )
+                conn.execute(
+                    "INSERT INTO pep_ledger_watermark "
+                    "(id, issued_count, last_reset_at, last_reset_reason) "
+                    "VALUES (1, ?, CURRENT_TIMESTAMP, ?) "
+                    "ON CONFLICT (id) DO UPDATE SET issued_count = excluded.issued_count, "
+                    "last_reset_at = excluded.last_reset_at, "
+                    "last_reset_reason = excluded.last_reset_reason",
+                    (count, reason),
+                )
+                conn.commit()
         else:
             raise RuntimeError(
                 "no durable ledger to re-baseline; the in-process ledger has "
@@ -386,7 +406,8 @@ class EnforcementGate:
                 warnings.warn(
                     f"EnforcementGate: unsigned token accepted in non-strict mode "
                     f"(reason: {vr.reason}). Set REMORA_PDP_SIGNING_KEY for production.",
-                    stacklevel=2,
+                    # check() -> _check_unlogged() -> here: 3 names check()'s caller.
+                    stacklevel=3,
                 )
                 br = token.check_bindings(
                     expected_observation_hash, now=now, context=context,

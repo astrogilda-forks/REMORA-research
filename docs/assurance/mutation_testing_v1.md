@@ -166,6 +166,73 @@ baseline now records 294 named survivors rather than 168. That is a larger set
 over a pool more than twice the size, not an accepted regression. The
 per-function breakdown is in the baseline file itself.
 
+## The 2026-10-13 re-measurement
+
+The weekly sweep ran again after #826 repaired its sandbox, and failed with 528
+survivors absent from the baseline. As in September, the count was mostly new
+code: `dispatch` had been split into refusal hooks (`_effect_refusal`,
+`_plan_refusal`, `_procedure_refusal`, `_surface_refusal`), and
+`verify_authenticity` and `_signature_refusal` had no baseline entries at all.
+It was not an accepted regression either. Each survivor was classified by
+where its mutation sits (inside a `governance_event` call, inside a result
+construction, or in logic), and every one was then killed or argued.
+
+| Step | Mutants | Killed | Survived |
+|---|---:|---:|---:|
+| Weekly sweep, 2026-10-12 (runner) | 3,115 | 2,411 | 704 |
+| Local re-run before any change | 3,115 | 2,446 | 634 |
+| Three new contract modules (round 1) | 3,332 | 3,165 | 141 |
+| Newly covered lines killed (round 2) | 3,337 | 3,218 | 110 |
+| Fourth and fifth sweeps (round 3) | 3,358 | 3,245 | 104 |
+
+The pool grows each round because `mutate_only_covered_lines` mutates lines
+the new tests reach for the first time: round 1 covered `_prepare_mediation`
+and `_capability_refusal`, which then contributed 42 new survivors of their
+own. Each round's verification applied every claimed kill to the source by
+hand and ran only the affected module.
+
+The tests are `tests/test_dispatch_refusal_contract.py`,
+`tests/test_lease_refusal_hooks_contract.py` and
+`tests/test_gate_token_nonce_mutation_contract.py`. They pin each refusal as
+a whole result (`executed is False`, the exact reason, the identity fields and
+`dispatch_check`) and each governance event by name, level and payload.
+
+Writing them found two defects in the source, both fixed:
+
+- `reset_ledger_watermark` had no D1 branch, so a Cloudflare deployment could
+  see a ledger that had lost rows and could not re-baseline it after an
+  authorized prune;
+- the non-strict "unsigned token accepted" warning pointed at `check()` inside
+  `gate.py` instead of its caller.
+
+They also pinned behaviour that was right and unguarded. A context presented
+for a lease bound to none must refuse. A caller mutating its own nested
+arguments mid-dispatch must not change what runs. A peek at the SQLite ledger
+must not spend a grant. A peek at a spent grant must report it spent.
+
+The baseline now records 104 survivors. Every one has a written argument in
+`tests/data/mutation_equivalent_{dispatch,lease,gate_token_nonce}.txt`:
+
+| Reason | Count |
+|---|---:|
+| Postgres-only branches, including their SQL text; the sweep runs without `REMORA_PG_DSN` | 42 |
+| Unreachable defaults and arguments that cannot change behaviour | 36 |
+| `"Z"` replacement before `fromisoformat`, a no-op on Python 3.11 and later | 12 |
+| SQL keyword or name case on SQLite and D1, which ignore it | 7 |
+| Killed by a test the sweep deselects (warning `stacklevel` under the trampoline) | 4 |
+| **Open**: killed when applied by hand, survived in the sandbox | 3 |
+| **Total** | **104** |
+
+The three open entries are `_check_unlogged` 231, 232 and 234, which are fields
+of the D1 already-consumed result. Applied by hand, two tests fail; inside
+mutmut they survived. The difference is not yet explained, and the entries
+say so rather than calling them equivalent.
+
+Agent-written tests were part of this pass: three parallel agents and one
+second-round agent, each in its own worktree, with every kill verified by
+applying the mutant. The verification is what makes them evidence here, not
+who wrote them (docs/AI_USE.md).
+
 ## Survivors on covered lines, by function (pre-#405 baseline, 64.3 %)
 
 Historical table kept for the delta analysis above; the current numbers
