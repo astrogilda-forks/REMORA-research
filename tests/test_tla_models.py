@@ -5,10 +5,18 @@
 Runs scripts/check_tla_models.py when Java is available. Without Java the
 check is skipped with that reason: a model that was not checked is not
 passing. The structural tests below run everywhere.
+
+On CI a blocked checker fails instead of skipping. Until 2026-10-13 the pinned
+TLC jar was the rolling v1.8.0 pre-release; upstream rebuilt it, the SHA-256 no
+longer matched, and every CI job skipped the models without anyone seeing it.
+The pin is now the stable v1.7.4 release, and the traces are read from the
+models' own ``lastAction`` label, so they do not depend on how a TLC version
+prints actions.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -28,7 +36,7 @@ def test_every_expected_configuration_has_a_cfg_and_every_cfg_is_expected() -> N
     for name, want in EXPECTED["configs"].items():
         assert want["result"] in ("holds", "violated"), name
         if want["result"] == "violated":
-            assert want["invariant"] and want["trace"], name
+            assert want["invariant"] and (want.get("trace") or want.get("example_trace")), name
         assert want["why"].strip(), name
 
 
@@ -54,6 +62,34 @@ def test_the_cp_f4_trace_is_the_one_the_contract_probe_replays() -> None:
     assert order == sorted(order)
 
 
+def test_every_configuration_names_a_module_that_exists() -> None:
+    for name, want in EXPECTED["configs"].items():
+        assert (TLA / f"{want.get('module', 'LeaseRetry')}.tla").is_file(), name
+
+
+def test_the_reconciliation_rule_holds_and_each_weakening_is_violated() -> None:
+    """federation-port#2: the candidate holds, and every assumption it rests on is shown load-bearing."""
+    results = {n: c["result"] for n, c in EXPECTED["configs"].items() if n.startswith("reconcile_")}
+    holds = {n: results.pop(n) for n in ("reconcile_final", "reconcile_misreport_contradiction")}
+    assert holds == {"reconcile_final": "holds", "reconcile_misreport_contradiction": "holds"}
+    assert results and set(results.values()) == {"violated"}
+    # The two failure cases asked for on #2 come first in their traces.
+    assert EXPECTED["configs"]["reconcile_naive_absent"]["trace"][0] == "Lookup"
+    assert EXPECTED["configs"]["reconcile_effect_after_expiry"]["invariant"] == "NoEffectAfterExpiry"
+
+
+def test_the_models_label_every_step() -> None:
+    """The expected traces are read from lastAction; a step that does not set it would vanish from them."""
+    for module in {c.get("module", "LeaseRetry") for c in EXPECTED["configs"].values()}:
+        text = (TLA / f"{module}.tla").read_text(encoding="utf-8")
+        head = text[:text.index("Next ==")]
+        # Every definition that primes a variable is a step, and must name itself.
+        for m in re.finditer(r"^(\w+)(?:\([^)]*\))? ==(.*?)(?=^\S|\Z)", head, re.M | re.S):
+            name, body = m.group(1), m.group(2)
+            if "'" in body:
+                assert "lastAction'" in body, (module, name)
+
+
 def test_the_tlc_jar_is_pinned() -> None:
     assert re.fullmatch(r"[0-9a-f]{64}", EXPECTED["tlc"]["sha256"])
     assert EXPECTED["tlc"]["url"].startswith("https://github.com/tlaplus/tlaplus/releases/download/")
@@ -64,5 +100,7 @@ def test_tlc_reproduces_every_expected_verdict_and_trace() -> None:
     proc = subprocess.run([sys.executable, str(ROOT / "scripts/check_tla_models.py")],
                           capture_output=True, text=True, timeout=1800)
     if proc.returncode == 2:
+        if os.environ.get("CI"):
+            pytest.fail("BLOCKED on CI: the TLA+ models were not checked: " + proc.stdout.strip()[-300:])
         pytest.skip("BLOCKED: " + proc.stdout.strip()[-300:])
     assert proc.returncode == 0, proc.stdout + proc.stderr

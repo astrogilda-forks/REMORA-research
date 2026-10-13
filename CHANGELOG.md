@@ -4,6 +4,24 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Formal models (reconciliation, TLC pin)
+
+- `formal/tla/LeaseReconcile.tla` models the v1 reconciliation candidate for
+  aeoess/federation-port#2. The candidate rule holds under outages, crashes,
+  restarts and concurrent lookups (`reconcile_final`, including the liveness
+  property `EventuallySettled` under a stated scheduling assumption). Each
+  weakening of the rule is violated: closing on any authoritative absence,
+  unbounded retries, a budget a restart resets, no scheduling assumption, and
+  a provider that misreports finality. The model also exposed an unstated
+  delivery assumption in the retry bound, which is now named (`BoundedDelivery`).
+- The TLA+ check had not run on CI. The pinned `tla2tools.jar` was the v1.8.0
+  pre-release, which upstream rebuilds in place. Its SHA-256 stopped matching,
+  and all four test jobs skipped the models. The pin is now the stable v1.7.4
+  release, and a blocked checker fails on CI instead of skipping. Traces are
+  read from each model's `lastAction` label, so they no longer depend on how a
+  TLC version prints actions. All eight `LeaseRetry` traces reproduce
+  unchanged.
+
 ### Security (callable measurement on the API path)
 
 - `/v1/execution/*` now measures each callable the deployment's registry

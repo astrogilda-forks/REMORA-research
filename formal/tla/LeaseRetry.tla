@@ -37,7 +37,7 @@
 (* It is not a proof about the TypeScript runtime; the correspondence is   *)
 (* tested by the contract probes, not established here.                    *)
 (***************************************************************************)
-EXTENDS Naturals, FiniteSets
+EXTENDS Naturals, FiniteSets, Sequences, TLC
 
 CONSTANTS ConfirmationFinal, ClockSkew, UncertaintySticky, Crashes, Outages,
           ReadOnlyAfterDeadline, MaxAttempts
@@ -45,6 +45,7 @@ CONSTANTS ConfirmationFinal, ClockSkew, UncertaintySticky, Crashes, Outages,
 Outcomes == {"provider_confirmed", "failed_retriable", "unknown"}
 
 VARIABLES
+    lastAction,      \* the step that produced this state (see the note below)
     state,       \* "dispatched" | "provider_confirmed" | "failed" | "unknown"
     retriable,   \* the operation's retriable flag
     closed,      \* closed past the deadline as approval_expired_before_retry
@@ -56,15 +57,17 @@ VARIABLES
     clean,       \* attempts that reported failed-and-retriable (never sent)
     lateClaimed  \* attempts claimed after the deadline had passed
 
-vars == <<state, retriable, closed, attempts, running, sent, refunds, late, clean, lateClaimed>>
+vars == <<lastAction, state, retriable, closed, attempts, running, sent, refunds, late, clean, lateClaimed>>
 
 Init ==
+    /\ lastAction = "Init"
     /\ state = "dispatched" /\ retriable = FALSE /\ closed = FALSE
     /\ attempts = 1 /\ running = {1} /\ sent = {} /\ refunds = 0
     /\ late = FALSE /\ clean = {} /\ lateClaimed = {}
 
 \* A running attempt's request reaches the provider.
 Send(a) ==
+    /\ lastAction' = "Send(" \o ToString(a) \o ")"
     /\ a \in running /\ a \notin sent
     /\ sent' = sent \cup {a}
     /\ refunds' = 1
@@ -83,6 +86,7 @@ Honest(a) == IF a \in sent THEN {"provider_confirmed", "unknown"}
 EarlierUncertain(a) == \E j \in 1..(a - 1) : j \notin clean
 
 Finish(a, o) ==
+    /\ lastAction' = "Finish(" \o ToString(a) \o "," \o ToString(o) \o ")"
     /\ a \in running /\ o \in Honest(a)
     /\ running' = running \ {a}
     /\ clean' = IF o = "failed_retriable" THEN clean \cup {a} ELSE clean
@@ -98,6 +102,7 @@ Finish(a, o) ==
 
 \* A worker dies inside execute(): its attempt never reports.
 Crash(a) ==
+    /\ lastAction' = "Crash(" \o ToString(a) \o ")"
     /\ Crashes /\ a \in running
     /\ running' = running \ {a}
     /\ UNCHANGED <<state, retriable, closed, attempts, sent, refunds, late, clean, lateClaimed>>
@@ -106,6 +111,7 @@ LeaseSeenExpired == running = {} \/ ClockSkew
 
 \* claimDispatch, as a retry submits the same request.
 Claim ==
+    /\ lastAction' = "Claim"
     /\ ~closed /\ attempts < MaxAttempts
     /\ \/ state = "unknown"
        \/ state = "failed" /\ retriable
@@ -124,9 +130,12 @@ Claim ==
             /\ lateClaimed' = IF late THEN lateClaimed \cup {attempts + 1} ELSE lateClaimed
             /\ UNCHANGED <<retriable, closed, sent, refunds, late, clean>>
 
-Tick == ~late /\ late' = TRUE
+Tick == ~late /\ late' = TRUE /\ lastAction' = "Tick"
         /\ UNCHANGED <<state, retriable, closed, attempts, running, sent, refunds, clean, lateClaimed>>
 
+\* lastAction names the step that produced each state, with its parameters. It changes no
+\* behaviour; it makes the counterexample trace readable from the states themselves, so the
+\* expected traces do not depend on how a TLC version prints actions.
 Next ==
     \/ \E a \in 1..MaxAttempts : Send(a) \/ Crash(a)
     \/ \E a \in 1..MaxAttempts, o \in Outcomes : Finish(a, o)

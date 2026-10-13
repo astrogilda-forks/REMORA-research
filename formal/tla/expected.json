@@ -2,24 +2,167 @@
   "schema": "remora-tla-expected-v1",
   "spec": "formal/tla/LeaseRetry.tla",
   "tlc": {
-    "version": "1.8.0",
-    "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
-    "sha256": "7beec0f04818732a62fa193731711a99aa4f11279499b2360a7d156c519ea78d"
+    "version": "1.7.4",
+    "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
+    "sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
   },
   "configs": {
-    "pinned_reachable": {"result": "holds", "why": "control: the pinned rule is safe while every attempt can reach the provider"},
-    "pinned_outage": {"result": "violated", "invariant": "NoClosedFailureWithEffect",
-      "trace": ["Send(1)", "Finish(1,\"unknown\")", "Claim", "Finish(2,\"failed_retriable\")", "Tick", "Claim"],
-      "why": "CP-F4: a lost response, then an outage, then the deadline; confirmed on the runtime by contract probe CP-F4"},
-    "pinned_skew_reachable": {"result": "holds", "why": "clock skew alone does not break it; CP-F1 also needs the later attempt to be unable to reach the provider"},
-    "confirmfinal_all": {"result": "violated", "invariant": "NoClosedFailureWithEffect",
-      "trace": ["Send(1)", "Claim", "Finish(2,\"failed_retriable\")", "Tick", "Claim"],
-      "why": "making a confirmation final does not help when the operation closes before the earlier attempt reports"},
-    "sticky_all": {"result": "holds", "why": "uncertainty sticky alone holds under outage, crash and skew"},
-    "sticky_confirmfinal_all": {"result": "holds", "why": "both rules together hold under outage, crash and skew"},
-    "sticky_confirmfinal_dispatch_after_expiry": {"result": "violated", "invariant": "NoDispatchAfterExpiry",
-      "trace": ["Tick", "Claim"],
-      "why": "aeoess/federation-port#1 at a134e94: past the deadline a retry is still dispatched, so the first request can come after the authorization expired"},
-    "read_only_after_expiry": {"result": "holds", "why": "the rule asked for in review: nothing is dispatched after the deadline; all four invariants hold under outage, crash and skew"}
+    "pinned_reachable": {
+      "result": "holds",
+      "why": "control: the pinned rule is safe while every attempt can reach the provider"
+    },
+    "pinned_outage": {
+      "result": "violated",
+      "invariant": "NoClosedFailureWithEffect",
+      "trace": [
+        "Send(1)",
+        "Finish(1,\"unknown\")",
+        "Claim",
+        "Finish(2,\"failed_retriable\")",
+        "Tick",
+        "Claim"
+      ],
+      "why": "CP-F4: a lost response, then an outage, then the deadline; confirmed on the runtime by contract probe CP-F4"
+    },
+    "pinned_skew_reachable": {
+      "result": "holds",
+      "why": "clock skew alone does not break it; CP-F1 also needs the later attempt to be unable to reach the provider"
+    },
+    "confirmfinal_all": {
+      "result": "violated",
+      "invariant": "NoClosedFailureWithEffect",
+      "trace": [
+        "Send(1)",
+        "Claim",
+        "Finish(2,\"failed_retriable\")",
+        "Tick",
+        "Claim"
+      ],
+      "why": "making a confirmation final does not help when the operation closes before the earlier attempt reports"
+    },
+    "sticky_all": {
+      "result": "holds",
+      "why": "uncertainty sticky alone holds under outage, crash and skew"
+    },
+    "sticky_confirmfinal_all": {
+      "result": "holds",
+      "why": "both rules together hold under outage, crash and skew"
+    },
+    "sticky_confirmfinal_dispatch_after_expiry": {
+      "result": "violated",
+      "invariant": "NoDispatchAfterExpiry",
+      "trace": [
+        "Tick",
+        "Claim"
+      ],
+      "why": "aeoess/federation-port#1 at a134e94: past the deadline a retry is still dispatched, so the first request can come after the authorization expired"
+    },
+    "read_only_after_expiry": {
+      "result": "holds",
+      "why": "the rule asked for in review: nothing is dispatched after the deadline; all four invariants hold under outage, crash and skew"
+    },
+    "reconcile_naive_absent": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "NoFailedWithEffect",
+      "trace": [
+        "Lookup",
+        "Receive(1)",
+        "Settle(1)"
+      ],
+      "why": "federation-port#2 failure case 1: an authoritative absence closes the operation, then the earlier request reaches the provider and settles"
+    },
+    "reconcile_final": {
+      "module": "LeaseReconcile",
+      "result": "holds",
+      "why": "the candidate rule: absence closes only on key-scoped finality inside retention, retries and lookups bounded by retention, durable budget, and under the sweep assumption every unknown operation settles or reaches an operator"
+    },
+    "reconcile_no_retention_bound": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "AtMostOneEffect",
+      "trace": [
+        "Receive(1)",
+        "Settle(1)",
+        "RetentionTick",
+        "Dispatch",
+        "Forget",
+        "Receive(2)",
+        "Settle(2)"
+      ],
+      "why": "a retry sent after the retention window reaches a provider that forgot the key: a second refund"
+    },
+    "reconcile_unbounded_delivery": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "AtMostOneEffect",
+      "trace": [
+        "Dispatch",
+        "Receive(1)",
+        "Settle(1)",
+        "RetentionTick",
+        "Forget",
+        "Receive(2)",
+        "Settle(2)"
+      ],
+      "why": "timing assumption T3 is load-bearing: a retry sent inside the window that arrives after the provider forgot the key is a second refund"
+    },
+    "reconcile_effect_after_expiry": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "NoEffectAfterExpiry",
+      "trace": [
+        "Receive(1)",
+        "Tick",
+        "Settle(1)"
+      ],
+      "why": "federation-port#2 failure case 2: no dispatch after the deadline, yet a request sent before it settles after it; the runtime cannot prevent this, only record it"
+    },
+    "reconcile_volatile_budget": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "EventuallySettled",
+      "why": "a budget or status that a restart resets lets reconciliation loop without end; budgets must survive restarts (liveness: TLC may report another lasso, so only the property and the loop are compared; example_trace is one such run)",
+      "example_trace": [
+        "Drop(1)",
+        "Tick",
+        "RetentionTick",
+        "Cancel",
+        "Forget",
+        "RequireOperator",
+        "Restart",
+        "Back to state 7"
+      ]
+    },
+    "reconcile_no_scheduling": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "EventuallySettled",
+      "why": "operator_required within a bounded number of steps needs the scheduling assumption S1: without a caller or a sweep nothing happens (liveness: TLC may report another lasso, so only the property and the loop are compared; example_trace is one such run)",
+      "example_trace": [
+        "Tick",
+        "Drop(1)",
+        "RetentionTick",
+        "Forget",
+        "Cancel",
+        "Stuttering"
+      ]
+    },
+    "reconcile_misreported_final": {
+      "module": "LeaseReconcile",
+      "result": "violated",
+      "invariant": "NoFailedWithEffect",
+      "trace": [
+        "Lookup",
+        "Receive(1)",
+        "Settle(1)"
+      ],
+      "why": "finality is the provider's guarantee: a provider that reports a pending request as final absence makes the closure wrong"
+    },
+    "reconcile_misreport_contradiction": {
+      "module": "LeaseReconcile",
+      "result": "holds",
+      "why": "even with a misreporting provider, a contradicting confirmation wins and is never invented"
+    }
   }
 }
