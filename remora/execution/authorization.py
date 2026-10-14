@@ -9,8 +9,9 @@ route layer owns all HTTP conversion (it maps them to status 409).
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from remora.toolcall.callable_digest import callable_digest_for
 from remora.toolcall.toolspec import ToolSpecBundle

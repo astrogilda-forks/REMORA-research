@@ -206,7 +206,7 @@ class DurableRevocationStore:
             self._ensure_table(conn, own_commit=own_commit)
             try:
                 conn.execute(sql, (tenant_id, principal, reason))
-            except Exception as exc:  # noqa: BLE001 — re-raised below
+            except Exception as exc:
                 if not _is_duplicate(exc):
                     raise
             if own_commit:
@@ -225,7 +225,7 @@ class DurableRevocationStore:
                     _write(conn, own_commit=True)
         except RevocationStoreUnavailable:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise RevocationStoreUnavailable(
                 f"principal revocation store unreachable: {exc}"
             ) from exc
@@ -245,7 +245,7 @@ class DurableRevocationStore:
                 with self._connect() as conn:
                     self._ensure_table(conn, own_commit=True)
                     row = conn.execute(sql, (tenant_id, principal)).fetchone()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise RevocationStoreUnavailable(
                 f"principal revocation store unreachable: {exc}"
             ) from exc

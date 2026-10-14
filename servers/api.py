@@ -380,7 +380,9 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
     return _safe_error_response(exc, status_code=500)
 
 
-from remora.enforcement.token import GrantMintingRefused as _GrantMintingRefused  # noqa: E402
+from remora.enforcement.token import (
+    GrantMintingRefused as _GrantMintingRefused,
+)
 
 app.add_exception_handler(_GrantMintingRefused, _grant_minting_refused_handler)
 
@@ -770,7 +772,7 @@ def is_ephemeral_filesystem_type(fstype: str | None) -> bool:
     return fstype.strip().lower() in _EPHEMERAL_FSTYPES
 
 
-def _mount_filesystem_type(path: "os.PathLike[str] | str") -> str | None:
+def _mount_filesystem_type(path: os.PathLike[str] | str) -> str | None:
     """Filesystem type backing ``path``, read from the Linux mount table.
 
     Returns None where it cannot be established — a platform without
@@ -799,7 +801,7 @@ def _mount_filesystem_type(path: "os.PathLike[str] | str") -> str | None:
     return best_type
 
 
-def filesystem_type_for(path: "os.PathLike[str] | str") -> str | None:
+def filesystem_type_for(path: os.PathLike[str] | str) -> str | None:
     """Filesystem type for ``path``, walking up to the nearest existing ancestor.
 
     On a first start the database file does not exist yet, so the question is
@@ -1007,6 +1009,8 @@ def _validate_deployment_tool_metadata() -> None:
     """
     from remora.toolcall.deployment_registry import (
         ENV_VAR as _TOOL_METADATA_ENV,
+    )
+    from remora.toolcall.deployment_registry import (
         load_deployment_tool_metadata,
     )
 
@@ -1033,7 +1037,9 @@ def _validate_strict_profile_at_startup() -> None:
     from remora.profiles import STRICT_PROFILES, current_runtime_profile
 
     if current_runtime_profile() in STRICT_PROFILES:
-        from remora.toolcall.runtime_profile import validate_runtime_profile_prerequisites
+        from remora.toolcall.runtime_profile import (
+            validate_runtime_profile_prerequisites,
+        )
 
         validate_runtime_profile_prerequisites()
 
@@ -1202,7 +1208,7 @@ def _tool_registry_component_hash() -> str:
                              separators=(",", ":")).encode("utf-8"))
     for env_name in ("REMORA_TOOL_REGISTRY_MODULE", "REMORA_SEMANTIC_BUNDLE_MODULE"):
         spec = os.getenv(env_name, "").strip()
-        hasher.update(f"|{env_name}={spec}".encode("utf-8"))
+        hasher.update(f"|{env_name}={spec}".encode())
         if not spec:
             continue
         try:
@@ -1212,7 +1218,7 @@ def _tool_registry_component_hash() -> str:
                       if origin and Path(origin).is_file() else "no-source")
         except (ImportError, OSError, TypeError, ValueError):
             digest = "unresolved"
-        hasher.update(f":{digest}".encode("utf-8"))
+        hasher.update(f":{digest}".encode())
 
     # Deployment-declared tool risk metadata (REMORA_TOOL_METADATA_FILE).
     # It changes what a tool IS to the policy engine, so it belongs in the
@@ -1222,10 +1228,12 @@ def _tool_registry_component_hash() -> str:
     # granted before the relabel.
     from remora.toolcall.deployment_registry import (
         ENV_VAR as _TOOL_METADATA_ENV,
+    )
+    from remora.toolcall.deployment_registry import (
         deployment_registry_digest,
     )
     hasher.update(
-        f"|{_TOOL_METADATA_ENV}={deployment_registry_digest()}".encode("utf-8")
+        f"|{_TOOL_METADATA_ENV}={deployment_registry_digest()}".encode()
     )
     return "sha256:" + hasher.hexdigest()
 
@@ -1588,7 +1596,7 @@ def _finalize_envelope_audit(
 def _assess_semantic_overlay(
     *,
     envelope_payload: dict[str, Any],
-    tool_call: "AssessToolCall",
+    tool_call: AssessToolCall,
     tenant_id: str,
     question: str,
 ) -> dict[str, Any] | None:
@@ -3176,7 +3184,7 @@ class _BodySizeLimitMiddleware:
 # on the wire, before the framework parser can collapse them. Registered
 # before the body-size limit so that limit stays outermost and bounds the
 # bytes this guard buffers. An admitted body is replayed unchanged.
-from servers.strict_json_ingress import StrictJsonIngressMiddleware  # noqa: E402
+from servers.strict_json_ingress import StrictJsonIngressMiddleware
 
 app.add_middleware(StrictJsonIngressMiddleware)
 app.add_middleware(_BodySizeLimitMiddleware)

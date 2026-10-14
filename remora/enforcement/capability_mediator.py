@@ -200,7 +200,7 @@ class CapabilityMediator:
             with self._lock:
                 self._records.append(effect)
             return effect
-        except Exception:  # noqa: BLE001 - began and failed: the state is unknown
+        except Exception:
             effect = MediatedEffect(state=EffectState.UNKNOWN, refusal=None, **base)
         else:
             effect = MediatedEffect(state=EffectState.EXECUTED, refusal=None, result=result,

@@ -37,16 +37,16 @@ tenant scoped
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import threading
 from typing import Any, Protocol, runtime_checkable
 
+from remora.errors import RemoraError
+
 __all__ = [
-    "NonceStore",
-    "NonceStoreUnavailable",
     "DurableNonceStore",
     "InMemoryNonceStore",
+    "NonceStore",
+    "NonceStoreUnavailable",
 ]
 
 #: Composite primary key, so tenant isolation is enforced by the store rather
@@ -205,7 +205,7 @@ class DurableNonceStore:
                 try:
                     conn.execute(sql, (tenant_id, nonce))
                     conn.commit()
-                except Exception as exc:  # noqa: BLE001 — re-raised below
+                except Exception as exc:
                     if not self._is_duplicate(exc):
                         raise
                     # End the failed transaction before the context manager's
@@ -214,7 +214,7 @@ class DurableNonceStore:
                     return False
         except NonceStoreUnavailable:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Anything reaching here is an unknown outcome. The caller must
             # refuse WITHOUT burning the nonce: the grant may still be
             # unspent, and destroying it would turn a transient fault into a
@@ -239,7 +239,7 @@ class DurableNonceStore:
             with self._connect() as conn:
                 self._ensure_table(conn)
                 row = conn.execute(sql, (tenant_id, nonce)).fetchone()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise NonceStoreUnavailable(str(exc)) from exc
         return row is not None
 
@@ -253,7 +253,7 @@ class DurableNonceStore:
             with self._connect() as conn:
                 self._ensure_table(conn)
                 row = conn.execute(sql, (tenant_id,)).fetchone()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise NonceStoreUnavailable(str(exc)) from exc
         if row is None:
             return 0

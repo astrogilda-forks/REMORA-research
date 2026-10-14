@@ -7,7 +7,8 @@ import os
 from functools import lru_cache
 
 from remora.governance.execution_identity import (
-    ExecutionContextProvider, ExecutionContextRefused,
+    ExecutionContextProvider,
+    ExecutionContextRefused,
 )
 
 

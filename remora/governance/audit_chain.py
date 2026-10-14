@@ -46,10 +46,10 @@ import dataclasses
 import hashlib
 import hmac
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from collections.abc import Iterator
 from typing import Any
 
 from remora.governance.envelope import DecisionEnvelope
@@ -137,7 +137,7 @@ class RemoraAuditChain:
         """Number of entries in the chain."""
         return len(self._entries)
 
-    def __iter__(self) -> "Iterator[ChainEntry]":
+    def __iter__(self) -> Iterator[ChainEntry]:
         """Iterate over ChainEntry records in order."""
         return iter(self._entries)
 

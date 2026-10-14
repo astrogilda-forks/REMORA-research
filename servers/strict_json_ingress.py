@@ -41,7 +41,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 STRICT_PATH_PREFIXES: tuple[str, ...] = ("/v1/execution/", "/v1/assess")
 STRICT_METHODS: frozenset[bytes | str] = frozenset({"POST", "PUT", "PATCH"})

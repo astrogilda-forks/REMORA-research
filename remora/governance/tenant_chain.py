@@ -31,11 +31,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sqlite3
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-import sqlite3
 from typing import Any
 
 from remora.governance.audit_signing import (
@@ -315,7 +315,7 @@ _SIGNATURE_PROBLEMS = ("signature_mismatch_at:", "signature_missing_at:",
 
 
 def verification_statuses(
-    entries: "tuple[ChainEntry, ...] | list[ChainEntry]", problems: list[str]
+    entries: tuple[ChainEntry, ...] | list[ChainEntry], problems: list[str]
 ) -> dict[str, str]:
     """``hash_chain_status`` and ``signature_status`` for one verification.
 
@@ -445,7 +445,7 @@ class SQLiteTenantChain:
         self._local = threading.local()
         self._conn().executescript(_SQLITE_DDL)
 
-    def _conn(self) -> "sqlite3.Connection":
+    def _conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
         if conn is None:
             conn = sqlite3.connect(self._db_path, timeout=30, isolation_level=None)

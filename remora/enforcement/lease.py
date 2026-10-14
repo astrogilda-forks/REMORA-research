@@ -41,8 +41,6 @@ evidence of integrated, unbypassable enforcement.
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import copy
 import hashlib
 import hmac
@@ -51,20 +49,26 @@ import logging
 import os
 import threading
 import uuid
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Callable, ContextManager, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from remora.enforcement import lease_signing as _signing
 from remora.enforcement.nonce_store import NonceStore, NonceStoreUnavailable
+from remora.errors import RemoraError
 from remora.observability.events import governance_event
 from remora.policy.observation import canonical_tool_call_hash
 
 if TYPE_CHECKING:
-    from remora.governance.execution_identity import ExecutionContextV1, ExecutionContextProvider
     from remora.audit.recorder import RecorderClient
     from remora.capabilities.model import EffectiveCapabilitySet
     from remora.enforcement.resolved_effect import EffectResolver, ResolvedEffect
+    from remora.governance.execution_identity import (
+        ExecutionContextProvider,
+        ExecutionContextV1,
+    )
     from remora.governance.plan_binding import PlanBinding, RevisionReader
     from remora.governance.procedure import ProcedureContract, Step
     from remora.governance.task_identity import TaskIdentity
@@ -905,7 +909,7 @@ class GovernedToolDispatcher:
             current = self._effect_resolver.resolve(tool_name, arguments, target_environment)
         except UnresolvedReference:
             return "unresolved_reference"
-        except Exception:  # noqa: BLE001 - a failed lookup is not an absent one
+        except Exception:
             return "resolved_effect_unresolvable"
         if lease.resolved_effect_hash:
             if not hmac.compare_digest(current.digest(), lease.resolved_effect_hash):
@@ -965,7 +969,7 @@ class GovernedToolDispatcher:
         contract, trace_for = self._procedure
         try:
             trace = trace_for(lease)
-        except Exception:  # noqa: BLE001 - an unreadable history is not an empty one
+        except Exception:
             return "procedure_trace_unavailable"
         refused = replay(contract, trace).admits(
             Step(tool_name, arguments if isinstance(arguments, dict) else {}))
@@ -1120,7 +1124,7 @@ class GovernedToolDispatcher:
             return None
         try:
             current = self._surface_observer()
-        except Exception:  # noqa: BLE001 - an unobservable surface is not an unchanged one
+        except Exception:
             return "surface_unobservable" if enforcing else None
         self.surface_checks += 1
         if hmac.compare_digest(current, lease.surface_digest):
@@ -1165,7 +1169,7 @@ class GovernedToolDispatcher:
         with self._registry_lock:
             return tuple(sorted(self._tools))
 
-    def registry_guard(self) -> ContextManager[bool]:
+    def registry_guard(self) -> AbstractContextManager[bool]:
         """Serialize a local observation/dispatch transaction with registration."""
         return self._registry_lock
 
@@ -1249,7 +1253,7 @@ class GovernedToolDispatcher:
         try:
             ceiling = (self._downstream_ceilings(tool_name)
                        if self._downstream_ceilings is not None else None)
-        except Exception:  # noqa: BLE001 - an unreadable ceiling is not an empty one
+        except Exception:
             return None, "downstream_ceiling_unavailable"
         if ceiling is None:
             if self._require_declaration:
@@ -1377,7 +1381,7 @@ class GovernedToolDispatcher:
         # a window in which the executed call is not the verified one.
         try:
             arguments = copy.deepcopy(arguments)
-        except Exception:  # noqa: BLE001 - an uncopyable payload has no exact form
+        except Exception:
             governance_event(
                 "dispatch.refused", level=logging.WARNING,
                 reason="tool_args_not_canonical", tenant_id=tenant_id,
@@ -1467,8 +1471,10 @@ class GovernedToolDispatcher:
             )
         check: dict[str, Any] | None = None
         if lease.execution_context_hash or execution_context is not None or self._require_execution_context:
+            from remora.enforcement.runtime_identity import (
+                current_runtime_identity_hash,
+            )
             from remora.governance.execution_identity import ExecutionContextRefused
-            from remora.enforcement.runtime_identity import current_runtime_identity_hash
 
             observed_runtime = current_runtime_identity_hash()
             check = {
@@ -1688,7 +1694,7 @@ class GovernedToolDispatcher:
             if self._effect_domain is not None:
                 try:
                     self._effect_domain.close(lease)
-                except Exception as exc:  # noqa: BLE001 - it expires with its authority
+                except Exception as exc:
                     governance_event(
                         "dispatch.effect_domain_close_failed", level=logging.WARNING,
                         tenant_id=lease.tenant_id, tool_name=tool_name,

@@ -67,8 +67,8 @@ from remora.errors import RemoraError
 
 __all__ = [
     "TaskIdentity",
-    "agreeing_task",
     "TaskIdentityMismatch",
+    "agreeing_task",
     "merge_task_fields",
     "task_fields",
 ]
@@ -113,7 +113,7 @@ class TaskIdentity:
                 raise ValueError(f"{name} must not carry leading or trailing space")
 
     @classmethod
-    def from_fields(cls, data: Any) -> "TaskIdentity | None":
+    def from_fields(cls, data: Any) -> TaskIdentity | None:
         """Read an identity from a mapping, or None when it carries neither.
 
         A mapping carrying exactly one half is an error rather than a
@@ -133,13 +133,13 @@ class TaskIdentity:
             )
         return cls(context_id=context_id, task_id=task_id)
 
-    def matches(self, other: "TaskIdentity | None") -> bool:
+    def matches(self, other: TaskIdentity | None) -> bool:
         """Exact equality on both halves. None never matches."""
         return other is not None and (
             self.context_id == other.context_id and self.task_id == other.task_id
         )
 
-    def differences(self, other: "TaskIdentity | None") -> tuple[str, ...]:
+    def differences(self, other: TaskIdentity | None) -> tuple[str, ...]:
         """Which halves disagree, for a refusal that says what was wrong."""
         if other is None:
             return ("task_unbound",)
@@ -151,7 +151,7 @@ class TaskIdentity:
         return tuple(out)
 
 
-def task_fields(identity: "TaskIdentity | None") -> dict[str, str]:
+def task_fields(identity: TaskIdentity | None) -> dict[str, str]:
     """The identity as signable fields, or an empty mapping when absent.
 
     Empty rather than ``{"context_id": None, "task_id": None}``: the caller
@@ -165,7 +165,7 @@ def task_fields(identity: "TaskIdentity | None") -> dict[str, str]:
 
 
 def merge_task_fields(payload: dict[str, Any],
-                      identity: "TaskIdentity | None") -> dict[str, Any]:
+                      identity: TaskIdentity | None) -> dict[str, Any]:
     """Fold an identity into a signable payload, omitting it when absent.
 
     Refuses to overwrite an identity already present in the payload. A
@@ -184,7 +184,7 @@ def merge_task_fields(payload: dict[str, Any],
     return {**payload, **fields}
 
 
-def agreeing_task(*identities: "TaskIdentity | None") -> "TaskIdentity | None":
+def agreeing_task(*identities: TaskIdentity | None) -> TaskIdentity | None:
     """The one task every bound structure names, or None when none is bound.
 
     The token context, the lease and the A2A envelope each carry a task
