@@ -50,6 +50,11 @@ This file lists externally relevant changes by release. Fine-grained development
 - Fixed on the way: `EnforcementGate.reset_ledger_watermark` had no D1 branch,
   so a Cloudflare deployment could not re-baseline its ledger watermark; the
   non-strict unsigned-token warning now names `check()`'s caller.
+- Follow-up: `DurableNonceStore.consumed_count` no longer carries a dict
+  branch no backend can reach (sqlite3, psycopg and `D1Connection` all
+  hand the row back positionally) nor the column alias that branch read.
+  A test pins the positional read and the alias-free query on SQLite and
+  D1; the two case-only mutants of the statement keep their baseline ids.
 
 ### Interop (the effect hash rule's preimage)
 
