@@ -63,7 +63,15 @@ jobs:
         # pyproject.toml addopts — no API keys or network access required.
         env:
           REMORA_REQUIRE_SECURITY_EXTRA: "1"
-        run: python -m pytest tests/ -q
+        run: |
+          set -o pipefail
+          python -m pytest tests/ -q -rs | tee pytest-report.txt
+
+      - name: Every skipped test names a listed reason
+        # A skipped test did not run. scripts/check_skip_reasons.py fails on a
+        # reason absent from docs/assurance/skip_reason_allowlist_v1.yaml and
+        # prints how many tests each listed reason kept from running.
+        run: python scripts/check_skip_reasons.py pytest-report.txt
 
       - name: Verify zero false-accept rate
         # HONESTY NOTE (research audit, 2026-07-27): this step READS the
