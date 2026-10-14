@@ -148,3 +148,15 @@ def test_npm_locks_exclude_known_vulnerable_dependency_versions(manifest, packag
     for path, entry in lock["packages"].items():
         if path.endswith(f"/{package}"):
             assert Version(entry["version"]) >= Version(patched), path
+
+
+def test_the_pytest_job_installs_the_identity_extra_so_the_adapter_tests_run() -> None:
+    """tests/test_review_identity_exp_sub.py and test_silent_fallback_events.py
+    importorskip PyJWT. Until 2026-10-14 no extra declared it, so the pytest job
+    silently skipped them (found by the skip-reason gate, #844)."""
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        extras = tomllib.load(handle)["project"]["optional-dependencies"]
+    names = {Requirement(value).name.lower() for value in extras["identity"]}
+    assert "pyjwt" in names
+    ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert 'pip install -e ".[dev,causal,api,security,identity]"' in ci

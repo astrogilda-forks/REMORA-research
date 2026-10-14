@@ -59,6 +59,11 @@ cloud = ["boto3>=1.26"]
 # unaudited, because the supply-chain job installed a narrower extra set than
 # the test jobs. See the comment on that job.
 security = ["cryptography>=50.0.0"]
+# Identity adapters (remora/adapters/identity: JWT, Entra ID, Keycloak) import
+# PyJWT lazily. Until 2026-10-14 no extra declared it, so a deployment had no
+# install path and the pytest job never ran the adapter tests (#844 made the
+# skip visible). The crypto extra brings the RS256 key support the adapters use.
+identity = ["PyJWT[crypto]>=2.10"]
 # MCP server transport (httpx is the only hard dep for the MCP workers)
 mcp = ["httpx>=0.25"]
 # REST API gateway (servers/api.py) — FastAPI + ASGI server
