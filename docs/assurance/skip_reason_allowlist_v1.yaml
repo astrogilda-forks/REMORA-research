@@ -93,6 +93,9 @@ entries:
   - pattern: "(v2 set|routing bench data) absent; run scripts/build_routing_bench\\.py"
     class: artifact
     note: "The routing benchmark set is built from local data."
+  - pattern: "(AgentDojo|ToolSandbox|tau2) (source|tool) cache absent; run scripts/build_routing_bench\\.py --fetch"
+    class: artifact
+    note: "The routing benchmark adapters read fetched upstream caches that are not committed."
   - pattern: "local compendium absent \\(expected in CI\\)"
     class: artifact
     note: "The research compendium is a local file by design."
@@ -130,6 +133,9 @@ entries:
   - pattern: "boundary freshness needs full Git history; this clone is shallow|--regenerate needs a git checkout"
     class: platform
     note: "Shallow or exported checkouts."
+  - pattern: "the (manifest|register)'s snapshot commit is not in this \\(shallow\\) clone"
+    class: platform
+    note: "The provenance ledger and register pin a snapshot commit; actions/checkout fetches depth 1."
   - pattern: "Stale rate-limited KV cache entry.*"
     class: platform
     note: "Worker integration against a rate-limited cache."
