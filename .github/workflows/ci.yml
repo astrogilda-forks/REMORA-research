@@ -56,9 +56,10 @@ jobs:
           # WHAT gets installed. The lock file contains editable (-e) and comment
           # lines that pip rejects in a constraints file, so filter them out.
           grep -vE '^-e|^#|file://' requirements-lock.txt > /tmp/constraints.txt
-          # identity: PyJWT for the identity-adapter tests, which otherwise skip
-          # (docs/assurance/skip_reason_allowlist_v1.yaml lists no reason for it).
-          pip install -e ".[dev,causal,api,security,identity]" -c /tmp/constraints.txt
+          # identity: PyJWT for the identity-adapter tests; otel: the SDK for the
+          # structural tracing tests. Both otherwise skip, and
+          # docs/assurance/skip_reason_allowlist_v1.yaml lists no reason for it.
+          pip install -e ".[dev,causal,api,security,identity,otel]" -c /tmp/constraints.txt
 
       - name: Run deterministic test suite
         # Markers 'live' and 'live_replay_heavy' are excluded by default in

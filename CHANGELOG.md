@@ -72,6 +72,11 @@ This file lists externally relevant changes by release. Fine-grained development
   never ran in the pytest job. New `identity` extra (`PyJWT[crypto]`); the
   pytest job installs it, the lock-resolvability sets include it, and a
   missing `jwt` now fails the job instead of skipping.
+- The same for OpenTelemetry: `remora/observability/otel.py` documented a
+  manual `pip install` and no extra declared the packages, so the structural
+  tracing tests (issue #45 gap 6) never ran in the job. New `otel` extra
+  (API, SDK, OTLP/HTTP exporter, all already pinned in the lock); the pytest
+  job installs it, and a missing `opentelemetry.sdk` fails the job.
 
 ### Interop (the effect hash rule's preimage)
 

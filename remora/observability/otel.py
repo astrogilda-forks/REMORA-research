@@ -27,11 +27,10 @@ Dependency strategy
 (the common case for lightweight REMORA deployments), the tracer silently
 becomes a no-op.  No import error, no crash.
 
-Install the optional dependency::
+Install the optional dependency through the ``otel`` extra, which pins the
+API, the SDK and the OTLP/HTTP exporter through the lock file::
 
-    pip install opentelemetry-api opentelemetry-sdk
-    # For OTLP export:
-    pip install opentelemetry-exporter-otlp
+    pip install -e ".[otel]"
 
 Usage
 -----

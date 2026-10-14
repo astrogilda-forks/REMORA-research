@@ -158,5 +158,7 @@ def test_the_pytest_job_installs_the_identity_extra_so_the_adapter_tests_run() -
         extras = tomllib.load(handle)["project"]["optional-dependencies"]
     names = {Requirement(value).name.lower() for value in extras["identity"]}
     assert "pyjwt" in names
+    otel = {Requirement(value).name.lower() for value in extras["otel"]}
+    assert {"opentelemetry-api", "opentelemetry-sdk"} <= otel
     ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert 'pip install -e ".[dev,causal,api,security,identity]"' in ci
+    assert 'pip install -e ".[dev,causal,api,security,identity,otel]"' in ci
