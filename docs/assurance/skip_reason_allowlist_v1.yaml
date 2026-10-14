@@ -1,0 +1,140 @@
+schema_version: skip-reason-allowlist/v1
+
+# Every reason a test may skip with in the CI pytest job (.github/workflows/ci.yml,
+# "Run deterministic test suite"), checked by scripts/check_skip_reasons.py.
+# A reason that matches no entry fails the job. Patterns are Python regular
+# expressions matched against the whole reason text of a `SKIPPED [n] path:line:
+# reason` line from `pytest -rs`.
+#
+# Not listed on purpose, because the job installs them and a skip would mean
+# the install is broken: `could not import 'fastapi'`, 'cryptography', 'httpx',
+# 'yaml', 'jsonschema', 'uvicorn'. Not listed either: `BLOCKED: ...` from
+# tests/test_tla_models.py, which is a failure since #834, and that file's
+# `java not found: TLA+ models NOT checked`: the ubuntu runner image ships a
+# JDK, and a runner without one must fail the job, not skip the model checks.
+
+classes:
+  optional_dependency: "A package outside the job's install set (dev, causal, api, security). The tests run wherever it is installed."
+  external_tool: "A binary or toolchain the job does not provide (node, esbuild, git on a shallow clone)."
+  other_job: "The test runs in another CI job that provides what it needs (Postgres service, OPA binary, APS clone)."
+  artifact: "A results or dataset artifact that is not committed. The test did not run; the claim it guards is not verified by this job."
+  data_conditional: "The test guards a case the fixture or engine configuration did not produce; it says so instead of asserting on the wrong case."
+  platform: "The runner's platform or clone shape (time zone, POSIX bits, shallow history)."
+  live: "A live service behind REMORA_LIVE; deselected by addopts, listed in case a marker is added by hand."
+
+entries:
+  # ── other_job ──────────────────────────────────────────────────────────
+  - pattern: "could not import 'psycopg(\\.conninfo)?'.*"
+    class: other_job
+    note: "The postgres extra is not in the pytest job; the ledger and reservation contracts run in the Postgres jobs of ci.yml and mutation.yml."
+  - pattern: "REMORA_PG_DSN not set.*"
+    class: other_job
+    note: "Same as above; the Postgres jobs set the DSN. The suffix names which contract needs the real service."
+  - pattern: "opa binary not found on PATH.*"
+    class: other_job
+    note: "OPA/Rego conformance is its own mandatory job with the binary installed."
+  - pattern: "APS suite sibling clone is not present"
+    class: other_job
+    note: "The APS v0.1 profile runs in the 'REMORA v0.1 + v0.2 against pinned APS' job, which clones the suite."
+
+  # ── external_tool ──────────────────────────────────────────────────────
+  - pattern: "node not available"
+    class: external_tool
+    note: "The pytest job has no Node; the worker modules are type-checked and parity-tested in the worker-* jobs."
+  - pattern: "esbuild not installed in workers/agent-control"
+    class: external_tool
+    note: "Same as above."
+  - pattern: "this node cannot strip TypeScript types"
+    class: external_tool
+    note: "Same as above."
+  - pattern: "worker( approval| envelope)? module not present"
+    class: external_tool
+    note: "The worker source is read from workers/; absent only on a partial checkout."
+  - pattern: "REMORA worker not available"
+    class: external_tool
+    note: "Worker integration needs a deployed Worker; opt-in."
+  - pattern: "git is not available"
+    class: external_tool
+    note: "Live tool-call execution shells out to git."
+
+  # ── optional_dependency ────────────────────────────────────────────────
+  - pattern: "could not import '(jwt|numpy|opentelemetry\\.sdk|datasets)'.*"
+    class: optional_dependency
+    note: "PyJWT, numpy (analysis extra), the OpenTelemetry SDK and Hugging Face datasets are not in the job's install set. Known gap: the review-identity and tracing tests behind them do not run here."
+  - pattern: "Hugging Face datasets is not installed"
+    class: optional_dependency
+    note: "Standard benchmarks need the datasets extra."
+  - pattern: "NLI backend unavailable: .*"
+    class: optional_dependency
+    note: "Semantic entropy needs the nli extra and a model download."
+  - pattern: ".*, not installed here"
+    class: optional_dependency
+    note: "tests/test_generator_imports.py names the generator modules it could not import."
+
+  # ── artifact ───────────────────────────────────────────────────────────
+  - pattern: "(thermodynamic eval|canonical ablation|thermo|ablation|canonical) artifacts? missing"
+    class: artifact
+    note: "Thermodynamic-framing artifacts; the framing was withdrawn from the paper (PR #227) and the artifacts are not committed."
+  - pattern: "grounding holdout not (built yet|yet evaluated)|manifest not present|episodes_sha256 not yet set"
+    class: artifact
+    note: "The grounding holdout is built by a script and not committed."
+  - pattern: "(Knowledge dataset|Replay log|validate_knowledge_dataset\\.py) not present|Validator script not found"
+    class: artifact
+    note: "The knowledge dataset and its validator live outside the repository."
+  - pattern: "artifact not generated; run scripts/run_cross_domain_transfer\\.py"
+    class: artifact
+    note: "results/aromer_cross_domain_transfer_v1.json is regenerated by the script; CAP-012 cites the committed copy."
+  - pattern: ".* not generated yet .*"
+    class: artifact
+    note: "SAP v2 end-to-end inputs are produced by the pipeline, not committed."
+  - pattern: "external_validation_raw\\.jsonl not present; run scripts/run_external_validation\\.py first"
+    class: artifact
+    note: "External validation raw output is not committed."
+  - pattern: "(v2 set|routing bench data) absent; run scripts/build_routing_bench\\.py"
+    class: artifact
+    note: "The routing benchmark set is built from local data."
+  - pattern: "local compendium absent \\(expected in CI\\)"
+    class: artifact
+    note: "The research compendium is a local file by design."
+
+  # ── data_conditional ───────────────────────────────────────────────────
+  - pattern: "low_risk_obs not ACCEPT in this engine config|clean low-risk obs is not ACCEPT; cannot isolate taint-only block|No ACCEPT observations in this engine config|argument_tainted=True doesn.*"
+    class: data_conditional
+    note: "Causal attribution tests need an ACCEPT baseline the current engine configuration may not produce."
+  - pattern: "No items accepted.*"
+    class: data_conditional
+    note: "SAP v3 end-to-end checks need accepted items."
+  - pattern: "fixture reached ESCALATE; this guard needs a VERIFY case|no ACCEPT under this profile; the contract is exercised by the .*|profile did not (abstain on|escalate) this call"
+    class: data_conditional
+    note: "Profile-dependent decision cases; the guard states which case it needed."
+  - pattern: ".* is explicitly declared reversible"
+    class: data_conditional
+    note: "The fail-closed reversibility test skips action types the corpus declares reversible."
+  - pattern: "disclosure applies once E7 is recorded as independent"
+    class: data_conditional
+    note: "Guards the exposure disclosure only when the E7 contract is EXTERNALLY_VERIFIED."
+  - pattern: "single-valued enum|checked by test_session_dir_selects_the_session_state"
+    class: data_conditional
+    note: "MCP tool-contract parametrisations that another test covers."
+
+  # ── platform ───────────────────────────────────────────────────────────
+  - pattern: "local zone is UTC and cannot be changed on this platform"
+    class: platform
+    note: "The runner's zone is UTC; the test needs a non-UTC local zone."
+  - pattern: "POSIX mode bits"
+    class: platform
+    note: "Windows only."
+  - pattern: "this interpreter cannot import under an audit hook: .*"
+    class: platform
+    note: "CPython 3.14.0 on Windows breaks import under any audit hook; the effect-observer tests run on the Linux matrix."
+  - pattern: "boundary freshness needs full Git history; this clone is shallow|--regenerate needs a git checkout"
+    class: platform
+    note: "Shallow or exported checkouts."
+  - pattern: "Stale rate-limited KV cache entry.*"
+    class: platform
+    note: "Worker integration against a rate-limited cache."
+
+  # ── live ───────────────────────────────────────────────────────────────
+  - pattern: "live test: set REMORA_LIVE=1 to run against the deployed Worker"
+    class: live
+    note: "conftest.py marks live tests; addopts deselects them before this skip applies."
