@@ -30,9 +30,10 @@ was held to.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 __all__ = [
     "ESCALATION_THRESHOLD",

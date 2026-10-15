@@ -310,7 +310,11 @@ Postgres contract kills both. A first version of this section also excluded
 keyed `N`. The confirming runner sweep saw it survive, and run alone it
 survives the D1 test: `D1Connection.fetchone()` returns a tuple, so the
 `isinstance(row, dict)` branch that reads the alias is unreachable. The
-mutant is equivalent and listed; removing the dead branch is a follow-up.
+mutant is equivalent and listed. The dead branch and the alias nothing read
+were removed on 2026-10-14. The statement's two case-only mutants keep their
+ids, `consumed_count__mutmut_3` and `__mutmut_4`, under mutmut 3.8.0. A
+scoped sweep checked them, and they stay in the list as keyword-case
+mutants like every other.
 
 Agent-written tests were part of this pass: three parallel agents and one
 second-round agent, each in its own worktree, with every kill verified by

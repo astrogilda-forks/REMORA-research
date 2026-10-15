@@ -151,7 +151,7 @@ class EffectDomain:
                     found = find()
                     if found is None:
                         return "execution_state_unverifiable"
-        except Exception:  # noqa: BLE001 - unknown is not open
+        except Exception:
             return "execution_state_unverifiable"
         return datetime.fromtimestamp(found, UTC)
 
@@ -164,7 +164,7 @@ class EffectDomain:
             try:
                 claimed = self._ledger.try_consume(f"effect:{digest}:{index}",
                                                    tenant_id=tenant_id)
-            except Exception as exc:  # noqa: BLE001 - unknown is not a free slot
+            except Exception as exc:
                 raise EffectRefused("execution_state_unverifiable") from exc
             if claimed:
                 self._next_slot[digest] = index + 1
@@ -186,7 +186,7 @@ class EffectDomain:
             return
         try:
             closed = self._ledger.consumed(f"effects-closed:{digest}", tenant_id=tenant_id)
-        except Exception as exc:  # noqa: BLE001 - unknown is not open
+        except Exception as exc:
             raise EffectRefused("execution_state_unverifiable") from exc
         if closed:
             raise EffectRefused(CapabilityRefusal.CONTEXT_MISSING.value)
@@ -200,13 +200,13 @@ class EffectDomain:
             try:
                 closed = self._ledger.consumed(f"effects-closed:{lease.digest()}",
                                                tenant_id=lease.tenant_id)
-            except Exception:  # noqa: BLE001 - unknown is not open
+            except Exception:
                 return "execution_state_unverifiable"
             if closed:
                 return CapabilityRefusal.CONTEXT_MISSING.value
         try:
             started = self._execution_started(lease)
-        except Exception:  # noqa: BLE001 - an unknown answer is not a yes
+        except Exception:
             return "execution_state_unverifiable"
         if not started:
             return "execution_not_started"
@@ -218,7 +218,7 @@ class EffectDomain:
             return CapabilityRefusal.DIGEST_MISMATCH.value
         try:
             ceiling = self._ceilings(lease.tool_name)
-        except Exception:  # noqa: BLE001 - an unreadable ceiling is not an empty one
+        except Exception:
             return "downstream_ceiling_unavailable"
         if ceiling is None:
             ceiling = DownstreamCeiling(tool=lease.tool_name, capabilities=())
@@ -298,7 +298,7 @@ class EffectDomain:
             try:
                 self._ledger.try_consume(f"effects-closed:{digest}", tenant_id=lease.tenant_id)
                 durable = True
-            except Exception:  # noqa: BLE001 - closed here; the lease's expiry bounds the rest
+            except Exception:
                 durable = False
         return {"closed": True, "durable": durable,
                 "effects": len(mediator.records) if mediator else 0}

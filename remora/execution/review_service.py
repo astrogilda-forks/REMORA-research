@@ -15,23 +15,24 @@ unverified metadata in the audit record only.
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
-from contextlib import AbstractContextManager
-
-from remora.execution.ports import (AuditChainPort, ReviewQueuePort,
-                                    TransactionalAppendPort, appender,
-                                    audit_ref)
-
-from remora.governance.audit_outbox import encode_key
-from remora.governance.execution_identity import (
-    ExecutionContextRefused, historical_context,
-)
-
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from datetime import timedelta
 from typing import Any
 
+from remora.errors import RemoraError
+from remora.execution.ports import (
+    AuditChainPort,
+    ReviewQueuePort,
+    TransactionalAppendPort,
+    appender,
+    audit_ref,
+)
+from remora.governance.audit_outbox import encode_key
+from remora.governance.execution_identity import (
+    ExecutionContextRefused,
+    historical_context,
+)
 
 
 class ReviewNotFound(RemoraError):

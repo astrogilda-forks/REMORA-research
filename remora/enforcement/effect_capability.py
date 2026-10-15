@@ -23,21 +23,26 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from remora.capabilities.delegation import (
-    MAX_DELEGATION_DEPTH,
-    MAX_DELEGATION_TTL_SECONDS,
-    DelegationDenied,
-)
 from remora.capabilities.ceiling import (
     INITIAL_EFFECT_CAPABILITIES,
     CeilingRefused,
     DownstreamCeiling,
     EffectCapability,
 )
+from remora.capabilities.delegation import (
+    MAX_DELEGATION_DEPTH,
+    MAX_DELEGATION_TTL_SECONDS,
+    DelegationDenied,
+)
 from remora.capabilities.model import EffectiveCapabilitySet, _parse
 
-__all__ = ["CeilingRefused", "DownstreamCeiling", "EffectCapability",
-           "INITIAL_EFFECT_CAPABILITIES", "derive_effect_authority"]
+__all__ = [
+    "INITIAL_EFFECT_CAPABILITIES",
+    "CeilingRefused",
+    "DownstreamCeiling",
+    "EffectCapability",
+    "derive_effect_authority",
+]
 
 def derive_effect_authority(parent: EffectiveCapabilitySet, *, tool_name: str,
                             ceiling: DownstreamCeiling, now: datetime, ttl_seconds: int = 60,

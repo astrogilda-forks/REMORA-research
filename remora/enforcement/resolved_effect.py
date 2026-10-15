@@ -113,7 +113,7 @@ class ClosedWorldResolver:
 
     def with_changes(self, *, tools: Mapping[str, tuple[str, str]] | None = None,
                      resources: Mapping[tuple[str, str], str] | None = None
-                     ) -> "ClosedWorldResolver":
+                     ) -> ClosedWorldResolver:
         """A resolver with some entries replaced; this one is unchanged."""
         return ClosedWorldResolver(
             tools={**self._tools, **(tools or {})},

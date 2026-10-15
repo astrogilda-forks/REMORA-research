@@ -50,6 +50,11 @@ This file lists externally relevant changes by release. Fine-grained development
 - Fixed on the way: `EnforcementGate.reset_ledger_watermark` had no D1 branch,
   so a Cloudflare deployment could not re-baseline its ledger watermark; the
   non-strict unsigned-token warning now names `check()`'s caller.
+- Follow-up: `DurableNonceStore.consumed_count` no longer carries a dict
+  branch no backend can reach (sqlite3, psycopg and `D1Connection` all
+  hand the row back positionally) nor the column alias that branch read.
+  A test pins the positional read and the alias-free query on SQLite and
+  D1; the two case-only mutants of the statement keep their baseline ids.
 
 ### CI (a skipped test must name a listed reason)
 
@@ -77,6 +82,20 @@ This file lists externally relevant changes by release. Fine-grained development
   tracing tests (issue #45 gap 6) never ran in the job. New `otel` extra
   (API, SDK, OTLP/HTTP exporter, all already pinned in the lock); the pytest
   job installs it, and a missing `opentelemetry.sdk` fails the job.
+
+### Quality (style rule sets gate the trusted core, REM-037)
+
+- `quality-gates.yml` runs ruff over `remora/policy`, `enforcement`,
+  `governance`, `execution` and `servers` with the isort, pyupgrade and
+  Ruff-specific rule sets next to the bandit and bugbear ones. One
+  mechanical commit applied the fixes (sorted imports, unquoted
+  annotations, dropped unused noqa, two unpacking rewrites, two ClassVar
+  annotations); no behaviour changed and every capability the touched
+  files evidence is rebound. Excluded with reasons: `UP042`, because
+  `StrEnum` changes what `str()` returns for members that reach audit
+  records; `RUF001` to `RUF003`, because prose characters belong to the
+  prose ratchet; `UP037` on the four mutation-tested files, because mutant
+  ids are positional. Remaining REM-037 item: hash-locked Python installs.
 
 ### Interop (the effect hash rule's preimage)
 

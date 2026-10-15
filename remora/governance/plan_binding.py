@@ -65,14 +65,14 @@ class PlanBinding:
 
     @classmethod
     def capture(cls, plan_id: str, resources: list[str], depends_on: list[str],
-                read_revision: RevisionReader) -> "PlanBinding":
+                read_revision: RevisionReader) -> PlanBinding:
         """Record the current revision of each resource the plan read."""
         return cls(plan_id=plan_id,
                    reads=tuple(sorted((r, read_revision(r)) for r in set(resources))),
                    depends_on=tuple(sorted(set(depends_on))))
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, object]) -> "PlanBinding":
+    def from_dict(cls, data: Mapping[str, object]) -> PlanBinding:
         reads = data.get("reads")
         if not isinstance(reads, Mapping):
             raise ValueError("plan.reads must map resource to revision")
@@ -114,7 +114,7 @@ def revalidate(plan: PlanBinding, read_revision: RevisionReader) -> PlanCheck:
     for resource, revision in plan.reads:
         try:
             current = read_revision(resource)
-        except Exception:  # noqa: BLE001 - unknown is not unchanged
+        except Exception:
             if resource in plan.depends_on:
                 unreadable.append(resource)
             continue

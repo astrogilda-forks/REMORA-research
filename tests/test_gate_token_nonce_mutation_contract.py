@@ -714,3 +714,28 @@ def test_a_peek_at_a_spent_grant_reports_it_spent(tmp_path: Path, fake_d1: Sqlit
         assert gate.check(grant) == EnforcementResult(
             allowed=False, action="accept", token_verified=True,
             reason="token_already_consumed", strict_mode=True)
+
+
+# ── follow-up to #842: the count row is positional on every backend ──────
+
+
+def test_the_count_is_read_positionally_and_carries_no_alias(
+        fake_d1: SqliteD1, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``consumed_count`` reads ``row[0]``. sqlite3 and psycopg return tuples
+    by default and ``D1Connection.fetchone()`` converts its dict rows, so a
+    column alias would never be read by name: the query must not carry one,
+    and the count must still be right on both local backends."""
+    sqlite_store = DurableNonceStore(db_path=str(tmp_path / "count.db"))
+    d1_store = _d1_store(fake_d1, monkeypatch)
+    for store in (sqlite_store, d1_store):
+        assert store.try_consume("n-1", tenant_id="acme") is True
+        assert store.try_consume("n-2", tenant_id="acme") is True
+        assert store.try_consume("n-3", tenant_id="globex") is True
+        assert store.consumed_count(tenant_id="acme") == 2
+        assert store.consumed_count(tenant_id="globex") == 1
+        assert store.consumed_count(tenant_id="nobody") == 0
+    # Case-insensitive on purpose: keyword case is not what this test pins,
+    # and the sweep lists the statement's case-only mutants as equivalent.
+    counts = [s.upper() for s in fake_d1.sql() if s.upper().startswith("SELECT COUNT")]
+    assert counts, "the D1 fake saw no count query"
+    assert all(" AS " not in s for s in counts)

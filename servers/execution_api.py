@@ -39,33 +39,42 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from remora.enforcement.gate import EnforcementGate
-from remora.enforcement.nonce_store import DurableNonceStore, NonceStore
-from remora.governance.effect_receipt import (
-    ReceiptRefused,
-    verify_receipt as verify_effect_receipt,
-)
 from remora.enforcement.lease import (
     ExecutionLease,
     GovernedToolDispatcher,
 )
-from remora.toolcall.deployment_registry import resolve_tool_metadata
-from remora.enforcement.token import PolicyDecisionToken
+from remora.enforcement.nonce_store import DurableNonceStore, NonceStore
 from remora.enforcement.outbox import (
     ExecutionOutbox,
     PostgresExecutionOutbox,
     SQLiteExecutionOutbox,
     UnbackedExecutionOutbox,
 )
+from remora.enforcement.token import PolicyDecisionToken
+from remora.governance import audit_outbox as _audit_outbox
+from remora.governance.effect_receipt import (
+    ReceiptRefused,
+)
+from remora.governance.effect_receipt import (
+    verify_receipt as verify_effect_receipt,
+)
 from remora.governance.effect_verification import (
     EffectVerification,
 )
 from remora.governance.execution_identity import (
-    ExecutionContextRefused, ExecutionContextV1, historical_context,
+    ExecutionContextRefused,
+    ExecutionContextV1,
+    historical_context,
 )
-from servers.execution_identity import context_provider, context_required
 from remora.governance.lifecycle import (
     IllegalTransition,
     check_transition,
+)
+from remora.governance.loop_safety import (
+    DurableLoopSafetyStore,
+    InMemoryLoopSafetyStore,
+    LoopSafetyMonitor,
+    LoopSafetyStoreUnavailable,
 )
 from remora.governance.review_queue import (
     ReviewQueue,
@@ -75,28 +84,23 @@ from remora.governance.revocation_store import (
     RevocationStore,
     RevocationStoreUnavailable,
 )
-from remora.governance import audit_outbox as _audit_outbox
-from remora.governance.loop_safety import (
-    DurableLoopSafetyStore,
-    InMemoryLoopSafetyStore,
-    LoopSafetyMonitor,
-    LoopSafetyStoreUnavailable,
-)
 from remora.governance.task_identity import TaskIdentity
 from remora.governance.tenant_chain import TenantAuditChain
 from remora.policy.decision_engine import RemoraDecisionEngine
 from remora.policy.observation import PolicyObservation, canonical_tool_call_hash
 from remora.policy.report import DecisionAction
-from remora.toolcall.toolspec import ToolSpecBundle, ToolSpecRefused
+from remora.toolcall.deployment_registry import resolve_tool_metadata
 from remora.toolcall.semantic_bundle import (
     IntentResolver,
     SemanticBundle,
     compute_intent_authority_hash,
     load_argument_scope_validator,
-    load_intent_resolver,
     load_intent_resolution_provider,
+    load_intent_resolver,
     load_semantic_bundle,
 )
+from remora.toolcall.toolspec import ToolSpecBundle, ToolSpecRefused
+
 # Wire contracts (issue #241 extraction slice 1): request/response Pydantic
 # models live in servers/execution_contracts.py; re-imported here so existing
 # `from servers.execution_api import ToolCallRequest` style access keeps
@@ -106,28 +110,29 @@ from servers.execution_contracts import (  # noqa: F401
     ApproveRequest,
     AuditRef,
     DerivationProposal,
+    DispatchLeasedRequest,
     EffectVerificationRequest,
     ErrorDetail,
-    DispatchLeasedRequest,
     ExecuteAcceptedRequest,
     ExecuteRequest,
     ExecutionApproveResponse,
     ExecutionAssessResponse,
     ExecutionAuditVerifyResponse,
     ExecutionExecuteResponse,
-    ExecutionPendingResponse,
     ExecutionGrant,
     ExecutionOutcome,
+    ExecutionPendingResponse,
     GovernanceAction,
+    LoopSafetyResetRequest,
     PepResult,
     RejectRequest,
+    RevokePrincipalRequest,
     SemanticAssessment,
     ToolCallRequest,
     ToolExecutionResult,
     ToolResultEnvelopeModel,
-    RevokePrincipalRequest,
-    LoopSafetyResetRequest,
 )
+from servers.execution_identity import context_provider, context_required
 
 #: The only path the execution domain serves.
 #:
@@ -234,15 +239,15 @@ _ENGINE = _engine_from_env()
 # the previous process-local LRU forgot every key on restart, so a retried
 # idempotency key re-ran assess and FORKED the proposal identity with a new
 # chain record). In-process fallback keeps the bounded-LRU behavior.
-from remora.persistence.idempotency import (  # noqa: E402
+import threading as _threading
+
+from remora.persistence.idempotency import (
     IdempotencyClaim,
     IdempotencyConflict,
     IdempotencyStore,
     build_idempotency_store,
     idempotency_scope,
 )
-
-import threading as _threading
 
 #: Guards every lazy singleton below. FastAPI runs sync endpoints in a
 #: threadpool, so "if X is None: X = build()" is a real check-then-set race:
@@ -384,8 +389,8 @@ _ITEM_TENANT: dict[str, str] = {}
 
 
 import contextvars as _contextvars
-import datetime as _dt
 import dataclasses
+import datetime as _dt
 
 # FT-02: the connection of the CURRENTLY OPEN db_transaction_state, exposed
 # so the outbox row can be written inside that same transaction. A
@@ -397,7 +402,7 @@ import dataclasses
 # Typed Any deliberately: the connection is a sqlite3.Connection or a
 # psycopg.Connection depending on the configured backend, and the outbox
 # adapter that receives it is chosen by the same switch.
-_ACTIVE_TX_CONNECTION: "_contextvars.ContextVar[Any]" = (
+_ACTIVE_TX_CONNECTION: _contextvars.ContextVar[Any] = (
     _contextvars.ContextVar("remora_active_tx_connection", default=None)
 )
 
@@ -411,7 +416,7 @@ _ACTIVE_TX_CONNECTION: "_contextvars.ContextVar[Any]" = (
 # middleware, because sync endpoints run in a threadpool with a COPY of the
 # context: a set() inside the handler never propagates back, but mutating
 # the shared holder object does.
-CURRENT_PROPOSAL_ID: "_contextvars.ContextVar[dict[str, str | None] | None]" = (
+CURRENT_PROPOSAL_ID: _contextvars.ContextVar[dict[str, str | None] | None] = (
     _contextvars.ContextVar("remora_current_proposal_id", default=None)
 )
 
@@ -424,7 +429,7 @@ def _note_proposal_id(proposal_id: Any) -> None:
 # Built eagerly, like _CHAIN and _GATE: a durable adapter runs its DDL on
 # its own connection, and doing that lazily inside an open transaction
 # deadlocks against SQLite's BEGIN EXCLUSIVE write lock.
-_OUTBOX: "ExecutionOutbox | None" = None
+_OUTBOX: ExecutionOutbox | None = None
 
 
 def _outbox() -> ExecutionOutbox:
@@ -487,8 +492,8 @@ DEFAULT_OUTBOX_STALE_SECONDS = 900
 
 
 def chain_append_transactional(
-    tenant: str, payload: "dict[str, Any]", *, key: str
-) -> "Any | None":
+    tenant: str, payload: dict[str, Any], *, key: str
+) -> Any | None:
     """Append an audit event, joining the caller's state transaction when there is one.
 
     Inside ``db_transaction_state`` the event is enqueued on the SAME
@@ -530,14 +535,14 @@ def drain_audit_outbox(tenant: str | None = None) -> int:
 
         with sqlite3.connect(db_path) as conn:
             return _audit_outbox.drain(conn, _CHAIN, tenant=tenant)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Recovery that raises would turn a durable, recoverable gap into a
         # failed request. The row stays pending and the next sweep retries.
         return 0
 
 
 def reconcile_stale_dispatches(
-    tenant: str, *, now: "datetime | None" = None
+    tenant: str, *, now: datetime | None = None
 ) -> list[Any]:
     """Settle dispatch intents whose worker never reported back.
 
@@ -638,31 +643,53 @@ def project_terminal_intents(tenant: str) -> list[dict[str, Any]]:
 # loading/verification and the assessed-record read-back live in
 # remora/execution/authorization.py. These wrappers bind this module's
 # ambient state (env, chain) and keep the HTTP conversion at the route layer.
+from remora.execution.authorization import (
+    assessed_record as _authz_assessed_record,
+)
+from remora.execution.authorization import (
+    assessed_toolspec_for_proposal as _authz_assessed_toolspec_for_proposal,
+)
+from remora.execution.authorization import (
+    load_toolspec_bundle as _authz_load_bundle,
+)
+from remora.execution.authorization import (
+    reset_toolspec_bundle_cache,
+)
+from remora.execution.authorization import (
+    resolve_toolspec as _authz_resolve_toolspec,
+)
+from remora.execution.authorization import (
+    verified_registration as _authz_verified_registration,
+)
 from remora.execution.dispatch import (
     dispatch_under_lease as _dispatch_under_lease_impl,
-    record_dispatch_intent as _record_dispatch_intent_impl,
 )
-from remora.execution.service import (
-    TokenRefused,
-    ToolSpecChanged,
-    assess_proposal as _assess_proposal,
-    execute_approved_item as _execute_approved_item,
-    redeem_accept_token as _redeem_accept_token,
+from remora.execution.dispatch import (
+    record_dispatch_intent as _record_dispatch_intent_impl,
 )
 from remora.execution.review_service import (
     ReviewConflict,
     ReviewNotFound,
     SeparationOfDutiesRefused,
+)
+from remora.execution.review_service import (
     approve_item as _approve_item,
+)
+from remora.execution.review_service import (
     reject_item as _reject_item,
 )
-from remora.execution.authorization import (
-    assessed_record as _authz_assessed_record,
-    assessed_toolspec_for_proposal as _authz_assessed_toolspec_for_proposal,
-    load_toolspec_bundle as _authz_load_bundle,
-    reset_toolspec_bundle_cache,
-    resolve_toolspec as _authz_resolve_toolspec,
-    verified_registration as _authz_verified_registration,
+from remora.execution.service import (
+    TokenRefused,
+    ToolSpecChanged,
+)
+from remora.execution.service import (
+    assess_proposal as _assess_proposal,
+)
+from remora.execution.service import (
+    execute_approved_item as _execute_approved_item,
+)
+from remora.execution.service import (
+    redeem_accept_token as _redeem_accept_token,
 )
 
 #: Re-exported under the name the tests reload this module for. An assignment
@@ -719,7 +746,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
     return results
 
 
-def _toolspec_bundle() -> "ToolSpecBundle | None":
+def _toolspec_bundle() -> ToolSpecBundle | None:
     return _authz_load_bundle(_os.environ)
 
 
@@ -830,6 +857,8 @@ import json
 from remora.persistence.execution_state import (  # noqa: F401
     from_dict,
     to_dict,
+)
+from remora.persistence.execution_state import (
     transaction_state as _transaction_state,
 )
 
@@ -1042,7 +1071,7 @@ def _capability_resolver() -> Any:
 
 
 def _resolve_capability(tool_call: Any, principal: str, tenant: str,
-                        now: "_dt.datetime | None" = None) -> Any:
+                        now: _dt.datetime | None = None) -> Any:
     """A fresh capability set for this call, or None without a policy.
 
     Resolved from the deployment's policy for the AUTHENTICATED principal,
@@ -1087,7 +1116,7 @@ def _capability_block(tool_call: Any, principal: str, tenant: str) -> dict[str, 
     """What /assess records about the capability check (Q8.2)."""
     try:
         capability_set = _resolve_capability(tool_call, principal, tenant)
-    except Exception:  # noqa: BLE001 - an unreadable epoch source refuses, never allows
+    except Exception:
         return {"allowed": False, "refusal": "capability_epoch_unverifiable",
                 "requested_tool": tool_call.tool_name}
     if capability_set is None:
@@ -1237,7 +1266,7 @@ def _current_policy_bundle_hash() -> str:
     return api_mod._policy_component_hashes().get("policy_hash") or ""
 
 
-def _lease_nonce_store() -> "NonceStore | None":
+def _lease_nonce_store() -> NonceStore | None:
     """Durable lease-nonce consumption over whichever backend is configured.
 
     Deliberately reads the same three variables as the durability guard in
@@ -1522,10 +1551,10 @@ def _reset_tool_dispatcher() -> None:
 # redeployment) that unsets the variable falls back to the registry-only
 # path instead of consulting a stale bundle.
 
-_SEMANTIC: "tuple[str, SemanticBundle | None, IntentResolver | None] | None" = None
+_SEMANTIC: tuple[str, SemanticBundle | None, IntentResolver | None] | None = None
 
 
-def _semantic_bundle() -> "tuple[SemanticBundle | None, IntentResolver | None]":
+def _semantic_bundle() -> tuple[SemanticBundle | None, IntentResolver | None]:
     global _SEMANTIC
     spec = _os.environ.get("REMORA_SEMANTIC_BUNDLE_MODULE", "").strip()
     cached = _SEMANTIC
@@ -1652,8 +1681,8 @@ def semantic_call_context(
     untrusted_context: str | None = None,
     domain: str = "unknown",
     user_task: str = "",
-    derivations: "tuple[dict[str, Any], ...]" = (),
-) -> "tuple[PolicyObservation | None, dict[str, Any]]":
+    derivations: tuple[dict[str, Any], ...] = (),
+) -> tuple[PolicyObservation | None, dict[str, Any]]:
     """Authoritative semantic observation + context for one proposed call.
 
     Shared by ``/v1/execution/assess`` and ``/v1/assess`` so both endpoints
@@ -1929,7 +1958,7 @@ def _toolspec_description(tool_name: str) -> str | None:
 
 # Off unless REMORA_SEMANTIC_SHADOW is set, and refused at startup when it is
 # set without the rest of its configuration (servers/semantic_shadow.py).
-from servers.semantic_shadow import (  # noqa: E402
+from servers.semantic_shadow import (
     SemanticShadow,
     build_semantic_shadow_from_env,
 )
@@ -1940,7 +1969,7 @@ _SEMANTIC_SHADOW = build_semantic_shadow_from_env(
 
 
 def _assess_proposal_with_loop_state(
-    *, tenant: str, principal: str, req: "ToolCallRequest",
+    *, tenant: str, principal: str, req: ToolCallRequest,
 ) -> dict[str, Any]:
     return _assess_proposal(
         tenant=tenant, principal=principal, proposal=req,
@@ -2048,7 +2077,7 @@ def capability_projection(request: Request, task_type: str = "",
     call = SimpleNamespace(target_environment=target_environment, task_type=task_type or None)
     try:
         capability_set = _resolve_capability(call, principal, tenant)
-    except Exception as exc:  # noqa: BLE001 - same fail-closed rule as the execution paths
+    except Exception as exc:
         raise HTTPException(status_code=503,
                             detail="capability_epoch_unverifiable") from exc
     if capability_set is None:
@@ -2062,7 +2091,7 @@ def capability_projection(request: Request, task_type: str = "",
         if bundle is not None:
             try:
                 schema = dict(bundle.get(name).argument_schema)
-            except Exception:  # noqa: BLE001 - no signed spec: no schema is invented
+            except Exception:
                 schema = None
         specs[name] = {"description": f"{entry.get('action_type', '')} "
                                       f"({entry.get('risk_tier', '')} risk)".strip(),
@@ -2190,7 +2219,7 @@ def revoke_principal(req: RevokePrincipalRequest, request: Request) -> dict[str,
 
 def _resolution_plan_for(
     *,
-    action: "DecisionAction",
+    action: DecisionAction,
     report: Any,
     tenant: str,
     item: Any,
@@ -2265,7 +2294,7 @@ def _dispatch_under_lease(
     *,
     tenant: str,
     principal: str,
-    tool_call: "ToolCallRequest",
+    tool_call: ToolCallRequest,
     semantic: dict[str, Any],
     now: datetime,
     gate_allowed: bool = True,
@@ -2296,7 +2325,7 @@ def _dispatch_under_lease(
         # lease refused as capability_not_yet_valid.
         try:
             capability_set = _resolve_capability(tool_call, principal, tenant, now=now)
-        except Exception:  # noqa: BLE001 - unknown epochs are not current ones
+        except Exception:
             return {"executed": False, "refusal_reason": "capability_epoch_unverifiable",
                     "proposal_id": proposal_id}
         if capability_set is not None:
@@ -2377,7 +2406,7 @@ def _dispatch_under_lease(
     404: {"model": ErrorDetail, "description": "Review item not found for this tenant."},
     409: {"model": ErrorDetail, "description": "Item not in an executable state."},
 })
-def execute(req: ExecuteRequest, request: Request) -> "dict[str, Any] | JSONResponse":
+def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONResponse:
     """Execute a previously approved item under full re-gating.
 
     The complete payload is re-presented and freshly re-decided: an
@@ -2552,7 +2581,7 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
     durable tenant-scoped state before the tool runs. An authority-signed lease
     presented for a different call is refused here.
     """
-    tenant, role, principal = _auth(request)
+    tenant, role, _principal = _auth(request)
     from servers import api as api_mod
 
     api_mod._require_tenant_capability(role, tenant, "execute")
@@ -2659,14 +2688,28 @@ def reject(req: RejectRequest, request: Request) -> dict[str, Any]:
 # read projections live in remora/execution/projections.py. Wrappers bind this
 # module's chain and outbox; record_effect_verification keeps its public name
 # (used by the SDK effect surface and tests).
-from remora.execution.projections import (  # noqa: E402
+from remora.execution.projections import (
     EFFECT_STATE as _EFFECT_STATE,  # noqa: F401  (name kept for tests)
+)
+from remora.execution.projections import (
     EffectVerificationReplay,
+)
+from remora.execution.projections import (
     current_state as _current_state_impl,
+)
+from remora.execution.projections import (
     dispatch_projection as _dispatch_projection_impl,
-    effect_projection as _effect_projection,  # noqa: F401  (pure; direct use)
+)
+from remora.execution.projections import (
+    effect_projection as _effect_projection,
+)
+from remora.execution.projections import (
     envelope_projection as _envelope_projection,
+)
+from remora.execution.projections import (
     proposal_events as _proposal_events_impl,
+)
+from remora.execution.projections import (
     record_effect_verification as _record_effect_verification_impl,
 )
 

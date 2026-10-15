@@ -228,7 +228,7 @@ class A2AGovernanceEnvelope:
         _drop_absent_task(data)
         return json.dumps(data, sort_keys=True, separators=(",", ":"), default=str).encode()
 
-    def task_identity(self) -> "TaskIdentity | None":
+    def task_identity(self) -> TaskIdentity | None:
         """The bound task, or None. Raises ValueError when only one half is set."""
         from remora.governance.task_identity import TaskIdentity
 
@@ -249,7 +249,7 @@ class A2AGovernanceEnvelope:
         tool_call_hash: str | None = None,
         expires_at: str | None = None,
         signing_key: bytes | None = None,
-        task_identity: "TaskIdentity | None" = None,
+        task_identity: TaskIdentity | None = None,
         declared_operation: DeclaredOperation | None = None,
     ) -> A2AGovernanceEnvelope:
         """Create an envelope, signed when a key is available.
@@ -299,7 +299,7 @@ class A2AGovernanceEnvelope:
         link_keys: dict[str, RegisteredKey] | None = None,
         replay_guard: Callable[[str], bool] | None = None,
         strict: bool = True,
-        expected_task_identity: "TaskIdentity | None" = None,
+        expected_task_identity: TaskIdentity | None = None,
         actual_operation: tuple[str, str] | None = None,
     ) -> VerificationResult:
         """Verify integrity, accountability, and delegation attenuation.

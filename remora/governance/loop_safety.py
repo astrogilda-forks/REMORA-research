@@ -271,7 +271,7 @@ class DurableLoopSafetyStore:
                 commit = getattr(conn, "commit", None)
                 if commit is not None:
                     commit()
-        except Exception as exc:  # noqa: BLE001 - the outcome is unknown
+        except Exception as exc:
             raise LoopSafetyStoreUnavailable(f"loop safety store unreachable: {exc}") from exc
 
     def events(self, *, tenant_id: str, context_id: str) -> list[LoopEvent]:
@@ -285,7 +285,7 @@ class DurableLoopSafetyStore:
             with self._connect() as conn:
                 self._ensure_table(conn)
                 rows = conn.execute(sql, (tenant_id, context_id)).fetchall()
-        except Exception as exc:  # noqa: BLE001 - never read as an empty history
+        except Exception as exc:
             raise LoopSafetyStoreUnavailable(f"loop safety store unreachable: {exc}") from exc
         return [
             LoopEvent(int(seq), task_id, tool_name,

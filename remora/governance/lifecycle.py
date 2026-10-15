@@ -23,12 +23,12 @@ slice (it touches the protected execution path).
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+from remora.errors import RemoraError
 
 _SCHEMA_PATH = (
     Path(__file__).resolve().parents[2] / "schemas" / "execution_lifecycle_v1.yaml"
@@ -55,7 +55,7 @@ class LifecycleModel:
     version: int
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "LifecycleModel":
+    def load(cls, path: Path | None = None) -> LifecycleModel:
         raw = yaml.safe_load((path or _SCHEMA_PATH).read_text(encoding="utf-8"))
         transitions: dict[tuple[str, str], str] = {}
         for row in raw["transitions"]:
@@ -114,7 +114,7 @@ class LifecycleTracker:
                 f"event {event!r} is not legal in state {self.state!r} "
                 f"(lifecycle v{self.model.version})"
             )
-        self.trail = self.trail + ((self.state, event, nxt),)
+        self.trail = (*self.trail, (self.state, event, nxt))
         self.state = nxt
         return nxt
 

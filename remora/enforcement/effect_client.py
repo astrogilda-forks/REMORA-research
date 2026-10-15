@@ -52,7 +52,7 @@ def http_post(endpoint: str, *, token: str = "", timeout: float = 30.0) -> Post:
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
                 return dict(json.loads(response.read().decode()))
-        except Exception as exc:  # noqa: BLE001 - unknown state, not a refusal
+        except Exception as exc:
             raise EffectDomainUnavailable(str(exc)) from exc
 
     return post

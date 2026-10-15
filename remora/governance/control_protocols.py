@@ -43,12 +43,11 @@ to ``audit_detail``, the internal audit channel.
 """
 from __future__ import annotations
 
-from itertools import pairwise
-
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
+from itertools import pairwise
 
 from remora.policy.report import DecisionAction
 

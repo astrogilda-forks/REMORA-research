@@ -37,16 +37,16 @@ tenant scoped
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import threading
 from typing import Any, Protocol, runtime_checkable
 
+from remora.errors import RemoraError
+
 __all__ = [
-    "NonceStore",
-    "NonceStoreUnavailable",
     "DurableNonceStore",
     "InMemoryNonceStore",
+    "NonceStore",
+    "NonceStoreUnavailable",
 ]
 
 #: Composite primary key, so tenant isolation is enforced by the store rather
@@ -205,7 +205,7 @@ class DurableNonceStore:
                 try:
                     conn.execute(sql, (tenant_id, nonce))
                     conn.commit()
-                except Exception as exc:  # noqa: BLE001 — re-raised below
+                except Exception as exc:
                     if not self._is_duplicate(exc):
                         raise
                     # End the failed transaction before the context manager's
@@ -214,7 +214,7 @@ class DurableNonceStore:
                     return False
         except NonceStoreUnavailable:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Anything reaching here is an unknown outcome. The caller must
             # refuse WITHOUT burning the nonce: the grant may still be
             # unspent, and destroying it would turn a transient fault into a
@@ -239,24 +239,28 @@ class DurableNonceStore:
             with self._connect() as conn:
                 self._ensure_table(conn)
                 row = conn.execute(sql, (tenant_id, nonce)).fetchone()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise NonceStoreUnavailable(str(exc)) from exc
         return row is not None
 
     def consumed_count(self, *, tenant_id: str) -> int:
-        """Rows for one tenant. For operator verification, not for decisions."""
+        """Rows for one tenant. For operator verification, not for decisions.
+
+        Every backend hands the row back positionally: sqlite3 and psycopg
+        return tuples by default, and ``D1Connection.fetchone()`` converts
+        its dict rows (tests/test_d1_connection.py pins that). The count is
+        therefore read as ``row[0]`` and the column carries no alias.
+        """
         sql = (
-            "SELECT COUNT(*) AS n FROM lease_nonce_consumed WHERE tenant_id = "
+            "SELECT COUNT(*) FROM lease_nonce_consumed WHERE tenant_id = "
             f"{self._placeholder()}"
         )
         try:
             with self._connect() as conn:
                 self._ensure_table(conn)
                 row = conn.execute(sql, (tenant_id,)).fetchone()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise NonceStoreUnavailable(str(exc)) from exc
         if row is None:
             return 0
-        if isinstance(row, dict):
-            return int(row.get("n", 0))
         return int(row[0])

@@ -63,7 +63,7 @@ class ResolvedEffectGraph:
 
     @classmethod
     def from_mediator(cls, mediator: CapabilityMediator, *,
-                      root_effect_digest: str | None) -> "ResolvedEffectGraph":
+                      root_effect_digest: str | None) -> ResolvedEffectGraph:
         nodes = tuple(
             ResolvedEffectNode(index=i, capability=r.capability, resource=r.resource,
                                state=r.state.value, refusal=r.refusal,

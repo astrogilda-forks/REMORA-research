@@ -34,18 +34,18 @@ if TYPE_CHECKING:
 __all__ = ["effect_policy_refusal", "static_effect_policy_refusal"]
 
 
-def _read_only(spec: "ToolSpec") -> bool:
+def _read_only(spec: ToolSpec) -> bool:
     from remora.policy.decision_engine import _READ_ONLY_ACTION_TYPES
 
     return (spec.action_type or "").strip().lower() in _READ_ONLY_ACTION_TYPES
 
 
-def _capabilities(spec: "ToolSpec") -> tuple[Any, ...] | None:
+def _capabilities(spec: ToolSpec) -> tuple[Any, ...] | None:
     ceiling = spec.downstream_capabilities
     return None if ceiling is None else tuple(ceiling.capabilities)
 
 
-def static_effect_policy_refusal(spec: "ToolSpec") -> str | None:
+def static_effect_policy_refusal(spec: ToolSpec) -> str | None:
     """The refusal a signed spec earns on its own, before registration."""
     mode = spec.effect_mode
     if mode is None:
@@ -63,7 +63,7 @@ def static_effect_policy_refusal(spec: "ToolSpec") -> str | None:
     return None
 
 
-def effect_policy_refusal(spec: "ToolSpec", *, mediated: bool) -> str | None:
+def effect_policy_refusal(spec: ToolSpec, *, mediated: bool) -> str | None:
     """The refusal for a spec as registered: static rules, then registration."""
     refusal = static_effect_policy_refusal(spec)
     if refusal is not None:
