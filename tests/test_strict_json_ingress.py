@@ -91,6 +91,18 @@ def test_non_finite_numbers_are_refused(literal: bytes) -> None:
     assert _refused(b'{"ratio": ' + literal + b"}") == "json_non_finite_number"
 
 
+@pytest.mark.parametrize("literal", [b"1e309", b"-1e309", b"1e9999", b"-1e9999"])
+def test_finite_literal_overflow_is_refused(literal: bytes) -> None:
+    # Python's default JSON parser turns these into inf, bypassing
+    # parse_constant and potentially changing the action's value.
+    assert _refused(b'{"ratio": ' + literal + b"}") == "json_non_finite_number"
+
+
+def test_finite_exponent_remains_admitted_unchanged() -> None:
+    raw = b'{"ratio": 1.5e300}'
+    assert admit_strict_json(raw) == json.loads(raw)
+
+
 def test_noncharacter_is_refused() -> None:
     assert _refused('{"s": "￾"}'.encode("utf-8")) == "json_noncharacter"
     assert _refused('{"s": "﷐"}'.encode("utf-8")) == "json_noncharacter"
