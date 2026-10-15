@@ -48,6 +48,8 @@ EXTRA_SETS: tuple[str, ...] = (
     "dev,causal",
     "dev,causal,api",
     "dev,causal,api,security",
+    "dev,causal,api,security,identity",
+    "dev,causal,api,security,identity,otel",
     "dev,causal,api,security,postgres",
     "dev,nli",
     "docs",
