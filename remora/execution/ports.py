@@ -37,13 +37,16 @@ if TYPE_CHECKING:
 
     from remora.enforcement.gate import EnforcementResult
     from remora.enforcement.outbox import OutboxRow, OutboxState
-    from remora.governance.review_queue import (Approval, DispatchOutcome,
-                                                ExecutionOutcome,
-                                                PendingReview)
+    from remora.governance.execution_identity import ExecutionContextV1
+    from remora.governance.review_queue import (
+        Approval,
+        DispatchOutcome,
+        ExecutionOutcome,
+        PendingReview,
+    )
     from remora.governance.tenant_chain import ChainEntry
     from remora.policy.observation import PolicyObservation
     from remora.policy.report import DecisionAction
-    from remora.governance.execution_identity import ExecutionContextV1
 
 __all__ = [
     "AuditChainPort",
@@ -106,13 +109,13 @@ class PolicyDecisionTokenPort(Protocol):
 class AuditChainPort(Protocol):
     """Tenant-scoped, hash-chained audit record store."""
 
-    def append(self, tenant_id: str, payload: dict[str, Any]) -> "ChainEntry": ...
+    def append(self, tenant_id: str, payload: dict[str, Any]) -> ChainEntry: ...
 
     def append_once(
         self, tenant_id: str, idempotency_key: str, payload: dict[str, Any]
-    ) -> "ChainEntry | None": ...
+    ) -> ChainEntry | None: ...
 
-    def entries(self, tenant_id: str) -> tuple["ChainEntry", ...]: ...
+    def entries(self, tenant_id: str) -> tuple[ChainEntry, ...]: ...
 
 
 class TransactionalAppendPort(Protocol):
@@ -126,7 +129,7 @@ class TransactionalAppendPort(Protocol):
 
     def __call__(
         self, tenant: str, payload: dict[str, Any], *, key: str
-    ) -> "ChainEntry | None": ...
+    ) -> ChainEntry | None: ...
 
 
 def audit_ref(entry: Any, *, key: str) -> dict[str, Any]:
@@ -153,9 +156,9 @@ def audit_ref(entry: Any, *, key: str) -> dict[str, Any]:
 
 
 def appender(
-    chain: "AuditChainPort",
-    transactional_append: "TransactionalAppendPort | None",
-) -> "TransactionalAppendPort":
+    chain: AuditChainPort,
+    transactional_append: TransactionalAppendPort | None,
+) -> TransactionalAppendPort:
     """The transactional append when the caller wired one, else the plain chain.
 
     The fallback is not a weakening. A caller that wires no transactional
@@ -184,7 +187,7 @@ class EnforcementGatePort(Protocol):
         consume: bool = False,
         now: str | None = None,
         context: Any = None,
-    ) -> "EnforcementResult": ...
+    ) -> EnforcementResult: ...
 
 
 class PolicyEnginePort(Protocol):
@@ -195,7 +198,7 @@ class PolicyEnginePort(Protocol):
     import boundary -- and narrowing it is a follow-up, not a blocker.
     """
 
-    def decide(self, observation: "PolicyObservation") -> Any: ...
+    def decide(self, observation: PolicyObservation) -> Any: ...
 
 
 class ToolDispatcherPort(Protocol):
@@ -233,15 +236,15 @@ class DispatchOutboxPort(Protocol):
         tool_call_json: str | None = None,
         authorization_expires_at: datetime | None = None,
         requested_by: str | None = None,
-    ) -> "OutboxRow": ...
+    ) -> OutboxRow: ...
 
     def claim(
         self, outbox_id: str, *, worker_id: str, now: datetime | None = None
-    ) -> "OutboxRow | None": ...
+    ) -> OutboxRow | None: ...
 
     def record_intent_enlisted(
         self,
-        connection: "sqlite3.Connection",
+        connection: sqlite3.Connection,
         *,
         proposal_id: str,
         tenant_id: str,
@@ -254,70 +257,70 @@ class DispatchOutboxPort(Protocol):
         tool_call_json: str | None = None,
         authorization_expires_at: datetime | None = None,
         requested_by: str | None = None,
-    ) -> "OutboxRow": ...
+    ) -> OutboxRow: ...
 
     def settle(
         self,
         outbox_id: str,
-        state: "OutboxState",
+        state: OutboxState,
         *,
         detail: str | None = None,
         now: datetime | None = None,
         projection_json: str | None = None,
-    ) -> "OutboxRow": ...
+    ) -> OutboxRow: ...
 
-    def get(self, outbox_id: str) -> "OutboxRow": ...
+    def get(self, outbox_id: str) -> OutboxRow: ...
 
     def mark_projected(
         self, outbox_id: str, *, now: datetime | None = None
-    ) -> "OutboxRow": ...
+    ) -> OutboxRow: ...
 
-    def unprojected_terminal(self, tenant_id: str) -> list["OutboxRow"]: ...
+    def unprojected_terminal(self, tenant_id: str) -> list[OutboxRow]: ...
 
     def rows_for_proposal(
         self, tenant_id: str, proposal_id: str
-    ) -> list["OutboxRow"]: ...
+    ) -> list[OutboxRow]: ...
 
 
 class ReviewQueuePort(Protocol):
     """The pending-review state machine, as the services drive it."""
 
-    def item(self, item_id: str) -> "PendingReview": ...
+    def item(self, item_id: str) -> PendingReview: ...
 
     def enqueue(
         self,
-        observation: "PolicyObservation",
-        requested_action: "DecisionAction",
+        observation: PolicyObservation,
+        requested_action: DecisionAction,
         queue_ttl: timedelta | None = None,
-    ) -> "PendingReview": ...
+    ) -> PendingReview: ...
 
-    def expire_due(self, now: datetime | None = None) -> list["PendingReview"]: ...
+    def expire_due(self, now: datetime | None = None) -> list[PendingReview]: ...
 
     def approve(
         self, item_id: str, approver: str, approval_ttl: timedelta
-    ) -> "Approval": ...
+    ) -> Approval: ...
 
     def reject(
         self, item_id: str, reviewer: str, reason: str
-    ) -> "PendingReview": ...
+    ) -> PendingReview: ...
 
     def execute(
         self,
         item_id: str,
-        fresh_observation: "PolicyObservation",
+        fresh_observation: PolicyObservation,
         now: datetime | None = None,
-    ) -> "ExecutionOutcome": ...
+    ) -> ExecutionOutcome: ...
 
     def regate_authorized(
         self,
         item_id: str,
-        fresh_observation: "PolicyObservation",
-    ) -> "ExecutionOutcome": ...
+        fresh_observation: PolicyObservation,
+    ) -> ExecutionOutcome: ...
 
     def record_execution_outcome(
         self,
         item_id: str,
         *,
-        outcome: "DispatchOutcome",
+        outcome: DispatchOutcome,
         reason: str | None = None,
-    ) -> "PendingReview": ...
+    ) -> PendingReview: ...

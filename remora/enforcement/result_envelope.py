@@ -58,11 +58,11 @@ def _canonical_bytes(value: Any) -> tuple[bytes, str]:
                        default=str).encode("utf-8"),
             "application/json",
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
     try:
         return repr(value).encode("utf-8", errors="replace"), "text/plain"
-    except Exception:  # noqa: BLE001
+    except Exception:
         return b"<unrepresentable tool result>", "text/plain"
 
 

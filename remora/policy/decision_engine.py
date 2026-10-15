@@ -24,18 +24,12 @@ from remora.credal import (
     CredalEnvelope,
     compute_from_obs,
 )
-from remora.policy.invariants import InvariantResult, check_all_invariants
 from remora.observability.events import governance_event
+from remora.policy.invariants import InvariantResult, check_all_invariants
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
 from remora.policy.resolution import ResolutionPlan
-from remora.policy.trap_classifier import (
-    TRAP_ESCALATE_THRESHOLD,
-    TRAP_VERIFY_THRESHOLD,
-)
-from remora.policy.trap_classifier import (
-    score as trap_score,
-)
+
 # Heuristic decision thresholds moved to remora/policy/thresholds.py
 # (2026-07-29). Re-imported into THIS module namespace so the
 # _CONDITIONAL_GATES lambdas below (which close over these as engine-module
@@ -43,19 +37,26 @@ from remora.policy.trap_classifier import (
 # tests/test_policy_threshold_constants.py keep resolving. VALUES are
 # unchanged; see thresholds.py for the CALIBRATED-vs-HEURISTIC provenance
 # note. Calibrated thresholds stay constructor-injected, never imported here.
-from remora.policy.thresholds import (  # noqa: F401  (re-exported for gate closures + tests)
-    MIN_REQUIRED_ORACLE_VOTES,
-    ORDERED_HIGH_TRUST_MIN,
+from remora.policy.thresholds import (
+    CLASSIFICATION_CONFIDENCE_MIN,
+    ENV_CONFIDENCE_MIN,
     EVIDENCE_CONFIDENCE_MIN,
     LOW_TRUST_ABSTAIN_MAX,
+    MIN_REQUIRED_ORACLE_VOTES,
     MINIMAX_AMBIGUITY_WIDTH_MIN,
-    ENV_CONFIDENCE_MIN,
-    CLASSIFICATION_CONFIDENCE_MIN,
     MISSPECIFICATION_RISK_MAX,
-    SESSION_CUMULATIVE_RISK_MAX,
-    SESSION_ACTION_COUNT_MAX,
+    ORDERED_HIGH_TRUST_MIN,
     POLICY_GENERALIZATION_RISK_MAX,
+    SESSION_ACTION_COUNT_MAX,
+    SESSION_CUMULATIVE_RISK_MAX,
     SIMILAR_ACTION_FLOOD_MAX,
+)
+from remora.policy.trap_classifier import (
+    TRAP_ESCALATE_THRESHOLD,
+    TRAP_VERIFY_THRESHOLD,
+)
+from remora.policy.trap_classifier import (
+    score as trap_score,
 )
 
 # Action types that are inherently safe to classify conservatively.
@@ -388,12 +389,6 @@ def _normalize_observation(obs: PolicyObservation) -> PolicyObservation:
 # PolicyTrace / PolicyRuleEvaluation moved to remora/policy/trace.py
 # (2026-07-29) and re-exported here so remora/__init__.py and the test suite
 # keep importing them from remora.policy.decision_engine unchanged.
-from remora.policy.trace import (  # noqa: E402, F401  (re-exported)
-    PolicyRuleEvaluation,
-    PolicyTrace,
-)
-
-
 # ---------------------------------------------------------------------------
 # Conditional-gate inventory (single source of truth for decide + explain)
 # ---------------------------------------------------------------------------
@@ -413,8 +408,12 @@ from remora.policy.trace import (  # noqa: E402, F401  (re-exported)
 # (its reason is appended before the floor return but VERIFY is returned late),
 # the unknown-action-type floor, and the ACCEPT/VERIFY/ABSTAIN tail (which has
 # ambiguity-penalty side-reasons and engine-config-dependent branches).
+from collections.abc import Callable
 
-from collections.abc import Callable  # noqa: E402
+from remora.policy.trace import (
+    PolicyRuleEvaluation,
+    PolicyTrace,
+)
 
 
 @dataclass(frozen=True)
@@ -432,9 +431,9 @@ class _ConditionalGate:
 
     name: str
     reason: DecisionReason
-    evaluate: Callable[["RemoraDecisionEngine", PolicyObservation, "CredalEnvelope", float], DecisionAction | None]
+    evaluate: Callable[[RemoraDecisionEngine, PolicyObservation, CredalEnvelope, float], DecisionAction | None]
     idle_label: str
-    describe: Callable[[PolicyObservation, "CredalEnvelope", float], str]
+    describe: Callable[[PolicyObservation, CredalEnvelope, float], str]
 
     def outcome_label(self, action: DecisionAction | None) -> str:
         return action.value.upper() if action is not None else self.idle_label
@@ -1593,7 +1592,7 @@ class RemoraDecisionEngine:
         _invariant_recheck: bool = False,
     ) -> DecisionReport:
         if obs.assurance_root is not None and DecisionReason.TRACE_ATTACHED not in reasons:
-            reasons = list(reasons) + [DecisionReason.TRACE_ATTACHED]
+            reasons = [*reasons, DecisionReason.TRACE_ATTACHED]
 
         source = self._source_of_decision(reasons)
 
@@ -1747,7 +1746,7 @@ class RemoraDecisionEngine:
 
     def _escalate_invariant_violation(
         self,
-        violations: list["InvariantResult"],
+        violations: list[InvariantResult],
         obs: PolicyObservation,
         *,
         credal: CredalEnvelope | None,

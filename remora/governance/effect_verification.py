@@ -43,11 +43,12 @@ reader's reading of the status name:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from remora import frozen_json
 
@@ -209,7 +210,7 @@ class EffectVerification:
             raise ValueError(
                 f"scope {self.scope!r}: a verdict covers the declared delta only")
 
-    def observed_from(self, vantage: Any) -> "EffectVerification":
+    def observed_from(self, vantage: Any) -> EffectVerification:
         """This record with its vantage derived from who observed.
 
         ``independent`` only when the observation vantage derives as
@@ -242,7 +243,7 @@ class EffectVerification:
         detail: str = "",
         evidence_refs: tuple[str, ...] = (),
         now: datetime | None = None,
-    ) -> "EffectVerification":
+    ) -> EffectVerification:
         """Both sides are hashed, so a later reader can re-check the
         comparison rather than trust this record's verdict."""
         # Private deep copies, hashed from the copy the record keeps: the

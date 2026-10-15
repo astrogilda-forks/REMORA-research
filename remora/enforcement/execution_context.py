@@ -42,7 +42,7 @@ class ExecutionContext:
     def for_dispatch(cls, *, tool_name: str, capability_set: EffectiveCapabilitySet,
                      proposal_id: str, policy_bundle_hash: str, toolspec_hash: str,
                      lease_digest: str, context_id: str = "", task_id: str = "",
-                     runtime_identity_hash: str = "") -> "ExecutionContext":
+                     runtime_identity_hash: str = "") -> ExecutionContext:
         """The context for dispatching ``tool_name`` under ``capability_set``."""
         return cls(
             execution_id=str(uuid.uuid4()),

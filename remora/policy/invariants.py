@@ -79,12 +79,11 @@ Extending
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import abc
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from remora.errors import RemoraError
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction, DecisionReport
 

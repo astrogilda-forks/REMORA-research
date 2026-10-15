@@ -97,7 +97,7 @@ class RuntimeTrustBaseIdentity:
     generation: str = ""
 
     @classmethod
-    def from_environment(cls, env: "dict[str, str] | None" = None) -> RuntimeTrustBaseIdentity:
+    def from_environment(cls, env: dict[str, str] | None = None) -> RuntimeTrustBaseIdentity:
         """Read this process's own declaration. Unset fields stay empty."""
         source = os.environ if env is None else env
         return cls(

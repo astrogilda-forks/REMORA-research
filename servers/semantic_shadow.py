@@ -60,10 +60,11 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from remora.decision_providers.enrich import (
     SemanticThresholds,

@@ -12,7 +12,7 @@ back to a specific field in the envelope.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from remora.governance.envelope import DecisionEnvelope
 
@@ -64,14 +64,14 @@ class DecisionExplainer:
     No inference, no hallucination — just structured translation.
     """
 
-    _OUTCOME_VERBS = {
+    _OUTCOME_VERBS: ClassVar[dict[str, str]] = {
         "ACCEPTED": "approved for autonomous execution",
         "VERIFIED": "approved pending human verification",
         "ABSTAINED": "blocked — REMORA declined to act",
         "ESCALATED": "escalated to human review",
     }
 
-    _RISK_DESCRIPTIONS = {
+    _RISK_DESCRIPTIONS: ClassVar[dict[str, str]] = {
         "low": "a low-risk action with minimal potential for harm",
         "medium": "a medium-risk action requiring standard governance checks",
         "high": "a high-risk action requiring elevated scrutiny",

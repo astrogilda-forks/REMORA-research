@@ -73,6 +73,20 @@ This file lists externally relevant changes by release. Fine-grained development
   tests behind them do not run in this job; several results-artifact tests
   skip because their artifacts are not committed.
 
+### Quality (style rule sets gate the trusted core, REM-037)
+
+- `quality-gates.yml` runs ruff over `remora/policy`, `enforcement`,
+  `governance`, `execution` and `servers` with the isort, pyupgrade and
+  Ruff-specific rule sets next to the bandit and bugbear ones. One
+  mechanical commit applied the fixes (sorted imports, unquoted
+  annotations, dropped unused noqa, two unpacking rewrites, two ClassVar
+  annotations); no behaviour changed and every capability the touched
+  files evidence is rebound. Excluded with reasons: `UP042`, because
+  `StrEnum` changes what `str()` returns for members that reach audit
+  records; `RUF001` to `RUF003`, because prose characters belong to the
+  prose ratchet; `UP037` on the four mutation-tested files, because mutant
+  ids are positional. Remaining REM-037 item: hash-locked Python installs.
+
 ### Interop (the effect hash rule's preimage)
 
 - `effect-evidence-v1.1` (DRAFT) now defines what the `hash` comparison rule

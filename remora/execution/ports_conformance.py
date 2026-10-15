@@ -25,18 +25,26 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from remora.enforcement.gate import EnforcementGate
     from remora.enforcement.lease import GovernedToolDispatcher
-    from remora.enforcement.outbox import (ExecutionOutbox,
-                                           PostgresExecutionOutbox,
-                                           SQLiteExecutionOutbox)
+    from remora.enforcement.outbox import (
+        ExecutionOutbox,
+        PostgresExecutionOutbox,
+        SQLiteExecutionOutbox,
+    )
     from remora.enforcement.token import PolicyDecisionToken
-    from remora.execution.ports import (AuditChainPort, DispatchOutboxPort,
-                                        EnforcementGatePort,
-                                        PolicyDecisionTokenPort,
-                                        ReviewQueuePort, ToolDispatcherPort)
+    from remora.execution.ports import (
+        AuditChainPort,
+        DispatchOutboxPort,
+        EnforcementGatePort,
+        PolicyDecisionTokenPort,
+        ReviewQueuePort,
+        ToolDispatcherPort,
+    )
     from remora.governance.review_queue import ReviewQueue
-    from remora.governance.tenant_chain import (PostgresTenantChain,
-                                                SQLiteTenantChain,
-                                                TenantAuditChain)
+    from remora.governance.tenant_chain import (
+        PostgresTenantChain,
+        SQLiteTenantChain,
+        TenantAuditChain,
+    )
 
     def _conforms(
         in_memory_chain: TenantAuditChain,

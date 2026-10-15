@@ -8,11 +8,9 @@ copy could drift from the chain it describes. No HTTP knowledge here.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from remora.errors import RemoraError
-
-from typing import Any
 
 
 class EffectVerificationReplay(RemoraError, RuntimeError):
@@ -82,10 +80,11 @@ def record_effect_verification(chain: Any, tenant: str, verification: Any, *,
     than reaching out to a third party from inside governance.
     """
     record = verification.to_dict()
-    from remora.governance.execution_identity import (
-        ExecutionContextRefused, historical_context,
-    )
     from remora.governance.effect_receipt import resolve_lineage
+    from remora.governance.execution_identity import (
+        ExecutionContextRefused,
+        historical_context,
+    )
 
     proposal_id = str(record.get("proposal_id", ""))
     context = historical_context(chain, tenant, proposal_id) if proposal_id else None
@@ -215,7 +214,7 @@ def envelope_projection(
     *,
     proposal_id: str,
     tenant: str,
-) -> "DecisionEnvelope":
+) -> DecisionEnvelope:
     """One DecisionEnvelope for one proposal, derived from the chain (#37).
 
     The envelope is the canonical governance contract, but the execution path

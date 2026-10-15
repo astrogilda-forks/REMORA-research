@@ -59,8 +59,6 @@ module exists to remove, at the moment an operator believed they had fixed it.
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import base64
 import binascii
 import hashlib
@@ -68,18 +66,20 @@ import hmac
 import os
 from typing import Any
 
+from remora.errors import RemoraError
+
 __all__ = [
-    "ALG_HMAC",
     "ALG_ED25519",
     "ALG_ED25519_V2",
+    "ALG_HMAC",
     "LeaseKeyRevoked",
     "LegacyFormatRefused",
     "SigningUnavailable",
+    "hmac_accepted",
     "issuer_algorithm",
+    "public_key_only",
     "sign_payload",
     "verify_payload",
-    "hmac_accepted",
-    "public_key_only",
 ]
 
 ALG_HMAC = "hmac-sha256"
@@ -377,7 +377,7 @@ def verify_payload(payload: bytes, signature: str, *, alg: str, kid: str = "",
             )
         try:
             public.verify(bytes.fromhex(signature), payload)
-        except (ValueError, Exception):  # noqa: B014 - InvalidSignature subclasses Exception
+        except (ValueError, Exception):
             return False
         return True
     if alg == ALG_HMAC:

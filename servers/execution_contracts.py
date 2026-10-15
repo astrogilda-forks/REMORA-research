@@ -248,7 +248,7 @@ class PlanProposal(BaseModel):
     depends_on: list[str] = Field(default_factory=list, max_length=256)
 
     @model_validator(mode="after")
-    def _dependencies_were_read(self) -> "PlanProposal":
+    def _dependencies_were_read(self) -> PlanProposal:
         from remora.governance.plan_binding import PlanBinding
 
         PlanBinding.from_dict(self.model_dump())  # raises for an unread dependency
@@ -306,7 +306,7 @@ class ToolCallRequest(BaseModel):
     task_type: str | None = Field(None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
-    def _task_identity_is_whole(self) -> "ToolCallRequest":
+    def _task_identity_is_whole(self) -> ToolCallRequest:
         from remora.governance.task_identity import TaskIdentity
 
         # Raises ValueError (a 422) for one half, blank or padded values.

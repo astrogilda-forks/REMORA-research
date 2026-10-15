@@ -45,13 +45,13 @@ for a runnable example.
 """
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from dataclasses import fields as dataclasses_fields
-from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, ClassVar
 
