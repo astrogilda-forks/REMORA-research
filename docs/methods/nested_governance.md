@@ -204,7 +204,9 @@ redact": because the act of summarisation can leak structure and content.
 ### Implementation: RAG (optional extension)
 
 Access control is **opt-in**. Without `AccessContext`, the oracle behaves
-exactly as before. With it, every query is automatically filtered.
+exactly as before. With it, every query is automatically filtered. The
+identity adapters need PyJWT: install the `identity` extra
+(`pip install -e ".[identity]"`).
 
 ```python
 from remora.adapters.identity import AccessContext

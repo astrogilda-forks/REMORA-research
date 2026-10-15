@@ -68,10 +68,20 @@ This file lists externally relevant changes by release. Fine-grained development
   unlisted: imports the job installs (fastapi, cryptography, httpx, yaml,
   jsonschema, uvicorn) and the TLA `BLOCKED` path. A test checks that every
   literal skip reason in `tests/` is listed or deliberately not.
-- Made visible by the list, not changed: PyJWT, numpy, the OpenTelemetry
-  SDK and Hugging Face datasets are outside the job's install set, so the
-  tests behind them do not run in this job; several results-artifact tests
-  skip because their artifacts are not committed.
+- Made visible by the list, not changed: numpy, the OpenTelemetry SDK and
+  Hugging Face datasets are outside the job's install set, so the tests
+  behind them do not run in this job; several results-artifact tests skip
+  because their artifacts are not committed.
+- PyJWT had no install path: the identity adapters (JWT, Entra ID,
+  Keycloak) import it lazily and no extra declared it, so the adapter tests
+  never ran in the pytest job. New `identity` extra (`PyJWT[crypto]`); the
+  pytest job installs it, the lock-resolvability sets include it, and a
+  missing `jwt` now fails the job instead of skipping.
+- The same for OpenTelemetry: `remora/observability/otel.py` documented a
+  manual `pip install` and no extra declared the packages, so the structural
+  tracing tests (issue #45 gap 6) never ran in the job. New `otel` extra
+  (API, SDK, OTLP/HTTP exporter, all already pinned in the lock); the pytest
+  job installs it, and a missing `opentelemetry.sdk` fails the job.
 
 ### Quality (style rule sets gate the trusted core, REM-037)
 

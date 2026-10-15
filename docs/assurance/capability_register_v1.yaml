@@ -520,8 +520,9 @@ capabilities:
   - id: CAP-011
     name: "OTel GenAI telemetry (gen_ai.* + remora.* spans, pinned schema)"
     status: IMPLEMENTED_LIBRARY
-    verified_at_sha: d27468aea68f9f4b01f49506f865b52c03807264
+    verified_at_sha: a17b3d44fcf3912c603bcad7964273bb8496b135
     verified_by: >-
+      re-audited 2026-10-14 at a17b3d4 (OTEL-EXTRA), from d27468a: remora/observability/otel.py changes only its module docstring, which now names the new `otel` extra (opentelemetry-api, opentelemetry-sdk, opentelemetry-exporter-otlp-proto-http, all already pinned in requirements-lock.txt) in place of a manual pip command. No code changed: the tracer is still a no-op without the API and every span attribute is as before. Evidence: tests/test_tracing_structural.py now runs in the CI pytest job (the otel extra is in its install set) instead of skipping. The capability's mechanism is unchanged; status, scope and caveats unchanged.
       audit 2026-08-26 (issue #425 backlog burn-down): every cited evidence test executed green at this revision (tests/test_otel.py; part of a 259-test pass over all sixteen previously-unbound capabilities), the capability-semantics gate (scripts/check_capability_semantics.py) confirms the claimed status 'IMPLEMENTED_LIBRARY' is demonstrable in the runtime wiring, and the caveat was re-read against the current code. Method: test execution + machine-checked wiring semantics + caveat review; not an independent external audit.
     evidence:
       - remora/observability/otel.py

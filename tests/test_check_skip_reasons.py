@@ -118,7 +118,8 @@ def test_every_static_skip_reason_in_the_suite_is_listed_or_deliberately_not(gat
     # image ships a JDK), so that reason stays off the list as well.
     deliberately_unlisted = {"BLOCKED: ", "; ", "java not found: TLA+ models NOT checked"}
     installed = {"fastapi", "cryptography", "httpx", "yaml", "jsonschema", "uvicorn",
-                 "cryptography.hazmat.primitives.asymmetric.ed25519"}
+                 "cryptography.hazmat.primitives.asymmetric.ed25519",
+                 "jwt", "opentelemetry.sdk"}  # identity and otel extras, installed by the pytest job
     pat = re.compile(r"(?:pytest\.skip\(|pytest\.mark\.skip\(\s*reason\s*=\s*|skipif\([^)]*?reason\s*=\s*)\s*(?P<f>f?)[\"']([^\"']+)[\"']")
     imports = re.compile(r"importorskip\(\s*[\"']([^\"']+)[\"']")
     missing: list[str] = []
