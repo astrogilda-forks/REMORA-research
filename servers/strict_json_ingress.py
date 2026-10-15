@@ -25,7 +25,8 @@ Refused, with a stable ``code``:
 ``json_duplicate_member``   a repeated object member name, compared after
                             escape decoding (``"a"`` and ``"\\u0061"`` are the
                             same name)
-``json_non_finite_number``  ``NaN``, ``Infinity``, ``-Infinity`` or a\n                            finite-looking literal overflowing to infinity
+``json_non_finite_number``  ``NaN``, ``Infinity``, ``-Infinity`` or a
+                            finite-looking literal overflowing to infinity
 ``json_unpaired_surrogate`` a string containing a lone surrogate code point
 ``json_noncharacter``       a string containing a Unicode noncharacter
                             (I-JSON, RFC 7493 section 2.1)
