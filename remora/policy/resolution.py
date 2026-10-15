@@ -28,8 +28,9 @@ escalation dressed as a lookup.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction, DecisionReport
@@ -168,7 +169,7 @@ def validate_and_reenter(
         source = plan.source_tools[min(index, len(plan.source_tools) - 1)]
         try:
             verdict = validator(source, argument)
-        except Exception as exc:  # noqa: BLE001 — an unreachable validator is a gap
+        except Exception as exc:
             violation = f"validator raised: {exc}"
             break
 
@@ -274,7 +275,7 @@ def resolve_and_reenter(
         source = plan.source_tools[min(index, len(plan.source_tools) - 1)]
         try:
             value = resolver(source, argument)
-        except Exception as exc:  # noqa: BLE001 — an unreachable resolver is a gap
+        except Exception as exc:
             violation = f"resolver raised: {exc}"
             break
 

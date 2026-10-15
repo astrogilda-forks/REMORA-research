@@ -53,8 +53,9 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from remora.legal.citation_existence import resolve_citation_existence  # noqa: E402
 from typing import Any
+
+from remora.legal.citation_existence import resolve_citation_existence
 
 # stderr only -- stdout carries JSON-RPC and must stay clean. WARNING, not
 # ERROR: the previous level silenced every oracle-failure and degradation

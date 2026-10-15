@@ -34,7 +34,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import TYPE_CHECKING, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from remora.toolcall.toolspec import ToolSpecBundle
@@ -57,13 +58,13 @@ def _digest(bundle_digest: str, tools: Iterable[tuple[str, str]]) -> str:
     ).hexdigest()
 
 
-def signed_surface_digest(bundle: "ToolSpecBundle") -> str:
+def signed_surface_digest(bundle: ToolSpecBundle) -> str:
     """The surface the signed bundle declares: every spec, by id and hash."""
     return _digest(bundle.bundle_digest,
                    ((s.tool_id, s.toolspec_hash) for s in bundle.tool_specs()))
 
 
-def observed_surface_digest(bundle: "ToolSpecBundle", registered: Iterable[str]) -> str:
+def observed_surface_digest(bundle: ToolSpecBundle, registered: Iterable[str]) -> str:
     """The surface an executor actually offers: its registered tools, each
     with the spec hash the bundle gives it, or ``unsigned``."""
     specs = {s.tool_id: s.toolspec_hash for s in bundle.tool_specs()}

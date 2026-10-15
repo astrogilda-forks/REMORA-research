@@ -56,13 +56,13 @@ from a probe that had read the wrong key (NEGATIVE_RESULTS section 49).
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Mapping, Sequence
+from typing import Any
 
+from remora.errors import RemoraError
 from remora.governance.effect_verification import EffectStatus
 
 __all__ = [

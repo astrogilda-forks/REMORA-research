@@ -24,16 +24,17 @@ part of RMR-004 rather than being claimed here.
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import hashlib
 import hmac
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Mapping, Sequence
+from typing import Any
+
+from remora.errors import RemoraError
 
 __all__ = [
     "ContextManifest",
@@ -158,7 +159,7 @@ class ContextManifest:
         generated_at: str,
         signing_identity: str,
         signing_key: bytes,
-    ) -> "ContextManifest":
+    ) -> ContextManifest:
         for name, value in (
             ("intake_id", intake_id),
             ("spec_id", spec_id),

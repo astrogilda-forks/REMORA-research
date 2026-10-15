@@ -22,18 +22,20 @@ Enforcement levels:
 """
 from __future__ import annotations
 
+import logging
 import warnings
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC
-import logging
 from typing import Any
 
+from remora.enforcement.token import (
+    AuthorizationContext,
+    PolicyDecisionToken,
+    TokenVerificationResult,
+)
 from remora.observability.events import governance_event
-
-from remora.enforcement.token import AuthorizationContext
-from remora.enforcement.token import PolicyDecisionToken, TokenVerificationResult
 
 
 @dataclass(frozen=True)

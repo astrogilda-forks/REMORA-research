@@ -28,10 +28,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 __all__ = [
     "BINDINGS",
@@ -97,7 +98,7 @@ class BindingPolicy:
                             if o.get(binding) == "NOT_APPLICABLE"))
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any]) -> "BindingPolicy":
+    def from_mapping(cls, raw: Mapping[str, Any]) -> BindingPolicy:
         problems: list[str] = []
         if raw.get("schema") != SCHEMA:
             problems.append(f"schema must be {SCHEMA!r}, got {raw.get('schema')!r}")

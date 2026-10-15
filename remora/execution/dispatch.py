@@ -13,23 +13,26 @@ happened instead of implying execution.
 """
 from __future__ import annotations
 
-from remora.execution.ports import ToolCallPort, ToolDispatcherPort
-
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from remora.enforcement.lease import ExecutionLease, LeaseRefused, ToolExecutionStateUnknown
+from remora.enforcement.lease import (
+    ExecutionLease,
+    LeaseRefused,
+    ToolExecutionStateUnknown,
+)
 from remora.enforcement.lease_signing import SigningUnavailable
+from remora.enforcement.outbox import ExecutionOutbox, OutboxRow
+from remora.enforcement.result_envelope import capture_tool_result
+from remora.execution.ports import ToolCallPort, ToolDispatcherPort
 from remora.execution.remote_dispatch import (
     RemoteDispatchUnavailable,
     execution_endpoint,
     remote_dispatch,
 )
-from remora.enforcement.outbox import ExecutionOutbox, OutboxRow
-from remora.observability.events import governance_event
-from remora.enforcement.result_envelope import capture_tool_result
 from remora.governance.execution_identity import ExecutionContextV1
+from remora.observability.events import governance_event
 
 
 def _execution_context(semantic: dict[str, Any]) -> ExecutionContextV1 | None:
@@ -387,9 +390,9 @@ def record_dispatch_intent(
     tool_call_hash: str,
     grant_jti: str,
     tool_call_json: str | None = None,
-    authorization_expires_at: "datetime | None" = None,
+    authorization_expires_at: datetime | None = None,
     requested_by: str | None = None,
-) -> "OutboxRow":
+) -> OutboxRow:
     """Record the dispatch intent, inside the caller's transaction when open.
 
     With a durable backend the row commits with the authorization and rolls

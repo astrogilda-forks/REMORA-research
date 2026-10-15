@@ -44,17 +44,17 @@ behind. The fasttrack register remains the status authority.
 """
 from __future__ import annotations
 
-import logging
-from typing import Any
-
-from remora.observability.events import governance_event
 import hashlib
+import logging
 import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from typing import Any
+
+from remora.observability.events import governance_event
 
 __all__ = [
     "ExecutionOutbox",
@@ -134,7 +134,7 @@ def idempotency_key(proposal_id: str, tool_call_hash: str, attempt_no: int) -> s
     """
     hasher = hashlib.sha256()
     for part in (proposal_id, tool_call_hash, str(attempt_no)):
-        hasher.update(f"{len(part)}:{part}".encode("utf-8"))
+        hasher.update(f"{len(part)}:{part}".encode())
     return hasher.hexdigest()
 
 
@@ -326,7 +326,7 @@ class ExecutionOutbox:
 
     def record_intent_enlisted(
         self,
-        connection: "sqlite3.Connection",
+        connection: sqlite3.Connection,
         *,
         proposal_id: str,
         tenant_id: str,
@@ -613,7 +613,7 @@ class SQLiteExecutionOutbox(ExecutionOutbox):
     one is single-node by construction.
     """
 
-    def __init__(self, db_path: str) -> None:  # noqa: D107 - see class doc
+    def __init__(self, db_path: str) -> None:
         self._db_path = db_path
         self._local = threading.local()
         self._conn().executescript(_SQLITE_DDL)
@@ -967,7 +967,7 @@ class SQLiteExecutionOutbox(ExecutionOutbox):
         )
 
     @classmethod
-    def _row_any(cls, record: "sqlite3.Row | tuple") -> OutboxRow:
+    def _row_any(cls, record: sqlite3.Row | tuple) -> OutboxRow:
         """Parse a row from a caller connection, which may lack row_factory."""
         if not isinstance(record, sqlite3.Row):
             columns = (
@@ -998,7 +998,7 @@ class PostgresExecutionOutbox(ExecutionOutbox):
 
     _SELECT = "SELECT " + ", ".join(_COLUMNS) + " FROM execution_outbox"
 
-    def __init__(self, dsn: str) -> None:  # noqa: D107 - see class doc
+    def __init__(self, dsn: str) -> None:
         import psycopg  # type: ignore[import-not-found]
 
         self._psycopg = psycopg

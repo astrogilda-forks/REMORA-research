@@ -38,14 +38,13 @@ above are storage-invariant.
 """
 from __future__ import annotations
 
-from remora.execution.outcome import DispatchOutcome
-
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 
+from remora.execution.outcome import DispatchOutcome
 from remora.governance.degradation import ChainedEvent, ChainedEventLog
 from remora.governance.revocation_store import (
     InMemoryRevocationStore,
@@ -78,7 +77,7 @@ def _approval_survives(
             and _SEVERITY[fresh_action] <= _SEVERITY[approved_action])
 
 
-_OUTCOME_STATUS: "dict[DispatchOutcome, ItemStatus]" = {}
+_OUTCOME_STATUS: dict[DispatchOutcome, ItemStatus] = {}
 
 
 class ItemStatus(str, Enum):
@@ -621,7 +620,7 @@ class ReviewQueue:
         self,
         item_id: str,
         *,
-        outcome: "DispatchOutcome",
+        outcome: DispatchOutcome,
         reason: str | None = None,
     ) -> PendingReview:
         """Record what actually happened after authorization.

@@ -41,8 +41,6 @@ the alternative is a caller that retries a side effect it already caused.
 """
 from __future__ import annotations
 
-from remora.errors import RemoraError
-
 import json
 import os
 import urllib.error
@@ -50,10 +48,12 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from remora.errors import RemoraError
+
 __all__ = [
     "ENDPOINT_ENV",
-    "TOKEN_ENV",
     "TIMEOUT_ENV",
+    "TOKEN_ENV",
     "RemoteDispatchUnavailable",
     "execution_endpoint",
     "remote_dispatch",
@@ -187,7 +187,7 @@ def remote_dispatch(
         detail = ""
         try:
             detail = exc.read().decode("utf-8", errors="replace")[:300]
-        except Exception:  # noqa: BLE001 - best effort on an error path
+        except Exception:
             detail = ""
         if 400 <= exc.code < 500:
             return {"executed": False,
