@@ -135,6 +135,8 @@ python -m pytest tests/ -q
 
 Use `deploy/ot-pilot/` or the execution quickstart for a deployment-shaped test.
 
+A skipped test did not run. The CI pytest job runs with `-rs`, and `scripts/check_skip_reasons.py` fails it on any skip reason absent from `docs/assurance/skip_reason_allowlist_v1.yaml`, which classes each listed reason (optional dependency, external tool, another job, missing artifact, platform, data conditional, live). A new skip reason needs an entry there before it reaches CI.
+
 ## Evidence sources
 
 Do not infer maturity from implementation size. Use:

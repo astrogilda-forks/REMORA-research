@@ -50,6 +50,28 @@ This file lists externally relevant changes by release. Fine-grained development
 - Fixed on the way: `EnforcementGate.reset_ledger_watermark` had no D1 branch,
   so a Cloudflare deployment could not re-baseline its ledger watermark; the
   non-strict unsigned-token warning now names `check()`'s caller.
+- Follow-up: `DurableNonceStore.consumed_count` no longer carries a dict
+  branch no backend can reach (sqlite3, psycopg and `D1Connection` all
+  hand the row back positionally) nor the column alias that branch read.
+  A test pins the positional read and the alias-free query on SQLite and
+  D1; the two case-only mutants of the statement keep their baseline ids.
+
+### CI (a skipped test must name a listed reason)
+
+- The CI pytest job skipped 126 tests on master without saying why: the
+  job ran without `-rs`, and the same shape had kept the TLA+ checks
+  silently skipped for weeks before #834. The job now runs with `-rs` and
+  `scripts/check_skip_reasons.py` fails it on a skip reason that matches no
+  entry of `docs/assurance/skip_reason_allowlist_v1.yaml`. Each entry names
+  what the skip depends on and why that is acceptable in the job; the gate
+  prints how many tests each listed reason kept from running. Deliberately
+  unlisted: imports the job installs (fastapi, cryptography, httpx, yaml,
+  jsonschema, uvicorn) and the TLA `BLOCKED` path. A test checks that every
+  literal skip reason in `tests/` is listed or deliberately not.
+- Made visible by the list, not changed: PyJWT, numpy, the OpenTelemetry
+  SDK and Hugging Face datasets are outside the job's install set, so the
+  tests behind them do not run in this job; several results-artifact tests
+  skip because their artifacts are not committed.
 
 ### Quality (style rule sets gate the trusted core, REM-037)
 
