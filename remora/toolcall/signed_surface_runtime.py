@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, Callable, Mapping, Sequence
 
 from remora.enforcement.lease import GovernedToolDispatcher
-from remora.toolcall.callable_digest import (  # noqa: F401  (re-exported)
+from remora.toolcall.callable_digest import (
     CLOSURE_PREFIX,
     callable_digest_for,
     closure_digest,
@@ -26,6 +26,18 @@ from remora.toolcall.callable_digest import (  # noqa: F401  (re-exported)
 from remora.toolcall.runtime_surface import RuntimeTool, canonical_json
 from remora.toolcall.surface_runtime import SurfaceRuntime
 from remora.toolcall.toolspec import ToolSpec, ToolSpecBundle
+
+# The digest helpers are re-exported: callers and tests import them from
+# here, next to the runtime that checks them.
+__all__ = [
+    "CLOSURE_PREFIX",
+    "SignedSurfaceRuntime",
+    "callable_digest_for",
+    "closure_digest",
+    "closure_members",
+    "expected_surface_tool",
+    "source_digest",
+]
 
 
 def expected_surface_tool(spec: ToolSpec) -> RuntimeTool:

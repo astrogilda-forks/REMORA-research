@@ -42,6 +42,15 @@ This file lists externally relevant changes by release. Fine-grained development
   narrowing, external inventories, and JCS.
   Design note: `docs/design/scoped-evidence-obligations-v1.md`.
 
+### Quality (CodeQL notes cleared, 2026-10-16)
+
+- `signed_surface_runtime` declares `__all__`, so its re-exported digest
+  helpers are explicit rather than hidden behind a lint suppression; a test
+  drops imports it repeated. CAP-022 re-anchored, no behaviour change.
+- Four notes dismissed with reasons: two deliberate function-local imports
+  that break an import cycle in `servers/api.py`, a compatibility re-export
+  in `servers/execution_api.py`, and a type used only in string annotations.
+
 ### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
 
 - `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
