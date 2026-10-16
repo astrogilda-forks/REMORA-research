@@ -46,6 +46,18 @@ This file lists externally relevant changes by release. Fine-grained development
   the evidence one execution can produce. Across processes the effect domain
   already claims each slot in the durable ledger before its executor runs;
   this fix is for the in-process mediator.
+### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
+
+- `tests/test_hard_guards_dominate_max_trust.py` starts from one
+  observation that ACCEPTs on the probabilistic path with trust and
+  evidence at their maximum. It flips each of the eleven hard-guard signals
+  in `hard_guard_floor` one at a time, in the default engine and with both
+  opt-in accept paths on. Each must remove the ACCEPT with the floor's own
+  action and reason. NaN, +inf and -inf in every finite-gate field never
+  ACCEPT. NaN and -inf on a risk field are stopped by
+  `NON_FINITE_INPUT_VERIFY`, the only gate they cannot pass. That path had
+  no test before. No engine code changed.
+
 ### Fixed (a ResolutionPlan refuses a malformed binding, SDD-AS-v1 B02)
 
 - `ResolutionPlan` now validates itself at construction: at least one target
