@@ -4,6 +4,32 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Evidence (scoped evidence obligations over the outbox, REAS G1)
+
+- New read-only package `remora/evidence/obligations/`. A manifest, locked
+  before a dispatch window opens, fixes two obligations per intent: terminal
+  settlement and downstream projection, each with a deadline. `assess()`
+  compares a closed, digest-bound outbox snapshot against it and reports per
+  intent SATISFIED, PENDING, MISSING (late or never), INVALID, CONFLICTED or
+  NOT_APPLICABLE. Absence counts only once the snapshot has closed past the
+  due time. UNKNOWN stays PENDING and unobservable.
+- Coverage is established only for an inventory source the deployment
+  accepts, the manifest's tenant, a matching records digest and a close past
+  every deadline. Each result carries a fixed list of what it does not
+  establish, including execution authority and the effect itself.
+- Pure and deterministic: no clock, store or environment reads, and a later
+  snapshot gives a new assessment id. The package imports nothing from
+  enforcement, execution, policy or capabilities (AST test).
+- Searched validation against a hand-written oracle: no false "complete" and
+  no false "incomplete" found in 400 generated examples per seed (three seeds
+  run locally), over the domain declared in the test module.
+- Snapshots are built from the outbox's read-only `rows_created_in` query,
+  tested on the in-process and SQLite adapters.
+- Not built: a scheduled reader that decides `closed_at` in a deployment,
+  read-back for UNKNOWN, receipt intake, issuer policy, delegation
+  narrowing, external inventories, and JCS.
+  Design note: `docs/design/scoped-evidence-obligations-v1.md`.
+
 ### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
 
 - `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
