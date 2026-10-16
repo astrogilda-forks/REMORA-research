@@ -324,3 +324,70 @@ def test_the_latest_dispatch_supersedes_an_earlier_one():
     lineage = resolve_lineage(events)
     assert lineage.dispatch_id == "jti-retry", (
         "a retry supersedes; a receipt must attest to the attempt that ran last")
+
+# ── malformed evidence must not establish a positive execution claim ───────
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tool_executed", "false"),
+        ("tool_executed", "true"),
+        ("tool_executed", 1),
+        ("tool_executed", None),
+        ("state_unknown", "false"),
+        ("state_unknown", 0),
+        ("state_unknown", None),
+    ],
+)
+def test_non_boolean_dispatch_flag_is_refused(field, value):
+    events = _dispatched()
+    events[-1]["payload"][field] = value
+    with pytest.raises(ReceiptRefused) as exc:
+        _submit(events=events)
+    assert exc.value.reason == "dispatch_flags_malformed"
+
+
+def test_missing_dispatch_flags_cannot_establish_execution():
+    events = _dispatched()
+    events[-1]["payload"].pop("tool_executed")
+    events[-1]["payload"].pop("state_unknown")
+    with pytest.raises(ReceiptRefused) as exc:
+        _submit(events=events)
+    assert exc.value.reason == "dispatch_did_not_execute"
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ["", "not-a-timestamp", "2026-10-15",
+     "2026-10-15T12:00:00", None],
+)
+def test_missing_or_malformed_dispatch_time_is_refused(timestamp):
+    events = _dispatched()
+    events[-1]["timestamp"] = timestamp
+    with pytest.raises(ReceiptRefused) as exc:
+        _submit(events=events)
+    assert exc.value.reason == "dispatch_time_unparseable"
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ["2026-10-15", "2026-10-15T12:00:00",
+     "2026-10-15 12:00:00+00:00", "not-a-timestamp"],
+)
+def test_incomplete_or_unzoned_observation_time_is_refused(timestamp):
+    with pytest.raises(ReceiptRefused) as exc:
+        _submit(verified_at=timestamp)
+    assert exc.value.reason == "verified_at_unparseable"
+
+
+def test_zulu_time_still_verifies():
+    _lineage, status = _submit(
+        verified_at=OBSERVED_AT.isoformat().replace("+00:00", "Z")
+    )
+    assert status is EffectStatus.VERIFIED
+
+
+def test_explicit_unknown_boolean_remains_resolvable():
+    _lineage, status = _submit(events=_dispatched(executed=False, unknown=True))
+    assert status is EffectStatus.VERIFIED

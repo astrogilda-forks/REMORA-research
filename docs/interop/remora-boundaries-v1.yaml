@@ -16,7 +16,7 @@ provenance:
       sha256: 1a2b5cdbe7bc9f61143786dae89102389039c77451e8cb4f99d60d4015572c4b
       role: workflow capability declarations
     - path: docs/assurance/capability_register_v1.yaml
-      sha256: 8be14cd5de5b3d131dcc15ac72b4e059de19db18eae85cdcf3fff1e66c2cf1c6
+      sha256: 9dd11c0eaa762b0924602d5dd2b5e7b70a44f1e2c6b7e9e4cffde35535f85328
       role: implementation maturity and freshness source
     - path: artifacts/interop/index.json
       sha256: 6e1172cabf33ca2f141cdb02e28210ca93e66873389a133285620fafeec86d28
