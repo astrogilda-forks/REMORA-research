@@ -179,6 +179,22 @@ This file lists externally relevant changes by release. Fine-grained development
 - No defect was found. The HTTP execution API never builds a resolution plan
   itself, so re-entry stays a library step that the test composes with it.
 
+### Paper (revision 2026-10-16)
+
+- The preprint's abstract is cut to about 300 words and leads with the three
+  measured results; the introduction gains a contributions list and a
+  headline-results table bound to the claim register. The text follows the
+  code again: the decision grant is described as the Ed25519 v3 format
+  (RMR-CR-002), E7 is recorded as `EXTERNALLY_VERIFIED` with its two
+  independent Probity run records and the exposure disclosure, and the
+  federation-port contract probes, the TLA+ finding and the upstream fix
+  (aeoess/federation-port#1) are described in a new subsection together
+  with the CoSAI WS4 evidence-sufficiency mapping. The Markdown source's
+  stale one-page summary is rewritten, a dead benchmark script path is
+  corrected, the test count is refreshed, the `.tex` loses its byte-order
+  mark and gains PDF metadata, and the Markdown prose baseline falls from 78
+  to 70 long sentences. Version stays v0.12.0; only the revision date moves.
+
 ### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
 
 - `CapabilityMediator.invoke` spends the budget when it admits a request,

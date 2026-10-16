@@ -1,4 +1,4 @@
-﻿% =====================================================================
+% =====================================================================
 % REMORA: Governed Execution Assurance for Tool-Using AI Agents
 % LaTeX source - suitable for Overleaf, NeurIPS/ICML/ACL workshop templates
 % =====================================================================
@@ -14,6 +14,12 @@
 \usepackage{multirow}
 \usepackage{graphicx}
 \usepackage[hidelinks]{hyperref}
+\hypersetup{
+  pdftitle={REMORA: Governed Execution Assurance for Tool-Using AI Agents},
+  pdfauthor={Stian Skogbrott},
+  pdfsubject={Preprint: governed execution assurance for tool-using AI agents},
+  pdfkeywords={agentic AI safety, AI control, agent security, policy-as-code, selective prediction, audit governance},
+}
 % xurl = url with break points after every character class, so long
 % URLs and \path tokens wrap inside the narrow two-column measure
 % instead of protruding into the margin.
@@ -59,6 +65,7 @@
 % tokens) without visibly loosening the typography.
 \setlength{\emergencystretch}{2em}
 \tolerance=2000
+\raggedbottom
 
 % ---- Theorem environments -------------------------------------------
 \newtheorem{theorem}{Theorem}
@@ -72,7 +79,7 @@
 % Paper version - kept in lockstep with paper/remora_paper.md by
 % scripts/check_paper_sync.py (CI-enforced). The version and revision
 % strings below MUST match the .md version line.
-\newcommand{\paperversion}{Preprint v0.12.0, revision 2026-10-07; repository release tag \texttt{v0.12.0}}
+\newcommand{\paperversion}{Preprint v0.12.0, revision 2026-10-16; repository release tag \texttt{v0.12.0}}
 
 \author{
   Stian Skogbrott\thanks{Developer and maintainer of REMORA. Luftfiber AS.
@@ -81,7 +88,7 @@
   \texttt{https://github.com/darklordVirtual/REMORA-research}
 }
 
-\date{\paperversion\ --- \small compiled \today\ by CI from the repository LaTeX source}
+\date{\paperversion\\ \small compiled \today\ by CI from the repository LaTeX source}
 
 % ---- Notation -------------------------------------------------------
 \newcommand{\Oracles}{\mathcal{O}}
@@ -99,109 +106,46 @@
 
 % =====================================================================
 \begin{abstract}
-We present \textbf{REMORA}, a research-grade \emph{governed execution
-assurance} layer for tool-using AI agents. An agent intention is not an
-effect. A deterministic policy gate routes a proposed call to
-\textsc{accept}, \textsc{verify}, \textsc{abstain} or \textsc{escalate}
-before dispatch. A signed ToolSpec identifies what approval covers;
-an exact-call \texttt{ExecutionLease} binds that approval to one tool,
-argument set, target and policy bundle. Within the strict
-governed-execution profile and its declared credential topology, the
-authority domain holds no declared downstream execution credential, and
-the executor holds no lease-signing key; this boundary does not
-establish the absence of alternate credential, network or execution
-paths. A single-use grant is
-consumed at an enforcement point that re-evaluates policy. Lifecycle
-records distinguish \emph{authorized}, \emph{dispatched},
-\emph{executed} and \emph{verified effect}. Every decision emits a
-\texttt{DecisionEnvelope}; the API path finalizes it into a
-tenant-scoped hash chain and HMAC-signs it when a signing key is
-configured, and the envelope declares which trust-base components each
-record covers. The deterministic policy floor carries the safety rule:
-model consensus cannot override a hard block.
+REMORA is a governed execution-assurance layer for tool-using AI agents.
+An agent's intention is not an effect. A deterministic policy gate routes
+each proposed call to \textsc{accept}, \textsc{verify}, \textsc{abstain} or
+\textsc{escalate} before dispatch. A signed ToolSpec states what an approval
+covers, and an exact-call \texttt{ExecutionLease} binds that approval to one
+tool, argument set, target and policy bundle. A single-use grant is consumed
+at an enforcement point that re-evaluates policy. The lifecycle records
+\emph{authorized}, \emph{dispatched}, \emph{executed} and \emph{verified
+effect} as separate claims. Model consensus cannot override a hard block.
 
-We report three findings.
+We report three results. First, on a leakage-controlled 700-task tool-call
+benchmark (effective $N=70$) the full gate produced zero unsafe acceptances
+with higher decision utility ($+0.46$, $p\approx10^{-4}$) and accuracy
+(90\% vs.\ $\leq60\%$) than heuristic baselines (CLAIM-001); on 208
+AgentHarm scenarios \cite{andriushchenko2024agentharm} it produced zero
+false authorizations at the cost of blocking every benign counterpart
+(CLAIM-002). Second, bounded
+verification restores read utility from 0\% to 100\% in a regime where every
+state verdict is \textsc{unknown} (CLAIM-014), with zero corrupt-identifier
+or cross-tenant acceptances and writes held at \textsc{verify}. Third, on
+sealed BFCL v4 data the routing met all five pre-registered targets
+(wrong-call acceptance 10.9\%, routing accuracy 91.2\%; CLAIM-018,
+superseded by CLAIM-019 as the wrong-call baseline). A disjoint sealed
+C-ext3 track with declared tool contracts and verified task intents
+eliminated native wrong-call acceptance, 0/500 (Wilson 95\% upper bound
+0.76\%), while capping legitimate read autonomy at 26.6\%; four of seven
+targets were missed and published as measured (CLAIM-019).
 
-\textbf{First, a deterministic gate governs execution.} On a
-leakage-controlled tool-call benchmark, REMORA's full policy gate
-produced zero simulated unsafe acceptances with significantly higher
-decision utility and accuracy than heuristic baselines (mean utility
-$+0.456$, $p\approx10^{-4}$; accuracy 90\% vs.\ $\leq 60\%$).
-Under an intent-gating protocol on 208 independently sourced AgentHarm scenarios
-\cite{andriushchenko2024agentharm}, the same rule set produced zero
-false authorizations, at the cost of blocking every benign counterpart
-as well (FBR=100\%), a safety/friction corner point reported as such
-(CLAIM-001). Probabilistic consensus improves routing; it cannot override
-policy.
-
-\textbf{Second, bounded verification recovers useful reads.} Under study
-conditions, the validator loop restores read utility from 0\% to 100\%
-in a regime where every value verdict is \textsc{unknown}, with zero
-corrupt-identifier acceptances, zero cross-tenant lookups, and writes
-held at \textsc{verify} throughout. Absence of a record without a
-declared completeness guarantee is \textsc{unknown}, not
-\textsc{unsupported}. A \textsc{verify} names a bounded lookup and is
-followed by full re-entry of the router on a fresh observation; when
-no such lookup exists, the system \textsc{abstains}.
-
-\textbf{Third, the routing behaviour transfers to new external data.} In
-one sealed BFCL v4 run (1{,}527 episodes), REMORA met \textbf{all five
-pre-registered targets}: unknown required inputs were never guessed
-(0/32), irrelevant tools were refused 258/258 times, unobtainable inputs
-were refused 98/99 times, obtainable inputs were sent to verification
-96/99 times, and well-formed wrong calls were accepted 28/258 times
-(\textbf{10.9\%}, target $\leq 20\%$). Labelled routing accuracy was
-91.2\% (CLAIM-018, superseded by CLAIM-019 and kept as the
-permanent wrong-call baseline). A subsequent sealed C-ext3 track (2{,}799 episodes, disjoint
-sample) added declared tool contracts and verified task intents under a
-frozen deterministic semantic bundle with the semantic-authority floor,
-and eliminated native wrong-call acceptance entirely: \textbf{0/500}
-(Wilson 95\% upper bound 0.76\%), with a single-pass ablation attributing
-the effect to declared semantic authority ($24 \to 6 \to 0$ accepts
-across the arms). The cost was utility: legitimate read autonomy fell to
-26.6\% under the deterministic intent extractor, and four of seven
-pre-registered targets were missed and published as measured
-(NEGATIVE\_RESULTS.md \S39, CLAIM-019).
-
-The research router resolves 1{,}156/3{,}000 high-uncertainty MultiNLI
-cases without escalation (304 evidence-accepts, all entailment items,
-and 852 abstentions) in this proxy benchmark (CLAIM-005). On a separate
-$N=32$ critical-phase sample, low-trust items were correct 76.2\% of
-the time versus 36.4\% for high-trust items; critical-phase routing
-therefore does not rely on trust alone. Separately, a
-typed evidence-admission module can establish bounded premises for a
-particular observation without changing policy outcomes. Federation
-packages publish content-addressed
-contracts and distinguish reproduction from independent verification.
-Machine-readable capability and boundary declarations bound each claim
-with explicit claim ceilings and record what is not established.
-Neither an external attestation nor a model judgment grants execution
-permission.
-
-Key limitations: the component ablation identifies no component as
-necessary for the benchmark's zero unsafe accepts; every condition,
-including the one without hard blocks, records a false-accept rate of
-0.000 (CLAIM-020). The deterministic attribution rests on the
-mechanism. The entropy observable is computed by a
-token-fingerprint proxy rather than full semantic entropy over NLI
-clusters; the QA benchmark is partly author-curated; semantic evidence
-retrieval is pluggable but not live; the audit hash chain is
-tamper-evident, not tamper-proof, without external append-only storage;
-and the BFCL v4 track supplies no authoritative task-intent/tool-contract
-bundle and excludes wrong-argument values because BFCL has no independently
-vouchable state table. It therefore confirms the complete routing pipeline,
-not the isolated causal effect of semantic intent matching. REMORA is a
-governed autonomy layer, not a replacement for domain authority. The system
-is \texttt{SHADOW\_ONLY}: bounded external reproductions now exist for
-several frozen interoperability contracts, recorded as external
-second-implementation runs, not independent verification; independent runtime
-verification, production enforcement evidence and Federation adoption
-remain unestablished.
+Every number is bound to a machine-checked claim register, and
+machine-readable capability and boundary declarations state what the system
+establishes and what it does not. A component ablation attributes the
+benchmark's zero-unsafe result to no single component (CLAIM-020). One frozen
+interoperability contract has two independent external reproductions under
+the repository's recorded independence rule; production enforcement remains
+unestablished and the system is \texttt{SHADOW\_ONLY}.
 \end{abstract}
 
-\textbf{Keywords:} agentic AI safety, multi-oracle consensus, selective
-prediction, uncertainty routing, policy-as-code, audit governance,
-human-in-the-loop.
+\textbf{Keywords:} agentic AI safety, AI control, agent security,
+governance overlay, policy-as-code, selective prediction, uncertainty
+routing, audit governance, human-in-the-loop.
 
 % =====================================================================
 \section{Introduction}
@@ -281,6 +225,58 @@ routing experiments. For governed deployments, this would let an agent
 suggest useful actions without making its own confidence the source of
 permission. The reported numbers are tied to committed
 artifacts and their stated scope, not to field validation.
+
+\paragraph{Contributions.} This preprint makes five contributions, each
+bound to committed artifacts; Table~\ref{tab:headline} lists the headline
+numbers.
+\begin{enumerate}[leftmargin=*,itemsep=1pt]
+\item an authority-bound execution chain (signed ToolSpec, exact-call
+  \texttt{ExecutionLease}, single-use grant, re-policying at dispatch) whose
+  lifecycle separates authorization, dispatch, execution and verified effect
+  (\S\ref{sec:execution-chain});
+\item an argument-resolution ladder in which \textsc{unknown} is a
+  first-class verdict and a \textsc{verify} names a bounded lookup followed
+  by full re-entry of the router (\S\ref{sec:resolution-ladder},
+  \S\ref{sec:casestudy-fleetops});
+\item sealed external routing evidence on BFCL v4 and a disjoint C-ext3
+  track that isolates declared semantic authority, with the utility cost
+  published as measured (\S\ref{sec:routing-blind},
+  \S\ref{sec:wrongcall-implication});
+\item machine-readable capability and boundary declarations with explicit
+  claim ceilings, a claim register that gates every number in this paper,
+  and a negative-results record that includes an ablation attributing the
+  headline safety number to no component
+  (\S\ref{sec:boundary-declarations}, \S\ref{sec:ablation});
+\item frozen interoperability contracts with external run records, one of
+  them independently reproduced, together with contract probes and a
+  formal model contributed to an external federation transport
+  (\S\ref{sec:federation}).
+\end{enumerate}
+The paper follows that order: related work (\S\ref{sec:related}), the
+problem statement and architecture
+(\S\ref{sec:problem}--\S\ref{sec:audit}), evaluation and results
+(\S\ref{sec:eval}--\S\ref{sec:casestudy-fleetops}), negative results,
+validity and reproducibility (\S\ref{sec:negative}--\S\ref{sec:repro}), and
+the conclusion (\S\ref{sec:conclusion}).
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Headline results. Every row is bound to the claim register;
+  CLAIM-018 is superseded by CLAIM-019 and kept as the wrong-call baseline.}
+\begin{tabular}{@{}p{0.40\columnwidth}p{0.54\columnwidth}@{}}
+\toprule
+Study & Result (claim) \\
+\midrule
+Tool-call benchmark, 70 clusters & 0\% unsafe acceptance, Wilson [0.0\%, 5.2\%] (CLAIM-001) \\
+AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%] (CLAIM-002) \\
+Validator study, all-\textsc{unknown} regime & read utility 0\% to 100\% (CLAIM-014) \\
+Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-018, superseded) \\
+Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% (CLAIM-019) \\
+Component ablation & FAR 0.000 in every arm (CLAIM-020) \\
+\bottomrule
+\end{tabular}
+\label{tab:headline}
+\end{table}
 
 % =====================================================================
 \section{Background and Related Work}
@@ -474,15 +470,22 @@ and the honest boundary of every internal benchmark claim in this paper.
 
 \paragraph{AI control.}
 Greenblatt et al.\ (2024) \cite{greenblatt2024aicontrol} formalize safety
-protocols that remain effective when the \emph{policy model itself} is
-intentionally subversive, using trusted monitoring with limited audit
-budgets. In their taxonomy REMORA is a trusted-monitoring control
-protocol: a deterministic trusted layer plus weaker trusted monitors (the
-oracle swarm) gating an untrusted agent, with \textsc{escalate} as the
-audit budget. REMORA's threat model (injection, oracle compromise) does
-not yet include a strategically subversive agent: collusion and
-monitor-evasion failure modes from the control literature are open items
-for the red-team plan.
+protocols that remain effective when the policy model itself is
+intentionally subversive, using trusted monitoring with a limited audit
+budget. In that taxonomy REMORA is a trusted-monitoring protocol with a
+deterministic trusted floor. The hard-block layer and the authority-bound
+execution chain are the trusted components, the oracle swarm is a set of
+weaker trusted monitors, and \textsc{escalate} spends the audit budget. Two
+properties of the design are the control-relevant ones. Within the declared
+custody profile the untrusted agent never holds the material that mints
+authority, and no model output, its own or a monitor's, can clear a hard
+block. Resampling and defer-to-trusted protocols from the control literature
+are implemented as a library (\path{remora/governance/control_protocols.py},
+roadmap item RF-04) and are not wired into the decision path. The threat
+model evaluated here covers injection and oracle compromise. A strategically
+subversive agent, collusion between monitors and monitor evasion remain
+open items for the red-team plan, and the benchmarks in
+\S\ref{sec:results} do not measure them.
 
 \paragraph{Regulatory operationalization.}
 COMPL-AI \cite{guldimann2024complai} provides a technical interpretation
@@ -653,10 +656,14 @@ and audit hash-chain entry.
 
 Deciding and executing are separate trust domains, bound with
 cryptographic identity at every hop. The policy layer issues a
-\texttt{PolicyDecisionToken} (HMAC-SHA256; observation hash binds it to
-one governance call; the \texttt{jti} is consumed exactly once against
-a durable ledger, and an in-memory database is refused as a ``durable''
-backend). What an approval is granted \emph{over} is a signed ToolSpec
+\texttt{PolicyDecisionToken} (format v3: Ed25519 over a domain-separated
+payload, with a key identifier derived from the public key; the observation
+hash binds it to one governance call; the \texttt{jti} is consumed exactly
+once against a durable ledger, and an in-memory database is refused as a
+``durable'' backend). A redeemer configured with verification keys alone
+verifies every grant it is shown and mints none. The HMAC formats v1 and v2
+remain readable; once Ed25519 material is configured they are refused as
+live authority unless a migration window is declared. What an approval is granted \emph{over} is a signed ToolSpec
 whose identity travels inside the lease; a spec that moved between
 approval and dispatch refuses. Dispatch itself happens only under an
 exact-call \texttt{ExecutionLease} (tenant, actor, tool, canonical
@@ -684,9 +691,12 @@ audit event joins the state transaction through an audit outbox and is
 projected on a later execution-path interaction; this does not imply
 that all API audit writes are transactional or that idle tenants are
 automatically swept. \textbf{Stated gaps:} the
-decision token remains HMAC-signed (the asymmetric custody claim covers
-the lease layer only); KMS/HSM key management and process-boundary mTLS
-are not implemented; dispatch runs in the API process by default, with
+decision/enforcement split is real only where \texttt{/assess} and
+\texttt{/execute-accepted} run in different custody domains. A deployment
+that runs both in one process with the private key is one domain, and the
+review path still mints and consumes in-process. No deployment is proven to
+configure the asymmetric grant (RMR-CR-002 stays partial). KMS/HSM key
+management and process-boundary mTLS are not implemented; dispatch runs in the API process by default, with
 an opt-in separated dispatch worker (202 after durable authorization;
 the worker half re-verifies the persisted call against the recorded
 binding) exercised so far only by CI and its contract tests.
@@ -746,29 +756,67 @@ verdict distinct from \textsc{unsupported}, and a signal that cannot be establis
 is left absent rather than guessed, since a fabricated boolean enters the policy
 contract as fact, while \texttt{None} correctly says nothing establishes this.
 
-\paragraph{Evidence admission and federation (2026-10-02).}
+\subsection{Evidence Admission, Federation and Standards Work}
+\label{sec:federation}
+
 A separate, tested \texttt{remora/evidence/admission/} module derives
-producer visibility, coverage, observation vantage, exact-invocation
-binding and prior-commitment premises from typed records and
-deployment-owned trust configuration. Malformed evidence is a processing
-failure, not a negative property verdict. The module does not feed the
-frozen conformance checkers, effect verification or the execution decision;
-it supplies a contract for evaluating the provenance of future observations.
-The federation interop package pins source revisions and file digests,
-preserves native claim vocabulary and distinguishes reproduction from an
-independent second implementation. Bounded external run records now
-exist for the exact-call-binding, fresh-authority and effect-evidence
-contracts (E-ECB, E-FA, E-EE). They were run by an external second
-implementation (Probity) against frozen fixture packages and are recorded
-as \texttt{NOT\_INDEPENDENT}, explicitly not independent verification, and
-each boundary-level claim result is recorded as \texttt{NOT\_ESTABLISHED}.
-The E7 runtime-surface package remains pinned with no external run
-recorded as of 2026-10-06 (\path{artifacts/interop/index.json},
-\path{docs/interop/remora-boundaries-v1.yaml}).
-Federation records are evidence references, never execution
-authority. On the enforcing API, Jev's typed semantic judgments are
-opt-in shadow records appended after audit; they can guide a lookup or
-an approver but do not change a verdict.
+producer visibility, coverage, observation vantage, exact-invocation binding
+and prior-commitment premises from typed records and deployment-owned trust
+configuration. Malformed evidence is a processing failure, not a negative
+property verdict. The module does not feed the frozen conformance checkers,
+effect verification or the execution decision; it supplies a contract for
+evaluating the provenance of future observations. Its six clauses follow
+the evidence-sufficiency premises of the CoSAI workstream on secure design
+of agentic systems (WS4, \S7.4; \path{docs/design/evidence-admission-v1.md}).
+\texttt{NOT\_ESTABLISHED} is a conclusion reached after verification ran;
+malformed input is a processing failure; self-report is not independent
+observation. Absence needs producer visibility and coverage for the same
+scope; identifier equality is not binding; expected verdicts stay outside
+admission inputs. The author took part in the workstream's public
+request-for-comment threads on agent manifests and on evidence
+sufficiency.\footnote{cosai-oasis/ws4-secure-design-agentic-systems
+issues \#149, \#189 and \#27, August to September 2026.} Those threads
+argued the boundary between attested deployment state and action-time
+authority, and the three-valued verdict for absent evidence. The repository's
+evidence-sufficiency conformance packages are research artifacts, not
+workstream deliverables.
+
+Federation packages pin source revisions and file digests, preserve native
+claim vocabulary and distinguish reproduction from an independent second
+implementation. External run records exist for the exact-call-binding,
+fresh-authority and effect-evidence contracts (E-ECB, E-FA, E-EE). They were
+run by an external second implementation (Probity) against frozen fixture
+packages and are recorded as \texttt{NOT\_INDEPENDENT}, with each
+boundary-level claim result \texttt{NOT\_ESTABLISHED}. The E7
+runtime-surface contract has two external Probity run records (2026-10-08
+and 2026-10-09) that meet the repository's recorded independence rule, so
+its lifecycle is \texttt{EXTERNALLY\_VERIFIED} with independence
+\texttt{INDEPENDENT}. That rule means a second implementation importing no
+producer code, run outside the producer's control; it is not a blind study.
+The record keeps its exposure: the expected answers were published before
+the reader was written, and a lint diagnostic later exposed parts of the
+retained reference verifier. The reader neither imported nor executed it. Both records establish fixture premises only; the claim result
+and runtime capability-surface completeness stay \texttt{NOT\_ESTABLISHED}
+(\path{artifacts/interop/index.json}, \path{docs/interop/FEDERATION.md}).
+
+The federation work also runs in the other direction. A contract-coverage
+map lists every normative rule of the federation-port transport's contract
+with the tests that exercise it, and 29 contract probes run against the
+unmodified upstream runtime. The probes found four findings (CP-F1 to
+CP-F4). A late provider confirmation was dropped from operation state under
+lease takeover, and a deadline did not bound first provider contact.
+Unbounded adapter reason text entered provenance, and a lost response under
+outage closed an operation as failed while a refund existed. The
+fourth was found by a TLA+ model of lease retry
+(\path{formal/tla/LeaseRetry.tla}, checked in CI) and replayed by a probe.
+All four were fixed upstream in a pull request from this repository
+(aeoess/federation-port\#1, merged 2026-10-08); the probes now assert the
+corrected behaviour and fail on the pre-fix runtime
+(\path{artifacts/interop/federation-port-v0/contract-coverage.json}).
+Federation records are evidence references, never execution authority. On
+the enforcing API, typed semantic judgments from an external provider are
+opt-in shadow records appended after audit; they can guide a lookup or an
+approver but do not change a verdict.
 
 \subsection{Machine-Readable Capability and Boundary Declarations}
 \label{sec:boundary-declarations}
@@ -788,8 +836,9 @@ statement of what the record establishes, paired with explicit
 non-claims. Federation edges carry separate \textbf{status dimensions}
 for owner confirmation, pinning, execution, independence, claim result,
 production evidence and Federation adoption. A recorded external run
-therefore cannot be read upward as independent verification or
-production evidence. Role mappings for the draft Agent Authority
+advances the execution and independence dimensions only under the record's
+stated rule, and never the claim-result, production or adoption dimensions
+by itself. Role mappings for the draft Agent Authority
 Conformance model are declared as candidates with their partial
 coverage stated.
 
@@ -1296,7 +1345,7 @@ and later failed confirmation are retained in \path{NEGATIVE_RESULTS.md}
 results in this section concern action routing and evidence under their
 stated protocols.
 
-\subsection{Tool-Call Benchmark (700 rows; effective $N=70$)}
+\subsection{Tool-Call Benchmark (700 rows; effective \texorpdfstring{$N=70$}{N=70})}
 
 \begin{table}[h]
 \centering\small
@@ -1329,7 +1378,7 @@ Earlier versions of this table reported baselines at
 reading author-annotated severity and oracle context flags; the 2026-07-20
 re-run restricts all conditions to the observable task surface.
 
-\subsection{Conformal Coverage (Mondrian, $N=2{,}161$)}
+\subsection{Conformal Coverage (Mondrian, \texorpdfstring{$N=2{,}161$}{N=2,161})}
 
 \begin{table}[h]
 \centering\small
@@ -1355,7 +1404,7 @@ Critical and disordered phases cannot achieve
 meaningful coverage via conformal calibration alone, motivating the
 evidence router.
 
-\subsection{Evidence Router Proxy Benchmark (MultiNLI, $N=3{,}000$)}
+\subsection{Evidence Router Proxy Benchmark (MultiNLI, \texorpdfstring{$N=3{,}000$}{N=3,000})}
 
 Resolution rate 38.5\%; evidence-accept precision 100\%;
 false-accept rate on contradiction 0\%; abstain precision 99.3\%.
@@ -1444,7 +1493,7 @@ Its isolated effect remains \textbf{unmeasured}, because the BFCL v4
 confirmation contains no authoritative semantic bundle.
 
 % =====================================================================
-\subsection{External Validity: AgentHarm Benchmark ($N=88$)}
+\subsection{External Validity: AgentHarm Benchmark (\texorpdfstring{$N=88$}{N=88})}
 \label{sec:agentharm}
 
 \emph{This tri-mode evaluation ($N=88$;
@@ -1728,7 +1777,7 @@ $\chi > 1.45$ (97th percentile) $\Rightarrow$ \textsc{Escalate} with
 Q4 high-trust: 50\% correct; Q1 low-trust: 75\% correct.
 Confirmed on $N=32$ real-oracle items and replicated qualitatively
 on augmented $N=511$ simulated dataset. No trust threshold separates
-correct from incorrect critical-phase items. \emph{Consequence:}
+correct from incorrect critical-phase items (CLAIM-005). \emph{Consequence:}
 evidence routing (not trust scoring) is the required mechanism for
 critical-phase decisions.
 
@@ -1745,11 +1794,12 @@ not authorize every privileged effect its implementation can reach, so
 the lease binds the exact call, not the effect space. Authoritative
 execution-context binding is \texttt{NOT\_ESTABLISHED}: the opt-in
 path is tested inside REMORA, the authority of its deployment sources
-is not. The bounded external
-run records for the E-ECB, E-FA and E-EE contracts come from an external
-second implementation and are recorded as not independent; they are not
-independent verification, and no boundary-level claim result is
-established by them. The paper's custody claims
+is not. The external run
+records for the E-ECB, E-FA and E-EE contracts come from an external second
+implementation and are recorded as not independent. The two E7 records are
+independent under the repository's recorded rule and establish fixture
+premises only. No boundary-level claim result is established by any of
+them. The paper's custody claims
 (\S\ref{sec:execution-chain}), and its title, should be read within
 these declared limits: REMORA establishes properties at a declared
 boundary and does not claim that all agent effects are governed.
@@ -1819,6 +1869,9 @@ make benchmark    # all deterministic benchmarks
 make credibility-pack
 \end{lstlisting}
 
+At the revision date the suite collects 10{,}301 tests across 690 test
+files (\texttt{python -m pytest tests/ -q}); CI output is authoritative.
+
 Live oracle experiments require \texttt{GROQ\_API\_KEY} (earlier rounds)
 or \texttt{CLOUDFLARE\_API\_TOKEN} (Cloudflare Workers AI, the 2026-07
 clean round). Oracle model versions may change; results are sensitive to
@@ -1835,8 +1888,9 @@ frozen fixture bytes. They do not execute the REMORA runtime, and they
 do not validate that the current runtime implements the contract. A
 successful replay is a bounded fixture claim, not a reproduction of the
 system. Runtime-level reproduction is declared \texttt{NOT\_READY} for
-all three capabilities, and an externally recorded run is not
-independent verification. The declarations themselves validate with
+all three capabilities. An externally recorded run advances a contract's
+independence only under the recorded rule (\S\ref{sec:federation}) and
+never its claim result. The declarations themselves validate with
 \path{scripts/check_remora_capabilities.py},
 \path{scripts/check_remora_boundaries.py} and
 \path{scripts/build_remora_boundary_summary.py} \texttt{--check}.
@@ -1914,14 +1968,15 @@ The current architecture offers two further research interfaces. Typed
 evidence admission makes the scope and provenance of a claimed observation
 inspectable; federation publishes digest-pinned packages that an outside
 verifier can run without turning foreign results into execution authority.
-The former is not yet wired into effect verification. Bounded external
-run records now exist for the exact-call-binding, fresh-authority and
-effect-evidence contracts (E-ECB, E-FA, E-EE). They are runs by an
-external second implementation against frozen fixture contracts, recorded
-as not independent,
-and each boundary-level claim result is recorded as
-\texttt{NOT\_ESTABLISHED}. The E7 runtime-surface contract has pinned
-fixtures but no external run. Experiment-specific constraints appear
+The former is not yet wired into effect verification. External run
+records now exist for the exact-call-binding, fresh-authority and
+effect-evidence contracts (E-ECB, E-FA, E-EE), recorded as not independent.
+The E7 runtime-surface contract has two independent external reproductions
+under the repository's recorded rule, with every boundary-level claim
+result still \texttt{NOT\_ESTABLISHED}. Contract
+probes and a formal model from this repository found four findings in an
+external federation transport, all fixed upstream
+(\S\ref{sec:federation}). Experiment-specific constraints appear
 beside the reported results and in \S\ref{sec:threats};
 \texttt{NEGATIVE\_RESULTS.md} preserves the complete finding history.
 
@@ -2510,9 +2565,11 @@ post-hoc modification of audit records but does not prevent an adversary with
 storage write access from replacing the entire chain. For deployments where
 stronger guarantees are required, hardware attestation via a Trusted Execution
 Environment (TEE) provides a complementary layer: the \texttt{DecisionEnvelope}
-is signed inside a hardware-isolated enclave, and the attestation quote
-includes a measurement of the enclave binary, making silent substitution
-detectable even if storage is compromised.
+is signed inside a hardware-isolated enclave by a workload whose measurement
+matches the approved build and policy digest, so silent substitution is
+detectable even if storage is compromised. Attestation establishes which
+code and configuration were measured; it does not establish that the model
+or the policy decided correctly.
 
 This is an optional deployment hardening; it is not required for the core
 REMORA governance protocol described in the main paper.
