@@ -51,6 +51,30 @@ def test_cp_upper_degenerate_n_zero_fails_closed() -> None:
     assert clopper_pearson_upper(0, 0, 0.05) == 1.0
 
 
+# Reference values are SciPy's ``beta.ppf(1 - delta, k + 1, n - k)``, the
+# closed form of the same limit, computed once and pinned here so the test
+# needs no SciPy.
+@pytest.mark.parametrize(("k", "n", "delta", "expected"), [
+    (2500, 5000, 0.05, 0.5117286740409445),
+    (0, 5000, 0.05, 0.0005989670023149134),
+    (12, 20000, 0.01, 0.00114073340299283),
+    (4999, 5000, 0.05, 0.9999897413937423),
+    (3, 20, 0.1, 0.3041868114074787),
+])
+def test_cp_upper_matches_beta_quantile_at_large_n(
+    k: int, n: int, delta: float, expected: float,
+) -> None:
+    # The CDF used to multiply math.comb(n, i), an exact integer, by a float.
+    # From n of about 1030 the integer no longer fits a float and the call
+    # raised OverflowError (SDD-AS-v1 finding B01: k=2500, n=5000).
+    assert clopper_pearson_upper(k, n, delta) == pytest.approx(expected, abs=1e-9)
+
+
+def test_cp_upper_rejects_negative_error_count() -> None:
+    with pytest.raises(ValueError, match="k_errors"):
+        clopper_pearson_upper(-1, 10, 0.05)
+
+
 # ── SGR / LTT fixed-sequence certification ─────────────────────────────────
 
 def _separable(n_good: int = 50, n_bad: int = 50):

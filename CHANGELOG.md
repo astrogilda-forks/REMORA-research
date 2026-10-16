@@ -24,6 +24,19 @@ This file lists externally relevant changes by release. Fine-grained development
   the evidence one execution can produce. Across processes the effect domain
   already claims each slot in the durable ledger before its executor runs;
   this fix is for the in-process mediator.
+### Fixed (a ResolutionPlan refuses a malformed binding, SDD-AS-v1 B02)
+
+- `ResolutionPlan` now validates itself at construction: at least one target
+  argument and one source tool, no empty or duplicate names, and
+  `max_attempts` an int of at least 1 (not a bool). Before this an empty
+  source list crashed re-entry with an uncaught `IndexError`, an empty
+  target list let `validate_and_reenter` report every target confirmed and
+  ground the call, and `max_attempts` accepted `0`, `-1` and `True`. The
+  decision engine never built such a plan; a caller constructing one did.
+- The engine drops duplicate argument names before building a plan.
+- Not changed: sources are still matched to arguments by position, with the
+  last source as fallback. Explicit per-argument binding is SDD-AS-v1 WP-02
+  (VerificationPlanV2) and is not implemented here.
 
 ### Security (decision grants a redeemer cannot mint, RMR-CR-002)
 
