@@ -35,6 +35,18 @@ This file lists externally relevant changes by release. Fine-grained development
   budget without deadlock; `close()` during a running effect refuses new
   requests at once and leaves the running one to settle as what it was.
 
+### Design (VerificationPlan v2 proposal, SDD-AS-v1 AS-007)
+
+- New design note `docs/design/verification-plan-v2.md`. It records four
+  weaknesses of today's resolution plan, read from the code: positional
+  source choice with a last-source fallback, no expiry or task budget, a
+  validator that never sees the value, and no binding to tenant, task, call
+  or policy.
+- It proposes one explicit source binding per argument, a durable budget per
+  task reserved before any lookup, and typed source evidence checked against
+  the plan before re-entry. Five slices; the strict-profile cutover waits for
+  the owner's pilot/research decision. No code changes.
+
 ### CI (every collected test is accounted for, SDD-AS-v1 AS-002)
 
 - The pytest matrix writes JUnit XML, and `scripts/check_test_accounting.py`
