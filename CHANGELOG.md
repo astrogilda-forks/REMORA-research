@@ -4,17 +4,18 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
-### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
+### Quality (both Clopper-Pearson bounds held to one grid, SDD-AS-v1 AS-016)
 
-- `tests/test_hard_guards_dominate_max_trust.py` starts from one
-  observation that ACCEPTs on the probabilistic path with trust and
-  evidence at their maximum. It flips each of the eleven hard-guard signals
-  in `hard_guard_floor` one at a time, in the default engine and with both
-  opt-in accept paths on. Each must remove the ACCEPT with the floor's own
-  action and reason. NaN, +inf and -inf in every finite-gate field never
-  ACCEPT. NaN and -inf on a risk field are stopped by
-  `NON_FINITE_INPUT_VERIFY`, the only gate they cannot pass. That path had
-  no test before. No engine code changed.
+- `tests/test_binomial_bound_grid.py` pins both `clopper_pearson_upper`
+  implementations (`risk_control` and the guardrail's `binomial_bounds`) to
+  SciPy's beta quantile at 1e-10 for n = 1, 10, 500, 5000 and 100000 and
+  delta = .05 and .05/7, plus the k = 0 closed form, k = n, monotonicity
+  and the delta ordering. Both already met it; no bound value changed (old
+  and new `binomial_bounds` agree exactly for n < 300).
+- `binomial_bounds.clopper_pearson_upper` sums P(X <= k) on the shorter
+  side of the distribution, so one evaluation costs O(min(k, n - k))
+  instead of O(n). Its docstring no longer claims accuracy only up to
+  n = 500. `binomial_tail_prob` is unchanged.
 
 ### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
 
@@ -36,6 +37,18 @@ This file lists externally relevant changes by release. Fine-grained development
   the evidence one execution can produce. Across processes the effect domain
   already claims each slot in the durable ledger before its executor runs;
   this fix is for the in-process mediator.
+### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
+
+- `tests/test_hard_guards_dominate_max_trust.py` starts from one
+  observation that ACCEPTs on the probabilistic path with trust and
+  evidence at their maximum. It flips each of the eleven hard-guard signals
+  in `hard_guard_floor` one at a time, in the default engine and with both
+  opt-in accept paths on. Each must remove the ACCEPT with the floor's own
+  action and reason. NaN, +inf and -inf in every finite-gate field never
+  ACCEPT. NaN and -inf on a risk field are stopped by
+  `NON_FINITE_INPUT_VERIFY`, the only gate they cannot pass. That path had
+  no test before. No engine code changed.
+
 ### Fixed (a ResolutionPlan refuses a malformed binding, SDD-AS-v1 B02)
 
 - `ResolutionPlan` now validates itself at construction: at least one target
