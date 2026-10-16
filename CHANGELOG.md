@@ -4,6 +4,19 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Decisions (owner decisions for SDD-AS-v1, REAS and VerificationPlan v2)
+
+- `docs/architecture/ADR-sdd-as-v1-owner-decisions.md` records ten
+  decisions that blocked work: the frozen BFCL extractor stays frozen, who
+  issues obligation manifests and how a window closes, the isolation runtime,
+  no paid model runs before the locked-evaluation harness, the
+  pilot/research split, the VerificationPlan v2 registry, budget and cutover,
+  and deferring `mcp` 2.
+- `NEGATIVE_RESULTS.md` §81: the BFCL intent extractor ignores negation and
+  conditionals. Benchmark-only, kept frozen because the sealed C-ext3
+  manifest pins it; recorded as a validity limit of the semantic arm.
+- Dependabot ignores semver-major `mcp` updates (D10).
+
 ### Evidence (scoped evidence obligations over the outbox, REAS G1)
 
 - New read-only package `remora/evidence/obligations/`. A manifest, locked

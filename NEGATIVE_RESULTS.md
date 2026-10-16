@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-08: **22 `open`**, **27 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-16: **23 `open`**, **27 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -44,7 +44,8 @@ cites only `open` sections and that no `open` section is missing a theme.
    ABSTAIN 63.3%). The pre-identified follow-up is the LLM-as-proposer arm
    (SAP v5 §7; a model proposes intents, the deterministic matcher keeps
    sole authority) plus an explicit gate-ordering design for combined
-   semantic+argument observations.
+   semantic+argument observations. The same frozen extractor ignores
+   negation (§81), so its successor must handle it before the next run.
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -4834,3 +4835,30 @@ ESCALATE (`tests/test_escalate_semantics_guard.py`). A threshold chosen on a
 calibration split with a risk-control procedure. Fresh paired data, reported
 as FAR at a fixed FBR.
 
+## §81 The BFCL intent extractor ignores negation and conditionals (2026-10-16)
+<!-- finding-status: open -->
+
+**Status:** recorded as a validity limit; the sealed extractor is unchanged; a
+versioned successor is decided, not built.
+
+**What was found.** `extract_intent` in
+`remora/toolcall/routing/bfcl_semantic_bundle.py` passes only the bare action
+keyword on as the action span. "Please do not cancel booking B-104" and
+"before cancel" therefore yield an intent that SUPPORTS `cancel_booking`.
+Five strict xfails in `tests/test_intent_claim_boundaries.py` (#874) pin the
+behaviour.
+
+**Scope.** The extractor belongs to the BFCL benchmark bundle. No deployment
+bundle imports it (`deploy/gateway/bundle.py`, the OT pilot bundle and
+`servers.semantic_bundle_research` do not), so no live decision path is
+affected.
+
+**Why it is not fixed in place.** The sealed C-ext3 manifest pins the file's
+hash, and `scripts/run_bfcl_cext3.py` refuses to run if it changes. Editing it
+would make the published run irreproducible. It is a validity limit of the
+C-ext3 semantic arm instead: a negated task could have been read as support
+for a mutating call. How many C-ext3 tasks are negated is not measured here.
+
+**What follows.** The next locked evaluation uses a new, versioned extractor
+with negation and conditional handling, and the xfails become passing tests
+against it (`docs/architecture/ADR-sdd-as-v1-owner-decisions.md`, D1 and D5).

@@ -190,6 +190,7 @@ Several topics have more than one document. This table says which to open.
 | [Scoped evidence obligations v1 (design)](design/scoped-evidence-obligations-v1.md) | Read-only check that every dispatch intent in a closed outbox window settled and was projected by deadlines fixed in advance; MISSING only after a trusted close (open proposal) |
 | [ADR: authority custody and lease durability](architecture/ADR-authority-custody-and-lease-durability.md) | A and B implemented (Ed25519 custody split, durable lease nonces); C, D and E accepted as direction only |
 | [ADR: canonical decision engine](architecture/ADR-canonical-decision-engine.md) | The policy core decides; the consensus engine is a research surface with a stated lifetime; cross-surface middleware shared (issue #296) |
+| [ADR: SDD-AS-v1 owner decisions](architecture/ADR-sdd-as-v1-owner-decisions.md) | Ten owner decisions: frozen BFCL extractor kept, manifest issuer and inventory close, isolation runtime, no paid runs before the harness, pilot/research split, VerificationPlan v2 registry and budget, mcp 2 deferred |
 | [Multi-tenant security model](architecture/multi_tenant_security_model.md) | Tenant boundaries, threat table with test evidence, open gaps |
 | [Cloudflare state architecture](architecture/cloudflare_state_architecture.md) | Design: DO/D1/R2/KV/Workflows placement rules, tenant keying, secrets custody |
 
