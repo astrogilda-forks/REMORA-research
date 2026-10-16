@@ -186,6 +186,7 @@ Several topics have more than one document. This table says which to open.
 | [ADR: tainted arguments](architecture/ADR-tainted-argument-approval.md) | Approval suffices; sanitisation not required, with the residual stated (issue #40) |
 | [ADR: tainted argument floor order](architecture/ADR-tainted-argument-floor-order.md) | Severity-monotone floor: tainted HIGH-risk calls with no rollback or uncertain state escalate instead of verifying (WP-1) |
 | [Evidence admission v1 (design)](design/evidence-admission-v1.md) | CoSAI §7.4 premises as typed evidence: visibility, coverage, vantage, binding, prior commitment — evidence is not authority |
+| [Scoped evidence obligations v1 (design)](design/scoped-evidence-obligations-v1.md) | Read-only check that every dispatch intent in a closed outbox window settled and was projected by deadlines fixed in advance; MISSING only after a trusted close (open proposal) |
 | [ADR: authority custody and lease durability](architecture/ADR-authority-custody-and-lease-durability.md) | A and B implemented (Ed25519 custody split, durable lease nonces); C, D and E accepted as direction only |
 | [ADR: canonical decision engine](architecture/ADR-canonical-decision-engine.md) | The policy core decides; the consensus engine is a research surface with a stated lifetime; cross-surface middleware shared (issue #296) |
 | [Multi-tenant security model](architecture/multi_tenant_security_model.md) | Tenant boundaries, threat table with test evidence, open gaps |
