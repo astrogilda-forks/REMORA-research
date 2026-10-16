@@ -68,13 +68,34 @@ jobs:
           REMORA_REQUIRE_SECURITY_EXTRA: "1"
         run: |
           set -o pipefail
-          python -m pytest tests/ -q -rs | tee pytest-report.txt
+          python -m pytest tests/ -q -rs --junitxml=pytest-junit.xml | tee pytest-report.txt
 
       - name: Every skipped test names a listed reason
         # A skipped test did not run. scripts/check_skip_reasons.py fails on a
         # reason absent from docs/assurance/skip_reason_allowlist_v1.yaml and
         # prints how many tests each listed reason kept from running.
         run: python scripts/check_skip_reasons.py pytest-report.txt
+
+      - name: Every collected test has exactly one outcome
+        # SDD-AS-v1 AS-002. Reconciles the JUnit XML with pytest's summary
+        # line, so a truncated or partial report cannot pass as a clean run,
+        # and writes the per-outcome account uploaded below.
+        run: >-
+          python scripts/check_test_accounting.py pytest-junit.xml pytest-report.txt
+          --json test-accounting.json
+
+      - name: Upload test report, JUnit XML and account
+        # Uploaded on failure too: a red run is when the record matters.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pytest-results-py${{ matrix.python-version }}
+          path: |
+            pytest-report.txt
+            pytest-junit.xml
+            test-accounting.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Verify zero false-accept rate
         # HONESTY NOTE (research audit, 2026-07-27): this step READS the

@@ -13,6 +13,20 @@ This file lists externally relevant changes by release. Fine-grained development
   budget without deadlock; `close()` during a running effect refuses new
   requests at once and leaves the running one to settle as what it was.
 
+### CI (every collected test is accounted for, SDD-AS-v1 AS-002)
+
+- The pytest matrix writes JUnit XML, and `scripts/check_test_accounting.py`
+  reconciles it with pytest's summary line. Each testcase must have exactly
+  one outcome (ok, failure, error, skipped, xfailed), and the counts must
+  agree, so a truncated or partial report cannot pass as a clean run. The
+  check allows for pytest 8's xpass-as-plain-testcase and its double-counted
+  teardown errors, pinned by a real fixture. It refuses a JUnit file that
+  declares a DTD.
+- Each matrix job uploads `pytest-report.txt`, `pytest-junit.xml` and
+  `test-accounting.json` as `pytest-results-py<version>`, also when it fails.
+- Not done: the test-inventory hash compared across two clean jobs and the
+  environment manifest (AS-003), and a network-isolated unit job (AS-001).
+
 ### Quality (both Clopper-Pearson bounds held to one grid, SDD-AS-v1 AS-016)
 
 - `tests/test_binomial_bound_grid.py` pins both `clopper_pearson_upper`
