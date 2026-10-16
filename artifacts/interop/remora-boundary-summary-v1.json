@@ -4,8 +4,8 @@
     "project": "REMORA",
     "repository": "darklordVirtual/REMORA-research",
     "register": "docs/interop/remora-boundaries-v1.yaml",
-    "register_sha256": "c7f18875285c229d079bf49c7668e706e2043c87196d50f7e9dda03a3fcfb2e0",
-    "audited_revision": "6f59702f68389f5bc48e2f69dd271af18b011ae4",
+    "register_sha256": "7e87c1de87892269debfa21fdc93a31ba895bb00dd9d83d1ecc1a2fd66f6c596",
+    "audited_revision": "9291c56be062eee8844762751e737ae5b12c2e77",
     "freshness": "CURRENT"
   },
   "evidence_index": "artifacts/interop/index.json",
