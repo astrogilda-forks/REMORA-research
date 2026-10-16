@@ -53,8 +53,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from remora.toolcall.routing.goal_match import EFFECT_VOCABULARY, TaskIntent
-from remora.toolcall.routing.tool_contract import READ_EFFECTS
+from remora.toolcall.routing.goal_match import (
+    EFFECT_VOCABULARY,
+    GoalMatch,
+    GoalMatchResult,
+    TaskIntent,
+    match_tool_to_intent,
+)
+from remora.toolcall.routing.tool_contract import READ_EFFECTS, ToolContract
 
 PROPOSER_VERSION = "intent_proposer_v1"
 
@@ -98,6 +104,14 @@ Task:
 Arguments:
 {arguments}
 """
+
+#: Declared substitution fields of each template (SDD AS-010). This is a
+#: record, not the control: what keeps other data out of the prompt is that
+#: the entry points take no parameter that could carry it. A test pins these
+#: sets against the templates and the signatures, so adding a field means
+#: changing this constant in a reviewed diff.
+INTENT_PROMPT_FIELDS = frozenset({"effects", "resources", "task"})
+DERIVATION_PROMPT_FIELDS = frozenset({"transforms", "task", "arguments"})
 
 
 def prompt_sha256(template: str) -> str:
@@ -304,6 +318,33 @@ def combine_intents(deterministic: TaskIntent | None,
     if proposed is None or intents_agree(deterministic, proposed):
         return deterministic
     return None
+
+
+def combine_goal_match(
+    *,
+    contract: ToolContract | None,
+    deterministic: TaskIntent | None,
+    proposed: TaskIntent | None,
+    proposed_args: Mapping[str, Any] | None,
+    task_text: str | None,
+) -> GoalMatchResult:
+    """Goal-match verdict for the combined intent, never softer than REFUTED.
+
+    :func:`combine_intents` withdraws a disagreeing pair to ``None``, which
+    reads as UNKNOWN. That is right for a SUPPORTED the proposer contests. It
+    is wrong for a deterministic UNSUPPORTED: an established refutation must
+    not decay to "nothing is known" because a model proposed another reading.
+    So the deterministic verdict is computed first, and UNSUPPORTED stands.
+    """
+    def verdict(intent: TaskIntent | None) -> GoalMatchResult:
+        return match_tool_to_intent(
+            contract=contract, intent=intent, proposed_args=proposed_args,
+            task_text=task_text)
+
+    own = verdict(deterministic)
+    if own.verdict is GoalMatch.UNSUPPORTED:
+        return own
+    return verdict(combine_intents(deterministic, proposed))
 
 
 def propose_derivations(task: str, arguments: Mapping[str, Any],

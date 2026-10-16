@@ -62,7 +62,38 @@ class ResolutionPlan:
     #: The resolver hands control back; it never executes the original call.
     reenter_router: bool = True
 
+    def __post_init__(self) -> None:
+        # A plan is authority to act before the decision is final, so a
+        # malformed one is refused at construction rather than interpreted.
+        # SDD-AS-v1 B02: an empty source list crashed re-entry with an
+        # IndexError, an empty target list validated nothing and grounded the
+        # call, and max_attempts accepted 0, -1 and True.
+        if not isinstance(self.resolver, str) or not self.resolver:
+            raise ValueError("resolver must be a non-empty string")
+        if not self.target_arguments or not all(
+            isinstance(a, str) and a for a in self.target_arguments
+        ):
+            raise ValueError("target_arguments must be non-empty strings, at least one")
+        if len(set(self.target_arguments)) != len(self.target_arguments):
+            raise ValueError(
+                f"target_arguments contains a duplicate: {list(self.target_arguments)}"
+            )
+        if not self.source_tools or not all(
+            isinstance(t, str) and t for t in self.source_tools
+        ):
+            raise ValueError("source_tools must be non-empty strings, at least one")
+        if (
+            isinstance(self.max_attempts, bool)
+            or not isinstance(self.max_attempts, int)
+            or self.max_attempts < 1
+        ):
+            raise ValueError(
+                f"max_attempts must be an int >= 1, got {self.max_attempts!r}"
+            )
+
     def assert_within_budget(self, attempt: int) -> None:
+        if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+            raise ValueError(f"attempt must be an int >= 1, got {attempt!r}")
         if attempt > self.max_attempts:
             raise ResolutionExhausted(
                 f"attempt {attempt} exceeds max_attempts={self.max_attempts} "

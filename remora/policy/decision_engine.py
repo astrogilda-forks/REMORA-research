@@ -821,7 +821,7 @@ class RemoraDecisionEngine:
                     credal=credal, raw_obs=raw_obs,
                     resolution_plan=ResolutionPlan(
                         resolver="argument_resolution",
-                        target_arguments=tuple(obs.missing_required_arguments),
+                        target_arguments=tuple(dict.fromkeys(obs.missing_required_arguments)),
                         source_tools=tuple(obs.argument_resolver_tools),
                     ),
                 )
@@ -848,7 +848,7 @@ class RemoraDecisionEngine:
                     credal=credal, raw_obs=raw_obs,
                     resolution_plan=ResolutionPlan(
                         resolver="argument_validation",
-                        target_arguments=tuple(obs.unvalidated_required_arguments),
+                        target_arguments=tuple(dict.fromkeys(obs.unvalidated_required_arguments)),
                         source_tools=tuple(obs.argument_resolver_tools),
                     ),
                 )
