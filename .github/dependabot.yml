@@ -77,6 +77,11 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "huggingface_hub"
         update-types: ["version-update:semver-major"]
+      # mcp 2: REMORA does not import mcp; it is transitive. Security fixes
+      # land on 1.x (1.30.0, GHSA-84m7-p3x7-pcfv). A major with no consumer
+      # here to test it waits until a dependency requires it (ADR D10).
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   # Frontend dependencies, same risk-class principle.
   - package-ecosystem: "npm"
