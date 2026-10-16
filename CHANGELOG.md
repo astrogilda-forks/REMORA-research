@@ -26,6 +26,16 @@ This file lists externally relevant changes by release. Fine-grained development
   instead of O(n). Its docstring no longer claims accuracy only up to
   n = 500. `binomial_tail_prob` is unchanged.
 
+### Quality (BFCL holdout disjointness and C-ext3 denominators are tested, SDD-AS-v1 AS-025)
+
+- `tests/test_bfcl_holdout_disjointness_and_denominators.py` checks the
+  committed v3, C-ext2 and C-ext3 holdouts: no shared episode ID or cluster
+  ID between any two (0 found). It ties the sealed C-ext3 result to its
+  holdout by sha256 and checks that every one of its 2799 episodes lands in
+  a family count. Every metric's denominator equals its full family in all
+  three arms. Before this, disjointness was a build-time refusal plus a
+  manifest string. No result changed.
+
 ### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
 
 - `CapabilityMediator.invoke` spends the budget when it admits a request,
