@@ -1,6 +1,9 @@
 # VerificationPlan v2: explicit bindings, a task budget, typed source evidence
 
-- Status: proposal (2026-10-16). Design only: no code, no contract change yet.
+- Status: S1 and S2 implemented (2026-10-17) in
+  `remora/policy/verification_plan_v2.py`, tested by
+  `tests/test_verification_plan_v2.py`. Nothing emits or consumes v2 plans
+  yet; S3 to S5 are open.
 - Code it would change: `remora/policy/resolution.py`,
   `remora/policy/decision_engine.py` (`_argument_gate_report`),
   `remora/policy/report.py`, `servers/execution_api.py`
@@ -132,15 +135,32 @@ rather than relying on the hash argument alone.
 S1 and S2 touch no decision path. S4 changes `remora/policy/` and
 `servers/execution_api.py` and needs its own review.
 
-## Open questions for the owner
+## Owner decisions
 
-- Who owns the source-contract registry, and is it signed like ToolSpecs?
-- Default task budget: how many lookups, and what deadline?
-- Should exhaustion be ABSTAIN everywhere, or escalate for some risk tiers?
-- When does the strict profile start refusing v1 plans?
+The owner answered the open questions in
+`docs/architecture/ADR-sdd-as-v1-owner-decisions.md`:
+
+- D7: the source-contract registry is signed like ToolSpecs. The code takes
+  the accepted contracts as an argument and never trusts the evidence.
+- D8: the default budget is 8 lookups and 120 s, the ceiling 32 and 600 s.
+  Exhaustion is ABSTAIN.
+- D9: the strict profile refuses v1 plans once S4 lands and AS-009 passes
+  on v2.
+
+## What S1 and S2 add beyond this note
+
+- A plan may not outlive its budget deadline, and may not name more targets
+  than its lookup budget allows.
+- Target pointers must be disjoint. `/lines` and `/lines/0/sku` in one plan
+  are refused, because one target could rewrite what another one judged.
+- Value digests use their own domain tag. The evidence-admission form is not
+  reused, because it refuses floats and call arguments carry them.
+- `plan_outcome` folds assessments into SUPPORTED, REFUTED or ABSTAIN. Two
+  assessments that disagree on one target are a conflict and count as
+  neither answer.
 
 ## Not claimed
 
-This note describes a design. No v2 code exists, and nothing here changes
-what REMORA does today. The weaknesses listed above are read from the code
+S1 and S2 are pure library code. No decision path uses them, so nothing
+here changes what REMORA does today. The weaknesses listed above are read from the code
 at the commit this note was written against.
