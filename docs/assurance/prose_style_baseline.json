@@ -46,7 +46,7 @@
       "long_sentence": 1
     },
     "docs/07-api-reference.md": {
-      "long_sentence": 18,
+      "long_sentence": 17,
       "meta_governance": 3
     },
     "docs/10-contributing.md": {
@@ -322,7 +322,7 @@
       "long_sentence": 13
     },
     "paper/remora_paper.md": {
-      "long_sentence": 78,
+      "long_sentence": 70,
       "meta_governance": 1
     },
     "paper/remora_paper_template.md": {
