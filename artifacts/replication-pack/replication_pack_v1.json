@@ -21,9 +21,15 @@
     "measured_with_python": "3.13.7 (macOS arm64, venv with the dev extras)",
     "requirements_lock": {
       "path": "requirements-lock.txt",
-      "sha256_lf": "37d2fd5bd910c773806ad0f8a9a49d0a0549784a7cd0f0e137489b3fceea8f53"
+      "sha256_lf": "eb73b7cbac64ecbada0070a952ae258f92fc7fc512a0f6d81926043c95b9407b"
     },
     "requirements_lock_history": [
+      {
+        "path": "requirements-lock.txt",
+        "git_revision": "cf58768b4a90e9f15f94dab82d5a2716347a39ad",
+        "sha256_lf": "37d2fd5bd910c773806ad0f8a9a49d0a0549784a7cd0f0e137489b3fceea8f53",
+        "reason": "starlette 1.8.0 (#883); langchain 1.4.5, langchain-core 1.6.10, langsmith 0.14.8, openai 3.29.0 (#888); hypothesis 6.169.0, mypy 2.4.0, ruff 0.17.0, sqlglot 30.22.0, types-requests 2.33.0.20261006 (#889); charset-normalizer 3.5.2 (#891), black 26.10.1 (#892), fpdf2 2.8.9 (#893)"
+      },
       {
         "path": "requirements-lock.txt",
         "git_revision": "4f63ebf67cb19ef9a735ae0dbec7912511219759",

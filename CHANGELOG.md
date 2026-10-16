@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Dependencies (Python batch 2: starlette, agent SDKs, dev tools)
+
+- `starlette` 1.8.0; `langchain` 1.4.5, `langchain-core` 1.6.10, `langsmith`
+  0.14.8, `openai` 3.29.0; `hypothesis` 6.169.0, `mypy` 2.4.0, `ruff` 0.17.0,
+  `sqlglot` 30.22.0, `types-requests` 2.33.0.20261006; `charset-normalizer`
+  3.5.2, `black` 26.10.1, `fpdf2` 2.8.9.
+- On Linux, Python 3.12: all 11 install sets resolve, and `ruff check .`,
+  the core rule set and `mypy remora servers` pass with the new versions.
+  The replication pack's lock pin is refreshed.
+
 ### Dependencies (Python batch: mcp security fix, runtime framework, HF stack)
 
 - `mcp` 1.28.1 to 1.30.0 fixes GHSA-84m7-p3x7-pcfv (CVE-2026-59951), unbounded
