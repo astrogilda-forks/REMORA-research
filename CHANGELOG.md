@@ -4,18 +4,17 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
-### Decisions (owner decisions for SDD-AS-v1, REAS and VerificationPlan v2)
+### Dependencies (Python batch: mcp security fix, runtime framework, HF stack)
 
-- `docs/architecture/ADR-sdd-as-v1-owner-decisions.md` records ten
-  decisions that blocked work: the frozen BFCL extractor stays frozen, who
-  issues obligation manifests and how a window closes, the isolation runtime,
-  no paid model runs before the locked-evaluation harness, the
-  pilot/research split, the VerificationPlan v2 registry, budget and cutover,
-  and deferring `mcp` 2.
-- `NEGATIVE_RESULTS.md` §81: the BFCL intent extractor ignores negation and
-  conditionals. Benchmark-only, kept frozen because the sealed C-ext3
-  manifest pins it; recorded as a validity limit of the semantic arm.
-- Dependabot ignores semver-major `mcp` updates (D10).
+- `mcp` 1.28.1 to 1.30.0 fixes GHSA-84m7-p3x7-pcfv (CVE-2026-59951), unbounded
+  session accumulation in the StreamableHTTP transport. REMORA does not
+  import `mcp`; it arrives transitively.
+- `fastapi` 0.143.0 and `pydantic` 2.14.1 move with `pydantic_core` 2.50.1 and
+  `typing-inspection` 0.4.4. The Dependabot PR moved `pydantic` alone, which
+  left the lock unresolvable.
+- `hf-xet` 1.7.0, `tokenizers` 0.23.3, `transformers` 5.19.0.
+- All 11 declared install sets resolve on Linux (Python 3.12). The
+  replication pack's lock pin is refreshed with the reason recorded.
 
 ### Evidence (scoped evidence obligations over the outbox, REAS G1)
 
@@ -42,6 +41,19 @@ This file lists externally relevant changes by release. Fine-grained development
   read-back for UNKNOWN, receipt intake, issuer policy, delegation
   narrowing, external inventories, and JCS.
   Design note: `docs/design/scoped-evidence-obligations-v1.md`.
+
+### Decisions (owner decisions for SDD-AS-v1, REAS and VerificationPlan v2)
+
+- `docs/architecture/ADR-sdd-as-v1-owner-decisions.md` records ten
+  decisions that blocked work: the frozen BFCL extractor stays frozen, who
+  issues obligation manifests and how a window closes, the isolation runtime,
+  no paid model runs before the locked-evaluation harness, the
+  pilot/research split, the VerificationPlan v2 registry, budget and cutover,
+  and deferring `mcp` 2.
+- `NEGATIVE_RESULTS.md` §81: the BFCL intent extractor ignores negation and
+  conditionals. Benchmark-only, kept frozen because the sealed C-ext3
+  manifest pins it; recorded as a validity limit of the semantic arm.
+- Dependabot ignores semver-major `mcp` updates (D10).
 
 ### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
 
