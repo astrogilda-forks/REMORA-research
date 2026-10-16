@@ -4,6 +4,19 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Quality (both Clopper-Pearson bounds held to one grid, SDD-AS-v1 AS-016)
+
+- `tests/test_binomial_bound_grid.py` pins both `clopper_pearson_upper`
+  implementations (`risk_control` and the guardrail's `binomial_bounds`) to
+  SciPy's beta quantile at 1e-10 for n = 1, 10, 500, 5000 and 100000 and
+  delta = .05 and .05/7, plus the k = 0 closed form, k = n, monotonicity
+  and the delta ordering. Both already met it; no bound value changed (old
+  and new `binomial_bounds` agree exactly for n < 300).
+- `binomial_bounds.clopper_pearson_upper` sums P(X <= k) on the shorter
+  side of the distribution, so one evaluation costs O(min(k, n - k))
+  instead of O(n). Its docstring no longer claims accuracy only up to
+  n = 500. `binomial_tail_prob` is unchanged.
+
 ### Quality (BFCL holdout disjointness and C-ext3 denominators are tested, SDD-AS-v1 AS-025)
 
 - `tests/test_bfcl_holdout_disjointness_and_denominators.py` checks the
