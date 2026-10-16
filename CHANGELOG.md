@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
+
+- `CapabilityMediator.pending` counts admitted requests whose executor has
+  not returned. They have no record until then, so a reader can tell
+  "still running, may already have had its effect" from "did not run".
+- New tests: an executor that calls back into the mediator spends the same
+  budget without deadlock; `close()` during a running effect refuses new
+  requests at once and leaves the running one to settle as what it was.
+
 ### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
 
 - `CapabilityMediator.invoke` spends the budget when it admits a request,
