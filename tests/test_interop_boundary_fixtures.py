@@ -196,9 +196,6 @@ def test_the_hash_rule_preimage_is_the_one_remora_computes() -> None:
     RFC 8785-like digest, it must differ: those are the readings the
     definition exists to rule out.
     """
-    import hashlib
-    import json
-
     from remora.governance.effect_verification import effect_digest
 
     fixtures = json.loads((ROOT / "artifacts/interop/effect-evidence-v1.1/fixtures.json")
