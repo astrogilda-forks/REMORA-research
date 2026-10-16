@@ -51,6 +51,24 @@ def test_a_summary_that_disagrees_is_a_problem(tmp_path, summary, needle):
     assert any(needle in p for p in account.problems), account.problems
 
 
+@pytest.mark.parametrize("line", [
+    "1 failed, 2 passed in 0.46s",
+    "================ 370 passed, 17 deselected, 1 warning in 7.55s ================",
+    "== 1030 passed, 60 skipped, 9365 deselected, 1 warning in 116.46s (0:01:56) ===",
+])
+def test_summary_lines_in_every_pytest_shape_parse(line):
+    assert acct._parse_summary_line(line) is not None
+
+
+def test_a_long_hostile_line_is_rejected_quickly():
+    # CodeQL py/redos on the first version: nested quantifiers backtracked on
+    # "0 000 000 ...". The parser is linear now.
+    import time
+    start = time.perf_counter()
+    assert acct._parse_summary_line("0 " + "000 " * 50_000 + "x") is None
+    assert time.perf_counter() - start < 1.0
+
+
 def test_a_report_without_a_summary_line_is_a_problem(tmp_path):
     report = tmp_path / "report.txt"
     report.write_text("F.sxXEE   [ 54%]\n", encoding="utf-8")

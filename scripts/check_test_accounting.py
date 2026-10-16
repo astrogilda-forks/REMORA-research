@@ -35,8 +35,8 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-_SUMMARY = re.compile(r"^=*\s*((?:\d+ \w+(?:, )?)+) in [\d.]+s")
-_COUNT = re.compile(r"(\d+) (\w+)")
+_DURATION = re.compile(r" in \d+(?:\.\d+)?s(?: \(\d+:\d\d:\d\d\))?$")
+_PART = re.compile(r"(\d+) (\w+)")
 _SUMMARY_KEYS = {"passed", "failed", "skipped", "xfailed", "xpassed", "errors", "error",
                  "deselected", "warnings", "warning"}
 
@@ -63,20 +63,33 @@ def _outcome(case: ET.Element) -> list[str]:
     return found or ["ok"]
 
 
-def _summary(report: Path) -> dict[str, int] | None:
-    line = None
-    for raw in report.read_text(encoding="utf-8", errors="replace").splitlines():
-        if _SUMMARY.match(raw.strip()):
-            line = raw.strip()
-    if line is None:
+def _parse_summary_line(raw: str) -> dict[str, int] | None:
+    """``1 failed, 2 passed in 0.46s`` -> counts, or None if it is not one.
+
+    No nested quantifiers: the line is cut at its duration, split on ", ",
+    and each part must be exactly ``<number> <word>``.
+    """
+    line = raw.strip().strip("=").strip()
+    duration = _DURATION.search(line)
+    if duration is None:
         return None
     counts: dict[str, int] = {}
-    for number, word in _COUNT.findall(line.split(" in ")[0]):
-        if word not in _SUMMARY_KEYS:
+    for part in line[:duration.start()].split(", "):
+        match = _PART.fullmatch(part)
+        if match is None or match.group(2) not in _SUMMARY_KEYS:
             return None
-        key = {"error": "errors", "warning": "warnings"}.get(word, word)
-        counts[key] = int(number)
+        key = {"error": "errors", "warning": "warnings"}.get(match.group(2), match.group(2))
+        counts[key] = int(match.group(1))
     return counts
+
+
+def _summary(report: Path) -> dict[str, int] | None:
+    found = None
+    for raw in report.read_text(encoding="utf-8", errors="replace").splitlines():
+        parsed = _parse_summary_line(raw)
+        if parsed is not None:
+            found = parsed
+    return found
 
 
 def account(junit: Path, report: Path) -> Account:
