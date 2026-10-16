@@ -36,6 +36,7 @@ from typing import Any
 from remora.capabilities.model import CapabilityRefusal, EffectiveCapabilitySet
 from remora.capabilities.resource import ResourceRefused, canonical_resource
 from remora.enforcement.execution_context import ExecutionContext
+from remora.frozen_json import freeze, thaw
 
 __all__ = ["MAX_NESTED_EFFECTS", "CapabilityMediator", "EffectExecutor", "EffectRefused",
            "EffectState", "MediatedEffect"]
@@ -90,8 +91,14 @@ class MediatedEffect:
 
 
 def _arguments_hash(capability: str, resource: str, arguments: Any) -> str:
-    payload = json.dumps({"capability": capability, "resource": resource,
-                          "arguments": arguments}, sort_keys=True, default=str)
+    # For a JSON-domain value (all an executor is ever given) ``default=str`` is
+    # never called, so recorded hashes keep the encoding they always had. It
+    # only labels a refused request whose arguments were outside JSON.
+    try:
+        payload = json.dumps({"capability": capability, "resource": resource,
+                              "arguments": arguments}, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return ""
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -111,7 +118,14 @@ class CapabilityMediator:
         self._closed = False
         self._lock = threading.Lock()
         self._records: list[MediatedEffect] = []
+        if isinstance(max_effects, bool) or not isinstance(max_effects, int)                 or max_effects < 1:
+            raise ValueError(f"max_effects must be an int >= 1, got {max_effects!r}")
         self._max_effects = max_effects
+        #: Requests admitted against the budget: recorded ones plus those whose
+        #: executor is still running. The budget is spent at admission, under
+        #: the lock, because a record is written only after the executor
+        #: returns (SDD-AS-v1 B03: two requests passed a budget of one).
+        self._admitted = 0
         self._overflow = 0
 
     @property
@@ -175,7 +189,7 @@ class CapabilityMediator:
         """Run one effect under this execution's authority, or refuse it."""
         arguments = {} if arguments is None else arguments
         with self._lock:
-            if len(self._records) >= self._max_effects:
+            if self._admitted >= self._max_effects:
                 self._overflow += 1
                 return MediatedEffect(
                     execution_id=self._context.execution_id, capability=capability,
@@ -183,10 +197,23 @@ class CapabilityMediator:
                     state=EffectState.REFUSED,
                     refusal=CapabilityRefusal.EFFECT_BUDGET_EXHAUSTED.value,
                     arguments_hash="", authority_digest=self._authority.digest)
-            refusal, shown = self._refusal(capability, resource, arguments)
+            self._admitted += 1
+            # One private, read-only copy taken now is what gets checked,
+            # hashed and executed, so a caller mutating a nested value after
+            # this point changes none of them. Outside JSON is refused, not
+            # coerced with str().
+            try:
+                frozen = freeze(arguments) if isinstance(arguments, Mapping) else None
+            except TypeError:
+                frozen = None
+            checked = arguments if frozen is None else thaw(frozen)
+            if frozen is None:
+                refusal, shown = self._refusal(capability, resource, None)
+            else:
+                refusal, shown = self._refusal(capability, resource, checked)
             base = dict(execution_id=self._context.execution_id, capability=capability,
                         resource=shown, authority_digest=self._authority.digest,
-                        arguments_hash=_arguments_hash(capability, shown, arguments))
+                        arguments_hash=_arguments_hash(capability, shown, checked))
             if refusal is not None:
                 effect = MediatedEffect(state=EffectState.REFUSED, refusal=refusal.value, **base)
                 self._records.append(effect)
@@ -194,7 +221,7 @@ class CapabilityMediator:
         # Outside the lock: an executor may take time, and it must not be able
         # to block close() or another request's refusal.
         try:
-            result = self._executors[capability](shown, dict(arguments))
+            result = self._executors[capability](shown, thaw(frozen))
         except EffectRefused as refused:
             effect = MediatedEffect(state=EffectState.REFUSED, refusal=refused.reason, **base)
             with self._lock:
@@ -202,6 +229,13 @@ class CapabilityMediator:
             return effect
         except Exception:
             effect = MediatedEffect(state=EffectState.UNKNOWN, refusal=None, **base)
+        except BaseException:
+            # Interrupted mid-effect: the admitted request still gets its
+            # record, and it says the outcome is not known.
+            with self._lock:
+                self._records.append(
+                    MediatedEffect(state=EffectState.UNKNOWN, refusal=None, **base))
+            raise
         else:
             effect = MediatedEffect(state=EffectState.EXECUTED, refusal=None, result=result,
                                     **base)
