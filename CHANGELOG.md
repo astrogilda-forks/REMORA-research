@@ -4,6 +4,27 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
+
+- `CapabilityMediator.invoke` spends the budget when it admits a request,
+  under the lock, instead of comparing it with the records already written.
+  A record is written only after the executor returns, so with
+  `max_effects=1` concurrent requests all reached the executor (nine of nine
+  in the new barrier test). A failed or interrupted effect does not return
+  its budget, and an interrupt still leaves an `UNKNOWN` record.
+- The arguments are frozen once at admission (`remora.frozen_json`): the
+  authority check, the recorded hash and the executor all see one private
+  deep copy, so a caller mutating a nested value afterwards changes none of
+  them. The executor used to get a one-level `dict()` copy. Arguments
+  outside JSON (NaN, infinities, non-string keys, arbitrary objects) are
+  refused as `capability_argument_mismatch` rather than hashed through
+  `str()`. Hashes of JSON-domain arguments are unchanged.
+- `max_effects` must be an int of at least 1, not a bool.
+- Not changed: refusals still count against the same budget, which bounds
+  the evidence one execution can produce. Across processes the effect domain
+  already claims each slot in the durable ledger before its executor runs;
+  this fix is for the in-process mediator.
+
 ### Security (decision grants a redeemer cannot mint, RMR-CR-002)
 
 - `PolicyDecisionToken` format v3: Ed25519 over `REMORA/POLICY-GRANT/v3`,
