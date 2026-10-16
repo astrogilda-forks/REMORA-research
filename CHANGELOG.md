@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
+
+- `CapabilityMediator.pending` counts admitted requests whose executor has
+  not returned. They have no record until then, so a reader can tell
+  "still running, may already have had its effect" from "did not run".
+- New tests: an executor that calls back into the mediator spends the same
+  budget without deadlock; `close()` during a running effect refuses new
+  requests at once and leaves the running one to settle as what it was.
+
 ### CI (every collected test is accounted for, SDD-AS-v1 AS-002)
 
 - The pytest matrix writes JUnit XML, and `scripts/check_test_accounting.py`
@@ -31,6 +40,16 @@ This file lists externally relevant changes by release. Fine-grained development
   instead of O(n). Its docstring no longer claims accuracy only up to
   n = 500. `binomial_tail_prob` is unchanged.
 
+### Quality (BFCL holdout disjointness and C-ext3 denominators are tested, SDD-AS-v1 AS-025)
+
+- `tests/test_bfcl_holdout_disjointness_and_denominators.py` checks the
+  committed v3, C-ext2 and C-ext3 holdouts: no shared episode ID or cluster
+  ID between any two (0 found). It ties the sealed C-ext3 result to its
+  holdout by sha256 and checks that every one of its 2799 episodes lands in
+  a family count. Every metric's denominator equals its full family in all
+  three arms. Before this, disjointness was a build-time refusal plus a
+  manifest string. No result changed.
+
 ### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
 
 - `CapabilityMediator.invoke` spends the budget when it admits a request,
@@ -51,6 +70,18 @@ This file lists externally relevant changes by release. Fine-grained development
   the evidence one execution can produce. Across processes the effect domain
   already claims each slot in the durable ledger before its executor runs;
   this fix is for the in-process mediator.
+### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
+
+- `tests/test_hard_guards_dominate_max_trust.py` starts from one
+  observation that ACCEPTs on the probabilistic path with trust and
+  evidence at their maximum. It flips each of the eleven hard-guard signals
+  in `hard_guard_floor` one at a time, in the default engine and with both
+  opt-in accept paths on. Each must remove the ACCEPT with the floor's own
+  action and reason. NaN, +inf and -inf in every finite-gate field never
+  ACCEPT. NaN and -inf on a risk field are stopped by
+  `NON_FINITE_INPUT_VERIFY`, the only gate they cannot pass. That path had
+  no test before. No engine code changed.
+
 ### Fixed (a ResolutionPlan refuses a malformed binding, SDD-AS-v1 B02)
 
 - `ResolutionPlan` now validates itself at construction: at least one target
