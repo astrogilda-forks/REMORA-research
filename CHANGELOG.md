@@ -4,6 +4,23 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Quality (re-entry after a lookup is counted at the executor, SDD-AS-v1 AS-009)
+
+- A new end-to-end test runs a proposal with a missing argument through
+  `resolve_and_reenter` and `validate_and_reenter` with a fake lookup source,
+  then hands the re-entered call to the real execution API with a recording
+  tool as the only executor. It counts executor calls at every step.
+- A hard guard that already blocks the call means the lookup is never run
+  and the executor is reached zero times. A lookup that errors, returns
+  nothing or confirms the value absent ends in ABSTAIN with zero calls.
+- A call that still needs approval after the lookup reaches the executor
+  zero times before approval, once after it, and still once after two
+  replays. Approval of the pre-lookup call does not cover the re-entered one.
+- A token minted before the lookup is refused for the re-entered call with
+  zero calls. A new token bound to the re-entered call dispatches once.
+- No defect was found. The HTTP execution API never builds a resolution plan
+  itself, so re-entry stays a library step that the test composes with it.
+
 ### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
 
 - `CapabilityMediator.pending` counts admitted requests whose executor has
