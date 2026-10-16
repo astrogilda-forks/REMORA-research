@@ -4,6 +4,18 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Design (VerificationPlan v2 proposal, SDD-AS-v1 AS-007)
+
+- New design note `docs/design/verification-plan-v2.md`. It records four
+  weaknesses of today's resolution plan, read from the code: positional
+  source choice with a last-source fallback, no expiry or task budget, a
+  validator that never sees the value, and no binding to tenant, task, call
+  or policy.
+- It proposes one explicit source binding per argument, a durable budget per
+  task reserved before any lookup, and typed source evidence checked against
+  the plan before re-entry. Five slices; the strict-profile cutover waits for
+  the owner's pilot/research decision. No code changes.
+
 ### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
 
 - `CapabilityMediator.pending` counts admitted requests whose executor has
