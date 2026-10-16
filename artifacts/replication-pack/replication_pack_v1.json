@@ -21,9 +21,15 @@
     "measured_with_python": "3.13.7 (macOS arm64, venv with the dev extras)",
     "requirements_lock": {
       "path": "requirements-lock.txt",
-      "sha256_lf": "afcde635ca078de9c6cc695ba2df3ce0ed66fecf64792a2cc221bd2f56b9d103"
+      "sha256_lf": "37d2fd5bd910c773806ad0f8a9a49d0a0549784a7cd0f0e137489b3fceea8f53"
     },
     "requirements_lock_history": [
+      {
+        "path": "requirements-lock.txt",
+        "git_revision": "4f63ebf67cb19ef9a735ae0dbec7912511219759",
+        "sha256_lf": "afcde635ca078de9c6cc695ba2df3ce0ed66fecf64792a2cc221bd2f56b9d103",
+        "reason": "mcp 1.30.0 (GHSA-84m7-p3x7-pcfv / CVE-2026-59951, #849), fastapi 0.143.0 + pydantic 2.14.1/pydantic_core 2.50.1 + typing-inspection 0.4.4 (#851), hf-xet 1.7.0, tokenizers 0.23.3, transformers 5.19.0 (#853)"
+      },
       {
         "path": "requirements-lock.txt",
         "git_revision": "d10bcefcb8447da8f6c8491cc03495a03e8698bf",
