@@ -90,6 +90,21 @@ This file lists externally relevant changes by release. Fine-grained development
   instead of O(n). Its docstring no longer claims accuracy only up to
   n = 500. `binomial_tail_prob` is unchanged.
 
+### Quality (intent and claim cases beyond the first tests, SDD-AS-v1 AS-011)
+
+- New `tests/test_intent_claim_boundaries.py` covers rephrased requests that
+  must be supported, requests the extractor declines on purpose, a claim made
+  for another tenant, tasks with two goals, and refutations that later
+  unknown evidence must not soften.
+- `combine_goal_match` in `remora/toolcall/routing/intent_proposer.py` keeps a
+  deterministic UNSUPPORTED verdict when a model proposes a different reading.
+  Before, the veto turned it into UNKNOWN. A contested SUPPORTED still falls
+  back to UNKNOWN. The function is library code and is not wired into a run.
+- Defect found, not fixed: `extract_intent` loses "do not" and "before" in
+  front of an action word, so "Please do not cancel booking B-104" reads as a
+  cancel request. The file is frozen by the sealed C-ext3 manifest. Five tests
+  are marked `xfail(strict=True)` and name the owner decision.
+
 ### Quality (BFCL holdout disjointness and C-ext3 denominators are tested, SDD-AS-v1 AS-025)
 
 - `tests/test_bfcl_holdout_disjointness_and_denominators.py` checks the
