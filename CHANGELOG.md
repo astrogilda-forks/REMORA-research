@@ -4,6 +4,20 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Policy (VerificationPlan v2 S1 and S2: plan types and the evidence check)
+
+- `remora/policy/verification_plan_v2.py` defines the v2 plan, its binding,
+  the task budget and typed source evidence (SDD-AS-v1 AS-007, AS-008).
+  Construction refuses empty, duplicate or overlapping targets, bools as
+  ints, budgets over the ADR D8 ceiling and plans that outlive their
+  deadline.
+- `assess_evidence` turns SUPPORTED evidence into UNKNOWN on any mismatch:
+  tenant, value, source contract, predicate, source call, task, authority
+  epoch, plan, time window, or a contract outside the accepted registry.
+  `plan_outcome` re-enters only when every target is SUPPORTED.
+- Pure library code. No decision path emits or consumes v2 plans yet; the
+  durable task budget (S3) and engine wiring (S4) remain.
+
 ### Dependencies (Python batch 2: starlette, agent SDKs, dev tools)
 
 - `starlette` 1.8.0; `langchain` 1.4.5, `langchain-core` 1.6.10, `langsmith`

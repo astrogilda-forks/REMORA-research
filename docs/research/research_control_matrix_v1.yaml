@@ -1732,6 +1732,7 @@ bibliography:
     - {identifier: "arXiv:2608.27443", work: "Yan (2026), user-authored permission policies", code: [remora/governance/task_identity.py], recorded_as: yan-2026-permission-policies}
     - {identifier: "RFC 3161", work: "Time-Stamp Protocol", code: [remora/audit/hash_chain.py, remora/audit/merkle.py, remora/governance/envelope.py], recorded_as: rfc-3161-timestamping}
     - {identifier: "RFC 8785", work: "JSON Canonicalization Scheme", code: [remora/interop/jcs.py, remora/enforcement/runtime_identity.py], recorded_as: rfc-8785-jcs}
+    - {identifier: "RFC 6901", work: "JavaScript Object Notation (JSON) Pointer", code: [remora/policy/verification_plan_v2.py], note: "Cited as the syntax of a VerificationPlan v2 target pointer. A format reference, not a mechanism source: the module is library-only until S4 wires it."}
     - {identifier: "arXiv:2609.03340", work: "Chen, Wang & Brinton (2026), Fresh Memory, Stale Plans", code: [remora/governance/plan_binding.py], recorded_as: chen-2026-fresh-memory-stale-plans}
     - {identifier: "arXiv:2609.09458", work: "Singh et al. (2026), ContractEval", code: [remora/governance/procedure.py], recorded_as: singh-2026-contracteval}
     - {identifier: "arXiv:2609.18128", work: "Xiao & Nuzzo (2026), Symbolic Temporal Supervision", code: [remora/governance/procedure.py], recorded_as: xiao-2026-temporal-contracts}
