@@ -4,6 +4,25 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
+
+- `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
+  `DERIVATION_PROMPT_FIELDS`, pinned against the templates. A recording
+  provider captures the exact prompt on each path (answer, unusable answer,
+  provider error, record-mode miss and hit, replay miss, derivations) and
+  the test compares it with the allowlisted rendering and checks that
+  sentinels for policy, trust, grants, secrets, evidence and prior decisions
+  are absent. No leak found; no behaviour change.
+
+### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
+
+- `CapabilityMediator.pending` counts admitted requests whose executor has
+  not returned. They have no record until then, so a reader can tell
+  "still running, may already have had its effect" from "did not run".
+- New tests: an executor that calls back into the mediator spends the same
+  budget without deadlock; `close()` during a running effect refuses new
+  requests at once and leaves the running one to settle as what it was.
+
 ### Design (VerificationPlan v2 proposal, SDD-AS-v1 AS-007)
 
 - New design note `docs/design/verification-plan-v2.md`. It records four
@@ -15,15 +34,6 @@ This file lists externally relevant changes by release. Fine-grained development
   task reserved before any lookup, and typed source evidence checked against
   the plan before re-entry. Five slices; the strict-profile cutover waits for
   the owner's pilot/research decision. No code changes.
-
-### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
-
-- `CapabilityMediator.pending` counts admitted requests whose executor has
-  not returned. They have no record until then, so a reader can tell
-  "still running, may already have had its effect" from "did not run".
-- New tests: an executor that calls back into the mediator spends the same
-  budget without deadlock; `close()` during a running effect refuses new
-  requests at once and leaves the running one to settle as what it was.
 
 ### CI (every collected test is accounted for, SDD-AS-v1 AS-002)
 
