@@ -143,6 +143,16 @@ class CapabilityMediator:
             return tuple(self._records)
 
     @property
+    def pending(self) -> int:
+        """Admitted requests whose executor has not returned yet.
+
+        They have no record until it does, so this is the visible unsettled
+        state: a request that is pending may already have had its effect.
+        """
+        with self._lock:
+            return self._admitted - len(self._records)
+
+    @property
     def overflow(self) -> int:
         """Requests refused because the budget was spent; not recorded one by one."""
         with self._lock:

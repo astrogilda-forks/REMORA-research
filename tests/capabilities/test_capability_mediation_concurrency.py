@@ -158,3 +158,78 @@ def _expected_hash(arguments):
     return hashlib.sha256(json.dumps(
         {"capability": "database.read", "resource": RESOURCE, "arguments": arguments},
         sort_keys=True).encode()).hexdigest()
+
+
+def test_an_executor_that_calls_back_into_the_mediator_spends_the_same_budget():
+    # Reentrancy (AS-004): the lock is not held while an executor runs, so a
+    # nested request neither deadlocks nor gets a budget of its own.
+    nested = []
+    holder = {}
+
+    def executor(resource, arguments):
+        if arguments["depth"] < 3:
+            nested.append(holder["m"].invoke("database.read", RESOURCE,
+                                             {"depth": arguments["depth"] + 1}))
+        return "ok"
+
+    holder["m"] = mediator = _mediator(executor, max_effects=2)
+    outer = mediator.invoke("database.read", RESOURCE, {"depth": 0})
+    assert outer.state is EffectState.EXECUTED
+    assert [e.state for e in nested] == [EffectState.REFUSED, EffectState.EXECUTED]
+    assert nested[0].refusal == CapabilityRefusal.EFFECT_BUDGET_EXHAUSTED.value
+    assert len(mediator.records) == 2 and mediator.overflow == 1
+
+
+def test_close_during_an_effect_refuses_new_requests_and_keeps_the_running_one():
+    entered, release = threading.Event(), threading.Event()
+
+    def executor(resource, arguments):
+        entered.set()
+        assert release.wait(10)
+        return "ok"
+
+    mediator = _mediator(executor)
+    results = []
+    t = threading.Thread(target=lambda: results.append(
+        mediator.invoke("database.read", RESOURCE, {"query": "a"})))
+    t.start()
+    assert entered.wait(10)
+    assert mediator.pending == 1
+    mediator.close()  # must not wait for the running executor
+    late = mediator.invoke("database.read", RESOURCE, {"query": "b"})
+    assert late.refusal == CapabilityRefusal.CONTEXT_MISSING.value
+    release.set()
+    t.join(10)
+    # close() does not pretend the started effect was cancelled.
+    assert results[0].state is EffectState.EXECUTED
+    assert mediator.pending == 0
+
+
+def test_a_running_effect_is_visible_as_pending_until_it_settles():
+    # AS-006: between admission and the executor's return there is no record
+    # yet; ``pending`` is the visible unsettled state, so a reader cannot
+    # mistake "no record" for "did not run".
+    entered, release = threading.Event(), threading.Event()
+
+    def executor(resource, arguments):
+        entered.set()
+        assert release.wait(10)
+        raise RuntimeError("lost the connection after sending")
+
+    mediator = _mediator(executor)
+    t = threading.Thread(target=mediator.invoke,
+                         args=("database.read", RESOURCE, {"query": "a"}))
+    t.start()
+    assert entered.wait(10)
+    assert mediator.pending == 1 and mediator.records == ()
+    release.set()
+    t.join(10)
+    assert mediator.pending == 0
+    assert [r.state for r in mediator.records] == [EffectState.UNKNOWN]
+
+
+def test_refusals_are_never_pending():
+    mediator = _mediator(lambda r, a: "ok")
+    mediator.close()
+    mediator.invoke("database.read", RESOURCE, {"query": "a"})
+    assert mediator.pending == 0
