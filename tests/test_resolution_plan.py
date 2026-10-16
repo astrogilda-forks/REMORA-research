@@ -196,6 +196,62 @@ def test_max_attempts_is_enforced() -> None:
         plan.assert_within_budget(3)
 
 
+@pytest.mark.parametrize("bad", [0, -1, True, False, 1.0, "1", None])
+def test_a_plan_refuses_an_attempt_budget_that_is_not_a_positive_int(bad: object) -> None:
+    # SDD-AS-v1 B02: 0, -1 and True were accepted at construction. True passed
+    # the budget check as 1, and an upper-bound check alone never rejects 0.
+    with pytest.raises(ValueError, match="max_attempts"):
+        ResolutionPlan(
+            resolver="argument_resolution",
+            target_arguments=("a",),
+            source_tools=("lookup_a",),
+            max_attempts=bad,  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize(("targets", "sources", "match"), [
+    ((), ("lookup_a",), "target_arguments"),
+    (("a", "a"), ("lookup_a",), "duplicate"),
+    (("a", ""), ("lookup_a",), "target_arguments"),
+    (("a",), (), "source_tools"),
+    (("a",), ("",), "source_tools"),
+])
+def test_a_plan_refuses_an_empty_or_ambiguous_binding(
+    targets: tuple[str, ...], sources: tuple[str, ...], match: str,
+) -> None:
+    # An empty source list made re-entry index source_tools[-1] outside its
+    # try block (IndexError). An empty target list made validation report
+    # every target confirmed and ground the call without asking anything.
+    with pytest.raises(ValueError, match=match):
+        ResolutionPlan(
+            resolver="argument_validation",
+            target_arguments=targets,
+            source_tools=sources,
+        )
+
+
+def test_the_budget_check_refuses_a_bool_attempt() -> None:
+    plan = ResolutionPlan(
+        resolver="argument_resolution",
+        target_arguments=("a",),
+        source_tools=("lookup_a",),
+    )
+    with pytest.raises(ValueError, match="attempt"):
+        plan.assert_within_budget(True)
+
+
+def test_duplicate_missing_arguments_still_yield_one_valid_plan() -> None:
+    obs = _obs(
+        missing_required_arguments=("reservation_id", "reservation_id"),
+        argument_resolver_tools=("lookup_reservation_id",),
+        arguments_satisfiable=True,
+    )
+    report = ENGINE.decide(obs)
+    assert report.action == DecisionAction.VERIFY
+    assert report.resolution_plan is not None
+    assert report.resolution_plan.target_arguments == ("reservation_id",)
+
+
 def test_re_entry_never_loops() -> None:
     """One resolution round, then a terminal decision. No unbounded retry."""
     calls = {"n": 0}
