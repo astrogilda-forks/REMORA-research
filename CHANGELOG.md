@@ -4,6 +4,18 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Dependencies (Python batch: mcp security fix, runtime framework, HF stack)
+
+- `mcp` 1.28.1 to 1.30.0 fixes GHSA-84m7-p3x7-pcfv (CVE-2026-59951), unbounded
+  session accumulation in the StreamableHTTP transport. REMORA does not
+  import `mcp`; it arrives transitively.
+- `fastapi` 0.143.0 and `pydantic` 2.14.1 move with `pydantic_core` 2.50.1 and
+  `typing-inspection` 0.4.4. The Dependabot PR moved `pydantic` alone, which
+  left the lock unresolvable.
+- `hf-xet` 1.7.0, `tokenizers` 0.23.3, `transformers` 5.19.0.
+- All 11 declared install sets resolve on Linux (Python 3.12). The
+  replication pack's lock pin is refreshed with the reason recorded.
+
 ### Evidence (scoped evidence obligations over the outbox, REAS G1)
 
 - New read-only package `remora/evidence/obligations/`. A manifest, locked

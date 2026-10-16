@@ -25,7 +25,8 @@ Refused, with a stable ``code``:
 ``json_duplicate_member``   a repeated object member name, compared after
                             escape decoding (``"a"`` and ``"\\u0061"`` are the
                             same name)
-``json_non_finite_number``  ``NaN``, ``Infinity`` or ``-Infinity``
+``json_non_finite_number``  ``NaN``, ``Infinity``, ``-Infinity`` or a
+                            finite-looking literal overflowing to infinity
 ``json_unpaired_surrogate`` a string containing a lone surrogate code point
 ``json_noncharacter``       a string containing a Unicode noncharacter
                             (I-JSON, RFC 7493 section 2.1)
@@ -40,6 +41,7 @@ compute a tool-call hash; everything else passes through untouched.
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections.abc import Iterable
 from typing import Any
@@ -172,6 +174,18 @@ def _refuse_constant(name: str) -> Any:
     raise StrictJsonRefusal("json_non_finite_number", f"{name} is not a JSON number")
 
 
+def _finite_float(literal: str) -> float:
+    # json.loads normally converts 1e9999 to inf without invoking
+    # parse_constant. Deny that overflow before the framework reparses it.
+    value = float(literal)
+    if not math.isfinite(value):
+        raise StrictJsonRefusal(
+            "json_non_finite_number",
+            f"{literal} does not represent a finite JSON number",
+        )
+    return value
+
+
 # ── the admission function ─────────────────────────────────────────────────
 
 def admit_strict_json(
@@ -200,7 +214,8 @@ def admit_strict_json(
     _check_depth(text, depth)
     try:
         value = json.loads(
-            text, object_pairs_hook=_unique_members, parse_constant=_refuse_constant
+            text, object_pairs_hook=_unique_members,
+            parse_constant=_refuse_constant, parse_float=_finite_float
         )
     except StrictJsonRefusal:
         raise

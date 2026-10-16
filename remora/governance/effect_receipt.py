@@ -80,6 +80,12 @@ __all__ = [
 MAX_CLOCK_SKEW = timedelta(minutes=5)
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+# A receipt needs an actual, timezone-aware instant. datetime.fromisoformat()
+# also accepts date-only and naive values, which do not establish ordering.
+_RECEIPT_INSTANT = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})"
+)
 
 #: Reason codes ``verify_declared_delta`` emits, with the one status each
 #: belongs to. Reason codes are otherwise free text from the deployment's
@@ -142,11 +148,14 @@ class DispatchLineage:
 
 
 def _parse(ts: str) -> datetime | None:
+    """Parse a full timestamp with an explicit offset, never invent UTC."""
+    if not isinstance(ts, str) or not _RECEIPT_INSTANT.fullmatch(ts):
+        return None
     try:
-        parsed = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return parsed if parsed.tzinfo is not None else None
 
 
 def resolve_lineage(events: Sequence[Mapping[str, Any]]) -> DispatchLineage:
@@ -170,8 +179,17 @@ def resolve_lineage(events: Sequence[Mapping[str, Any]]) -> DispatchLineage:
     # chain's own timestamp beside it. Both are read from the chain; nothing
     # here comes from the receipt.
     payload = result.get("payload") or result
-    executed = bool(payload.get("tool_executed"))
-    state_unknown = bool(payload.get("state_unknown"))
+    # A string such as "false" is truthy in Python. Audit metadata must not
+    # become positive execution evidence through a bool() coercion. Absent
+    # fields default to False; an unknown can only be established explicitly.
+    for field in ("tool_executed", "state_unknown"):
+        if field in payload and type(payload[field]) is not bool:
+            raise ReceiptRefused(
+                "dispatch_flags_malformed",
+                f"{field} must be a JSON boolean in the recorded dispatch",
+            )
+    executed = payload.get("tool_executed", False)
+    state_unknown = payload.get("state_unknown", False)
     lineage = DispatchLineage(
         proposal_id=str(payload.get("proposal_id", "")),
         tool_call_hash=str(payload.get("tool_call_hash", "")),
@@ -370,11 +388,20 @@ def verify_receipt(
             f"{claimed_status.value} requires verified_at: when the verifier "
             "looked is part of what makes the observation evidence")
     observed_at = _parse(verified_at)
-    attempted_at = _parse(lineage.attempted_at)
     if observed_at is None:
-        raise ReceiptRefused("verified_at_unparseable",
-                             "verified_at is not an ISO-8601 timestamp")
-    if attempted_at is not None and observed_at < attempted_at:
+        raise ReceiptRefused(
+            "verified_at_unparseable",
+            "verified_at must be a timezone-aware ISO-8601 instant",
+        )
+    attempted_at = _parse(lineage.attempted_at)
+    if attempted_at is None:
+        # A missing or malformed source timestamp must not silently skip the
+        # chronological check and turn an attestation into EFFECT_VERIFIED.
+        raise ReceiptRefused(
+            "dispatch_time_unparseable",
+            "the audit dispatch timestamp is missing or not an aware instant",
+        )
+    if observed_at < attempted_at:
         # A reading taken before the call cannot be evidence that the call
         # worked, however well-formed it is. This is the check that catches a
         # pre-existing matching state being passed off as a verification.

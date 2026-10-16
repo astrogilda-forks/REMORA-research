@@ -277,6 +277,17 @@ def test_a_stale_observation_is_refused(client) -> None:
     assert "observation_precedes_dispatch" in response.json()["detail"]
 
 
+@pytest.mark.parametrize(
+    "timestamp",
+    ["2026-10-15", "2026-10-15T12:00:00"],
+)
+def test_effect_endpoint_refuses_ambiguous_observation_timestamp(client, timestamp) -> None:
+    proposal_id = _executed(client)
+    response = _post(client, proposal_id, verified_at=timestamp)
+    assert response.status_code == 409, response.text
+    assert "verified_at_unparseable" in response.json()["detail"]
+
+
 def test_verified_without_a_recorded_observation_is_refused(client) -> None:
     """A verdict that records neither side of its own comparison.
 
