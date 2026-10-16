@@ -42,6 +42,16 @@ This file lists externally relevant changes by release. Fine-grained development
   narrowing, external inventories, and JCS.
   Design note: `docs/design/scoped-evidence-obligations-v1.md`.
 
+### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
+
+- `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
+  `DERIVATION_PROMPT_FIELDS`, pinned against the templates. A recording
+  provider captures the exact prompt on each path (answer, unusable answer,
+  provider error, record-mode miss and hit, replay miss, derivations) and
+  the test compares it with the allowlisted rendering and checks that
+  sentinels for policy, trust, grants, secrets, evidence and prior decisions
+  are absent. No leak found; no behaviour change.
+
 ### Decisions (owner decisions for SDD-AS-v1, REAS and VerificationPlan v2)
 
 - `docs/architecture/ADR-sdd-as-v1-owner-decisions.md` records ten
@@ -54,16 +64,6 @@ This file lists externally relevant changes by release. Fine-grained development
   conditionals. Benchmark-only, kept frozen because the sealed C-ext3
   manifest pins it; recorded as a validity limit of the semantic arm.
 - Dependabot ignores semver-major `mcp` updates (D10).
-
-### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
-
-- `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
-  `DERIVATION_PROMPT_FIELDS`, pinned against the templates. A recording
-  provider captures the exact prompt on each path (answer, unusable answer,
-  provider error, record-mode miss and hit, replay miss, derivations) and
-  the test compares it with the allowlisted rendering and checks that
-  sentinels for policy, trust, grants, secrets, evidence and prior decisions
-  are absent. No leak found; no behaviour change.
 
 ### Execution (read-only window inventory on the outbox, REAS G1 reader)
 
