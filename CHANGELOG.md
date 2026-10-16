@@ -4,6 +4,18 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
+
+- `tests/test_hard_guards_dominate_max_trust.py` starts from one
+  observation that ACCEPTs on the probabilistic path with trust and
+  evidence at their maximum. It flips each of the eleven hard-guard signals
+  in `hard_guard_floor` one at a time, in the default engine and with both
+  opt-in accept paths on. Each must remove the ACCEPT with the floor's own
+  action and reason. NaN, +inf and -inf in every finite-gate field never
+  ACCEPT. NaN and -inf on a risk field are stopped by
+  `NON_FINITE_INPUT_VERIFY`, the only gate they cannot pass. That path had
+  no test before. No engine code changed.
+
 ### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
 
 - `CapabilityMediator.invoke` spends the budget when it admits a request,
