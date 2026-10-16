@@ -23,9 +23,11 @@ This file lists externally relevant changes by release. Fine-grained development
 - Searched validation against a hand-written oracle: no false "complete" and
   no false "incomplete" found in 400 generated examples per seed (three seeds
   run locally), over the domain declared in the test module.
-- Not built: a deployment inventory reader (needs a read-only window query on
-  the outbox, a protected path), read-back for UNKNOWN, receipt intake,
-  issuer policy, delegation narrowing, external inventories, and JCS.
+- Snapshots are built from the outbox's read-only `rows_created_in` query,
+  tested on the in-process and SQLite adapters.
+- Not built: a scheduled reader that decides `closed_at` in a deployment,
+  read-back for UNKNOWN, receipt intake, issuer policy, delegation
+  narrowing, external inventories, and JCS.
   Design note: `docs/design/scoped-evidence-obligations-v1.md`.
 
 ### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)

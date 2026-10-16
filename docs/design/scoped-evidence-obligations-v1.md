@@ -110,10 +110,9 @@ snapshot gives a new assessment; nothing rewrites an earlier one.
 
 ## Not built
 
-- A deployment inventory reader. The outbox adapters have no read-only
-  "all rows for a tenant in a window" query; `closed_at` is supplied by the
-  caller. That query belongs in `remora/enforcement/outbox.py`, a protected
-  path, and is its own change.
+- A scheduled deployment reader. The outbox's read-only
+  `rows_created_in(tenant_id, start=, end=)` supplies the rows, but nothing
+  yet decides when a window is closed and records `closed_at` for it.
 - Read-back evidence for UNKNOWN, receipt intake and journal (SDD G2 RRA),
   issuer policy (G3 EAS) and delegation narrowing (G4 MDN).
 - A JSON Schema file for the manifest. The parser is strict (unknown fields,

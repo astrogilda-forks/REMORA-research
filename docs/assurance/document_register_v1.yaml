@@ -2983,6 +2983,14 @@ documents:
   status: proposal
   topic: docs_design_verification-plan-v2_md
   code_synced: unreviewed
+  verdict: pending
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - evaluators
+  last_reviewed: '2026-10-16'
+  validates_against: []
+  claims: []
 - id: DOC-385
   path: docs/design/scoped-evidence-obligations-v1.md
   status: proposal

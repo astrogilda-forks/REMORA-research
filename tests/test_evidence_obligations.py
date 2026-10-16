@@ -499,3 +499,24 @@ def test_real_outbox_lifecycle_through_the_assessor(outbox):
     assert projected["p-4"] is SlotState.NOT_APPLICABLE
     assert result.coverage is Coverage.ESTABLISHED_WITHIN_DECLARED_SCOPE
     assert result.claim_verdict is ClaimVerdict.NOT_ESTABLISHED
+
+
+def test_snapshot_from_the_outbox_window_query(outbox):
+    """The outbox's own read-only window query is the inventory: a row from
+    before the window and another tenant's row never reach the snapshot."""
+    t = CREATED
+    _intent(outbox, 1, T0 - timedelta(seconds=1))
+    stuck = _intent(outbox, 2, t)
+    outbox.claim(stuck.outbox_id, worker_id="w", now=t)
+    outbox.record_intent(
+        proposal_id="p-x", tenant_id="globex", item_id="i-x",
+        tool_name="store_artifact", tool_call_hash="f" * 64,
+        grant_jti="jti-x", now=t)
+    rows = outbox.rows_created_in(TENANT, start=T0, end=WINDOW_END)
+    snapshot = snapshot_from_outbox_rows(rows, tenant_id=TENANT, writer=WRITER,
+                                         closed_at=CLOSURE)
+    result = _assess(snapshot)
+    assert [r.record_id for r in snapshot.records] == [stuck.outbox_id]
+    assert result.out_of_window_records == 0
+    assert _slots(result)[(stuck.outbox_id, "settled")][0] is SlotState.MISSING
+    assert result.coverage is Coverage.ESTABLISHED_WITHIN_DECLARED_SCOPE
