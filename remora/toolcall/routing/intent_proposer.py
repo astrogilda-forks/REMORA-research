@@ -99,6 +99,14 @@ Arguments:
 {arguments}
 """
 
+#: Declared substitution fields of each template (SDD AS-010). This is a
+#: record, not the control: what keeps other data out of the prompt is that
+#: the entry points take no parameter that could carry it. A test pins these
+#: sets against the templates and the signatures, so adding a field means
+#: changing this constant in a reviewed diff.
+INTENT_PROMPT_FIELDS = frozenset({"effects", "resources", "task"})
+DERIVATION_PROMPT_FIELDS = frozenset({"transforms", "task", "arguments"})
+
 
 def prompt_sha256(template: str) -> str:
     """Hash of a prompt template; pinned in the manifest at lock time."""

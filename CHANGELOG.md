@@ -28,6 +28,16 @@ This file lists externally relevant changes by release. Fine-grained development
   issuer policy, delegation narrowing, external inventories, and JCS.
   Design note: `docs/design/scoped-evidence-obligations-v1.md`.
 
+### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
+
+- `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
+  `DERIVATION_PROMPT_FIELDS`, pinned against the templates. A recording
+  provider captures the exact prompt on each path (answer, unusable answer,
+  provider error, record-mode miss and hit, replay miss, derivations) and
+  the test compares it with the allowlisted rendering and checks that
+  sentinels for policy, trust, grants, secrets, evidence and prior decisions
+  are absent. No leak found; no behaviour change.
+
 ### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
 
 - `CapabilityMediator.pending` counts admitted requests whose executor has
