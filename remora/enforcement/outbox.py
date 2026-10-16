@@ -49,6 +49,7 @@ import logging
 import sqlite3
 import threading
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
@@ -194,6 +195,25 @@ class OutboxRow:
 
 def _now(now: datetime | None) -> datetime:
     return now or datetime.now(UTC)
+
+
+def _in_window(
+    rows: Iterable[OutboxRow], tenant_id: str, start: datetime, end: datetime
+) -> list[OutboxRow]:
+    """Rows of one tenant created in ``[start, end)``, in a stable order.
+
+    The window is compared on parsed datetimes, not on the stored text, so a
+    row written with a different UTC offset spelling is still placed right.
+    """
+    if start.tzinfo is None or end.tzinfo is None:
+        raise ValueError("window bounds need an explicit UTC offset")
+    if end <= start:
+        raise ValueError("window end must be after its start")
+    return sorted(
+        (r for r in rows
+         if r.tenant_id == tenant_id and start <= r.created_at < end),
+        key=lambda r: (r.created_at, r.outbox_id),
+    )
 
 
 def _check_claimable(row: OutboxRow) -> None:
@@ -546,6 +566,18 @@ class ExecutionOutbox:
                 key=lambda r: r.created_at,
             )
 
+    def rows_created_in(
+        self, tenant_id: str, *, start: datetime, end: datetime
+    ) -> list[OutboxRow]:
+        """Every intent for *tenant_id* created in ``[start, end)``, any state.
+
+        Read-only inventory for evidence-obligation assessment (REAS G1):
+        nothing is filtered by state, so a row stuck in DISPATCHING is listed
+        next to the settled ones. Ordered by (created_at, outbox_id).
+        """
+        with self._lock:
+            return _in_window(self._rows.values(), tenant_id, start, end)
+
     def _require(self, outbox_id: str) -> OutboxRow:
         row = self._rows.get(outbox_id)
         if row is None:
@@ -882,6 +914,15 @@ class SQLiteExecutionOutbox(ExecutionOutbox):
             (tenant_id, proposal_id),
         ).fetchall()
         return [self._row(r) for r in rows]
+
+    def rows_created_in(
+        self, tenant_id: str, *, start: datetime, end: datetime
+    ) -> list[OutboxRow]:
+        rows = self._conn().execute(
+            "SELECT * FROM execution_outbox WHERE tenant_id = ?",
+            (tenant_id,),
+        ).fetchall()
+        return _in_window((self._row(r) for r in rows), tenant_id, start, end)
 
     def _require_conn(
         self, conn: sqlite3.Connection, outbox_id: str
@@ -1283,6 +1324,16 @@ class PostgresExecutionOutbox(ExecutionOutbox):
                 (tenant_id, proposal_id),
             ).fetchall()
         return [self._row_tuple(r) for r in records]
+
+    def rows_created_in(
+        self, tenant_id: str, *, start: datetime, end: datetime
+    ) -> list[OutboxRow]:
+        with self._psycopg.connect(self._dsn) as conn:
+            records = conn.execute(
+                self._SELECT + " WHERE tenant_id = %s", (tenant_id,)
+            ).fetchall()
+        return _in_window((self._row_tuple(r) for r in records), tenant_id,
+                          start, end)
 
     def reconcile_unclaimed(
         self,

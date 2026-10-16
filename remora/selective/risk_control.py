@@ -82,19 +82,34 @@ def clopper_pearson_upper(k_errors: int, n: int, delta: float) -> float:
     Smallest p_u such that P(X <= k_errors | n, p_u) <= delta — the
     classical Clopper-Pearson upper limit, computed by bisection on the
     exact binomial CDF (no SciPy dependency). Fails closed: n == 0 -> 1.0.
+
+    The CDF is summed in log space. Multiplying ``math.comb(n, i)`` by a
+    float overflowed from n of about 1030 (SDD-AS-v1 finding B01).
     """
     if n <= 0:
         return 1.0
+    if k_errors < 0:
+        raise ValueError(f"k_errors must be >= 0, got {k_errors}")
     if k_errors >= n:
         return 1.0
     if not 0.0 < delta < 1.0:
         raise ValueError(f"delta must be in (0, 1), got {delta}")
 
+    log_n_fact = math.lgamma(n + 1)
+
     def cdf(p: float) -> float:
-        return sum(
-            math.comb(n, i) * (p ** i) * ((1.0 - p) ** (n - i))
+        if p <= 0.0:
+            return 1.0
+        if p >= 1.0:
+            return 0.0  # k_errors < n is established above
+        log_p, log_q = math.log(p), math.log1p(-p)
+        logs = [
+            log_n_fact - math.lgamma(i + 1) - math.lgamma(n - i + 1)
+            + i * log_p + (n - i) * log_q
             for i in range(0, k_errors + 1)
-        )
+        ]
+        peak = max(logs)
+        return math.exp(peak) * math.fsum(math.exp(x - peak) for x in logs)
 
     lo, hi = k_errors / n, 1.0
     for _ in range(200):

@@ -16,7 +16,7 @@ running daemon.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from hypothesis import given, settings
@@ -344,6 +344,58 @@ def test_memory_outbox_refuses_enlistment_rather_than_faking_it() -> None:
         )
 
 
+# ── Window inventory (REAS G1 evidence obligations) ────────────────────────
+
+W0 = datetime(2026, 10, 16, 12, 0, tzinfo=UTC)
+
+
+def _window_rows(outbox):
+    """One row before, two inside (one left DISPATCHING), one at the end
+    bound, and one for another tenant inside the window."""
+    def put(n, at, tenant="acme"):
+        return outbox.record_intent(
+            proposal_id=f"p-{n}", tenant_id=tenant, item_id=f"i-{n}",
+            tool_name="store_artifact", tool_call_hash=f"{n:064x}",
+            grant_jti=f"j-{n}", now=at)
+
+    before = put(1, W0 - timedelta(seconds=1))
+    inside = put(2, W0)
+    stuck = put(3, W0 + timedelta(minutes=30))
+    outbox.claim(stuck.outbox_id, worker_id="w", now=W0 + timedelta(minutes=31))
+    at_end = put(4, W0 + timedelta(hours=1))
+    other = put(5, W0 + timedelta(minutes=5), tenant="globex")
+    return before, inside, stuck, at_end, other
+
+
+def test_rows_created_in_is_half_open_tenant_scoped_and_state_blind(outbox):
+    before, inside, stuck, at_end, other = _window_rows(outbox)
+    rows = outbox.rows_created_in("acme", start=W0, end=W0 + timedelta(hours=1))
+    assert [r.outbox_id for r in rows] == [inside.outbox_id, stuck.outbox_id]
+    # A crash-left claim is part of the inventory, not filtered out.
+    assert rows[1].state is OutboxState.DISPATCHING
+
+
+def test_rows_created_in_matches_a_different_offset_spelling(outbox):
+    """Bounds in another UTC offset select the same instants."""
+    _window_rows(outbox)
+    plus2 = timezone(timedelta(hours=2))
+    utc = outbox.rows_created_in("acme", start=W0, end=W0 + timedelta(hours=1))
+    shifted = outbox.rows_created_in(
+        "acme", start=W0.astimezone(plus2),
+        end=(W0 + timedelta(hours=1)).astimezone(plus2))
+    assert [r.outbox_id for r in shifted] == [r.outbox_id for r in utc]
+
+
+@pytest.mark.parametrize(("start", "end"), [
+    (W0, W0),
+    (W0 + timedelta(seconds=1), W0),
+    (W0.replace(tzinfo=None), W0 + timedelta(hours=1)),
+])
+def test_rows_created_in_refuses_an_ill_formed_window(outbox, start, end):
+    with pytest.raises(ValueError):
+        outbox.rows_created_in("acme", start=start, end=end)
+
+
 # ── Postgres adapter: contract-tested against a real service ───────────────
 #
 # DSN-gated like the tenant-chain contract tests; the CI job that provides a
@@ -567,3 +619,16 @@ def test_reconcilers_scope_to_one_tenant(outbox) -> None:
     outbox.reconcile_unclaimed("acme", older_than=timedelta(seconds=-1))
     assert outbox.get(mine.outbox_id).state is OutboxState.FAILED
     assert outbox.get(theirs.outbox_id).state is OutboxState.DISPATCH_PENDING
+
+
+@pg_dsn
+def test_postgres_rows_created_in_matches_the_reference(pg_outbox) -> None:
+    outbox, tenant = pg_outbox
+    rows = []
+    for n, offset in enumerate((-1, 0, 1800, 3600)):
+        rows.append(outbox.record_intent(
+            proposal_id=f"pw-{n}", tenant_id=tenant, item_id=f"i-{n}",
+            tool_name="store_artifact", tool_call_hash=f"{n:064x}",
+            grant_jti=f"jw-{n}", now=W0 + timedelta(seconds=offset)))
+    got = outbox.rows_created_in(tenant, start=W0, end=W0 + timedelta(hours=1))
+    assert [r.outbox_id for r in got] == [rows[1].outbox_id, rows[2].outbox_id]

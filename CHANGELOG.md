@@ -4,6 +4,206 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Evidence (scoped evidence obligations over the outbox, REAS G1)
+
+- New read-only package `remora/evidence/obligations/`. A manifest, locked
+  before a dispatch window opens, fixes two obligations per intent: terminal
+  settlement and downstream projection, each with a deadline. `assess()`
+  compares a closed, digest-bound outbox snapshot against it and reports per
+  intent SATISFIED, PENDING, MISSING (late or never), INVALID, CONFLICTED or
+  NOT_APPLICABLE. Absence counts only once the snapshot has closed past the
+  due time. UNKNOWN stays PENDING and unobservable.
+- Coverage is established only for an inventory source the deployment
+  accepts, the manifest's tenant, a matching records digest and a close past
+  every deadline. Each result carries a fixed list of what it does not
+  establish, including execution authority and the effect itself.
+- Pure and deterministic: no clock, store or environment reads, and a later
+  snapshot gives a new assessment id. The package imports nothing from
+  enforcement, execution, policy or capabilities (AST test).
+- Searched validation against a hand-written oracle: no false "complete" and
+  no false "incomplete" found in 400 generated examples per seed (three seeds
+  run locally), over the domain declared in the test module.
+- Snapshots are built from the outbox's read-only `rows_created_in` query,
+  tested on the in-process and SQLite adapters.
+- Not built: a scheduled reader that decides `closed_at` in a deployment,
+  read-back for UNKNOWN, receipt intake, issuer policy, delegation
+  narrowing, external inventories, and JCS.
+  Design note: `docs/design/scoped-evidence-obligations-v1.md`.
+
+### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
+
+- `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
+  `DERIVATION_PROMPT_FIELDS`, pinned against the templates. A recording
+  provider captures the exact prompt on each path (answer, unusable answer,
+  provider error, record-mode miss and hit, replay miss, derivations) and
+  the test compares it with the allowlisted rendering and checks that
+  sentinels for policy, trust, grants, secrets, evidence and prior decisions
+  are absent. No leak found; no behaviour change.
+
+### Execution (read-only window inventory on the outbox, REAS G1 reader)
+
+- `rows_created_in(tenant_id, start=, end=)` on the in-process, SQLite and
+  Postgres outboxes lists every intent a tenant recorded in `[start, end)`,
+  whatever its state, so a row a crash left in DISPATCHING appears next to
+  the settled ones. This is the inventory that evidence-obligation
+  assessment reads.
+- The window is compared on parsed datetimes, so bounds in another UTC
+  offset select the same rows. Naive or empty windows are refused.
+- Read-only: no state transition, lock or schema change. The boundary
+  register is re-anchored to the commit that adds it.
+
+### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
+
+- `CapabilityMediator.pending` counts admitted requests whose executor has
+  not returned. They have no record until then, so a reader can tell
+  "still running, may already have had its effect" from "did not run".
+- New tests: an executor that calls back into the mediator spends the same
+  budget without deadlock; `close()` during a running effect refuses new
+  requests at once and leaves the running one to settle as what it was.
+
+### Design (VerificationPlan v2 proposal, SDD-AS-v1 AS-007)
+
+- New design note `docs/design/verification-plan-v2.md`. It records four
+  weaknesses of today's resolution plan, read from the code: positional
+  source choice with a last-source fallback, no expiry or task budget, a
+  validator that never sees the value, and no binding to tenant, task, call
+  or policy.
+- It proposes one explicit source binding per argument, a durable budget per
+  task reserved before any lookup, and typed source evidence checked against
+  the plan before re-entry. Five slices; the strict-profile cutover waits for
+  the owner's pilot/research decision. No code changes.
+
+### CI (every collected test is accounted for, SDD-AS-v1 AS-002)
+
+- The pytest matrix writes JUnit XML, and `scripts/check_test_accounting.py`
+  reconciles it with pytest's summary line. Each testcase must have exactly
+  one outcome (ok, failure, error, skipped, xfailed), and the counts must
+  agree, so a truncated or partial report cannot pass as a clean run. The
+  check allows for pytest 8's xpass-as-plain-testcase and its double-counted
+  teardown errors, pinned by a real fixture. It refuses a JUnit file that
+  declares a DTD.
+- Each matrix job uploads `pytest-report.txt`, `pytest-junit.xml` and
+  `test-accounting.json` as `pytest-results-py<version>`, also when it fails.
+- Not done: the test-inventory hash compared across two clean jobs and the
+  environment manifest (AS-003), and a network-isolated unit job (AS-001).
+
+### CI (the test inventory is hashed and compared across two jobs, SDD-AS-v1 AS-003)
+
+- `scripts/test_inventory.py collect` writes the sorted node ids of
+  `pytest --collect-only` with a SHA-256 over the list, and an environment
+  manifest: Python version and implementation, platform, installed
+  distributions with versions, the hash of each lock file and the git SHA. It
+  holds no environment values, host or user names, or paths.
+- Each pytest matrix job uploads both files with `pytest-results-py<version>`.
+- A new job, `test-inventory-reproducibility`, collects the suite again on
+  Python 3.12 and fails if its hash differs from the matrix leg's, printing
+  the node ids found in only one. Other Python versions are not compared with
+  each other, because they may collect different parameter sets. The job
+  feeds `deterministic-suite-required`; no job was renamed.
+- Not done: a network-isolated unit job (AS-001). The comparison shows that
+  collection is stable, not that every test passes the same way twice.
+
+### Quality (both Clopper-Pearson bounds held to one grid, SDD-AS-v1 AS-016)
+
+- `tests/test_binomial_bound_grid.py` pins both `clopper_pearson_upper`
+  implementations (`risk_control` and the guardrail's `binomial_bounds`) to
+  SciPy's beta quantile at 1e-10 for n = 1, 10, 500, 5000 and 100000 and
+  delta = .05 and .05/7, plus the k = 0 closed form, k = n, monotonicity
+  and the delta ordering. Both already met it; no bound value changed (old
+  and new `binomial_bounds` agree exactly for n < 300).
+- `binomial_bounds.clopper_pearson_upper` sums P(X <= k) on the shorter
+  side of the distribution, so one evaluation costs O(min(k, n - k))
+  instead of O(n). Its docstring no longer claims accuracy only up to
+  n = 500. `binomial_tail_prob` is unchanged.
+
+### Quality (intent and claim cases beyond the first tests, SDD-AS-v1 AS-011)
+
+- New `tests/test_intent_claim_boundaries.py` covers rephrased requests that
+  must be supported, requests the extractor declines on purpose, a claim made
+  for another tenant, tasks with two goals, and refutations that later
+  unknown evidence must not soften.
+- `combine_goal_match` in `remora/toolcall/routing/intent_proposer.py` keeps a
+  deterministic UNSUPPORTED verdict when a model proposes a different reading.
+  Before, the veto turned it into UNKNOWN. A contested SUPPORTED still falls
+  back to UNKNOWN. The function is library code and is not wired into a run.
+- Defect found, not fixed: `extract_intent` loses "do not" and "before" in
+  front of an action word, so "Please do not cancel booking B-104" reads as a
+  cancel request. The file is frozen by the sealed C-ext3 manifest. Five tests
+  are marked `xfail(strict=True)` and name the owner decision.
+
+### Quality (BFCL holdout disjointness and C-ext3 denominators are tested, SDD-AS-v1 AS-025)
+
+- `tests/test_bfcl_holdout_disjointness_and_denominators.py` checks the
+  committed v3, C-ext2 and C-ext3 holdouts: no shared episode ID or cluster
+  ID between any two (0 found). It ties the sealed C-ext3 result to its
+  holdout by sha256 and checks that every one of its 2799 episodes lands in
+  a family count. Every metric's denominator equals its full family in all
+  three arms. Before this, disjointness was a build-time refusal plus a
+  manifest string. No result changed.
+
+### Quality (re-entry after a lookup is counted at the executor, SDD-AS-v1 AS-009)
+
+- A new end-to-end test runs a proposal with a missing argument through
+  `resolve_and_reenter` and `validate_and_reenter` with a fake lookup source,
+  then hands the re-entered call to the real execution API with a recording
+  tool as the only executor. It counts executor calls at every step.
+- A hard guard that already blocks the call means the lookup is never run
+  and the executor is reached zero times. A lookup that errors, returns
+  nothing or confirms the value absent ends in ABSTAIN with zero calls.
+- A call that still needs approval after the lookup reaches the executor
+  zero times before approval, once after it, and still once after two
+  replays. Approval of the pre-lookup call does not cover the re-entered one.
+- A token minted before the lookup is refused for the re-entered call with
+  zero calls. A new token bound to the re-entered call dispatches once.
+- No defect was found. The HTTP execution API never builds a resolution plan
+  itself, so re-entry stays a library step that the test composes with it.
+
+### Fixed (the mediator's effect budget holds under concurrency, SDD-AS-v1 B03)
+
+- `CapabilityMediator.invoke` spends the budget when it admits a request,
+  under the lock, instead of comparing it with the records already written.
+  A record is written only after the executor returns, so with
+  `max_effects=1` concurrent requests all reached the executor (nine of nine
+  in the new barrier test). A failed or interrupted effect does not return
+  its budget, and an interrupt still leaves an `UNKNOWN` record.
+- The arguments are frozen once at admission (`remora.frozen_json`): the
+  authority check, the recorded hash and the executor all see one private
+  deep copy, so a caller mutating a nested value afterwards changes none of
+  them. The executor used to get a one-level `dict()` copy. Arguments
+  outside JSON (NaN, infinities, non-string keys, arbitrary objects) are
+  refused as `capability_argument_mismatch` rather than hashed through
+  `str()`. Hashes of JSON-domain arguments are unchanged.
+- `max_effects` must be an int of at least 1, not a bool.
+- Not changed: refusals still count against the same budget, which bounds
+  the evidence one execution can produce. Across processes the effect domain
+  already claims each slot in the durable ledger before its executor runs;
+  this fix is for the in-process mediator.
+### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
+
+- `tests/test_hard_guards_dominate_max_trust.py` starts from one
+  observation that ACCEPTs on the probabilistic path with trust and
+  evidence at their maximum. It flips each of the eleven hard-guard signals
+  in `hard_guard_floor` one at a time, in the default engine and with both
+  opt-in accept paths on. Each must remove the ACCEPT with the floor's own
+  action and reason. NaN, +inf and -inf in every finite-gate field never
+  ACCEPT. NaN and -inf on a risk field are stopped by
+  `NON_FINITE_INPUT_VERIFY`, the only gate they cannot pass. That path had
+  no test before. No engine code changed.
+
+### Fixed (a ResolutionPlan refuses a malformed binding, SDD-AS-v1 B02)
+
+- `ResolutionPlan` now validates itself at construction: at least one target
+  argument and one source tool, no empty or duplicate names, and
+  `max_attempts` an int of at least 1 (not a bool). Before this an empty
+  source list crashed re-entry with an uncaught `IndexError`, an empty
+  target list let `validate_and_reenter` report every target confirmed and
+  ground the call, and `max_attempts` accepted `0`, `-1` and `True`. The
+  decision engine never built such a plan; a caller constructing one did.
+- The engine drops duplicate argument names before building a plan.
+- Not changed: sources are still matched to arguments by position, with the
+  last source as fallback. Explicit per-argument binding is SDD-AS-v1 WP-02
+  (VerificationPlanV2) and is not implemented here.
+
 ### Security (decision grants a redeemer cannot mint, RMR-CR-002)
 
 - `PolicyDecisionToken` format v3: Ed25519 over `REMORA/POLICY-GRANT/v3`,
