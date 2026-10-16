@@ -14,6 +14,18 @@ This file lists externally relevant changes by release. Fine-grained development
   sentinels for policy, trust, grants, secrets, evidence and prior decisions
   are absent. No leak found; no behaviour change.
 
+### Execution (read-only window inventory on the outbox, REAS G1 reader)
+
+- `rows_created_in(tenant_id, start=, end=)` on the in-process, SQLite and
+  Postgres outboxes lists every intent a tenant recorded in `[start, end)`,
+  whatever its state, so a row a crash left in DISPATCHING appears next to
+  the settled ones. This is the inventory that evidence-obligation
+  assessment reads.
+- The window is compared on parsed datetimes, so bounds in another UTC
+  offset select the same rows. Naive or empty windows are refused.
+- Read-only: no state transition, lock or schema change. The boundary
+  register is re-anchored to the commit that adds it.
+
 ### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
 
 - `CapabilityMediator.pending` counts admitted requests whose executor has
