@@ -38,6 +38,18 @@ This file lists externally relevant changes by release. Fine-grained development
   sentinels for policy, trust, grants, secrets, evidence and prior decisions
   are absent. No leak found; no behaviour change.
 
+### Execution (read-only window inventory on the outbox, REAS G1 reader)
+
+- `rows_created_in(tenant_id, start=, end=)` on the in-process, SQLite and
+  Postgres outboxes lists every intent a tenant recorded in `[start, end)`,
+  whatever its state, so a row a crash left in DISPATCHING appears next to
+  the settled ones. This is the inventory that evidence-obligation
+  assessment reads.
+- The window is compared on parsed datetimes, so bounds in another UTC
+  offset select the same rows. Naive or empty windows are refused.
+- Read-only: no state transition, lock or schema change. The boundary
+  register is re-anchored to the commit that adds it.
+
 ### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
 
 - `CapabilityMediator.pending` counts admitted requests whose executor has
@@ -46,6 +58,18 @@ This file lists externally relevant changes by release. Fine-grained development
 - New tests: an executor that calls back into the mediator spends the same
   budget without deadlock; `close()` during a running effect refuses new
   requests at once and leaves the running one to settle as what it was.
+
+### Design (VerificationPlan v2 proposal, SDD-AS-v1 AS-007)
+
+- New design note `docs/design/verification-plan-v2.md`. It records four
+  weaknesses of today's resolution plan, read from the code: positional
+  source choice with a last-source fallback, no expiry or task budget, a
+  validator that never sees the value, and no binding to tenant, task, call
+  or policy.
+- It proposes one explicit source binding per argument, a durable budget per
+  task reserved before any lookup, and typed source evidence checked against
+  the plan before re-entry. Five slices; the strict-profile cutover waits for
+  the owner's pilot/research decision. No code changes.
 
 ### CI (every collected test is accounted for, SDD-AS-v1 AS-002)
 
@@ -60,6 +84,22 @@ This file lists externally relevant changes by release. Fine-grained development
   `test-accounting.json` as `pytest-results-py<version>`, also when it fails.
 - Not done: the test-inventory hash compared across two clean jobs and the
   environment manifest (AS-003), and a network-isolated unit job (AS-001).
+
+### CI (the test inventory is hashed and compared across two jobs, SDD-AS-v1 AS-003)
+
+- `scripts/test_inventory.py collect` writes the sorted node ids of
+  `pytest --collect-only` with a SHA-256 over the list, and an environment
+  manifest: Python version and implementation, platform, installed
+  distributions with versions, the hash of each lock file and the git SHA. It
+  holds no environment values, host or user names, or paths.
+- Each pytest matrix job uploads both files with `pytest-results-py<version>`.
+- A new job, `test-inventory-reproducibility`, collects the suite again on
+  Python 3.12 and fails if its hash differs from the matrix leg's, printing
+  the node ids found in only one. Other Python versions are not compared with
+  each other, because they may collect different parameter sets. The job
+  feeds `deterministic-suite-required`; no job was renamed.
+- Not done: a network-isolated unit job (AS-001). The comparison shows that
+  collection is stable, not that every test passes the same way twice.
 
 ### Quality (both Clopper-Pearson bounds held to one grid, SDD-AS-v1 AS-016)
 
