@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### AS-010 (the intent proposer's provider input is allowlisted and tested on every path)
+
+- `intent_proposer` declares `INTENT_PROMPT_FIELDS` and
+  `DERIVATION_PROMPT_FIELDS`, pinned against the templates. A recording
+  provider captures the exact prompt on each path (answer, unusable answer,
+  provider error, record-mode miss and hit, replay miss, derivations) and
+  the test compares it with the allowlisted rendering and checks that
+  sentinels for policy, trust, grants, secrets, evidence and prior decisions
+  are absent. No leak found; no behaviour change.
+
 ### Execution (read-only window inventory on the outbox, REAS G1 reader)
 
 - `rows_created_in(tenant_id, start=, end=)` on the in-process, SQLite and
