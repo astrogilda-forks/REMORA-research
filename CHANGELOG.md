@@ -4,6 +4,22 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### CI (the test inventory is hashed and compared across two jobs, SDD-AS-v1 AS-003)
+
+- `scripts/test_inventory.py collect` writes the sorted node ids of
+  `pytest --collect-only` with a SHA-256 over the list, and an environment
+  manifest: Python version and implementation, platform, installed
+  distributions with versions, the hash of each lock file and the git SHA. It
+  holds no environment values, host or user names, or paths.
+- Each pytest matrix job uploads both files with `pytest-results-py<version>`.
+- A new job, `test-inventory-reproducibility`, collects the suite again on
+  Python 3.12 and fails if its hash differs from the matrix leg's, printing
+  the node ids found in only one. Other Python versions are not compared with
+  each other, because they may collect different parameter sets. The job
+  feeds `deterministic-suite-required`; no job was renamed.
+- Not done: a network-isolated unit job (AS-001). The comparison shows that
+  collection is stable, not that every test passes the same way twice.
+
 ### Quality (the mediator's in-flight state is visible, SDD-AS-v1 AS-004/AS-006)
 
 - `CapabilityMediator.pending` counts admitted requests whose executor has
