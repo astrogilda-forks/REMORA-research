@@ -71,10 +71,18 @@ is a known gap, reported as such, and the verdict stays `not_established`.
 
 ## What a positive result does not establish
 
-Every assessment carries the same fixed list, whatever its verdict:
-visibility beyond the outbox, absence of unobserved events, production PEP
-mediation, legitimate business purpose, independence from the producer,
-execution authority, and that an effect occurred as reported. The outbox is
+Every assessment carries the same fixed list, whatever its verdict. It does
+not establish:
+
+- visibility beyond the outbox;
+- absence of unobserved events;
+- production PEP mediation;
+- legitimate business purpose;
+- independence from the producer;
+- execution authority;
+- that an effect occurred as reported.
+
+The outbox is
 REMORA's own record, so a positive result is a self-consistency statement
 about REMORA's governed dispatches in one window, not an independent
 observation.
