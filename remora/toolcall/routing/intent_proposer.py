@@ -99,9 +99,11 @@ Arguments:
 {arguments}
 """
 
-#: The only substitution fields each template may carry. These are the whole
-#: input the provider can see (SDD AS-010); a test pins them against the
-#: templates, so adding a field is a reviewed change to this constant.
+#: Declared substitution fields of each template (SDD AS-010). This is a
+#: record, not the control: what keeps other data out of the prompt is that
+#: the entry points take no parameter that could carry it. A test pins these
+#: sets against the templates and the signatures, so adding a field means
+#: changing this constant in a reviewed diff.
 INTENT_PROMPT_FIELDS = frozenset({"effects", "resources", "task"})
 DERIVATION_PROMPT_FIELDS = frozenset({"transforms", "task", "arguments"})
 
