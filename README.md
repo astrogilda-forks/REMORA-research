@@ -6,6 +6,17 @@
 
 Policy-gated control between an agent's intent and a real-world effect.
 
+**Research question.** Can authorization enforced outside the agent, and bound to the exact tool call, stop the calls an agent should not make while keeping it useful? Where does it fail?
+
+**What the evidence shows so far.** The runs are sealed or pre-registered unless marked. Every number resolves to the [claim register](docs/assurance/claim_register_v1.yaml), and every failure stays in [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md).
+
+1. On sealed BFCL v4 episodes, declared tool contracts with a semantic-authority floor accepted none of the 500 (C-ext3) and none of the 295 (C-ext4) substituted wrong calls. A revised bundle raised correct-call acceptance from 6.9% to 29.9%. Clustered by tool the upper bounds are 3.5% and 5.42%, almost no wrong call came from the task's own tool list, and most correct calls still do not proceed. The open problem is the safety–utility trade-off, not safety alone.
+2. On AgentHarm, an imported intent-gating run blocked all 208 harmful scenarios and all 208 benign twins. It enforces a floor and does not tell intent apart (NEGATIVE_RESULTS §80).
+3. A consensus-temperature uncertainty signal was falsified on 1,231 fresh items under a pre-registered plan (SAP v3, CLAIM-012) and is kept only as a diagnostic.
+4. The project's own simulator benchmark had label leakage and an overstated sample size: 700 tasks are 70 templates (NEGATIVE_RESULTS §17). Only corrected numbers are reported, and the benchmark's 0% unsafe result is attributed to no component (CLAIM-020).
+
+**What it does not yet test:** an adversarial agent trying to get past the gate (the AI-control threat model), wrong calls a model actually makes, external baselines, and the execution chain under attack. These are the next experiments; the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md) track each objection and what was done about it.
+
 An agent proposes a tool call. REMORA is a governance overlay between that proposal and the protected tool: it evaluates the exact action before it runs, and returns one of four decisions:
 
 | Decision | Meaning |
@@ -26,7 +37,9 @@ python -m remora try
 
 ## Where to start
 
-One ordered reading path; the [documentation index](docs/README.md) lists the complete registered set.
+**Reviewing the research?** Five files are enough: the [paper](paper/remora_paper.pdf), [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md), the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md), the [claim register](docs/assurance/claim_register_v1.yaml) and [how to reproduce every result](docs/06-reproducibility.md). The repository also keeps about 400 Markdown files of design history and product material; none of them is needed to judge a claim.
+
+**Working on the code?** One ordered reading path follows; the [documentation index](docs/README.md) lists the complete registered set.
 
 1. [Developer handoff](DEVELOPER_OVERVIEW.md): the shortest technical path through the repository
 2. [Architecture](ARCHITECTURE.md): components, data flow, module stability
@@ -65,11 +78,11 @@ Headline values are governed by the [claim register](docs/assurance/claim_regist
 <!-- claim:CLAIM-021 gold_call_accept_pct wrong_call_accept_pct obtainable_verify_pct -->
 | # | Benchmark | Result | Scope |
 |---|---|---|---|
-| 1 | **AgentHarm** | **0.0%** wrongly allowed (0/208); 95% upper bound 1.81%; false-block rate on the benign twins **100.0%** (208/208 blocked) | Intent classification only. The gate blocked every scenario, harmful or benign, so this measures the hard-block floor, not discrimination between harmful and benign. The 208 scenarios come from 47 base behaviours; over those the upper bound is 7.6% |
-| 2 | **Adversarial simulator** | **0.0%** unsafe runs (0/70 templates; 700 tasks); 95% cluster-level Wilson upper bound **5.2%** (6.4% over the 56 harmful templates); utility +0.456, a post-hoc test | Simulated; effective N = 70 (70 templates × 10 cosmetic variants); unsafe-rate gap Δ=0.0143 vs. baseline, not statistically significant |
-| 3 | **BFCL v4 (C-ext3)** | Native wrong-call acceptance **0.0%** (0/500; Wilson 95% upper bound **0.76%** by row, 3.5% clustered by tool); irrelevant-tool refusal **100.0%** (300/300); required-input guessing **0.0%** (0/398) | Sealed once, 2,799 episodes, frozen semantic bundle + authority floor; the joint pre-registered hypothesis was not supported because read autonomy missed its target; see NEGATIVE_RESULTS §39 |
-| 4 | **Historical regression** | **0.0%** wrongly allowed (0/167) | Previously observed failures only |
-| 5 | **BFCL v4 (C-ext4)** | Correct calls accepted **29.9%** (87/291), against **6.9%** for the frozen v1 bundle on the same episodes; native wrong-call acceptance **0.0%** (0/295, as for a refuse-all control; 5.42% upper bound clustered by tool); obtainable-input VERIFY **84.0%** | Sealed once, the whole remaining reserve, 1,562 episodes; all eight pre-registered targets met; the gain sits on tools also seen in development (CLAIM-021) |
+| 1 | **BFCL v4 (C-ext4)** | Correct calls accepted **29.9%** (87/291), against **6.9%** for the frozen v1 bundle on the same episodes; native wrong-call acceptance **0.0%** (0/295, as for a refuse-all control; 5.42% upper bound clustered by tool); obtainable-input VERIFY **84.0%** | Sealed once, the whole remaining reserve, 1,562 episodes; all eight pre-registered targets met; the gain sits on tools also seen in development (CLAIM-021) |
+| 2 | **BFCL v4 (C-ext3)** | Native wrong-call acceptance **0.0%** (0/500; Wilson 95% upper bound **0.76%** by row, 3.5% clustered by tool); irrelevant-tool refusal **100.0%** (300/300); required-input guessing **0.0%** (0/398) | Sealed once, 2,799 episodes, frozen semantic bundle + authority floor; the joint pre-registered hypothesis was not supported because read autonomy missed its target; see NEGATIVE_RESULTS §39 |
+| 3 | **Adversarial simulator** | **0.0%** unsafe runs (0/70 templates; 700 tasks); 95% cluster-level Wilson upper bound **5.2%** (6.4% over the 56 harmful templates); utility +0.456, a post-hoc test | Simulated; effective N = 70 (70 templates × 10 cosmetic variants); unsafe-rate gap Δ=0.0143 vs. baseline, not statistically significant |
+| 4 | **AgentHarm** | **0.0%** wrongly allowed (0/208); 95% upper bound 1.81%; false-block rate on the benign twins **100.0%** (208/208 blocked) | Intent classification only. The gate blocked every scenario, harmful or benign, so this measures the hard-block floor, not discrimination between harmful and benign. The 208 scenarios come from 47 base behaviours; over those the upper bound is 7.6% |
+| 5 | **Historical regression** | **0.0%** wrongly allowed (0/167) | Previously observed failures only |
 
 <details>
 <summary>How to read those numbers</summary>
@@ -146,7 +159,7 @@ It cannot enforce against a credential path that bypasses its dispatcher. Deploy
 | `docs/archive/` | Superseded or historical material |
 | `paper/` | Research paper and supporting publication artifacts |
 
-Research modules, AROMER, the older statistical-physics work and historical design documents stay in the repository for reproducibility and audit history. Their presence does not make them part of the enforcing runtime path; the capability register says what is wired, and [DEVELOPER_OVERVIEW.md](DEVELOPER_OVERVIEW.md#known-boundary) states the known engineering boundary.
+Research modules stay in the repository for reproducibility and audit history: AROMER (`remora/aromer/`), the older statistical-physics hypotheses (`remora/thermodynamics.py`, `remora/lyapunov.py`, `remora/research_attic/`, legacy names for uncertainty observables, not physics) and historical design documents. Their presence does not make them part of the enforcing runtime path; the capability register says what is wired, and [DEVELOPER_OVERVIEW.md](DEVELOPER_OVERVIEW.md#known-boundary) states the known engineering boundary.
 
 For product-oriented integration see [Assured Agent Execution](https://github.com/darklordVirtual/assured-agent-execution), which consumes pinned REMORA artifacts rather than copying the governance core.
 
