@@ -81,6 +81,27 @@ and that the committed code reproduces the regenerable ones. It is not a
 third-party result. No REMORA container image is published, so the pack pins
 the base image digest and records `image: null` with that reason.
 
+### Replaying the sealed C-ext4 track
+
+The pack never re-runs a sealed track, and `scripts/run_bfcl_cext4.py`
+refuses a second run, because a second run is not blind. The C-ext4 routing
+is deterministic, so a narrower question can still be checked: does the code
+at the locked commit, applied to the committed episodes, give exactly the
+published counts?
+
+```bash
+python scripts/replay_sealed_cext4.py                    # at the locked commit; needs full history
+python scripts/replay_sealed_cext4.py --at working-tree  # today's code, drift check
+```
+
+The first form checks out the manifest's `locked_at_commit` into a temporary
+worktree and confirms that the frozen code and data hash to the values
+recorded at seal time. It then routes all four arms and compares n and d for
+every metric with `per_arm_metrics` in the result file (36 counts). A replay
+writes nothing, so it adds no evidence beyond showing that CLAIM-021's counts
+follow from committed inputs. `scripts/bfcl_cext4_seen_split_posthoc.py`
+recomputes the post-hoc split in NEGATIVE_RESULTS §82 the same way.
+
 ---
 
 ## Claim 1, 0% unsafe execution on 700-task adversarial benchmark

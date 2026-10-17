@@ -17,6 +17,13 @@ This file lists externally relevant changes by release. Fine-grained development
   seen/unseen split behind §82 and writes
   `artifacts/posthoc/bfcl_cext4_seen_split.json`. A test recomputes it and
   checks the artifact, §82 and the paper against each other.
+- `scripts/replay_sealed_cext4.py` replays the sealed C-ext4 track at its
+  locked commit in a temporary worktree, after checking the frozen code and
+  data against the seal hashes, and compares all 36 arm-metric counts with
+  the published result. `--at working-tree` checks today's code for drift.
+  Both pass. Tests cover the comparison and run both replays; the
+  locked-commit one skips on a shallow clone (new skip-reason entry).
+  Documented in docs/06-reproducibility.md.
 - The reproduction section's test count is refreshed (10,850 tests in 706
   files on master `17db5502`).
 
