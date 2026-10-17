@@ -1,0 +1,57 @@
+# Value label schema v1 (derived information-flow control, IFC-01).
+#
+# A label is (readers, integrity). It is the unit every later work package of
+# docs/design/derived-information-flow-control-v1.md attaches to a context, a
+# tool-result field, a handle or a resource. Implementation:
+# remora/flow/label.py. Lattice laws: tests/flow/test_label_lattice.py.
+
+schema_version: 1
+status: implemented
+implemented_at: "2026-10-17"
+design: docs/design/derived-information-flow-control-v1.md#31-labels
+
+label:
+  readers:
+    one_of:
+      - const: PUBLIC
+        meaning: The top reader set. Anyone may read. It is not a resource.
+      - type: set
+        items: principal_pattern
+        canonical_form: >-
+          The minimal antichain: no pattern within another. Two reader sets
+          that admit the same principals are equal and serialise identically.
+  integrity:
+    enum: [TRUSTED, UNTRUSTED]
+
+principal_pattern:
+  form: "<scheme>://<authority>/<path>, optionally followed by /* for the subtree strictly below it"
+  canonicalisation: remora.capabilities.resource.canonical_resource_pattern
+  refused: >-
+    percent-encoding, backslashes, queries, fragments, user information
+    (the email@ form), '.' and '..' segments, empty segments, whitespace and
+    control characters. An email principal is written email://<domain>/<local-part>.
+  schemes_in_use:
+    user: "user://<tenant>/<id>"
+    email: "email://<domain>/<local-part>"
+    iban: "iban://<country>/<iban>"
+    ext: "ext://<host> (an external host, including a model provider)"
+    res: "res://<resource> (a labelled resource)"
+
+order_and_join:
+  leq: "L1 ⊑ L2 iff readers(L2) ⊆ readers(L1) and (integrity(L1) = UNTRUSTED ⇒ integrity(L2) = UNTRUSTED)"
+  join: "L1 ⊔ L2 = (readers(L1) ∩ readers(L2), UNTRUSTED if either is UNTRUSTED)"
+  bottom: "(PUBLIC, TRUSTED)"
+  intersection: >-
+    Patterns form a tree, so two patterns are nested or disjoint. p ∩ q is the
+    more specific one when one is within the other, otherwise empty. PUBLIC is
+    the identity. The result is exact: data under L1 ⊔ L2 reaches r iff both
+    L1 and L2 reach r.
+  flows_to: "flows_to(L, r) iff readers(L) = PUBLIC or r is within some pattern of readers(L)"
+
+field_value_label:
+  exactly_one_handle: "the handle's label (value integrity does not depend on the context)"
+  otherwise: "L_ctx joined with the label of every embedded handle"
+
+canonical_bytes:
+  encoding: "UTF-8 JSON, sorted keys, compact separators"
+  shape: '{"integrity": "<TRUSTED|UNTRUSTED>", "readers": "PUBLIC" | [sorted patterns], "v": "remora/flow-label/v1"}'

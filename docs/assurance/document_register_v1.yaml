@@ -3057,6 +3057,32 @@ documents:
   last_reviewed: '2026-10-17'
   validates_against: []
   claims: []
+- id: DOC-391
+  path: docs/design/derived-information-flow-control-v1.md
+  status: canonical
+  topic: docs_design_derived-information-flow-control-v1_md
+  code_synced: verified
+  verdict: current
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - researchers
+  last_reviewed: '2026-10-17'
+  validates_against: []
+  claims: []
+- id: DOC-392
+  path: docs/design/derived-information-flow-control-v1-status.md
+  status: canonical
+  topic: docs_design_derived-information-flow-control-v1-status_md
+  code_synced: verified
+  verdict: current
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - researchers
+  last_reviewed: '2026-10-17'
+  validates_against: []
+  claims: []
 - id: DOC-393
   path: docs/architecture/ADR-flow-meet-composition.md
   status: canonical
@@ -3390,4 +3416,6 @@ topics:
 - docs_architecture_adr_sdd_as_v1_owner_decisions_md
 - docs_review_PEER_REVIEW_FINDINGS_md
 - docs_assurance_statistical_analysis_plan_v7_control_eval_md
+- docs_design_derived-information-flow-control-v1_md
+- docs_design_derived-information-flow-control-v1-status_md
 - docs_architecture_ADR-flow-meet-composition_md
