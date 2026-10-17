@@ -4,6 +4,21 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Evidence (C-ext4: sealed BFCL utility result, CLAIM-021)
+
+- C-ext4 was sealed from the whole remaining BFCL v4 reserve (295 positive,
+  68 irrelevance rows; 1,562 episodes), locked, and run once under SAP v6.
+- All eight pre-registered targets were met. Bundle v2 with deterministic
+  receipts accepted 87/291 = 29.9 % of gold calls; the frozen v1 bundle
+  accepted 20/291 = 6.9 %. Exact one-sided McNemar p is about 1e-18.
+- Native wrong-call ACCEPT stayed 0/295, constructed wrong-tool 0/119, and
+  irrelevance ABSTAIN 68/68. Obtainable VERIFY rose from 45/119 to 100/119.
+- NEGATIVE_RESULTS §82 records the limit. The gain sits on tools also seen
+  in development (76 against 12); on 36 gold calls with unseen tools it was
+  11 against 8. Generalisation to new tool families is not shown.
+- README gains row 5; the result, manifest and provenance sidecars are
+  committed.
+
 ### Routing (semantic bundle v2 and deterministic derivation receipts, development only)
 
 - `remora/toolcall/routing/bfcl_semantic_bundle_v2.py` succeeds the frozen

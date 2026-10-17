@@ -788,6 +788,167 @@
           }
         ]
       }
+    },
+    {
+      "claim_id": "CLAIM-021",
+      "title": "Sealed C-ext4 BFCL v4 utility result (blind, spent)",
+      "artifacts": [
+        {
+          "path": "results/routing_bench_bfcl_v4_cext4_results.json",
+          "sha256_lf": "00b19e2e04d706379b424d681961f15ffc96b0fd2c263bbfaffcfc7c3c0b9482",
+          "results_manifest_class": "frozen"
+        },
+        {
+          "path": "data/routing_bench_bfcl_v4_cext4/manifest.json",
+          "sha256_lf": "41145789eda89a48f8c2eeda581aa424fa854a33f83f23922dd0feb396063c0d",
+          "results_manifest_class": null,
+          "role": "sealed holdout manifest"
+        },
+        {
+          "path": "data/routing_bench_bfcl_v4_cext4/bfcl_holdout.jsonl",
+          "sha256_lf": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4",
+          "results_manifest_class": null,
+          "role": "sealed holdout episodes"
+        },
+        {
+          "path": "data/routing_bench_bfcl_v4_cext4/registry.json",
+          "sha256_lf": "2c4e88f1d91162802d68d53bc74132355131e10fcd2a832f2aac4fbb9a132148",
+          "results_manifest_class": null,
+          "role": "sealed tool registry"
+        },
+        {
+          "path": "data/routing_bench_bfcl_v4_cext4/descriptions.json",
+          "sha256_lf": "9be3427e660f2e448ad2e578a435483e8df82dc338b1d55248bf564488dc16d1",
+          "results_manifest_class": null,
+          "role": "sealed tool descriptions"
+        }
+      ],
+      "integrity": [
+        {
+          "description": "the sealed track is recorded as evaluated",
+          "kind": "equals",
+          "pointer": "data/routing_bench_bfcl_v4_cext4/manifest.json#status",
+          "expected": "evaluated"
+        },
+        {
+          "description": "the manifest pins the committed holdout",
+          "kind": "sha256_of",
+          "file": "data/routing_bench_bfcl_v4_cext4/bfcl_holdout.jsonl",
+          "pointer": "data/routing_bench_bfcl_v4_cext4/manifest.json#sha256"
+        },
+        {
+          "description": "the manifest pins the committed registry",
+          "kind": "sha256_of",
+          "file": "data/routing_bench_bfcl_v4_cext4/registry.json",
+          "pointer": "data/routing_bench_bfcl_v4_cext4/manifest.json#registry_sha256"
+        },
+        {
+          "description": "the manifest pins the committed descriptions",
+          "kind": "sha256_of",
+          "file": "data/routing_bench_bfcl_v4_cext4/descriptions.json",
+          "pointer": "data/routing_bench_bfcl_v4_cext4/manifest.json#descriptions_sha256"
+        },
+        {
+          "description": "the result names the same holdout as the manifest",
+          "kind": "same_value",
+          "pointer": "results/routing_bench_bfcl_v4_cext4_results.json#holdout_sha256",
+          "other": "data/routing_bench_bfcl_v4_cext4/manifest.json#sha256"
+        },
+        {
+          "description": "the result names the same frozen v2 bundle as the manifest",
+          "kind": "same_value",
+          "pointer": "results/routing_bench_bfcl_v4_cext4_results.json#frozen_sha256.bundle_v2",
+          "other": "data/routing_bench_bfcl_v4_cext4/manifest.json#frozen_sha256.bundle_v2"
+        },
+        {
+          "description": "current bfcl_semantic_bundle_v2.py is the bundle frozen at sealing (advisory: code may legitimately move on; the sealed record rests on the recorded hash)",
+          "kind": "sha256_of",
+          "file": "remora/toolcall/routing/bfcl_semantic_bundle_v2.py",
+          "pointer": "data/routing_bench_bfcl_v4_cext4/manifest.json#frozen_sha256.bundle_v2",
+          "advisory": true
+        },
+        {
+          "description": "current bfcl_arms.py is the one frozen at sealing (advisory, as above)",
+          "kind": "sha256_of",
+          "file": "remora/toolcall/routing/bfcl_arms.py",
+          "pointer": "data/routing_bench_bfcl_v4_cext4/manifest.json#frozen_sha256.arms",
+          "advisory": true
+        }
+      ],
+      "metrics": [
+        {
+          "name": "gold_call_accept_pct",
+          "expected": 29.9,
+          "source": "register",
+          "binding": {
+            "path": "results/routing_bench_bfcl_v4_cext4_results.json#targets.gold_call_accept.value",
+            "scale": 100,
+            "rounded_to": 1
+          }
+        },
+        {
+          "name": "obtainable_verify_pct",
+          "expected": 84.0,
+          "source": "register",
+          "binding": {
+            "path": "results/routing_bench_bfcl_v4_cext4_results.json#targets.obtainable_verify_recall.value",
+            "scale": 100,
+            "rounded_to": 1
+          }
+        },
+        {
+          "name": "wrong_call_accept_pct",
+          "expected": 0.0,
+          "source": "register",
+          "binding": {
+            "path": "results/routing_bench_bfcl_v4_cext4_results.json#targets.known_wrong_call_accept.value",
+            "scale": 100
+          }
+        },
+        {
+          "name": "wrong_call_wilson_upper_pct",
+          "expected": 1.29,
+          "source": "register",
+          "binding": {
+            "path": "results/routing_bench_bfcl_v4_cext4_results.json#targets.known_wrong_call_accept.wilson95[1]",
+            "scale": 100
+          }
+        },
+        {
+          "name": "irrelevance_abstain_pct",
+          "expected": 100.0,
+          "source": "register",
+          "binding": {
+            "path": "results/routing_bench_bfcl_v4_cext4_results.json#targets.irrelevance_abstain_recall.value",
+            "scale": 100
+          }
+        },
+        {
+          "name": "unobtainable_abstain_pct",
+          "expected": 99.2,
+          "source": "register",
+          "binding": {
+            "path": "results/routing_bench_bfcl_v4_cext4_results.json#targets.unobtainable_abstain_recall.value",
+            "scale": 100,
+            "rounded_to": 1
+          }
+        },
+        {
+          "name": "n_clusters",
+          "expected": 363,
+          "source": "register",
+          "binding": {
+            "path": "data/routing_bench_bfcl_v4_cext4/manifest.json#n_clusters"
+          }
+        }
+      ],
+      "unbound_metrics": [],
+      "regenerate": {
+        "mode": "none",
+        "reason": "Sealed one-shot holdout (results manifest class frozen). The register: 'The sealed result must not be regenerated.' scripts/run_bfcl_cext4.py refuses a second run once the manifest status is evaluated. The pack verifies hashes, the manifest's internal pins and the metric fields only.",
+        "commands": [],
+        "compare": []
+      }
     }
   ],
   "excluded": [

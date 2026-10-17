@@ -1,0 +1,24 @@
+{
+  "schema": "result_provenance_v2",
+  "git_commit": "fff546028fdc05c368f01ade564f40e77f82b4ac",
+  "worktree_clean": false,
+  "python_version": "3.14.0",
+  "dependency_lock_sha256": "eb73b7cbac64ecbada0070a952ae258f92fc7fc512a0f6d81926043c95b9407b",
+  "script": "scripts/run_bfcl_cext4.py",
+  "input_sha256": {
+    "episodes": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4",
+    "registry": "2c4e88f1d91162802d68d53bc74132355131e10fcd2a832f2aac4fbb9a132148",
+    "descriptions": "9be3427e660f2e448ad2e578a435483e8df82dc338b1d55248bf564488dc16d1"
+  },
+  "random_seeds": null,
+  "command": "python scripts/run_bfcl_cext4.py --run",
+  "generated_at": "2026-10-17T10:55:32.874064+00:00",
+  "sidecar_written": "after the single run, in the same session and before any commit; git_commit is the lock commit the run executed at, and the dirty paths are the run's own outputs plus untracked local directories outside the repository's content",
+  "run_outputs": [
+    "results/routing_bench_bfcl_v4_cext4_results.json",
+    "data/routing_bench_bfcl_v4_cext4/manifest.json"
+  ],
+  "sap": "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md",
+  "artifact": "manifest.json",
+  "artifact_sha256": "41145789eda89a48f8c2eeda581aa424fa854a33f83f23922dd0feb396063c0d"
+}

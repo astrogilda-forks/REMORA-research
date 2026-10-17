@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-16: **23 `open`**, **27 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-17: **24 `open`**, **27 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39, §81): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81, §82): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -46,8 +46,9 @@ cites only `open` sections and that no `open` section is missing a theme.
    sole authority) plus an explicit gate-ordering design for combined
    semantic+argument observations. The same frozen extractor ignores
    negation (§81), so its successor must handle it before the next run;
-   bundle v2 (2026-10-17, development only) is that successor and awaits
-   the sealed C-ext4 track.
+   bundle v2 (2026-10-17) is that successor. On sealed C-ext4 it accepted
+   29.9 % of gold calls against 6.9 % for v1, with every safety count at
+   zero (CLAIM-021). The gain sits on tools seen in development (§82).
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -4916,3 +4917,39 @@ for a mutating call. How many C-ext3 tasks are negated is not measured here.
 **What follows.** The next locked evaluation uses a new, versioned extractor
 with negation and conditional handling, and the xfails become passing tests
 against it (`docs/architecture/ADR-sdd-as-v1-owner-decisions.md`, D1 and D5).
+
+## §82 The C-ext4 utility gain does not show generalisation to unseen tool families (2026-10-17)
+<!-- finding-status: open -->
+
+C-ext4 (CLAIM-021, SAP v6) met all eight pre-registered targets. Bundle v2
+with deterministic receipts accepted 87 of 291 gold calls on the sealed
+reserve, against 20 for the frozen v1 bundle, with every safety count at
+zero. The result is real, and it is narrower than its headline.
+
+**What was found.** A descriptive split computed after the run separates
+gold calls by whether their tool also occurs in the spent development sets.
+255 of the 291 do. On those, V2D accepted 76 and F1 accepted 12. On the
+other 36, V2D accepted 11 and F1 accepted 8. Almost all of the gain sits on
+tools the bundle's authoring rules were developed against. v1 already did
+reasonably on the unseen tools, so the comparison there is small and
+underpowered.
+
+**Why it matters.** Bundle v2's main repairs are naming rules: the verb
+after a `Domain_N_` prefix, and the class part of a dotted name. Rules
+learned from one tool catalogue can fit that catalogue's conventions
+without carrying over to another. The reserve shares the catalogue with the
+development sets, so C-ext4 cannot tell the two apart.
+
+**Other limits that stay open.**
+
+- 70.1 % of gold calls are still not accepted autonomously; 158 of 291
+  route VERIFY.
+- Read autonomy under v1's own read classification is 22/70 = 31.4 %,
+  far from SAP v5's 75 % bar.
+- The state index is empty, so the accept property is semantically
+  authorised read, not grounded read.
+- No BFCL v4 live row remains unseen, so BFCL cannot test this again.
+
+**What follows.** A test of generalisation needs a tool catalogue the
+bundle has never been developed against, sealed before any authoring rule
+is written for it.

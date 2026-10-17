@@ -987,3 +987,97 @@ claims:
     reproduce: >
       python experiments/toolcall_ablation_v2.py
       Artifact: results/toolcall_benchmark_v2_ablation.json
+
+  - id: CLAIM-021
+    title: "Sealed C-ext4: bundle v2 accepts 29.9% of correct calls against 6.9% for the frozen v1, with no wrong call accepted"
+    statement: >
+      Track C-ext4 was evaluated once on the whole remaining BFCL v4 reserve
+      (295 live_multiple and 68 live_irrelevance rows, ID-disjoint from the
+      spent v3, C-ext2 and C-ext3 holdouts; 1,562 episodes over 363
+      clusters). SAP v6 fixed every target before the set was built. Four
+      arms ran on the same episodes. The confirmatory arm V2D (semantic
+      bundle v2 with deterministic derivation receipts) accepted 87/291 =
+      29.9% of gold calls (Wilson 95% CI 24.9% to 35.4%). The frozen v1
+      bundle (arm F1, the C-ext3 configuration) accepted 20/291 = 6.9%. V2D
+      accepted 69 gold calls F1 did not, and F1 accepted 2 that V2D did not
+      (exact one-sided McNemar p about 1e-18). Obtainable VERIFY rose from
+      45/119 to 100/119 = 84.0%. Every safety count stayed at zero in every
+      arm: native wrong-call ACCEPT 0/295 (Wilson upper 1.29%), constructed
+      wrong-tool 0/119, required-unknown ACCEPT 0/238; irrelevance ABSTAIN
+      was 68/68. All eight pre-registered targets were met.
+    evidence_level: externally_benchmarked
+    status: active
+    blindness: blind
+    artifact:
+      - "results/routing_bench_bfcl_v4_cext4_results.json"
+      - "data/routing_bench_bfcl_v4_cext4/manifest.json"
+    n: 1562
+    n_detail: >
+      1,562 episodes over 363 source clusters (295 positive with 291 gold
+      identity episodes, 68 irrelevance). The whole reserve, no sampling;
+      overlap with every spent population is zero.
+    metrics:
+      gold_call_accept_pct: 29.9
+      obtainable_verify_pct: 84.0
+      wrong_call_accept_pct: 0.0
+      wrong_call_wilson_upper_pct: 1.29
+      irrelevance_abstain_pct: 100.0
+      unobtainable_abstain_pct: 99.2
+      n_clusters: 363
+    metric_bindings:
+      gold_call_accept_pct:
+        path: "results/routing_bench_bfcl_v4_cext4_results.json#targets.gold_call_accept.value"
+        scale: 100
+        rounded_to: 1
+      obtainable_verify_pct:
+        path: "results/routing_bench_bfcl_v4_cext4_results.json#targets.obtainable_verify_recall.value"
+        scale: 100
+        rounded_to: 1
+      wrong_call_accept_pct:
+        path: "results/routing_bench_bfcl_v4_cext4_results.json#targets.known_wrong_call_accept.value"
+        scale: 100
+      wrong_call_wilson_upper_pct:
+        path: "results/routing_bench_bfcl_v4_cext4_results.json#targets.known_wrong_call_accept.wilson95[1]"
+        scale: 100
+      irrelevance_abstain_pct:
+        path: "results/routing_bench_bfcl_v4_cext4_results.json#targets.irrelevance_abstain_recall.value"
+        scale: 100
+      unobtainable_abstain_pct:
+        path: "results/routing_bench_bfcl_v4_cext4_results.json#targets.unobtainable_abstain_recall.value"
+        scale: 100
+        rounded_to: 1
+      n_clusters:
+        path: "data/routing_bench_bfcl_v4_cext4/manifest.json#n_clusters"
+    utility_floors:
+      - metric: gold_call_accept_pct
+        min: 12.0
+        source: "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md"
+        source_detail: "P2 gold-call ACCEPT, pre-registered before the set was built."
+        status: met
+      - metric: obtainable_verify_pct
+        min: 60.0
+        source: "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md"
+        source_detail: "S5 obtainable VERIFY recall, pre-registered before the set was built."
+        status: met
+      - metric: unobtainable_abstain_pct
+        min: 95.0
+        source: "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md"
+        source_detail: "S4 unobtainable ABSTAIN recall, pre-registered before the set was built."
+        status: met
+    caveat: >
+      Evaluated once; the reserve is spent and no BFCL v4 live row remains
+      unseen. The accept property is semantically authorised read with an
+      empty state index, weaker than a grounded read. Bundle v2 was designed
+      on the three spent sets. The reserve's tasks were never read, but 255
+      of its 291 gold calls use a tool that also occurs in the spent sets.
+      A descriptive split after the run shows the gain sits there: on those
+      255, V2D accepted 76 and F1 12; on the 36 gold calls with a tool unseen
+      in development, V2D accepted 11 and F1 8. Generalisation to new tool
+      families is therefore not shown. The set is small, and 70.1% of gold
+      calls are still not accepted autonomously; 158 of 291 route VERIFY.
+      CLAIM-019 stays as recorded.
+    reproduce: >
+      The sealed result must not be regenerated. Verify hashes and status in
+      data/routing_bench_bfcl_v4_cext4/manifest.json; the runner is
+      scripts/run_bfcl_cext4.py and refuses a second run. SAP:
+      docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md.
