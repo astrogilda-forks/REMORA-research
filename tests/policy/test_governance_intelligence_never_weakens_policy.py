@@ -130,6 +130,9 @@ class TestBackwardsCompatibility:
         assert hasattr(DecisionEnvelope, "from_dict")
 
 
+_ALL_ACTIONS = tuple(DecisionAction.__members__.values())
+
+
 class TestExternalCapsNeverWeaken:
     """COMP-01 (SDD §3.9): monitor and protocol caps can only lower a decision."""
 
@@ -141,7 +144,7 @@ class TestExternalCapsNeverWeaken:
         raised = []
         for obs in _grid():
             baseline = ENGINE.decide(obs)
-            for action in DecisionAction:
+            for action in _ALL_ACTIONS:
                 capped = ENGINE.decide(obs, caps=[Cap(source, action, DecisionReason[reason])])
                 if executability(capped.action) > min(executability(baseline.action),
                                                       executability(action)):
@@ -152,7 +155,7 @@ class TestExternalCapsNeverWeaken:
         from remora.policy.composition import Cap
         from remora.policy.report import DecisionReason
         obs = PolicyObservation(question="q", risk_tier="low", adversarial_detected=True)
-        for action in DecisionAction:
+        for action in _ALL_ACTIONS:
             report = ENGINE.decide(obs, caps=[Cap("monitor", action, DecisionReason.MONITOR_CAP)])
             assert report.action is DecisionAction.ESCALATE
 
