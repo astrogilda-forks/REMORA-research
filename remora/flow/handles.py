@@ -47,7 +47,7 @@ __all__ = [
     "new_handle_id",
 ]
 
-#: One handle token. The id is 80 bits in RFC 4648 base32 without padding.
+#: One handle token. The id is 80 bits in base32 (A-Z, 2-7) without padding.
 HANDLE_TOKEN: Final = re.compile(r"⟦h:([A-Z2-7]{16})⟧")
 
 
