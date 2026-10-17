@@ -481,7 +481,7 @@ are defaults that no study has calibrated.
 
 **Flow contexts (RF-02, opt-in):** with `REMORA_FLOW_CONTROL=1`,
 `POST /v1/contexts` mints a flow context for derived information-flow
-control ([design](design/derived-information-flow-control-v1.md)). The body
+control ([roadmap](13-research-frontier-roadmap.md)). The body
 names the `user_principal` (`user://<tenant>/...`), the `model_principal`,
 an optional `q_principal` and an optional `parent_context_id`. The response
 is the server-minted `context_id` and `label_epoch`. Every processor must be
