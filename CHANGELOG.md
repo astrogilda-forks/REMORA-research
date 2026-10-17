@@ -4,6 +4,22 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-01 (label lattice)
+
+- New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).
+  `label.py` implements the SDD §3.1 lattice: `Label(readers, integrity)`,
+  `join`, `leq`, `flows_to`, `BOTTOM`, `canonical_bytes`, and
+  `field_value_label` for §3.4's split between value integrity and context.
+  Reader sets are kept as minimal antichains of
+  `remora.capabilities.resource` patterns. Patterns form a tree, so the
+  pairwise intersection is exact.
+- `schemas/value_label_schema.yaml` documents the label contract and its
+  pinned serialisation.
+- `tests/flow/test_label_lattice.py`: Hypothesis properties for every
+  IFC-01 acceptance law, plus exactness of join for flows. Run with three
+  seeds. Mutation testing with mutmut kills every mutant except five
+  equivalent ones, which the test module names.
+
 ### Research (SAP v7 draft and control-evaluation harness, no model call)
 
 - `docs/assurance/statistical_analysis_plan_v7_control_eval.md` (draft, not
