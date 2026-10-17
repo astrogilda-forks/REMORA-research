@@ -4,6 +4,30 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Research (SAP v7 draft and control-evaluation harness, no model call)
+
+- `docs/assurance/statistical_analysis_plan_v7_control_eval.md` (draft, not
+  registered) pre-registers seven defences against an untrusted Claude
+  agent on AgentDojo v1.2.2: no gate, refuse-all, a per-task allowlist, an
+  LLM monitor, REMORA (strict and observed-state) and two floor/monitor
+  compositions. It has three confirmatory hypotheses, a split rule, a
+  budget rule capped at 50 USD and a disclosure of prior exposure. The
+  owner fixes model IDs, prices and the monitor prompt, then registers it
+  on OSF.
+- `experiments/control_eval/` holds the defences, a REMORA adapter with
+  value-level provenance, and the statistics: attack-call labels, McNemar,
+  cluster bootstrap, clustered AUROC difference, split and budget guard.
+  It also holds the AgentDojo glue, a gated executor that asks a defence
+  before each call. `scripts/run_control_eval.py` runs a development dry run
+  with a scripted ground-truth agent; the pilot and the test run are
+  refused until SAP v7 §9 is settled. 22 tests run without AgentDojo.
+- The development dry run is the first finding
+  (`artifacts/control_eval/dev_dry_run_v1.json`). On legitimate calls,
+  REMORA blocked 90 of 91 and solved 11 of 29 tasks; refuse-all solved 10.
+  Bundle v2 grounds no intent in AgentDojo's phrasing.
+- `local.env`, which holds the experiment API key, is now in the committed
+  `.gitignore`.
+
 ### Evidence (peer-review level 2: post-hoc re-analysis, no sealed number changed)
 
 - `scripts/peer_review_posthoc.py` writes
