@@ -64,13 +64,12 @@ def route_arm(
     tools = sorted({e.proposed_tool_name for e in episodes if e.proposed_tool_name})
     state = StateIndex.from_values(set(), scopes=())
     engine = RemoraDecisionEngine(low_consequence_accept=True, semantic_authority_floor=True)
-    if arm == "F1":
-        bundle = bundle_v1.author_bundle(tools)
-        lexicon_v1 = bundle_v1.resource_lexicon(bundle, tools)
-        full = bundle_v1.full_resource_set(bundle, tools)
-    else:
-        bundle = bundle_v2.author_bundle(tools, descriptions)
-        full = bundle_v2.full_resource_set(bundle, tools)
+    bundle = (bundle_v1.author_bundle(tools) if arm == "F1"
+              else bundle_v2.author_bundle(tools, descriptions))
+    # v1 grounds against one lexicon over every tool; v2 against the tools
+    # in scope of each episode.
+    lexicon_v1 = bundle_v1.resource_lexicon(bundle, tools) if arm == "F1" else set()
+    full = (bundle_v1 if arm == "F1" else bundle_v2).full_resource_set(bundle, tools)
 
     out = []
     for e in episodes:
@@ -80,8 +79,7 @@ def route_arm(
             in_scope = set(e.available_tools)
             if e.proposed_tool_name:
                 in_scope.add(e.proposed_tool_name)
-            scope = sorted(in_scope)
-            lexicon = bundle_v2.resource_lexicon(bundle, scope)
+            lexicon = bundle_v2.resource_lexicon(bundle, sorted(in_scope))
             intent = bundle_v2.extract_intent(e.user_task or "", lexicon, full)
         if arm == "V2D":
             e = dataclasses.replace(
