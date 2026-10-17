@@ -4,6 +4,24 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Evidence COMP-01 (AgentHarm re-score, post hoc)
+
+- `scripts/comp01_agentharm_rescore.py` writes
+  `artifacts/posthoc/comp01_agentharm_rescore_v1.json`, recorded as
+  NEGATIVE_RESULTS §84. CLAIM-002 is unchanged.
+- **Composition set** (88 trimode tasks), at the hard-block point:
+
+  | Arm | Harmful stopped | Twin pairs told apart | AUROC |
+  |---|---|---|---|
+  | Old composition | 6/44 | 4 | 0.545 |
+  | Meet composition (oracle as a monitor cap) | 44/44 | 37 | 0.920 |
+  | Oracle alone | 44/44 | 38 | 0.932 |
+
+  The meet blocks 7 of 44 benign tasks. H6 holds.
+- **Threshold set** (CLAIM-002's 416 rows): the threshold calibrated on a
+  development half split by behaviour blocks nothing at a 10 % false-block
+  budget. Blocking starts only at a 50 % budget.
+
 ### Policy COMP-01 (meet composition, P-MONO)
 
 - `RemoraDecisionEngine.decide` now returns the least executable of its
