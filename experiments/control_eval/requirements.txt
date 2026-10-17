@@ -1,0 +1,4 @@
+# SAP v7 control evaluation, installed only for scripts/run_control_eval.py.
+# Not part of the CI install set: the harness tests do not import these.
+agentdojo==0.1.35
+anthropic==1.15.0

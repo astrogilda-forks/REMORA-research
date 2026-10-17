@@ -106,3 +106,6 @@ tmp/
 # mutmut working tree and cache (issue #280)
 mutants/
 .mutmut-cache
+
+# Local secrets for experiment runs (Anthropic API key for SAP v7); never commit.
+local.env
