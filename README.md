@@ -35,6 +35,7 @@ One ordered reading path; the [documentation index](docs/README.md) lists the co
 5. [Python SDK](docs/sdk.md): the one namespace with a backward-compatibility guarantee
 6. [Evidence and claims](docs/02-evidence-and-claims.md): what each result establishes, and what it does not
 7. [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md): failed hypotheses and limitations, kept permanently
+8. [Peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md): every objection raised against the paper, and what was done about it
 
 ## How an action gets through
 
@@ -64,11 +65,11 @@ Headline values are governed by the [claim register](docs/assurance/claim_regist
 <!-- claim:CLAIM-021 gold_call_accept_pct wrong_call_accept_pct obtainable_verify_pct -->
 | # | Benchmark | Result | Scope |
 |---|---|---|---|
-| 1 | **AgentHarm** | **0.0%** wrongly allowed (0/208); 95% upper bound 1.81%; false-block rate on the benign twins **100.0%** (208/208 blocked) | Intent classification only. The gate blocked every scenario, harmful or benign, so this measures the hard-block floor, not discrimination between harmful and benign |
-| 2 | **Adversarial simulator** | **0.0%** unsafe runs (0/70 templates; 700 tasks); 95% cluster-level Wilson upper bound **5.2%**; utility +0.456 | Simulated; effective N = 70 (70 templates × 10 cosmetic variants); unsafe-rate gap Δ=0.0143 vs. baseline, not statistically significant |
-| 3 | **BFCL v4 (C-ext3)** | Native wrong-call acceptance **0.0%** (0/500; Wilson 95% upper bound **0.76%**); irrelevant-tool refusal **100.0%** (300/300); required-input guessing **0.0%** (0/398) | Sealed once, 2,799 episodes, frozen semantic bundle + authority floor; utility targets missed; see NEGATIVE_RESULTS §39 |
+| 1 | **AgentHarm** | **0.0%** wrongly allowed (0/208); 95% upper bound 1.81%; false-block rate on the benign twins **100.0%** (208/208 blocked) | Intent classification only. The gate blocked every scenario, harmful or benign, so this measures the hard-block floor, not discrimination between harmful and benign. The 208 scenarios come from 47 base behaviours; over those the upper bound is 7.6% |
+| 2 | **Adversarial simulator** | **0.0%** unsafe runs (0/70 templates; 700 tasks); 95% cluster-level Wilson upper bound **5.2%** (6.4% over the 56 harmful templates); utility +0.456, a post-hoc test | Simulated; effective N = 70 (70 templates × 10 cosmetic variants); unsafe-rate gap Δ=0.0143 vs. baseline, not statistically significant |
+| 3 | **BFCL v4 (C-ext3)** | Native wrong-call acceptance **0.0%** (0/500; Wilson 95% upper bound **0.76%** by row, 3.5% clustered by tool); irrelevant-tool refusal **100.0%** (300/300); required-input guessing **0.0%** (0/398) | Sealed once, 2,799 episodes, frozen semantic bundle + authority floor; the joint pre-registered hypothesis was not supported because read autonomy missed its target; see NEGATIVE_RESULTS §39 |
 | 4 | **Historical regression** | **0.0%** wrongly allowed (0/167) | Previously observed failures only |
-| 5 | **BFCL v4 (C-ext4)** | Correct calls accepted **29.9%** (87/291), against **6.9%** for the frozen v1 bundle on the same episodes; native wrong-call acceptance **0.0%** (0/295); obtainable-input VERIFY **84.0%** | Sealed once, the whole remaining reserve, 1,562 episodes; all eight pre-registered targets met; the gain sits on tools also seen in development (CLAIM-021) |
+| 5 | **BFCL v4 (C-ext4)** | Correct calls accepted **29.9%** (87/291), against **6.9%** for the frozen v1 bundle on the same episodes; native wrong-call acceptance **0.0%** (0/295, as for a refuse-all control; 5.42% upper bound clustered by tool); obtainable-input VERIFY **84.0%** | Sealed once, the whole remaining reserve, 1,562 episodes; all eight pre-registered targets met; the gain sits on tools also seen in development (CLAIM-021) |
 
 <details>
 <summary>How to read those numbers</summary>
@@ -76,6 +77,7 @@ Headline values are governed by the [claim register](docs/assurance/claim_regist
 - The deterministic simulator has 70 independent templates; cosmetic variants do not increase the effective sample size.
 - BFCL v4 C-ext3 measures the safety axis only: declared semantic authority takes native wrong-call acceptance from 24/500 to 6 to **0** across the ablation arms. The utility side of the same run (read autonomy, argument routing) missed its pre-registered targets; those findings and the permanent 10.9% baseline live in NEGATIVE_RESULTS §39 and CLAIM-019's caveat, not here.
 - BFCL v4 C-ext4 is the utility half: a second deterministic bundle accepts about four times as many correct calls as the frozen one, with the safety counts still at zero. Most correct calls are still not accepted autonomously, and generalisation to unseen tool families is not shown.
+- REMORA routes annotated BFCL calls; it does not generate them. Each native wrong call is another task's correct call, and only 4 of the 295 in C-ext4 name a tool the task itself offered, so the zero counts say little about confusing two tools of one task. A name-overlap rule reaches part of the gold-call signal but also accepts wrong calls and calls missing required arguments (post hoc, NEGATIVE_RESULTS §83).
 - Internal reproducibility is not external replication or field validation.
 
 Replaced claims are kept in [superseded claims](docs/assurance/superseded_claims.md). Failed hypotheses and limitations are kept in [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md).

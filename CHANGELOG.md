@@ -4,6 +4,31 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Evidence (peer-review level 2: post-hoc re-analysis, no sealed number changed)
+
+- `scripts/peer_review_posthoc.py` writes
+  `artifacts/posthoc/peer_review_level2_v1.json` (status
+  `post_hoc_descriptive`). It first re-routes C-ext3 and C-ext4 and refuses
+  unless every published count reproduces. Two C-ext3 argument counts are
+  excepted; commit `edd9d144` changed them after the seal without moving any
+  ACCEPT. Nine tests pin the statistics and the artifact.
+- **Zero-count bounds clustered by tool:**
+  - C-ext3: 3.5 %, against 0.76 % by row.
+  - C-ext4: 5.42 %, against 1.29 % by row.
+  - CLAIM-001 over its harmful templates: 6.42 %.
+  - CLAIM-002 over its base behaviours: 7.56 %.
+- **What the BFCL wrong calls test:** only 4 of the 295 C-ext4 wrong calls
+  name a tool the task offered.
+- **Naive name-overlap rules** reach part of the gold-call signal. They also
+  accept wrong calls and calls missing required arguments; V2D accepts none
+  of those.
+- **Tool-clustered paired test for C-ext4:** 19 tools against 2,
+  p = 1.1×10⁻⁴.
+- **C-ext3 McNemar tests:** the pre-registered arm tests are now run.
+- **Paper and records:** the paper (.md and .tex), NEGATIVE_RESULTS.md §83
+  (new), docs/06 and the review register carry the results. Nine findings
+  changed status.
+
 ### Paper (peer-review level 1: corrections without new numbers)
 
 - New `docs/review/PEER_REVIEW_FINDINGS.md` lists 39 objections from an
