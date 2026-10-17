@@ -1,0 +1,3713 @@
+{
+ "AclApi.add_mapping": {
+  "produced_names": [],
+  "required_params": [
+   "resource_id",
+   "user_id",
+   "permissions"
+  ]
+ },
+ "Alarm_1_AddAlarm": {
+  "param_values": {
+   "new_alarm_name": [
+    "New Alarm"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "new_alarm_time"
+  ]
+ },
+ "Alarm_1_GetAlarms": {
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "Alltransactions": {
+  "produced_names": [],
+  "required_params": [
+   "statement_period"
+  ]
+ },
+ "ApplicationAnalyzeApi.get_call_details": {
+  "produced_names": [],
+  "required_params": [
+   "traceId",
+   "callId"
+  ]
+ },
+ "ApplicationAnalyzeApi.get_correlated_traces": {
+  "produced_names": [],
+  "required_params": [
+   "correlationId"
+  ]
+ },
+ "ApplicationAnalyzeApi.get_trace_download": {
+  "param_values": {
+   "offset": [
+    "0"
+   ],
+   "retrievalSize": [
+    "100"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "ApplicationSettingsApi.get_application_configs": {
+  "param_values": {
+   "config_type": [
+    "all",
+    "feature_toggles",
+    "system_behaviors"
+   ],
+   "environment": [
+    "development",
+    "staging",
+    "production"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "environment"
+  ]
+ },
+ "ApplicationSettingsApi.get_service_configs": {
+  "param_values": {
+   "service_name": [
+    "all"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "BankStatementOverView": {
+  "param_values": {
+   "account_type": [
+    "checking",
+    "savings",
+    "credit",
+    "loan",
+    "investment"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "bank_name",
+   "account_number",
+   "account_type",
+   "full_name",
+   "transaction_overview"
+  ]
+ },
+ "Buses_3_BuyBusTicket": {
+  "produced_names": [],
+  "required_params": [
+   "from_city",
+   "to_city",
+   "departure_date",
+   "departure_time",
+   "num_passengers"
+  ]
+ },
+ "Buses_3_FindBus": {
+  "param_values": {
+   "category": [
+    "direct",
+    "one-stop"
+   ],
+   "num_passengers": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "from_city",
+   "to_city",
+   "departure_date"
+  ]
+ },
+ "CalcProduct": {
+  "produced_names": [],
+  "required_params": [
+   "a",
+   "b"
+  ]
+ },
+ "ChaDri.change_drink": {
+  "produced_names": [],
+  "required_params": [
+   "drink_id",
+   "new_preferences"
+  ]
+ },
+ "ChaFod": {
+  "param_values": {
+   "newIngredients": [
+    ""
+   ],
+   "removeIngredients": [
+    ""
+   ],
+   "specialInstructions": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "foodItem"
+  ]
+ },
+ "ClientAddress.set_address": {
+  "produced_names": [],
+  "required_params": [
+   "full_address"
+  ]
+ },
+ "ControlAppliance.execute": {
+  "param_values": {
+   "command": [
+    "\uac70\uc2e4, \uc5d0\uc5b4\ucee8, \uc2e4\ud589",
+    ", \uc5d0\uc5b4\ucee8, \ub0c9\ubc29 \uc2e4\ud589",
+    "\ub2e4\uc6a9\ub3c4\uc2e4, \ud1b5\ub3cc\uc774, \uc911\uc9c0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "command"
+  ]
+ },
+ "CustomDashboardsApi.get_shareable_api_tokens": {
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "EventSettingsApi.restore_mobile_app_alert_config": {
+  "param_values": {
+   "created": [
+    "null"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "Events_3_BuyEventTickets": {
+  "param_values": {
+   "number_of_tickets": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "event_name",
+   "number_of_tickets",
+   "date",
+   "city"
+  ]
+ },
+ "Events_3_FindEvents": {
+  "param_values": {
+   "event_type": [
+    "Music",
+    "Theater"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "event_type",
+   "city"
+  ]
+ },
+ "Flights_4_SearchOnewayFlight": {
+  "param_values": {
+   "airlines": [
+    "United Airlines",
+    "American Airlines",
+    "Delta Airlines",
+    "Southwest Airlines",
+    "Alaska Airlines",
+    "British Airways",
+    "Air Canada",
+    "Air France",
+    "South African Airways",
+    "LOT Polish Airlines",
+    "LATAM Brasil",
+    "dontcare"
+   ],
+   "number_of_tickets": [
+    "1"
+   ],
+   "seating_class": [
+    "Economy",
+    "Premium Economy",
+    "Business"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "origin_airport",
+   "destination_airport",
+   "departure_date"
+  ]
+ },
+ "Flights_4_SearchRoundtripFlights": {
+  "param_values": {
+   "airlines": [
+    "United Airlines",
+    "American Airlines",
+    "Delta Airlines",
+    "Southwest Airlines",
+    "Alaska Airlines",
+    "British Airways",
+    "Air Canada",
+    "Air France",
+    "South African Airways",
+    "LOT Polish Airlines",
+    "LATAM Brasil",
+    "dontcare"
+   ],
+   "number_of_tickets": [
+    "1"
+   ],
+   "seating_class": [
+    "Economy",
+    "Premium Economy",
+    "Business"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "origin_airport",
+   "destination_airport",
+   "departure_date",
+   "return_date"
+  ]
+ },
+ "GET_PARCEL_STATE": {
+  "produced_names": [],
+  "required_params": [
+   "parcelTrackingId"
+  ]
+ },
+ "HNA_NEWS.search": {
+  "param_values": {
+   "category": [
+    "General",
+    "Politics",
+    "Economy",
+    "Sports",
+    "Technology",
+    "Entertainment"
+   ],
+   "date_range": [
+    "null"
+   ],
+   "language": [
+    "EN",
+    "FR",
+    "ES",
+    "DE",
+    "IT"
+   ],
+   "sort_by": [
+    "date",
+    "relevance"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "keyword"
+  ]
+ },
+ "HNA_WQA.search": {
+  "param_values": {
+   "language": [
+    "EN",
+    "ES",
+    "FR",
+    "DE"
+   ],
+   "max_results": [
+    "10"
+   ],
+   "result_format": [
+    "text",
+    "json",
+    "xml"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "keyword"
+  ]
+ },
+ "Homes_2_FindHomeByArea": {
+  "param_values": {
+   "intent": [
+    "rent",
+    "buy"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "area",
+   "intent",
+   "number_of_beds",
+   "number_of_baths"
+  ]
+ },
+ "Homes_2_ScheduleVisit": {
+  "produced_names": [],
+  "required_params": [
+   "property_name",
+   "visit_date"
+  ]
+ },
+ "Hotels_2_BookHouse": {
+  "produced_names": [],
+  "required_params": [
+   "where_to",
+   "number_of_adults",
+   "check_in_date",
+   "check_out_date"
+  ]
+ },
+ "Hotels_2_SearchHouse": {
+  "param_values": {
+   "has_laundry_service": [
+    "True",
+    "False",
+    "dontcare"
+   ],
+   "number_of_adults": [
+    "0"
+   ],
+   "rating": [
+    "0.0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "where_to"
+  ]
+ },
+ "Hotels_4_ReserveHotel": {
+  "param_values": {
+   "number_of_rooms": [
+    "1",
+    "2",
+    "3",
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "place_name",
+   "check_in_date",
+   "stay_length",
+   "location"
+  ]
+ },
+ "Hotels_4_SearchHotel": {
+  "param_values": {
+   "number_of_rooms": [
+    "1"
+   ],
+   "smoking_allowed": [
+    "True",
+    "False",
+    "dontcare"
+   ],
+   "star_rating": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location"
+  ]
+ },
+ "MaintenanceConfigurationApi.get_maintenance_config": {
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "Media_3_FindMovies": {
+  "param_values": {
+   "genre": [
+    "World",
+    "Fantasy",
+    "Offbeat",
+    "Mystery",
+    "Musical",
+    "Thriller",
+    "Comedy",
+    "Horror",
+    "Animation",
+    "Cult",
+    "Sci-fi",
+    "War",
+    "Drama",
+    "Family",
+    "Action"
+   ],
+   "starring": [
+    "All"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "genre"
+  ]
+ },
+ "Media_3_PlayMovie": {
+  "param_values": {
+   "subtitle_language": [
+    "English",
+    "Spanish",
+    "Hindi",
+    "French"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "title"
+  ]
+ },
+ "Messaging_1_ShareLocation": {
+  "produced_names": [],
+  "required_params": [
+   "location",
+   "contact_name"
+  ]
+ },
+ "Movies_1_BuyMovieTickets": {
+  "param_values": {
+   "show_time": [
+    "20:00"
+   ],
+   "show_type": [
+    "regular",
+    "3d",
+    "imax"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "movie_name",
+   "number_of_tickets",
+   "location"
+  ]
+ },
+ "Movies_1_FindMovies": {
+  "param_values": {
+   "genre": [
+    "World",
+    "Offbeat",
+    "Mystery",
+    "Supernatural",
+    "Horror",
+    "Animation",
+    "Sci-fi",
+    "Documentary",
+    "Drama",
+    "War",
+    "Family",
+    "Action",
+    "dontcare"
+   ],
+   "show_type": [
+    "regular",
+    "3d",
+    "imax",
+    "dontcare"
+   ],
+   "theater_name": [
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location"
+  ]
+ },
+ "Movies_1_GetTimesForMovie": {
+  "param_values": {
+   "show_type": [
+    "regular",
+    "3D",
+    "IMAX"
+   ],
+   "theater_name": [
+    "Any Theater"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "movie_name",
+   "location",
+   "show_date"
+  ]
+ },
+ "Movies_3_FindMovies": {
+  "param_values": {
+   "cast": [
+    "dontcare"
+   ],
+   "directed_by": [
+    "dontcare"
+   ],
+   "genre": [
+    "Offbeat",
+    "Fantasy",
+    "World",
+    "Mystery",
+    "Thriller",
+    "Comedy",
+    "Comedy-drama",
+    "Horror",
+    "Animation",
+    "Sci-fi",
+    "Cult",
+    "Drama",
+    "Anime",
+    "Family",
+    "Action",
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "Music_3_LookupMusic": {
+  "param_values": {
+   "album": [
+    "dontcare"
+   ],
+   "artist": [
+    "dontcare"
+   ],
+   "genre": [
+    "Reggae",
+    "Holiday",
+    "Electropop",
+    "Pop",
+    "Asia",
+    "House",
+    "Electronica",
+    "Funk",
+    "Rock",
+    "Metal",
+    "Dubstep",
+    "Country",
+    "dontcare"
+   ],
+   "year": [
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "Music_3_PlayMedia": {
+  "param_values": {
+   "album": [
+    "dontcare"
+   ],
+   "artist": [
+    "dontcare"
+   ],
+   "device": [
+    "Living room",
+    "Kitchen",
+    "Patio"
+   ],
+   "track": [
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "track"
+  ]
+ },
+ "OpenWeatherMap.get_current_weather": {
+  "param_values": {
+   "api_key": [
+    "YOUR_API_KEY_HERE"
+   ],
+   "location": [
+    "New York, USA",
+    "London, UK",
+    "Seoul, South Korea",
+    "Sydney, Australia",
+    "Tokyo, Japan"
+   ],
+   "units": [
+    "metric",
+    "imperial",
+    "standard"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location"
+  ]
+ },
+ "Payment_1_MakePayment": {
+  "param_values": {
+   "payment_method": [
+    "app balance",
+    "debit card",
+    "credit card"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "payment_method",
+   "amount",
+   "receiver"
+  ]
+ },
+ "Payment_1_RequestPayment": {
+  "produced_names": [],
+  "required_params": [
+   "receiver",
+   "amount"
+  ]
+ },
+ "ProductSearch.execute": {
+  "param_values": {
+   "category": [
+    "electronics",
+    "books",
+    "clothing",
+    "home",
+    "all categories"
+   ],
+   "price_range": [
+    "0-0"
+   ],
+   "sort_order": [
+    "asc",
+    "desc"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "keywords"
+  ]
+ },
+ "RentalCars_3_GetCarsAvailable": {
+  "param_values": {
+   "car_type": [
+    "Hatchback",
+    "Sedan",
+    "SUV",
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "city",
+   "start_date",
+   "pickup_time",
+   "end_date"
+  ]
+ },
+ "RentalCars_3_ReserveCar": {
+  "param_values": {
+   "car_type": [
+    "Hatchback",
+    "Sedan",
+    "SUV",
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "pickup_location",
+   "start_date",
+   "pickup_time",
+   "end_date",
+   "car_type",
+   "add_insurance"
+  ]
+ },
+ "Restaurants_2_FindRestaurants": {
+  "param_values": {
+   "category": [
+    "Mexican",
+    "Bistro",
+    "Izakaya",
+    "Brunch",
+    "Thai",
+    "Sandwich",
+    "Seafood",
+    "Barbecue",
+    "European",
+    "Steakhouse",
+    "Vietnamese",
+    "Asian",
+    "Coffeehouse",
+    "American",
+    "Gastropub",
+    "Austrian",
+    "Italian",
+    "Indian",
+    "Spanish",
+    "Vegetarian",
+    "Brasserie",
+    "Chinese",
+    "Breakfast",
+    "Greek",
+    "California",
+    "Tapas",
+    "Take-out",
+    "Japanese"
+   ],
+   "price_range": [
+    "cheap",
+    "moderate",
+    "pricey",
+    "ultra high-end"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "category",
+   "location"
+  ]
+ },
+ "Restaurants_2_ReserveRestaurant": {
+  "param_values": {
+   "number_of_seats": [
+    "2"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "restaurant_name",
+   "location",
+   "date",
+   "time"
+  ]
+ },
+ "RideSharing_2_GetRide": {
+  "param_values": {
+   "ride_type": [
+    "Pool",
+    "Regular",
+    "Luxury"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "destination",
+   "number_of_seats",
+   "ride_type"
+  ]
+ },
+ "Services_1_BookAppointment": {
+  "produced_names": [],
+  "required_params": [
+   "stylist_name",
+   "appointment_date",
+   "appointment_time"
+  ]
+ },
+ "Services_1_FindProvider": {
+  "produced_names": [],
+  "required_params": [
+   "city"
+  ]
+ },
+ "Services_4_BookAppointment": {
+  "produced_names": [],
+  "required_params": [
+   "therapist_name",
+   "appointment_time",
+   "appointment_date"
+  ]
+ },
+ "Services_4_FindProvider": {
+  "param_values": {
+   "type": [
+    "Psychologist",
+    "Family Counselor",
+    "Psychiatrist"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "city",
+   "type"
+  ]
+ },
+ "SyntheticSettingsApi.get_synthetic_location": {
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "ThinQ_Connect": {
+  "param_values": {
+   "airCleanOperationMode": [
+    "POWER_ON",
+    "POWER_OFF"
+   ],
+   "airConJobMode": [
+    "AIR_CLEAN",
+    "COOL",
+    "AIR_DRY"
+   ],
+   "airFlow": [
+    "LOW",
+    "HIGH",
+    "MID"
+   ],
+   "coolTargetTemperature": [
+    "24"
+   ],
+   "targetTemperature": [
+    "24"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "airConJobMode",
+   "airFlow",
+   "airCleanOperationMode"
+  ]
+ },
+ "TotalTransactions.calculate": {
+  "produced_names": [],
+  "required_params": [
+   "starting_date",
+   "ending_date",
+   "total_deposits",
+   "total_withdrawals",
+   "starting_balance",
+   "ending_balance"
+  ]
+ },
+ "Trains_1_FindTrains": {
+  "param_values": {
+   "_class": [
+    "Value",
+    "Flexible",
+    "Business"
+   ],
+   "number_of_adults": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "_from",
+   "to",
+   "date_of_journey"
+  ]
+ },
+ "Trains_1_GetTrainTickets": {
+  "param_values": {
+   "_class": [
+    "Value",
+    "Flexible",
+    "Business"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "_from",
+   "to",
+   "date_of_journey",
+   "journey_start_time",
+   "number_of_adults",
+   "trip_protection"
+  ]
+ },
+ "TransactionsV2": {
+  "produced_names": [],
+  "required_params": [
+   "debit",
+   "credit",
+   "vendor",
+   "date"
+  ]
+ },
+ "Travel_1_FindAttractions": {
+  "param_values": {
+   "category": [
+    "Place of Worship",
+    "Theme Park",
+    "Museum",
+    "Historical Landmark",
+    "Park",
+    "Tourist Attraction",
+    "Sports Venue",
+    "Shopping Area",
+    "Performing Arts Venue",
+    "Nature Preserve",
+    "dontcare"
+   ],
+   "free_entry": [
+    "True",
+    "False",
+    "dontcare"
+   ],
+   "good_for_kids": [
+    "True",
+    "False",
+    "dontcare"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location"
+  ]
+ },
+ "Weather_1_GetWeather": {
+  "produced_names": [],
+  "required_params": [
+   "city"
+  ]
+ },
+ "acl_api.AclApi.retrieve_projects": {
+  "produced_names": [],
+  "required_params": [
+   "uuid"
+  ]
+ },
+ "acl_api.add_mapping": {
+  "produced_names": [],
+  "required_params": [
+   "user_id",
+   "resource_id",
+   "permissions"
+  ]
+ },
+ "acl_api.delete_mapping": {
+  "produced_names": [],
+  "required_params": [
+   "teamUuid",
+   "projectUuid"
+  ]
+ },
+ "add": {
+  "produced_names": [],
+  "required_params": [
+   "a",
+   "b"
+  ]
+ },
+ "add_mtnards_server": {
+  "param_values": {
+   "host": [
+    "localhost"
+   ],
+   "nickname": [
+    "Default_Server_Nickname"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "api_key"
+  ]
+ },
+ "add_postgres_server": {
+  "param_values": {
+   "database": [
+    "postgres"
+   ],
+   "port": [
+    "5432"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "host",
+   "username",
+   "password"
+  ]
+ },
+ "adriel_contact": {
+  "param_values": {
+   "contact_id": [
+    "1"
+   ],
+   "format": [
+    "json",
+    "xml",
+    "csv"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "adriel_detail_experience_and_education": {
+  "param_values": {
+   "detail": [
+    "Not provided"
+   ],
+   "experience_or_education_type": [
+    "Internship at Sebelas Maret University (UNS)",
+    "Freelance work at Pingfest",
+    "Education at Sebelas Maret University (UNS)"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "experience_or_education_type"
+  ]
+ },
+ "adriel_experiences_and_education": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "adriel_list_projects": {
+  "param_values": {
+   "sort_order": [
+    "asc",
+    "desc"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "adriel_tech_stack": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "advice_by_id": {
+  "produced_names": [],
+  "required_params": [
+   "slip_id"
+  ]
+ },
+ "analysis_api.AnalysisApi.retrieve_analysis": {
+  "produced_names": [],
+  "required_params": [
+   "project",
+   "component",
+   "vulnerability"
+  ]
+ },
+ "analysis_api.AnalysisApi.update_analysis": {
+  "param_values": {
+   "decision": [
+    "approve",
+    "reject",
+    "escalate"
+   ],
+   "decision_reason": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "analysis_id",
+   "decision"
+  ]
+ },
+ "apdex_settings_api.ApdexSettingsApi.create_apdex_configuration": {
+  "param_values": {
+   "name": [
+    "Default Configuration"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "application_id",
+   "thresholds"
+  ]
+ },
+ "api.weather": {
+  "produced_names": [],
+  "required_params": [
+   "loc"
+  ]
+ },
+ "api_name.get_weather_forecast": {
+  "param_values": {
+   "temperature_unit": [
+    "Celsius",
+    "Fahrenheit"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location",
+   "date"
+  ]
+ },
+ "api_token_api.APITokenApi.get_api_tokens": {
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "api_token_api.APITokenApi.post_api_token": {
+  "param_values": {
+   "expiration_date": [
+    "2024-01-01"
+   ],
+   "permissions": [
+    "read",
+    "write",
+    "admin"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id",
+   "permissions"
+  ]
+ },
+ "archival_memory_insert": {
+  "produced_names": [],
+  "required_params": [
+   "content",
+   "request_heartbeat"
+  ]
+ },
+ "archival_memory_search": {
+  "param_values": {
+   "page": [
+    "0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "archive_documents": {
+  "param_values": {
+   "archive_format": [
+    "zip",
+    "tar",
+    "gzip",
+    "7z"
+   ],
+   "compression_level": [
+    "5"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "document_ids",
+   "archive_format",
+   "storage_path"
+  ]
+ },
+ "ask_to_user": {
+  "param_values": {
+   "timeout": [
+    "30"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "question",
+   "answer"
+  ]
+ },
+ "audio_mixer.combine_tracks": {
+  "param_values": {
+   "output_codec": [
+    "mp3",
+    "wav",
+    "aac",
+    "flac"
+   ],
+   "output_file_path": [
+    "combined_track.mp3"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "tracks",
+   "output_codec"
+  ]
+ },
+ "audit_log_api.AuditLogApi.get_access_logs": {
+  "param_values": {
+   "query": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "offset",
+   "pageSize"
+  ]
+ },
+ "audit_log_api.AuditLogApi.get_audit_logs": {
+  "param_values": {
+   "offset": [
+    "0"
+   ],
+   "query": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "pageSize"
+  ]
+ },
+ "badge_api.BadgeApi.get_project_policy_violations_badge1": {
+  "produced_names": [],
+  "required_params": [
+   "project_name",
+   "project_version"
+  ]
+ },
+ "badge_api.BadgeApi.get_project_vulnerabilities_badge": {
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "version"
+  ]
+ },
+ "book_flight": {
+  "produced_names": [],
+  "required_params": [
+   "flight",
+   "passengers",
+   "date"
+  ]
+ },
+ "celsius_to_fahrenheit": {
+  "produced_names": [],
+  "required_params": [
+   "celsius"
+  ]
+ },
+ "check_order_status": {
+  "param_values": {
+   "date_format": [
+    "MM/DD/YYYY"
+   ],
+   "order_status": [
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "order_id"
+  ]
+ },
+ "classify": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "close_project": {
+  "produced_names": [],
+  "required_params": [
+   "project_id"
+  ]
+ },
+ "cmd_controller.execute": {
+  "param_values": {
+   "unit": [
+    "N/A"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "command"
+  ]
+ },
+ "collect_customer_names": {
+  "param_values": {
+   "company_name": [
+    ""
+   ],
+   "middlename": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "firstname",
+   "lastname"
+  ]
+ },
+ "component_api.ComponentApi.get_component_by_identity": {
+  "produced_names": [],
+  "required_params": [
+   "group",
+   "name",
+   "version"
+  ]
+ },
+ "connect_to_server": {
+  "param_values": {
+   "retry_attempts": [
+    "3"
+   ],
+   "timeout": [
+    "30"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "nickname"
+  ]
+ },
+ "contact": {
+  "param_values": {
+   "email_address": [
+    ""
+   ],
+   "phone_number": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "person_name"
+  ]
+ },
+ "cookbook.search_recipe": {
+  "param_values": {
+   "cuisine": [
+    "Italian",
+    "Chinese",
+    "Indian",
+    "French",
+    "Mexican"
+   ],
+   "max_results": [
+    "10"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "keyword"
+  ]
+ },
+ "core_memory_append": {
+  "param_values": {
+   "name": [
+    "persona",
+    "human"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "content"
+  ]
+ },
+ "core_memory_replace": {
+  "param_values": {
+   "name": [
+    "persona",
+    "human"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "old_content",
+   "new_content"
+  ]
+ },
+ "create_vulnerability": {
+  "param_values": {
+   "description": [
+    "No detailed description provided."
+   ],
+   "remediation_status": [
+    "Not Started",
+    "In Progress",
+    "Completed"
+   ],
+   "severity": [
+    "Low",
+    "Medium",
+    "High",
+    "Critical"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "severity",
+   "affected_component"
+  ]
+ },
+ "create_website_alert_config": {
+  "param_values": {
+   "rule": [
+    "response_time",
+    "error_rate"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "description",
+   "severity",
+   "websiteId",
+   "tagFilterExpression",
+   "granularity",
+   "rule",
+   "threshold",
+   "timeThreshold"
+  ]
+ },
+ "create_workspace": {
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "base_branch"
+  ]
+ },
+ "dartfx_help": {
+  "param_values": {
+   "output_format": [
+    "text",
+    "HTML",
+    "PDF"
+   ],
+   "topic": [
+    "installation",
+    "configuration",
+    "troubleshooting",
+    "usage",
+    "functions"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "default.add_default_value": {
+  "produced_names": [],
+  "required_params": [
+   "dict",
+   "key",
+   "default_value"
+  ]
+ },
+ "default_function": {
+  "param_values": {
+   "action": [
+    "create",
+    "read",
+    "update",
+    "delete"
+   ],
+   "timeout": [
+    "60"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "action"
+  ]
+ },
+ "delete_apdex_configuration": {
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "detail_adriel_project": {
+  "produced_names": [],
+  "required_params": [
+   "project_name"
+  ]
+ },
+ "detail_experience_and_education": {
+  "param_values": {
+   "experience_or_education_name": [
+    "Not specified"
+   ],
+   "experience_or_education_type": [
+    "Internship at Universitas Sebelas Maret (UNS)",
+    "Freelance at Pingfest",
+    "Education at Universitas Sebelas Maret (UNS)"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "experience_or_education_type"
+  ]
+ },
+ "detail_project": {
+  "param_values": {
+   "project_name": [
+    "e-commerce-website",
+    "car-rental",
+    "turing-machine",
+    "invoice-website"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "project_name"
+  ]
+ },
+ "duck_duck_go": {
+  "param_values": {
+   "format": [
+    "json",
+    "xml",
+    "plaintext"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "duck_duck_go.search": {
+  "param_values": {
+   "format": [
+    "json",
+    "xml"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "experiences_and_education": {
+  "param_values": {
+   "years_experience": [
+    "0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "person_id"
+  ]
+ },
+ "fahrenheit_to_celsius": {
+  "produced_names": [],
+  "required_params": [
+   "fahrenheit"
+  ]
+ },
+ "filter_list": {
+  "param_values": {
+   "condition": [
+    "startswith",
+    "endswith",
+    "contains",
+    "equals"
+   ],
+   "filter_value": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "elements",
+   "condition"
+  ]
+ },
+ "find_flights": {
+  "produced_names": [],
+  "required_params": [
+   "origin",
+   "destination",
+   "date",
+   "passengers"
+  ]
+ },
+ "find_mobile_app_alert_config": {
+  "param_values": {
+   "validOn": [
+    "null"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "find_mobile_app_alert_config_versions": {
+  "produced_names": [],
+  "required_params": [
+   "id"
+  ]
+ },
+ "finish": {
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "flipImageAction": {
+  "param_values": {
+   "flip_direction": [
+    "horizontal",
+    "vertical"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "flip_direction"
+  ]
+ },
+ "fmp.income_statement": {
+  "param_values": {
+   "datatype": [
+    "json",
+    "csv"
+   ],
+   "limit": [
+    "10"
+   ],
+   "period": [
+    "annual",
+    "quarter"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "symbol",
+   "period"
+  ]
+ },
+ "generate_image_tool": {
+  "produced_names": [],
+  "required_params": [
+   "desc",
+   "file_name"
+  ]
+ },
+ "generate_password": {
+  "produced_names": [],
+  "required_params": [
+   "length"
+  ]
+ },
+ "generate_report": {
+  "param_values": {
+   "report_format": [
+    "pdf",
+    "html",
+    "csv"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id",
+   "start_date",
+   "end_date"
+  ]
+ },
+ "getClientRequestData": {
+  "produced_names": [],
+  "required_params": [
+   "url"
+  ]
+ },
+ "getCurrentTime": {
+  "param_values": {
+   "timezone": [
+    "local"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "getDetails": {
+  "produced_names": [],
+  "required_params": [
+   "question"
+  ]
+ },
+ "getRecommendationsAction": {
+  "param_values": {
+   "max_results": [
+    "10"
+   ],
+   "threshold": [
+    "0.5"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "image_data"
+  ]
+ },
+ "get_adriel_detail_experience_and_education": {
+  "produced_names": [],
+  "required_params": [
+   "experience_or_education_name"
+  ]
+ },
+ "get_adriel_education": {
+  "param_values": {
+   "username": [
+    "adriel_user_id"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_adriel_experiences": {
+  "param_values": {
+   "date_format": [
+    "YYYY-MM-DD",
+    "MM/DD/YYYY",
+    "DD-MM-YYYY"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "get_adriel_experiences_and_education": {
+  "param_values": {
+   "language": [
+    "EN",
+    "FR",
+    "ES",
+    "DE",
+    "CN"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "get_adriel_list_projects": {
+  "param_values": {
+   "sort_order": [
+    "start_date",
+    "name"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "get_adriel_profile": {
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "get_adriel_projects": {
+  "param_values": {
+   "status_filter": [
+    "active",
+    "completed",
+    "on_hold"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "get_adriel_tech_stack": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_all_apdex_configurations": {
+  "param_values": {
+   "application_id": [
+    "all"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_area_of_square": {
+  "produced_names": [],
+  "required_params": [
+   "size"
+  ]
+ },
+ "get_company_info": {
+  "produced_names": [],
+  "required_params": [
+   "company_name"
+  ]
+ },
+ "get_contact_information": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_current_weather": {
+  "param_values": {
+   "unit": [
+    "celsius",
+    "fahrenheit"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location"
+  ]
+ },
+ "get_detail_adriel_project": {
+  "param_values": {
+   "date_format": [
+    "YYYY-MM-DD"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "project_name"
+  ]
+ },
+ "get_headway": {
+  "produced_names": [],
+  "required_params": [
+   "ego_info",
+   "lane_info",
+   "bounding_boxes"
+  ]
+ },
+ "get_hosts_per_month": {
+  "produced_names": [],
+  "required_params": [
+   "month",
+   "year"
+  ]
+ },
+ "get_interviewer_list": {
+  "param_values": {
+   "experience_level": [
+    "junior",
+    "mid",
+    "senior"
+   ],
+   "skill": [
+    "Java",
+    "Python",
+    "C++",
+    "JavaScript",
+    "Ruby"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "skill"
+  ]
+ },
+ "get_location_summary_list": {
+  "param_values": {
+   "filter": [
+    ""
+   ],
+   "limit": [
+    "100"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_maintenance_configs": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_maintenance_configs_v2": {
+  "param_values": {
+   "filter_status": [
+    "active",
+    "inactive",
+    "completed"
+   ],
+   "page_size": [
+    "20"
+   ],
+   "sort_order": [
+    "asc",
+    "desc"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "page"
+  ]
+ },
+ "get_monitoring_state": {
+  "param_values": {
+   "filter_by": [
+    "status:active"
+   ],
+   "resource_type": [
+    "virtual_machine",
+    "physical_server",
+    "container"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "resource_type"
+  ]
+ },
+ "get_movie_details": {
+  "param_values": {
+   "language": [
+    "EN",
+    "ES",
+    "FR",
+    "DE",
+    "IT"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "movie_name"
+  ]
+ },
+ "get_movies": {
+  "param_values": {
+   "movie_format": [
+    "2D",
+    "3D",
+    "4DX",
+    "2D Screen X",
+    "ICE",
+    "IMAX 2D"
+   ],
+   "movie_language": [
+    "Hindi",
+    "English",
+    "Malayalam",
+    "Telugu",
+    "Punjabi"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "city"
+  ]
+ },
+ "get_parcel_state": {
+  "produced_names": [],
+  "required_params": [
+   "parcelTrackingId"
+  ]
+ },
+ "get_pods": {
+  "param_values": {
+   "field_selector": [
+    ""
+   ],
+   "label_selector": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "namespace"
+  ]
+ },
+ "get_product_details": {
+  "param_values": {
+   "color": [
+    "all colors"
+   ],
+   "size": [
+    "all sizes"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "product_id"
+  ]
+ },
+ "get_sensor_alerts": {
+  "param_values": {
+   "timespan": [
+    "31536000"
+   ],
+   "triggerMetric": [
+    "apparentPower",
+    "co2",
+    "current",
+    "door",
+    "frequency",
+    "humidity",
+    "indoorAirQuality",
+    "noise",
+    "pm25",
+    "powerFactor",
+    "realPower",
+    "temperature",
+    "tvoc",
+    "upstreamPower",
+    "voltage",
+    "water"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "perPage"
+  ]
+ },
+ "get_sensor_readings_history": {
+  "param_values": {
+   "perPage": [
+    "10"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "timespan"
+  ]
+ },
+ "get_sensor_readings_history_by_interval": {
+  "param_values": {
+   "interval": [
+    "15",
+    "120",
+    "300",
+    "900",
+    "3600",
+    "14400",
+    "86400",
+    "604800"
+   ],
+   "models": [
+    "MT10",
+    "MT11",
+    "MT12",
+    "MT14",
+    "MT20",
+    "MT30"
+   ],
+   "perPage": [
+    "10"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "timespan"
+  ]
+ },
+ "get_sensor_readings_latest": {
+  "produced_names": [],
+  "required_params": [
+   "perPage"
+  ]
+ },
+ "get_service_id": {
+  "param_values": {
+   "province_id": [
+    "1",
+    "2",
+    "3"
+   ],
+   "service_id": [
+    "1",
+    "2",
+    "3"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "service_id",
+   "province_id"
+  ]
+ },
+ "get_service_providers": {
+  "param_values": {
+   "professional_group_id": [
+    "1",
+    "2",
+    "3"
+   ],
+   "province_id": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5"
+   ],
+   "service_id": [
+    "1",
+    "2",
+    "3",
+    "13",
+    "39",
+    "15",
+    "35",
+    "24"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "get_services": {
+  "produced_names": [],
+  "required_params": [
+   "namespace"
+  ]
+ },
+ "get_show_times": {
+  "param_values": {
+   "cinema_hall": [
+    ""
+   ],
+   "movie_format": [
+    "2D",
+    "3D",
+    "4DX",
+    "2D Screen X",
+    "ICE",
+    "IMAX 2D"
+   ],
+   "movie_language": [
+    "English"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "city",
+   "movie_name",
+   "movie_date"
+  ]
+ },
+ "get_synthetic_locations": {
+  "param_values": {
+   "filter": [
+    "status:active"
+   ],
+   "sort": [
+    "name",
+    "id",
+    "created_at",
+    "updated_at"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "sort",
+   "offset",
+   "limit"
+  ]
+ },
+ "get_tech_stack": {
+  "produced_names": [],
+  "required_params": [
+   "employee_id"
+  ]
+ },
+ "get_tickets": {
+  "produced_names": [],
+  "required_params": [
+   "customer"
+  ]
+ },
+ "get_time_headway": {
+  "produced_names": [],
+  "required_params": [
+   "ego_info",
+   "lane_info",
+   "bboxes",
+   "velocities",
+   "accelerations"
+  ]
+ },
+ "get_time_to_collision": {
+  "produced_names": [],
+  "required_params": [
+   "ego_velocity",
+   "ego_acceleration",
+   "leading_object_velocity",
+   "leading_object_acceleration",
+   "initial_distance"
+  ]
+ },
+ "get_trip": {
+  "produced_names": [],
+  "required_params": [
+   "location"
+  ]
+ },
+ "get_url_content": {
+  "param_values": {
+   "timeout": [
+    "30"
+   ],
+   "user_agent": [
+    "Mozilla/5.0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "url"
+  ]
+ },
+ "get_weather_forecast": {
+  "param_values": {
+   "units": [
+    "metric",
+    "imperial"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location",
+   "start_date",
+   "end_date"
+  ]
+ },
+ "get_websites": {
+  "param_values": {
+   "status_filter": [
+    "active",
+    "inactive",
+    "maintenance"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "groups_api.GroupsApi.create_group_mapping": {
+  "produced_names": [],
+  "required_params": [
+   "group_id",
+   "key",
+   "value"
+  ]
+ },
+ "handover_to_agent": {
+  "param_values": {
+   "message": [
+    ""
+   ],
+   "priority": [
+    "low",
+    "medium",
+    "high"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "chat_id",
+   "agent_id"
+  ]
+ },
+ "health_api.HealthApi.get_version": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "help": {
+  "param_values": {
+   "context": [
+    "database",
+    "network",
+    "user_interface"
+   ],
+   "search_query": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "context"
+  ]
+ },
+ "help.display": {
+  "produced_names": [],
+  "required_params": [
+   "command"
+  ]
+ },
+ "help_me": {
+  "param_values": {
+   "urgency": [
+    "low",
+    "medium",
+    "high"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "topic"
+  ]
+ },
+ "holdings.get_13F_HR": {
+  "produced_names": [],
+  "required_params": [
+   "company_name",
+   "cik"
+  ]
+ },
+ "http_request": {
+  "param_values": {
+   "method": [
+    "GET",
+    "POST",
+    "PUT",
+    "DELETE",
+    "PATCH"
+   ],
+   "payload_json": [
+    "{}"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "method",
+   "url",
+   "request_heartbeat"
+  ]
+ },
+ "interviewer_review.get": {
+  "produced_names": [],
+  "required_params": [
+   "name"
+  ]
+ },
+ "inventory_management": {
+  "param_values": {
+   "color": [
+    "any"
+   ],
+   "quantity": [
+    "1"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "product_id"
+  ]
+ },
+ "ldap_api.LdapApi.add_mapping1": {
+  "param_values": {
+   "description": [
+    "No description provided"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "mapping_name",
+   "user_group",
+   "system_role"
+  ]
+ },
+ "list_files": {
+  "param_values": {
+   "file_type": [
+    "txt",
+    "md",
+    "py",
+    "js",
+    "css",
+    "data",
+    "all"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "list_projects": {
+  "param_values": {
+   "sort_order": [
+    "asc",
+    "desc"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id"
+  ]
+ },
+ "list_servers": {
+  "param_values": {
+   "nickname": [
+    "all",
+    "postgres",
+    "openapi",
+    "graphql"
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "load_model": {
+  "produced_names": [],
+  "required_params": [
+   "model",
+   "device"
+  ]
+ },
+ "lookup_amount": {
+  "produced_names": [
+   "amount"
+  ],
+  "required_params": []
+ },
+ "lookup_api_key": {
+  "produced_names": [
+   "api_key"
+  ],
+  "required_params": []
+ },
+ "lookup_appointment_time": {
+  "produced_names": [
+   "appointment_time"
+  ],
+  "required_params": []
+ },
+ "lookup_area": {
+  "produced_names": [
+   "area"
+  ],
+  "required_params": []
+ },
+ "lookup_b": {
+  "produced_names": [
+   "b"
+  ],
+  "required_params": []
+ },
+ "lookup_check_in_date": {
+  "produced_names": [
+   "check_in_date"
+  ],
+  "required_params": []
+ },
+ "lookup_city": {
+  "produced_names": [
+   "city"
+  ],
+  "required_params": []
+ },
+ "lookup_company_name": {
+  "produced_names": [
+   "company_name"
+  ],
+  "required_params": []
+ },
+ "lookup_content": {
+  "produced_names": [
+   "content"
+  ],
+  "required_params": []
+ },
+ "lookup_customer": {
+  "produced_names": [
+   "customer"
+  ],
+  "required_params": []
+ },
+ "lookup_date": {
+  "produced_names": [
+   "date"
+  ],
+  "required_params": []
+ },
+ "lookup_degrees": {
+  "produced_names": [
+   "degrees"
+  ],
+  "required_params": []
+ },
+ "lookup_departure_date": {
+  "produced_names": [
+   "departure_date"
+  ],
+  "required_params": []
+ },
+ "lookup_destination_airport": {
+  "produced_names": [
+   "destination_airport"
+  ],
+  "required_params": []
+ },
+ "lookup_drink_id": {
+  "produced_names": [
+   "drink_id"
+  ],
+  "required_params": []
+ },
+ "lookup_ego_velocity": {
+  "produced_names": [
+   "ego_velocity"
+  ],
+  "required_params": []
+ },
+ "lookup_employee_id": {
+  "produced_names": [
+   "employee_id"
+  ],
+  "required_params": []
+ },
+ "lookup_end_date": {
+  "produced_names": [
+   "end_date"
+  ],
+  "required_params": []
+ },
+ "lookup_event_type": {
+  "produced_names": [
+   "event_type"
+  ],
+  "required_params": []
+ },
+ "lookup_experience_or_education_type": {
+  "produced_names": [
+   "experience_or_education_type"
+  ],
+  "required_params": []
+ },
+ "lookup_full_name": {
+  "produced_names": [
+   "full_name"
+  ],
+  "required_params": []
+ },
+ "lookup_genre": {
+  "produced_names": [
+   "genre"
+  ],
+  "required_params": []
+ },
+ "lookup_id": {
+  "produced_names": [
+   "id"
+  ],
+  "required_params": []
+ },
+ "lookup_items": {
+  "produced_names": [
+   "items"
+  ],
+  "required_params": []
+ },
+ "lookup_loc": {
+  "produced_names": [
+   "loc"
+  ],
+  "required_params": []
+ },
+ "lookup_location": {
+  "produced_names": [
+   "location"
+  ],
+  "required_params": []
+ },
+ "lookup_method": {
+  "produced_names": [
+   "method"
+  ],
+  "required_params": []
+ },
+ "lookup_movie_name": {
+  "produced_names": [
+   "movie_name"
+  ],
+  "required_params": []
+ },
+ "lookup_name": {
+  "produced_names": [
+   "name"
+  ],
+  "required_params": []
+ },
+ "lookup_number_of_beds": {
+  "produced_names": [
+   "number_of_beds"
+  ],
+  "required_params": []
+ },
+ "lookup_number_of_seats": {
+  "produced_names": [
+   "number_of_seats"
+  ],
+  "required_params": []
+ },
+ "lookup_offset": {
+  "produced_names": [
+   "offset"
+  ],
+  "required_params": []
+ },
+ "lookup_parcelTrackingId": {
+  "produced_names": [
+   "parcelTrackingId"
+  ],
+  "required_params": []
+ },
+ "lookup_payment_method": {
+  "produced_names": [
+   "payment_method"
+  ],
+  "required_params": []
+ },
+ "lookup_person_id": {
+  "produced_names": [
+   "person_id"
+  ],
+  "required_params": []
+ },
+ "lookup_pickup_time": {
+  "produced_names": [
+   "pickup_time"
+  ],
+  "required_params": []
+ },
+ "lookup_product_id": {
+  "produced_names": [
+   "product_id"
+  ],
+  "required_params": []
+ },
+ "lookup_professional_id": {
+  "produced_names": [
+   "professional_id"
+  ],
+  "required_params": []
+ },
+ "lookup_property_name": {
+  "produced_names": [
+   "property_name"
+  ],
+  "required_params": []
+ },
+ "lookup_query": {
+  "produced_names": [
+   "query"
+  ],
+  "required_params": []
+ },
+ "lookup_receiver": {
+  "produced_names": [
+   "receiver"
+  ],
+  "required_params": []
+ },
+ "lookup_resource_id": {
+  "produced_names": [
+   "resource_id"
+  ],
+  "required_params": []
+ },
+ "lookup_ride_type": {
+  "produced_names": [
+   "ride_type"
+  ],
+  "required_params": []
+ },
+ "lookup_serials": {
+  "produced_names": [
+   "serials"
+  ],
+  "required_params": []
+ },
+ "lookup_statement": {
+  "produced_names": [
+   "statement"
+  ],
+  "required_params": []
+ },
+ "lookup_stay_length": {
+  "produced_names": [
+   "stay_length"
+  ],
+  "required_params": []
+ },
+ "lookup_time": {
+  "produced_names": [
+   "time"
+  ],
+  "required_params": []
+ },
+ "lookup_to_city": {
+  "produced_names": [
+   "to_city"
+  ],
+  "required_params": []
+ },
+ "lookup_type": {
+  "produced_names": [
+   "type"
+  ],
+  "required_params": []
+ },
+ "lookup_user_id": {
+  "produced_names": [
+   "user_id"
+  ],
+  "required_params": []
+ },
+ "lookup_uuid": {
+  "produced_names": [
+   "uuid"
+  ],
+  "required_params": []
+ },
+ "lookup_volume": {
+  "produced_names": [
+   "volume"
+  ],
+  "required_params": []
+ },
+ "lookup_websiteId": {
+  "produced_names": [
+   "websiteId"
+  ],
+  "required_params": []
+ },
+ "lookup_where_to": {
+  "produced_names": [
+   "where_to"
+  ],
+  "required_params": []
+ },
+ "lookup_year": {
+  "produced_names": [
+   "year"
+  ],
+  "required_params": []
+ },
+ "message_chatgpt": {
+  "produced_names": [],
+  "required_params": [
+   "message"
+  ]
+ },
+ "multiply": {
+  "produced_names": [],
+  "required_params": [
+   "a",
+   "b"
+  ]
+ },
+ "oidc_api.OidcApi.add_mapping2": {
+  "produced_names": [],
+  "required_params": [
+   "provider",
+   "client_id",
+   "client_secret"
+  ]
+ },
+ "oidc_api.OidcApi.is_available": {
+  "produced_names": [],
+  "required_params": [
+   "application_id"
+  ]
+ },
+ "open_project": {
+  "param_values": {
+   "access_mode": [
+    "readonly",
+    "readwrite"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "path"
+  ]
+ },
+ "order_processing.handle_order": {
+  "produced_names": [],
+  "required_params": [
+   "order_id",
+   "items",
+   "customer_info"
+  ]
+ },
+ "order_status_check": {
+  "produced_names": [],
+  "required_params": [
+   "order_id",
+   "product"
+  ]
+ },
+ "pause_heartbeats": {
+  "produced_names": [],
+  "required_params": [
+   "minutes"
+  ]
+ },
+ "permission_api.PermissionApi.add_permission_to_user": {
+  "param_values": {
+   "permission": [
+    "read",
+    "write",
+    "edit"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "username",
+   "permission"
+  ]
+ },
+ "play_artist": {
+  "produced_names": [],
+  "required_params": [
+   "artist_name"
+  ]
+ },
+ "play_song": {
+  "param_values": {
+   "volume": [
+    "70"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "policy_api.PolicyApi.create_policy": {
+  "param_values": {
+   "policy_type": [
+    "auto",
+    "home",
+    "life",
+    "health"
+   ],
+   "terms": [
+    "Standard terms apply. Please review the policy details thoroughly."
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "policy_name",
+   "policy_type",
+   "coverage_amount"
+  ]
+ },
+ "policy_api.update_policy": {
+  "produced_names": [],
+  "required_params": [
+   "policy_id",
+   "policy_data"
+  ]
+ },
+ "process_data": {
+  "produced_names": [],
+  "required_params": [
+   "file_path",
+   "image_path",
+   "vqa_pipeline"
+  ]
+ },
+ "process_transaction": {
+  "param_values": {
+   "currency": [
+    "USD",
+    "EUR",
+    "GBP",
+    "JPY"
+   ],
+   "memo": [
+    ""
+   ],
+   "transaction_fee": [
+    "0.0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "source_account",
+   "destination_account",
+   "amount"
+  ]
+ },
+ "product_search": {
+  "param_values": {
+   "category": [
+    "electronics",
+    "clothing",
+    "books",
+    "home appliances",
+    "toys"
+   ],
+   "color": [
+    "any"
+   ],
+   "size": [
+    "any"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "category"
+  ]
+ },
+ "project_api.ProjectApi.get_children_projects": {
+  "produced_names": [],
+  "required_params": [
+   "uuid"
+  ]
+ },
+ "project_api.ProjectApi.get_children_projects_by_classifier": {
+  "produced_names": [],
+  "required_params": [
+   "classifier",
+   "uuid"
+  ]
+ },
+ "project_api.ProjectApi.get_children_projects_by_tag": {
+  "produced_names": [],
+  "required_params": [
+   "tag",
+   "uuid"
+  ]
+ },
+ "project_api.ProjectApi.get_project_by_name_and_version": {
+  "produced_names": [],
+  "required_params": [
+   "name",
+   "version"
+  ]
+ },
+ "project_api.ProjectApi.get_projects": {
+  "param_values": {
+   "name": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "excludeInactive",
+   "onlyRoot"
+  ]
+ },
+ "project_api.ProjectApi.get_projects_by_tag": {
+  "produced_names": [],
+  "required_params": [
+   "tag"
+  ]
+ },
+ "project_api.ProjectApi.update_project": {
+  "produced_names": [],
+  "required_params": [
+   "project_id",
+   "project_data"
+  ]
+ },
+ "project_api.update_project": {
+  "produced_names": [],
+  "required_params": [
+   "project_id",
+   "project_data"
+  ]
+ },
+ "quarterly_earnings": {
+  "produced_names": [],
+  "required_params": [
+   "company_name",
+   "cik"
+  ]
+ },
+ "random_advice": {
+  "produced_names": [],
+  "required_params": [
+   "question"
+  ]
+ },
+ "recall_memory_search": {
+  "param_values": {
+   "page": [
+    "0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "releases_api.ReleasesApi.get_all_releases": {
+  "produced_names": [],
+  "required_params": [
+   "releaseId"
+  ]
+ },
+ "releases_api.ReleasesApi.post_release": {
+  "param_values": {
+   "description": [
+    "No detailed description provided."
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "version",
+   "release_date"
+  ]
+ },
+ "releases_api.ReleasesApi.put_release": {
+  "param_values": {
+   "release_name": [
+    "Unnamed Release"
+   ],
+   "version": [
+    "1.0.0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "releaseId"
+  ]
+ },
+ "removeBackgroundAction": {
+  "param_values": {
+   "output_format": [
+    "PNG",
+    "JPEG",
+    "GIF",
+    "BMP"
+   ],
+   "replacement_color": [
+    "#FFFFFF",
+    "#000000",
+    "null"
+   ],
+   "replacement_image_path": [
+    "null"
+   ],
+   "tolerance": [
+    "50"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "image_path"
+  ]
+ },
+ "rename_server": {
+  "produced_names": [],
+  "required_params": [
+   "_from",
+   "to"
+  ]
+ },
+ "repository_api.RepositoryApi.get_repository_meta_component": {
+  "produced_names": [],
+  "required_params": [
+   "purl"
+  ]
+ },
+ "repository_api.RepositoryApi.update_repository": {
+  "produced_names": [],
+  "required_params": [
+   "repository_id",
+   "update_fields"
+  ]
+ },
+ "requests.get": {
+  "param_values": {
+   "timeout": [
+    "5.0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "url"
+  ]
+ },
+ "resizeImageAction": {
+  "param_values": {
+   "image_format": [
+    "jpeg",
+    "png",
+    "gif",
+    "bmp"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "aspect_ratio_width",
+   "aspect_ratio_height"
+  ]
+ },
+ "rotateImageAction": {
+  "param_values": {
+   "image_format": [
+    "JPEG",
+    "PNG",
+    "BMP",
+    "GIF",
+    "TIFF"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "degrees"
+  ]
+ },
+ "search_advice": {
+  "param_values": {
+   "language": [
+    "EN",
+    "ES",
+    "DE",
+    "FR"
+   ],
+   "query": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "search_web_tool": {
+  "param_values": {
+   "num_results": [
+    "3"
+   ],
+   "source": [
+    "text",
+    "news"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "send.message": {
+  "param_values": {
+   "subject": [
+    "No Subject"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "dest",
+   "message"
+  ]
+ },
+ "sendHttpRequest": {
+  "param_values": {
+   "method": [
+    "GET",
+    "POST",
+    "PUT",
+    "DELETE",
+    "HEAD",
+    "PATCH"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "method",
+   "url"
+  ]
+ },
+ "send_message": {
+  "param_values": {
+   "priority": [
+    "low",
+    "normal",
+    "high"
+   ],
+   "recipient": [
+    "default@example.com"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "message"
+  ]
+ },
+ "set_alarm": {
+  "param_values": {
+   "purpose": [
+    "General reminder"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "alarm_time"
+  ]
+ },
+ "set_countdown": {
+  "param_values": {
+   "purpose": [
+    "General Reminder"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "duration"
+  ]
+ },
+ "set_volume": {
+  "produced_names": [],
+  "required_params": [
+   "volume"
+  ]
+ },
+ "simulateStatusCode": {
+  "produced_names": [],
+  "required_params": [
+   "url",
+   "statusCode"
+  ]
+ },
+ "software_versions": {
+  "param_values": {
+   "name": [
+    ""
+   ],
+   "origin": [
+    ""
+   ],
+   "time": [
+    "null"
+   ],
+   "type": [
+    "runtime",
+    "package_manager",
+    ""
+   ],
+   "version": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": []
+ },
+ "sort_array": {
+  "produced_names": [],
+  "required_params": [
+   "array"
+  ]
+ },
+ "sort_list": {
+  "param_values": {
+   "order": [
+    "asc",
+    "desc"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "elements"
+  ]
+ },
+ "start_oncall": {
+  "param_values": {
+   "oncall_type": [
+    "swift",
+    "mbox"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "question",
+   "oncall_type"
+  ]
+ },
+ "stock_price.get": {
+  "param_values": {
+   "exchange": [
+    "NYSE",
+    "NASDAQ",
+    "LSE",
+    "TSX",
+    "HKSE"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "ticker",
+   "exchange"
+  ]
+ },
+ "sub": {
+  "produced_names": [],
+  "required_params": [
+   "a",
+   "b"
+  ]
+ },
+ "sum": {
+  "produced_names": [],
+  "required_params": [
+   "a",
+   "b"
+  ]
+ },
+ "sum_elements": {
+  "produced_names": [],
+  "required_params": [
+   "elements"
+  ]
+ },
+ "telemetry.flowrules.interfaceInfo.get": {
+  "param_values": {
+   "infoType": [
+    "interfaces",
+    "status",
+    "statistics",
+    "errors"
+   ],
+   "interfaceType": [
+    "svi",
+    "ethernet",
+    "loopback",
+    "port-channel"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "fabricName",
+   "nodeId",
+   "podId",
+   "interfaceType",
+   "infoType"
+  ]
+ },
+ "testProxyHeaders": {
+  "produced_names": [],
+  "required_params": [
+   "url",
+   "headers"
+  ]
+ },
+ "transaction_summary.generate": {
+  "produced_names": [],
+  "required_params": [
+   "transactions",
+   "starting_date",
+   "ending_date",
+   "total_deposits",
+   "total_withdrawals",
+   "starting_balance",
+   "ending_balance",
+   "firstname",
+   "lastname"
+  ]
+ },
+ "transfer_to_human_agent": {
+  "produced_names": [],
+  "required_params": [
+   "statement"
+  ]
+ },
+ "tts_tool": {
+  "param_values": {
+   "file_name": [
+    ""
+   ],
+   "speaker": [
+    "male",
+    "female",
+    "bria",
+    "alex"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "content"
+  ]
+ },
+ "uber.eat.order": {
+  "param_values": {
+   "delivery_instructions": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "restaurant_id",
+   "items"
+  ]
+ },
+ "uber.ride": {
+  "param_values": {
+   "type": [
+    "plus",
+    "comfort",
+    "black"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "loc",
+   "type",
+   "time"
+  ]
+ },
+ "update_inventory": {
+  "param_values": {
+   "restock_threshold": [
+    "10"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "transaction_items"
+  ]
+ },
+ "usage_api.UsageApi.get_hosts_per_day": {
+  "produced_names": [],
+  "required_params": [
+   "day",
+   "month",
+   "year"
+  ]
+ },
+ "user.mandates": {
+  "param_values": {
+   "status": [
+    "active",
+    "pending",
+    "inactive"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "user_id",
+   "status"
+  ]
+ },
+ "user_authenticate": {
+  "param_values": {
+   "login_attempts": [
+    "0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "username",
+   "password"
+  ]
+ },
+ "user_authentication": {
+  "param_values": {
+   "login_attempts": [
+    "0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "username",
+   "password"
+  ]
+ },
+ "user_authentication.login": {
+  "param_values": {
+   "login_type": [
+    "standard",
+    "guest",
+    "admin"
+   ],
+   "redirect_url": [
+    "https://www.example.com/home"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "username",
+   "password"
+  ]
+ },
+ "user_authentication.validate": {
+  "param_values": {
+   "login_attempts": [
+    "0"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "username",
+   "password"
+  ]
+ },
+ "user_registration.create_account": {
+  "param_values": {
+   "referral_code": [
+    ""
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "username",
+   "password",
+   "email"
+  ]
+ },
+ "version_api.VersionApi.get_version": {
+  "produced_names": [],
+  "required_params": []
+ },
+ "vex_api.VexApi.export_project_as_cyclone_dx1": {
+  "produced_names": [],
+  "required_params": [
+   "uuid"
+  ]
+ },
+ "vex_api.VexApi.upload_vex1": {
+  "produced_names": [],
+  "required_params": [
+   "cyclonedx_document"
+  ]
+ },
+ "view_service_provider_profile": {
+  "produced_names": [],
+  "required_params": [
+   "professional_id"
+  ]
+ },
+ "weather.forecast": {
+  "param_values": {
+   "units": [
+    "C",
+    "F",
+    "km/h",
+    "mph"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "location",
+   "start_date",
+   "end_date"
+  ]
+ },
+ "weather.get": {
+  "param_values": {
+   "units": [
+    "metric",
+    "imperial"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "city",
+   "country"
+  ]
+ },
+ "weather.get_weather": {
+  "produced_names": [],
+  "required_params": [
+   "city",
+   "country"
+  ]
+ },
+ "weather.get_weather_data": {
+  "param_values": {
+   "language": [
+    "en",
+    "es",
+    "fr",
+    "de"
+   ],
+   "units": [
+    "metric",
+    "imperial"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "city",
+   "country"
+  ]
+ },
+ "web_search": {
+  "param_values": {
+   "language": [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "it"
+   ],
+   "results_limit": [
+    "10"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "query"
+  ]
+ },
+ "website_configuration_api.WebsiteConfigurationApi.create_website": {
+  "produced_names": [],
+  "required_params": [
+   "name"
+  ]
+ },
+ "website_configuration_api.WebsiteConfigurationApi.get_website": {
+  "produced_names": [],
+  "required_params": [
+   "websiteId"
+  ]
+ },
+ "website_configuration_api.WebsiteConfigurationApi.rename_website": {
+  "produced_names": [],
+  "required_params": [
+   "websiteId",
+   "name"
+  ]
+ },
+ "website_configuration_api.delete_website": {
+  "produced_names": [],
+  "required_params": [
+   "websiteId"
+  ]
+ },
+ "write_html_tool": {
+  "param_values": {
+   "filename": [
+    "output.html"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "content"
+  ]
+ },
+ "write_markdown_tool": {
+  "param_values": {
+   "filename": [
+    "output.md"
+   ]
+  },
+  "produced_names": [],
+  "required_params": [
+   "content"
+  ]
+ }
+}
