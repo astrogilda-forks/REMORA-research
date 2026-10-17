@@ -19,8 +19,16 @@ This file lists externally relevant changes by release. Fine-grained development
   those spent sets, gold calls accepted moved from 58/994 to 255/994 and
   obtainable VERIFY from 192/431 to 353/431. No safety count rose.
   These are development numbers and may not be cited as results.
-- Nothing in production uses the v2 bundle; the confirmatory number needs
-  the sealed C-ext4 track (SAP v6).
+- SAP v6 (`docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md`)
+  pre-registers the C-ext4 track before its set is built. Its co-primary
+  targets are wrong-call ACCEPT at or below 1 %, gold-call ACCEPT of at
+  least 12 %, and a paired gain over the frozen v1 bundle.
+- `scripts/build_bfcl_v4_cext4.py` seals the whole reserve once, and
+  `scripts/run_bfcl_cext4.py` runs it once. Both use
+  `remora/toolcall/routing/bfcl_arms.py`, the module the development replay
+  uses, so the sealed run measures the system that was developed. A
+  reject-all control arm runs beside F1, V2 and V2D (ADR D5).
+- Nothing in production uses the v2 bundle.
 
 ### Policy (VerificationPlan v2 S1 and S2: plan types and the evidence check)
 

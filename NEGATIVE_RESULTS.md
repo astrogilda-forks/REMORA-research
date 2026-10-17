@@ -2500,7 +2500,7 @@ transforms are unchanged.
 
 The table pools the three spent sets.
 
-| Arm F at the current commit | v1 | v2 with receipts |
+| Arm, at the current commit | F1 (v1) | V2D (v2 with receipts) |
 |---|---|---|
 | Known wrong-call ACCEPT | 0/1016 | 0/1016 |
 | Constructed wrong-tool ACCEPT | 3/298 | 0/298 |
