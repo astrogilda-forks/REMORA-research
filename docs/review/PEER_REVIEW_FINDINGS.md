@@ -1,0 +1,565 @@
+# Peer-review findings register
+
+This register tracks objections raised against the REMORA paper
+(`paper/remora_paper.md` and `paper/remora_paper.tex`) and what was done
+about each one. A finding is RESOLVED only when the fix has been checked
+against the objection itself. Changed text is not enough for a statistical
+error, an over-generalisation or a missing baseline: those stay OPEN until the
+analysis or data exists.
+
+`tests/test_peer_review_findings.py` checks the register's structure.
+
+## Statuses
+
+| Status | Meaning |
+|---|---|
+| OPEN | The objection stands and no fix is in place. |
+| IN_PROGRESS | Part of the fix is in place; the remainder is named under Verification. |
+| RESOLVED | The fix is in place and was checked against the objection. |
+| ACCEPTED_LIMITATION | The objection is correct and cannot be fixed for the existing evidence; the paper states it as a limit. |
+| SUPERSEDED | A later finding or decision replaces this one. |
+
+## Review rounds
+
+- R1 (2026-10-17). An adversarial internal review of the paper at master
+  `f66c4f7b` by four AI reviewer agents. Each had one remit: statistics and
+  experimental design, security novelty and literature, tool-use benchmark
+  validity, and overclaiming and md/tex consistency. Each cited file and line,
+  and the maintainer re-checked the decisive findings against the repository
+  before acting on them. R1 is not an independent human review; REM-021
+  remains open (`docs/AI_USE.md`).
+- R1 errors. Two R1 assertions were wrong or too broad, and are kept here
+  for the record.
+  - The overclaiming reviewer said the negation limit (NEGATIVE_RESULTS.md
+    §81) affects both semantic arms of C-ext4. It does not affect the
+    confirmatory arm: bundle v2's extractor returns no intent for "Please do
+    not cancel booking B-104". It does apply to C-ext3 and to the frozen-bundle
+    arm F1 in C-ext4.
+  - The maintainer's first answer to the clustering question was also wrong.
+    It said the 295 C-ext4 wrong calls were independent because they sit in
+    295 source clusters. They share 67 proposed tools, and the decision
+    depends on the tool (PRF-009).
+
+## Level plan (owner decision, 2026-10-17)
+
+1. Level 1: text corrections that need no new numbers.
+2. Level 2: statistical re-analysis of existing data. These are added as
+   post-hoc artifacts with their own scripts and never overwrite a sealed
+   result.
+3. Level 3: a bounded research programme: a threat model, an attack
+   evaluation of the execution chain, and SAP v7 on a new tool catalogue with
+   model-generated wrong calls and external baselines.
+
+The paper is framed as a systems artifact plus research method, around one
+primary hypothesis: can independently enforced authorization boundaries
+preserve useful agent autonomy under realistic, adversarial tool-use
+conditions?
+
+## Findings
+
+### PRF-001 The .tex oracle-count result contradicted the .md
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The .tex said majority vote gains about 10 pp and correlation weighting adds a further gain. The .md and the artifact say +25.8 pp, and weighting (69.54%) is below majority vote (82.78%). |
+| Evidence | `paper/remora_paper.tex`, the Ablations section at `f66c4f7b`; `results/ablation_v2_results.json` (A 0.5695, B 0.8278, C 0.6954). |
+| Affected claims | none (exploratory ablation) |
+| Action | Copy the .md result into the .tex. |
+| Owning PR | level-1 PR |
+| Verification | The .tex now gives 56.95%, 82.78% (+25.8 pp) and 69.54%, which matches `results/ablation_v2_results.json` and the .md Table 1. |
+| Status | RESOLVED |
+
+### PRF-002 Open negative results §80 and §81 were not cited
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The paper reported AgentHarm Mode 3 and the C-ext3 intents without citing §80 (Mode 3 tells 0 of 44 twin pairs apart) or §81 (the intent extractor ignores negation). |
+| Evidence | A grep for §80/§81 in both paper files at `f66c4f7b` returned nothing. |
+| Affected claims | CLAIM-002, CLAIM-019 |
+| Action | Cite §80 in the AgentHarm interpretation and §81 in the C-ext3 caveats. State that bundle v2 handles negation. |
+| Owning PR | level-1 PR |
+| Verification | §10.6 and §10.9 of both files cite them. The v2 negation statement was checked by running `bfcl_semantic_bundle_v2.extract_intent` on "Please do not cancel booking B-104", which returns no intent. |
+| Status | RESOLVED |
+
+### PRF-003 AgentHarm "all three governance goals met" rested on an asymmetric metric
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | VERIFY counts as a block for harmful tasks but not as friction for benign ones, and Mode 3 sends 80 of 88 cases to VERIFY. |
+| Evidence | §10.6; NEGATIVE_RESULTS.md §80. |
+| Affected claims | none directly (the tri-mode run is not a register claim); CLAIM-002 context |
+| Action | Qualify the goals sentence, state the asymmetry and report the twin-pair result. |
+| Owning PR | level-1 PR |
+| Verification | Both files now say the goals are met only under the blocked-recall definition, give 80/88 to VERIFY, and report 0 of 44 pairs (Mode 3) against 29 of 44 (Mode 1). A benign-friction column in the table was not added. |
+| Status | RESOLVED |
+
+### PRF-004 Abstract and headline table dropped decisive caveats
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The CLAIM-001 row omitted the 1.4% baselines and the non-significance. The CLAIM-002 row omitted FBR 100%. "The same rules" was false, because CLAIM-002 is an imported AROMER run. The simulator scope was not stated. |
+| Evidence | `paper/remora_paper.md` abstract and Table at `f66c4f7b`; `docs/assurance/claim_register_v1.yaml` CLAIM-001/002. |
+| Affected claims | CLAIM-001, CLAIM-002 |
+| Action | Add the caveats and remove "same rules". |
+| Owning PR | level-1 PR |
+| Verification | The abstract and table in both files now carry the baselines, the non-significance, every benign counterpart blocked, "imported intent-gating run" and "simulator". Still missing: the missed pre-registered FBR floor (≤40%) is not stated beside the table. |
+| Status | IN_PROGRESS |
+
+### PRF-005 The safety result was attributed to the deterministic floor without evidence
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | §17 opened with "Autonomous safety needs a deterministic floor", although the ablation records FAR 0 with the hard blocks removed. §11.1 deferred to a "mechanism-level argument in §17", and §17 did not contain one. |
+| Evidence | §11.1, §17, CLAIM-020. |
+| Affected claims | CLAIM-001, CLAIM-020 |
+| Action | Retitle §17's first result and state that the floor's share is unmeasured. |
+| Owning PR | level-1 PR |
+| Verification | A grep for "mechanism-level argument" and "produced by deterministic" in both files returns nothing. §17 now reads "The zero-unsafe result has no identified cause." |
+| Status | RESOLVED |
+
+### PRF-006 "The routing behaviour transfers" over-generalised
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The heading cites superseded CLAIM-018 and contradicts §82: the gain is on dev-seen tools of one catalogue. |
+| Evidence | Abstract and §17 at `f66c4f7b`; NEGATIVE_RESULTS.md §82. |
+| Affected claims | CLAIM-018, CLAIM-021 |
+| Action | Say "within one tool catalogue" and remove CLAIM-018 from the abstract headline. |
+| Owning PR | level-1 PR |
+| Verification | A grep for "transfers" in both files returns no heading. The .md abstract no longer cites CLAIM-018. The .tex abstract keeps it only as the superseded baseline. |
+| Status | RESOLVED |
+
+### PRF-007 The C-ext3 pre-registered joint hypothesis failed but was framed as a safety success
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | SAP v5 makes wrong-call ACCEPT and read autonomy (≥75%) co-primary under intersection-union. Read autonomy was 26.6%, so the hypothesis was not supported, while the paper led with "eliminated" wrong-call acceptance. |
+| Evidence | `docs/assurance/statistical_analysis_plan_v5_bfcl_semantic.md` §2; CLAIM-019. |
+| Affected claims | CLAIM-019 |
+| Action | State that the joint hypothesis was not supported wherever 0/500 is reported, and drop "eliminated". |
+| Owning PR | level-1 PR |
+| Verification | The abstract, introduction, §10.9 and §17 in both files say so, and "eliminat" no longer appears in reader text about C-ext3. |
+| Status | RESOLVED |
+
+### PRF-008 C-ext4 targets were set after the bundle existed, and refuse-all meets five of eight
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | Bundle v2 (08cc45e8, 12:04) came before SAP v6 (f0e6b18d, 12:21) on the same day. The obtainable-VERIFY bar fell from 95% to 60%, and the 75% read-autonomy bar was dropped. CONTROL meets all three safety targets plus irrelevance and unobtainable ABSTAIN. |
+| Evidence | git log; `results/routing_bench_bfcl_v4_cext4_results.json` `per_arm_metrics.CONTROL`. |
+| Affected claims | CLAIM-021 |
+| Action | Disclose this in §10.9 and §14. The run cannot be repeated; SAP v7 must fix targets before any bundle is written. |
+| Owning PR | level-1 PR |
+| Verification | Both files call the targets floors set after the bundle, name the five targets CONTROL meets, and report V2 (84/291) beside V2D (87/291). |
+| Status | ACCEPTED_LIMITATION |
+
+### PRF-009 Zero-count bounds assume independence between rows that share a tool
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The 295 C-ext4 wrong calls use 67 proposed tools, and the 500 C-ext3 wrong calls use 106. The decision is a function of the tool, so tool-clustered upper bounds are wider: the reviewer estimates about 5.4% and 3.5%, against 1.29% and 0.76%. Only 137 of the 295 were actively rejected; the rest were held at VERIFY or ESCALATE. |
+| Evidence | `data/routing_bench_bfcl_v4_cext4/bfcl_holdout.jsonl` (67 distinct `proposed_tool_name` among `:substituted` episodes, maintainer re-count); the reviewer's in-memory re-route. |
+| Affected claims | CLAIM-019, CLAIM-021 |
+| Action | Level 2: a post-hoc script and artifact giving tool-clustered and crossed bounds, the actively rejected count, and CONTROL beside each safety number. The paper now calls the 0.76% bound "row-level" and §14 says clustered bounds are wider and not yet reported. |
+| Owning PR | level-2 PR (not yet opened) |
+| Verification | Pending. The 5.4% and 3.5% figures are the reviewer's and are not yet in a committed artifact. |
+| Status | OPEN |
+
+### PRF-010 BFCL "native" wrong calls are synthetic cross-task substitutions
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | Each wrong call is another task's gold call, added to the task's tool list. In C-ext4, 287 of 295 name a tool the original task never offered. These calls are easier to separate than real model errors. |
+| Evidence | `remora/toolcall/routing/sources/bfcl.py` (the `substituted` episode); maintainer re-count on the C-ext4 holdout. |
+| Affected claims | CLAIM-018, CLAIM-019, CLAIM-021 |
+| Action | Disclose the construction in §10.8 and §14 (done). Level 2: report the in-catalogue subset. Level 3: model-generated wrong calls in SAP v7. |
+| Owning PR | level-1 PR (disclosure); level 2 and 3 to follow |
+| Verification | Both files now describe the construction. The 287/295 figure is not yet in a committed artifact, and the subset analysis is not done. |
+| Status | IN_PROGRESS |
+
+### PRF-011 No external or naive baseline on the sealed BFCL episodes
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | A name-overlap rule is competitive. The reviewer's two-token rule gave 80/291 gold accepts and 2/295 wrong accepts; the maintainer's re-run with a different tokenizer gave 67/291 and 3/295. V2D gave 87/291 and 0/295. No LLM judge or existing guardrail was run. |
+| Evidence | reviewer computation; maintainer re-run (scratch, not committed). |
+| Affected claims | CLAIM-021, CLAIM-019 |
+| Action | Level 2: committed post-hoc naive arms (name overlap, schema-only) with accept-gold against accept-wrong curves, labelled post hoc. Level 3: external baselines (LLM judge, policy engine) in SAP v7. §14 now states that no such baseline was run. |
+| Owning PR | level-2 PR (not yet opened) |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-012 The system routes annotated gold proposals; this was not stated
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | REMORA never generates a call. Gold-call acceptance is a friction measure on correct proposals, not task success. |
+| Evidence | `remora/toolcall/routing/sources/bfcl.py`, where the gold name and `allowed[0]` arguments become the proposal. |
+| Affected claims | CLAIM-021 |
+| Action | State the input contract in the abstract, §10.8 and §14. |
+| Owning PR | level-1 PR |
+| Verification | Both files now say "REMORA routes annotated calls; it does not generate them", and §14 says the measure is not comparable with leaderboard scores. |
+| Status | RESOLVED |
+
+### PRF-013 Argument families can be told apart by tool name; irrelevance holds by construction
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The obtainable mutant adds a producer named after the dropped argument. Irrelevance episodes propose no call. In 100 of 119 constructed wrong-tool mutants, a schema check alone rejects the call. |
+| Evidence | `remora/toolcall/routing/mutations.py` (the `MISSING_ARG_OBTAINABLE` producer); `bfcl.py` (irrelevance `proposed_name=None`). |
+| Affected claims | CLAIM-018, CLAIM-019, CLAIM-021 |
+| Action | Disclose (done). Level 2: report wrong-tool results on the schema-valid subset. SAP v7: realistic producer names, and irrelevance episodes that propose a plausible call. |
+| Owning PR | level-1 PR (disclosure) |
+| Verification | §10.8 of both files states both construct limits. The schema-valid subset count (19) is the reviewer's and is not yet committed. |
+| Status | IN_PROGRESS |
+
+### PRF-014 The C-ext4 gain sits on tools seen in development
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | 76 of 87 accepts fall on dev-seen tools; on the 36 unseen-tool calls the score is 11 against 8. |
+| Evidence | NEGATIVE_RESULTS.md §82; `artifacts/posthoc/bfcl_cext4_seen_split.json`. |
+| Affected claims | CLAIM-021 |
+| Action | Already disclosed (#898). Only a new sealed catalogue (SAP v7) can test generalisation. |
+| Owning PR | #898 |
+| Verification | The abstract, §10.9 and §17 state the limit, and the split is reproduced by a test. |
+| Status | ACCEPTED_LIMITATION |
+
+### PRF-015 No threat model, and the execution chain is not evaluated against attacks
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | Contribution 1 (ToolSpec, lease, grant, re-check) is never measured. There is no attack harness covering replay, argument substitution, ToolSpec swap, cross-task reuse, forged lease or TOCTOU. There is no explicit threat-model section. |
+| Evidence | §4.4, §10, §2.11 ("covers injection and oracle compromise"). |
+| Affected claims | none (no claim measures the chain) |
+| Action | Level 3: a threat-model section and an attack evaluation against a policy-only gateway baseline. New §13.13 and contribution 1 now state that the chain is not evaluated. |
+| Owning PR | level-1 PR (disclosure); level 3 to follow |
+| Verification | Pending for the evaluation. |
+| Status | OPEN |
+
+### PRF-016 Per-call authorization does not stop attacks composed of allowed calls
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | A read-secret-then-send exfiltration is built from individually authorized calls, and information-flow control exists for exactly this case. |
+| Evidence | `docs/09-related-work.md` already conceded "REMORA does not claim trajectory-level enforcement"; the paper did not say so. |
+| Affected claims | none |
+| Action | Declare the non-claim in §2.11 and §13.13. |
+| Owning PR | level-1 PR |
+| Verification | Both files state that REMORA does not claim trajectory-level or data-flow enforcement. |
+| Status | ACCEPTED_LIMITATION |
+
+### PRF-017 Missing related work
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | The paper does not cite: information-flow control for agents (FIDES; Wu et al. 2024) and isolation (IsolateGPT/SecGPT); Conseca, MELON, Task Shield, Spotlighting and StruQ/SecAlign; agent design patterns (Beurer-Kellner et al.) and MCP; the reference monitor (Anderson 1972) and the confused deputy; macaroons and Biscuit, OAuth RAR (RFC 9396), XACML and Cedar; tamper-evident logging (Schneier–Kelsey, Crosby–Wallach, Certificate Transparency). |
+| Evidence | Zero grep hits in the bibliography at `f66c4f7b`. |
+| Affected claims | none |
+| Action | Add a classical-foundations paragraph and an IFC/isolation subsection, with every reference verified against its source and given a role in the research control matrix (bibliography parity is CI-gated). |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-018 Positioning was inconsistent with the evidence
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | §2.11 called the contribution "uncertainty-routed escalation" and treated capability enforcement as complementary. §4.4 is capability enforcement, and consensus signals are not on any governed path. |
+| Evidence | §2.11, §5.2, §17. |
+| Affected claims | none |
+| Action | Reframe as a systems artifact plus evaluation method (owner decision 2026-10-17). Move the ensemble, debate, conformal and calibration material to an appendix. |
+| Owning PR | level-1 PR (reframing sentences) |
+| Verification | Done: the abstract, contributions and §2.11 state the reframing in both files. Remaining: the consensus and conformal material is still in the body. |
+| Status | IN_PROGRESS |
+
+### PRF-019 Clustering units for CLAIM-001 and CLAIM-002, and post-hoc utility test
+
+| Field | Value |
+|---|---|
+| Severity | MAJOR |
+| Claim | CLAIM-001's [0, 5.2%] uses 70 clusters, 14 of them benign-only. With 56 harmful clusters the bound is about 6.4%. CLAIM-002's 208 harmful scenarios come from 47 base behaviours, giving about 7.6%. The +0.46 utility test was declared post hoc. |
+| Evidence | `results/toolcall_benchmark_v2_significance.json`; `docs/assurance/statistical_analysis_plan.md` (H2 not supported; the utility delta reported as post hoc); claim register comment for CLAIM-001. |
+| Affected claims | CLAIM-001, CLAIM-002 |
+| Action | Level 2: recompute both bounds at the harmful-template and behaviour level as post-hoc artifacts. Done: the abstract no longer cites +0.46, and §14 marks it post hoc. |
+| Owning PR | level-2 PR (not yet opened) |
+| Verification | The post-hoc disclosure is in place. The re-clustered bounds are pending, and the figures above are the reviewer's. |
+| Status | IN_PROGRESS |
+
+### PRF-020 The C-ext4 McNemar p-value ignores tool clustering
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The 69 V2D-only accepts fall on 19 tools. A tool-level sign test gives p ≈ 1.1×10⁻⁴, not ≈1e-18. The target is still met at 0.01. |
+| Evidence | Reviewer re-route; SAP v6 P3. |
+| Affected claims | CLAIM-021 |
+| Action | Level 2: a tool-clustered paired test as a post-hoc artifact. |
+| Owning PR | level-2 PR (not yet opened) |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-021 C-ext3 ran three of six pre-registered arms and no paired test
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | SAP v5 §5 pre-registered arms A–F with cluster-level McNemar tests. `scripts/run_bfcl_cext3.py` runs A, C and F only. |
+| Evidence | `scripts/run_bfcl_cext3.py` `_arm_engines`. |
+| Affected claims | CLAIM-019 |
+| Action | Done: the deviation is disclosed in §10.9 of both files. Level 2: post-hoc pairwise tests on the committed C-ext3 episodes. |
+| Owning PR | level-1 PR (disclosure) |
+| Verification | The disclosure is in place; the tests are pending. |
+| Status | IN_PROGRESS |
+
+### PRF-022 Not all C-ext4 arms reported; receipts credited for the gain
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | V2 without receipts accepted 84/291 against V2D's 87/291, so the receipts add 3. |
+| Evidence | `results/routing_bench_bfcl_v4_cext4_results.json` `per_arm_metrics.V2`. |
+| Affected claims | CLAIM-021 |
+| Action | Report V2 and CONTROL in §10.9. |
+| Owning PR | level-1 PR |
+| Verification | Both files give V2 84/291 and the CONTROL targets. The counts were re-read from the result file. |
+| Status | RESOLVED |
+
+### PRF-023 The C-ext3 read-autonomy denominator was chosen by the bundle under test
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | 26.6% is 25/94 reads under the frozen bundle's own classification. Arm F accepted 25 of 487 gold calls. |
+| Evidence | SAP v5 §12 deviation 1. |
+| Affected claims | CLAIM-019 |
+| Action | Done: the denominator is now disclosed in §10.9. Level 2: report the all-gold rate from a committed artifact. |
+| Owning PR | level-1 PR (disclosure) |
+| Verification | The disclosure is in place; the all-gold figure is pending. |
+| Status | IN_PROGRESS |
+
+### PRF-024 The CLAIM-005 split is exploratory, with a cutpoint chosen on the same items
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The 16/21 vs 4/11 split uses τ chosen on the same 32 items (Fisher two-sided p ≈ 0.053, reviewer). The "replication" used simulated trust distributions. |
+| Evidence | CLAIM-005; §13.3. |
+| Affected claims | CLAIM-005 |
+| Action | Done: removed from the .md abstract, and labelled exploratory in the .tex. Remaining: label §13.3 of the .md, and commit the p-value as a post-hoc artifact. |
+| Owning PR | level-1 PR (partial) |
+| Verification | Partial. |
+| Status | IN_PROGRESS |
+
+### PRF-025 CLAIM-014's "0% to 100%" had no n and a zero-by-construction baseline
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The figure is 60/60 valid-identifier reads, and the baseline is zero because there are no validators and the index is empty. |
+| Evidence | `results/fleetops_validator_study_results.json` (`valid_id_completion_read` 60/60 with validators, 0/60 without). |
+| Affected claims | CLAIM-014 |
+| Action | Give n/d and say the baseline is zero by construction. |
+| Owning PR | level-1 PR |
+| Verification | The abstract, table, §12b and §17 in both files give 60/60 and 0/60, and the counts were re-read from the artifact. |
+| Status | RESOLVED |
+
+### PRF-026 Sealing has no external timestamp
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The seal shows only that hashes were recorded in order on a self-hosted git history. |
+| Evidence | SAP v6. |
+| Affected claims | CLAIM-019, CLAIM-021 |
+| Action | SAP v7: register with an external timestamp (for example OSF) before any data is built. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-027 "Every number is bound to a claim register" was untrue
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | +0.46, the p-value and "90% vs ≤60%" are not CLAIM-001 metrics, and several sections have no claims. |
+| Evidence | claim register metrics; paper abstract at `f66c4f7b`. |
+| Affected claims | CLAIM-001 |
+| Action | Say "each result above cites its claim-register entry" and "the headline numbers". |
+| Owning PR | level-1 PR |
+| Verification | A grep for "Every number is bound" and "gates every number" in both files returns nothing. |
+| Status | RESOLVED |
+
+### PRF-028 The "≤60%" accuracy comparison omits the temperature-gate baseline
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | Against the omitted temperature-gate baseline the utility gain is +0.26, not +0.46. |
+| Evidence | `results/toolcall_benchmark_v2_significance.json` (reviewer). |
+| Affected claims | CLAIM-001 |
+| Action | Done: the abstract no longer cites the accuracy comparison. Remaining: show the retired baseline row in §10.3, or scope +0.46 to the keyword heuristics. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-029 The .tex had a thinner limitations section and different results sections from the .md
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The .tex lacked oracle diversity, in-sample τ, proxy evidence, demo data, MetaJudge circularity, PS not deployed and no human evaluation. It named a "32-case" cross-domain replay that the .md does not have, and lacked the .md's N=36 benchmark. |
+| Evidence | `paper/remora_paper.tex` Negative Results at `f66c4f7b`. |
+| Affected claims | none |
+| Action | Port the limits and replace the 32-case mention with the N=36 benchmark. |
+| Owning PR | level-1 PR |
+| Verification | The .tex now has a paragraph for each listed limit and names the 36-case benchmark with its artifact. The compiled PDF has 27 pages, no overflow, and no undefined references (local texlive build). |
+| Status | RESOLVED |
+
+### PRF-030 Proof and guarantee wording without formal methods
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | "Theoretically optimal" (El-Yaniv & Wiener) does not hold for three LLMs. The conformal "per-phase coverage guarantees" fail under non-exchangeability. "Proves" was used for a parity test, and "provably serves the wrong goal" overstated the check. |
+| Evidence | §2.4, §2.5, §13.11, §10.9. |
+| Affected claims | none |
+| Action | Weaken the wording. |
+| Owning PR | level-1 PR |
+| Verification | A grep for "theoretically optimal", "provably" and "proves the trace" in both files returns nothing. The conformal sentence now says coverage holds only under exchangeability. |
+| Status | RESOLVED |
+
+### PRF-031 Appendix F and §14 disagreed with the register on gates and AII
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | Appendix F said one production gate remains; CLAIM-006 says two (REM-021, REM-023). §14 cited AII 0.8442 TRAINED without the same-day regression to CAPABLE. |
+| Evidence | CLAIM-006 caveat and statement. |
+| Affected claims | CLAIM-006 |
+| Action | Align with the register. |
+| Owning PR | level-1 PR |
+| Verification | Appendix F now lists REM-021 and REM-023. §14 (.md) and Threats (.tex) give the regression to 0.7885. |
+| Status | RESOLVED |
+
+### PRF-032 "Non-overlapping CIs are used to assess significance"
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | Comparing whether intervals overlap is not a valid significance test. |
+| Evidence | §14 Statistical validity. |
+| Affected claims | none |
+| Action | Remove the statement. |
+| Owning PR | level-1 PR |
+| Verification | Both files now say that overlapping or non-overlapping intervals are not evidence of a difference. |
+| Status | RESOLVED |
+
+### PRF-033 Audit log called "immutable" in one place and tamper-evident in another
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | §2.7 said "immutable hash-chaining", but §8.2 concedes tamper-detection only. |
+| Evidence | §2.7, §8.2. |
+| Affected claims | none |
+| Action | Use "tamper-evident" and point to §8.2. Citing forward-secure and anchored-log literature is part of PRF-017. |
+| Owning PR | level-1 PR |
+| Verification | A grep for "immutable hash" in both files returns nothing. |
+| Status | RESOLVED |
+
+### PRF-034 Wrong cross-reference to §13.9
+
+| Field | Value |
+|---|---|
+| Severity | NIT |
+| Claim | §10.9 pointed to §13.9 (MetaJudge circularity) for the semantic-authority mechanism. |
+| Evidence | `paper/remora_paper.md` §10.9. |
+| Affected claims | none |
+| Action | Point to §10.8. |
+| Owning PR | level-1 PR |
+| Verification | §10.9 now cites §10.8. |
+| Status | RESOLVED |
+
+### PRF-035 Table numbering in the .md is out of order
+
+| Field | Value |
+|---|---|
+| Severity | NIT |
+| Claim | The tables run 1, 3, 4, 5, 7, 6, 8, with no Table 2. |
+| Evidence | `paper/remora_paper.md`. |
+| Affected claims | none |
+| Action | Renumber the tables and every reference to them. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-036 Internal codenames are used without definition
+
+| Field | Value |
+|---|---|
+| Severity | NIT |
+| Claim | CLAIM-xxx, SAP v6, C-ext2/3/4, F1/V2D, E-ECB/E-FA/E-EE/E7, SHADOW_ONLY and REM-xxx appear without definition. |
+| Evidence | Abstract and body. |
+| Affected claims | none |
+| Action | Add a short glossary, or define each at first use. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-037 "Eliminated" for a zero count with an upper bound
+
+| Field | Value |
+|---|---|
+| Severity | NIT |
+| Claim | 0/500 with an upper bound of 0.76% is "no accepts observed", not elimination. |
+| Evidence | Abstract, introduction, §17. |
+| Affected claims | CLAIM-019 |
+| Action | Reword. |
+| Owning PR | level-1 PR |
+| Verification | See PRF-007. |
+| Status | RESOLVED |
+
+### PRF-038 Comparator figures and 2026 references need source checks
+
+| Field | Value |
+|---|---|
+| Severity | NIT |
+| Claim | Progent (39.9% to 1.0%) and CaMeL (77%, "provable security") depend on the arXiv version cited. The 2026 references (AIRGuard, PCAA, PoE, Michael & Roesner) should be checked against their sources. |
+| Evidence | §2.11; the reviewer flagged uncertainty rather than error. |
+| Affected claims | none |
+| Action | Pin the arXiv versions and re-check each figure. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
+### PRF-039 The roadmap stated the C-ext4 safety constraint as a Wilson upper bound
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | `docs/13-research-frontier-roadmap.md` says the wrong-call constraint is a Wilson upper bound ≤1%. SAP v6 set a point estimate ≤1%, and C-ext4's upper bound was 1.29%. A bound of 1% at zero observed needs at least 381 episodes. |
+| Evidence | `results/routing_bench_bfcl_v4_cext4_results.json` `targets.known_wrong_call_accept` (`<= 0.01`, wilson95 [0, 0.0129]); z²/(n+z²) < 0.01 first at n=381. |
+| Affected claims | CLAIM-021 |
+| Action | Correct the roadmap wording. |
+| Owning PR | level-1 PR |
+| Verification | The roadmap now states the point-estimate target, the 1.29% bound and the 381-episode requirement. |
+| Status | RESOLVED |
