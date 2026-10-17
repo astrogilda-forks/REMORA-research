@@ -302,6 +302,12 @@ results:
 - path: results/routing_bench_bfcl_v4_cext3_results.json
   class: frozen
   reason: sealed one-shot holdout; its lock/run protocol forbids a second run
+- path: results/routing_bench_bfcl_v4_cext4_results.json
+  class: frozen
+  reason: sealed one-shot holdout; its lock/run protocol forbids a second run
+- path: results/routing_bench_bfcl_v4_cext4_results.provenance.json
+  class: sidecar
+  of: results/routing_bench_bfcl_v4_cext4_results.json
 - path: results/routing_bench_bfcl_v4_results.json
   class: frozen
   reason: sealed one-shot holdout; its lock/run protocol forbids a second run

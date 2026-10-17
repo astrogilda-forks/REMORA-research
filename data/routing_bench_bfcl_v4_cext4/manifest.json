@@ -2073,6 +2073,7 @@
   "caveat": "Evaluated once, sealed. Arms CONTROL, F1, V2 and V2D on the same episodes; V2D is confirmatory. Empty state index: the accept property is semantically authorised read, weaker than a grounded read. Bundle v2 was designed on the spent sets; the reserve rows were not read. No retuning against this set is permitted; misses are published as measured.",
   "confirmatory_arm": "V2D",
   "descriptions_sha256": "9be3427e660f2e448ad2e578a435483e8df82dc338b1d55248bf564488dc16d1",
+  "evaluated_primary_met": true,
   "excluded_axes": {
     "wrong_argument_value": "No vouchable external state table; labels may not be used as authority."
   },
@@ -2096,7 +2097,7 @@
   "sap": "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md",
   "schema": "routing_bench_bfcl_v4_cext4_v1",
   "sha256": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4",
-  "status": "locked_never_run",
+  "status": "evaluated",
   "targets": {
     "constructed_wrong_tool_accept": [
       "<=",

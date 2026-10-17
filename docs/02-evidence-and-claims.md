@@ -160,6 +160,7 @@ with their artifacts:
 | CLAIM-017 | Semantic binding gap in match_tool_to_intent (finding, fixed and regression-tested) | regression_tested | `remora/toolcall/routing/goal_match.py` |
 | CLAIM-018 | **Superseded by CLAIM-019.** Disjoint sealed BFCL v4 (C-ext2): all five pre-registered targets met, wrong-call ACCEPT 28/258 = 10.9%. Retained permanently as the degraded-authority baseline — that track ran with `contracts=None, intent=None`, so the semantic gates never fired | externally_benchmarked | `results/routing_bench_bfcl_v4_results.json` |
 | CLAIM-019 | Sealed BFCL v4 C-ext3 with declared semantic authority: native wrong-call ACCEPT **0/500 = 0.0%** (Wilson 95% upper 0.76%), irrelevance 300/300, required-unknown 0/398. **Four of seven targets MISSED** and published as measured — read autonomy 25/94 = 26.6% against a 75% bar, obtainable VERIFY 46.7%, unobtainable ABSTAIN 63.3%, constructed wrong-tool 2/199 = 1.005% (`NEGATIVE_RESULTS.md` §39) | externally_benchmarked | `results/routing_bench_bfcl_v4_cext3_results.json` |
+| CLAIM-021 | Sealed BFCL v4 C-ext4 utility track: bundle v2 with deterministic receipts accepts **87/291 = 29.9%** of gold calls against **20/291 = 6.9%** for the frozen v1 bundle on the same episodes; native wrong-call ACCEPT 0/295; all eight pre-registered targets met. The gain sits on tools also seen in development (`NEGATIVE_RESULTS.md` §82) | externally_benchmarked | `results/routing_bench_bfcl_v4_cext4_results.json` |
 
 ### Utility floors
 
@@ -168,10 +169,11 @@ Each active safety claim in the register therefore also states its utility
 cost. It lists the pre-registered utility bars it was measured against
 (`utility_floors`), or gives the reason none applies (`utility_floor_exempt`).
 `scripts/check_claim_utility_floors.py` recomputes each floor's status from the
-bound metric and fails when the register says otherwise. Four of the five
+bound metric and fails when the register says otherwise. Four of the eight
 floors are missed and stay published as missed. One is the AgentHarm benign
 false-block rate (CLAIM-002, 100% against a 40% ceiling). The other three are
-BFCL C-ext3 routing targets (CLAIM-019). CLAIM-014's read-completion target is met.
+BFCL C-ext3 routing targets (CLAIM-019). CLAIM-014's read-completion target is
+met, and so are the three BFCL C-ext4 floors (CLAIM-021).
 CLAIM-001, CLAIM-003 and CLAIM-020 carry exemptions, because no utility bar was
 fixed for them before they ran.
 

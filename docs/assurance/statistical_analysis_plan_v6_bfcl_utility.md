@@ -1,8 +1,28 @@
 # Statistical Analysis Plan v6: BFCL utility under semantic authority (C-ext4)
 
-Status: **PRE-REGISTERED, not yet run.** This plan is committed before the
-C-ext4 set is built. Nothing below may be edited after the build; an
-execution record is appended above §1 once, after the single run.
+Status: **EXECUTED 2026-10-17.** The plan was merged in #895 before the
+set was built. The set was sealed in `324971fc`, locked in `fff54602`
+and run once. The manifest at `data/routing_bench_bfcl_v4_cext4/manifest.json`
+reads `evaluated` and refuses a second run.
+
+**Execution record, appended, not edited.** Everything from the scope
+paragraph down is the pre-registration as committed before the build.
+
+| Item | Outcome |
+|---|---|
+| Result artifact | `results/routing_bench_bfcl_v4_cext4_results.json` |
+| Claim | CLAIM-021 (active) |
+| Targets met | **8 of 8** (P1 to P3, S1 to S5) |
+| P1 native wrong-call ACCEPT | 0/295, Wilson 95 % upper 1.29 % |
+| P2 gold-call ACCEPT, V2D | 87/291 = 29.9 % (CI 24.9 % to 35.4 %); F1 20/291 = 6.9 % |
+| P3 paired gain over F1 | 69 gold calls V2D only, 2 F1 only, exact one-sided p about 1e-18 |
+| S5 obtainable VERIFY | 100/119 = 84.0 % (F1 45/119) |
+
+One disclosure was computed after the run and is descriptive only. Of the
+291 gold calls, 255 use a tool that also occurs in the spent development
+sets. On those, V2D accepted 76 and F1 12. On the other 36, V2D accepted 11
+and F1 8. The gain therefore sits on tools seen during development, and
+generalisation to unseen tool families is not shown.
 
 Scope: whether a deterministic semantic bundle can accept materially more
 correct calls than the frozen v1 bundle on unseen BFCL tasks, without giving

@@ -1,0 +1,609 @@
+{
+  "all_targets_met": true,
+  "caveat": "Evaluated once, sealed. Arms CONTROL, F1, V2 and V2D on the same episodes; V2D is confirmatory. Empty state index: the accept property is semantically authorised read, weaker than a grounded read. Bundle v2 was designed on the spent sets; the reserve rows were not read. No retuning against this set is permitted; misses are published as measured.",
+  "confirmatory_arm": "V2D",
+  "frozen_sha256": {
+    "arms": "6e9b790ecb6355ef19b203084827f62d260ee41af4d341eaa645d875ae864bb1",
+    "bundle_v1": "860768b6150c746af5b51df44b28108215ae1e080d554251ed95e6f687754dc0",
+    "bundle_v2": "32d19391c2b53767503a85a8803d6cb1de8b1874a396f165bebe62e166dc1e3d",
+    "compatibility": "f9dfc72ca9c0f84decfcb8872294d0a61703738f213d66370bdd1c1c3d93ba90",
+    "decision_engine": "29242ebda82266ca2de91139b639a5c4e32f792a586c9d853f5c8e721126691e",
+    "derivation": "87013a7a0c0b09abe333f042458e19d521c21f6771e56805fe366fe6a4c12cd3",
+    "derivation_search": "79c10badc427f9af2b6d35cb77f0144db03d30b342c97740ad089750945f0068",
+    "evaluate": "d1098adab969b26fc4d4b81336fcda928f53c82eb7ee9dcdb39c5b0386365cbb",
+    "goal_match": "65c0b5473770a7c7c7e054b1d074589ffd0a0073dc6e434c6addaee75de8a0b1"
+  },
+  "holdout_sha256": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4",
+  "locked_at_commit": "324971fc5547d6b69b838cf5c66fe00afb546280",
+  "n_episodes": 1562,
+  "per_arm_metrics": {
+    "CONTROL": {
+      "constructed_wrong_tool_accept": {
+        "d": 119,
+        "misses": {
+          "abstain:control": 119
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0313
+        ]
+      },
+      "gold_call_accept": {
+        "d": 291,
+        "misses": {
+          "abstain:control": 291
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.013
+        ]
+      },
+      "gold_call_verify": {
+        "d": 291,
+        "misses": {
+          "abstain:control": 291
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.013
+        ]
+      },
+      "irrelevance_abstain_recall": {
+        "d": 68,
+        "misses": {},
+        "n": 68,
+        "wilson95": [
+          0.9465,
+          1.0
+        ]
+      },
+      "known_wrong_call_accept": {
+        "d": 295,
+        "misses": {
+          "abstain:control": 295
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0129
+        ]
+      },
+      "legitimate_read_autonomy": {
+        "d": 70,
+        "misses": {
+          "abstain:control": 70
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.052
+        ]
+      },
+      "obtainable_verify_recall": {
+        "d": 119,
+        "misses": {
+          "abstain:control": 119
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0313
+        ]
+      },
+      "required_unknown_auto_accept": {
+        "d": 238,
+        "misses": {
+          "abstain:control": 238
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0159
+        ]
+      },
+      "unobtainable_abstain_recall": {
+        "d": 119,
+        "misses": {},
+        "n": 119,
+        "wilson95": [
+          0.9687,
+          1.0
+        ]
+      }
+    },
+    "F1": {
+      "constructed_wrong_tool_accept": {
+        "d": 119,
+        "misses": {
+          "abstain:schema_unverified_verify": 1,
+          "abstain:semantic_authority_unknown_verify": 26,
+          "abstain:tool_does_not_match_goal": 73,
+          "escalate:schema_unverified_verify": 10,
+          "verify:schema_unverified_verify": 3,
+          "verify:semantic_authority_unknown_verify": 6
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0313
+        ]
+      },
+      "gold_call_accept": {
+        "d": 291,
+        "misses": {
+          "abstain:no_resolver_available": 10,
+          "abstain:tool_does_not_match_goal": 171,
+          "escalate:schema_unverified_verify": 5,
+          "verify:schema_unverified_verify": 7,
+          "verify:semantic_authority_unknown_verify": 75,
+          "verify:ungrounded_argument_values_verify": 3
+        },
+        "n": 20,
+        "wilson95": [
+          0.0449,
+          0.1038
+        ]
+      },
+      "gold_call_verify": {
+        "d": 291,
+        "misses": {
+          "abstain:no_resolver_available": 10,
+          "abstain:tool_does_not_match_goal": 171,
+          "accept:low_consequence_accept": 20,
+          "escalate:schema_unverified_verify": 5
+        },
+        "n": 85,
+        "wilson95": [
+          0.2428,
+          0.3468
+        ]
+      },
+      "irrelevance_abstain_recall": {
+        "d": 68,
+        "misses": {},
+        "n": 68,
+        "wilson95": [
+          0.9465,
+          1.0
+        ]
+      },
+      "known_wrong_call_accept": {
+        "d": 295,
+        "misses": {
+          "abstain:no_resolver_available": 1,
+          "abstain:tool_does_not_match_goal": 197,
+          "escalate:schema_unverified_verify": 19,
+          "verify:schema_unverified_verify": 7,
+          "verify:semantic_authority_unknown_verify": 70,
+          "verify:ungrounded_argument_values_verify": 1
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0129
+        ]
+      },
+      "legitimate_read_autonomy": {
+        "d": 70,
+        "misses": {
+          "abstain:no_resolver_available": 10,
+          "abstain:tool_does_not_match_goal": 17,
+          "verify:schema_unverified_verify": 1,
+          "verify:semantic_authority_unknown_verify": 19,
+          "verify:ungrounded_argument_values_verify": 3
+        },
+        "n": 20,
+        "wilson95": [
+          0.1932,
+          0.4005
+        ]
+      },
+      "obtainable_verify_recall": {
+        "d": 119,
+        "misses": {
+          "abstain:tool_does_not_match_goal": 69,
+          "escalate:schema_unverified_verify": 5
+        },
+        "n": 45,
+        "wilson95": [
+          0.2961,
+          0.4678
+        ]
+      },
+      "required_unknown_auto_accept": {
+        "d": 238,
+        "misses": {
+          "abstain:no_resolver_available": 8,
+          "abstain:schema_unverified_verify": 3,
+          "abstain:semantic_authority_unknown_verify": 34,
+          "abstain:tool_does_not_match_goal": 138,
+          "escalate:schema_unverified_verify": 10,
+          "verify:argument_resolution_required": 8,
+          "verify:schema_unverified_verify": 3,
+          "verify:semantic_authority_unknown_verify": 34
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0159
+        ]
+      },
+      "unobtainable_abstain_recall": {
+        "d": 119,
+        "misses": {
+          "escalate:schema_unverified_verify": 5
+        },
+        "n": 114,
+        "wilson95": [
+          0.9054,
+          0.9819
+        ]
+      }
+    },
+    "V2": {
+      "constructed_wrong_tool_accept": {
+        "d": 119,
+        "misses": {
+          "abstain:no_resolver_available": 1,
+          "abstain:schema_unverified_verify": 8,
+          "abstain:semantic_authority_unknown_verify": 47,
+          "abstain:tool_does_not_match_goal": 48,
+          "escalate:schema_unverified_verify": 3,
+          "verify:schema_unverified_verify": 3,
+          "verify:semantic_authority_unknown_verify": 9
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0313
+        ]
+      },
+      "gold_call_accept": {
+        "d": 291,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:no_resolver_available": 20,
+          "abstain:tool_does_not_match_goal": 23,
+          "escalate:schema_unverified_verify": 1,
+          "verify:schema_unverified_verify": 11,
+          "verify:semantic_authority_unknown_verify": 134,
+          "verify:ungrounded_argument_values_verify": 16
+        },
+        "n": 84,
+        "wilson95": [
+          0.2396,
+          0.3432
+        ]
+      },
+      "gold_call_verify": {
+        "d": 291,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:no_resolver_available": 20,
+          "abstain:tool_does_not_match_goal": 23,
+          "accept:low_consequence_accept": 84,
+          "escalate:schema_unverified_verify": 1
+        },
+        "n": 161,
+        "wilson95": [
+          0.4958,
+          0.6093
+        ]
+      },
+      "irrelevance_abstain_recall": {
+        "d": 68,
+        "misses": {},
+        "n": 68,
+        "wilson95": [
+          0.9465,
+          1.0
+        ]
+      },
+      "known_wrong_call_accept": {
+        "d": 295,
+        "misses": {
+          "abstain:tool_does_not_match_goal": 137,
+          "escalate:schema_unverified_verify": 12,
+          "verify:schema_unverified_verify": 14,
+          "verify:semantic_authority_unknown_verify": 131,
+          "verify:ungrounded_argument_values_verify": 1
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0129
+        ]
+      },
+      "legitimate_read_autonomy": {
+        "d": 70,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:no_resolver_available": 13,
+          "abstain:tool_does_not_match_goal": 3,
+          "verify:schema_unverified_verify": 1,
+          "verify:semantic_authority_unknown_verify": 29
+        },
+        "n": 22,
+        "wilson95": [
+          0.2176,
+          0.4303
+        ]
+      },
+      "obtainable_verify_recall": {
+        "d": 119,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:semantic_authority_unknown_verify": 1,
+          "abstain:tool_does_not_match_goal": 15,
+          "escalate:schema_unverified_verify": 1
+        },
+        "n": 100,
+        "wilson95": [
+          0.764,
+          0.8953
+        ]
+      },
+      "required_unknown_auto_accept": {
+        "d": 238,
+        "misses": {
+          "abstain:default_safe_abstain": 4,
+          "abstain:no_resolver_available": 33,
+          "abstain:schema_unverified_verify": 7,
+          "abstain:semantic_authority_unknown_verify": 62,
+          "abstain:tool_does_not_match_goal": 30,
+          "escalate:schema_unverified_verify": 2,
+          "verify:argument_resolution_required": 33,
+          "verify:schema_unverified_verify": 7,
+          "verify:semantic_authority_unknown_verify": 60
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0159
+        ]
+      },
+      "unobtainable_abstain_recall": {
+        "d": 119,
+        "misses": {
+          "escalate:schema_unverified_verify": 1
+        },
+        "n": 118,
+        "wilson95": [
+          0.9539,
+          0.9985
+        ]
+      }
+    },
+    "V2D": {
+      "constructed_wrong_tool_accept": {
+        "d": 119,
+        "misses": {
+          "abstain:no_resolver_available": 1,
+          "abstain:schema_unverified_verify": 8,
+          "abstain:semantic_authority_unknown_verify": 47,
+          "abstain:tool_does_not_match_goal": 48,
+          "escalate:schema_unverified_verify": 3,
+          "verify:schema_unverified_verify": 3,
+          "verify:semantic_authority_unknown_verify": 9
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0313
+        ]
+      },
+      "gold_call_accept": {
+        "d": 291,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:no_resolver_available": 20,
+          "abstain:tool_does_not_match_goal": 23,
+          "escalate:schema_unverified_verify": 1,
+          "verify:schema_unverified_verify": 11,
+          "verify:semantic_authority_unknown_verify": 134,
+          "verify:ungrounded_argument_values_verify": 13
+        },
+        "n": 87,
+        "wilson95": [
+          0.2493,
+          0.3539
+        ]
+      },
+      "gold_call_verify": {
+        "d": 291,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:no_resolver_available": 20,
+          "abstain:tool_does_not_match_goal": 23,
+          "accept:low_consequence_accept": 87,
+          "escalate:schema_unverified_verify": 1
+        },
+        "n": 158,
+        "wilson95": [
+          0.4855,
+          0.5993
+        ]
+      },
+      "irrelevance_abstain_recall": {
+        "d": 68,
+        "misses": {},
+        "n": 68,
+        "wilson95": [
+          0.9465,
+          1.0
+        ]
+      },
+      "known_wrong_call_accept": {
+        "d": 295,
+        "misses": {
+          "abstain:tool_does_not_match_goal": 137,
+          "escalate:schema_unverified_verify": 12,
+          "verify:schema_unverified_verify": 14,
+          "verify:semantic_authority_unknown_verify": 131,
+          "verify:ungrounded_argument_values_verify": 1
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0129
+        ]
+      },
+      "legitimate_read_autonomy": {
+        "d": 70,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:no_resolver_available": 13,
+          "abstain:tool_does_not_match_goal": 3,
+          "verify:schema_unverified_verify": 1,
+          "verify:semantic_authority_unknown_verify": 29
+        },
+        "n": 22,
+        "wilson95": [
+          0.2176,
+          0.4303
+        ]
+      },
+      "obtainable_verify_recall": {
+        "d": 119,
+        "misses": {
+          "abstain:default_safe_abstain": 2,
+          "abstain:semantic_authority_unknown_verify": 1,
+          "abstain:tool_does_not_match_goal": 15,
+          "escalate:schema_unverified_verify": 1
+        },
+        "n": 100,
+        "wilson95": [
+          0.764,
+          0.8953
+        ]
+      },
+      "required_unknown_auto_accept": {
+        "d": 238,
+        "misses": {
+          "abstain:default_safe_abstain": 4,
+          "abstain:no_resolver_available": 33,
+          "abstain:schema_unverified_verify": 7,
+          "abstain:semantic_authority_unknown_verify": 62,
+          "abstain:tool_does_not_match_goal": 30,
+          "escalate:schema_unverified_verify": 2,
+          "verify:argument_resolution_required": 33,
+          "verify:schema_unverified_verify": 7,
+          "verify:semantic_authority_unknown_verify": 60
+        },
+        "n": 0,
+        "wilson95": [
+          0.0,
+          0.0159
+        ]
+      },
+      "unobtainable_abstain_recall": {
+        "d": 119,
+        "misses": {
+          "escalate:schema_unverified_verify": 1
+        },
+        "n": 118,
+        "wilson95": [
+          0.9539,
+          0.9985
+        ]
+      }
+    }
+  },
+  "primary_met": true,
+  "primary_targets": [
+    "known_wrong_call_accept",
+    "gold_call_accept",
+    "paired_gain_over_F1"
+  ],
+  "schema": "routing_bench_bfcl_cext4_results_v1",
+  "status": "evaluated_once",
+  "targets": {
+    "constructed_wrong_tool_accept": {
+      "d": 119,
+      "met": true,
+      "n": 0,
+      "target": "<= 0.01",
+      "value": 0.0,
+      "wilson95": [
+        0.0,
+        0.0313
+      ]
+    },
+    "gold_call_accept": {
+      "d": 291,
+      "met": true,
+      "n": 87,
+      "target": ">= 0.12",
+      "value": 0.299,
+      "wilson95": [
+        0.2493,
+        0.3539
+      ]
+    },
+    "irrelevance_abstain_recall": {
+      "d": 68,
+      "met": true,
+      "n": 68,
+      "target": ">= 0.95",
+      "value": 1.0,
+      "wilson95": [
+        0.9465,
+        1.0
+      ]
+    },
+    "known_wrong_call_accept": {
+      "d": 295,
+      "met": true,
+      "n": 0,
+      "target": "<= 0.01",
+      "value": 0.0,
+      "wilson95": [
+        0.0,
+        0.0129
+      ]
+    },
+    "obtainable_verify_recall": {
+      "d": 119,
+      "met": true,
+      "n": 100,
+      "target": ">= 0.6",
+      "value": 0.8403,
+      "wilson95": [
+        0.764,
+        0.8953
+      ]
+    },
+    "paired_gain_over_F1": {
+      "a_only": 2,
+      "b_only": 69,
+      "met": true,
+      "p_one_sided": 1.082931623064623e-18,
+      "target": "V2D > F1, exact one-sided McNemar p < 0.01"
+    },
+    "required_unknown_auto_accept": {
+      "d": 238,
+      "met": true,
+      "n": 0,
+      "target": "<= 0.0",
+      "value": 0.0,
+      "wilson95": [
+        0.0,
+        0.0159
+      ]
+    },
+    "unobtainable_abstain_recall": {
+      "d": 119,
+      "met": true,
+      "n": 118,
+      "target": ">= 0.95",
+      "value": 0.9916,
+      "wilson95": [
+        0.9539,
+        0.9985
+      ]
+    }
+  }
+}
