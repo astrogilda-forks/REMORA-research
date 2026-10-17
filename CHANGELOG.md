@@ -4,6 +4,28 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-03a (ToolSpec v4 `flow` block, parser and linter)
+
+- `schemas/tool_spec_v4.yaml` defines the signed `flow` block: `sources`
+  (how each result field is labelled and whether the model sees it by value
+  or as a handle) and `sink` (who receives the arguments).
+- `remora/flow/spec.py` parses a block into frozen data and refuses any key
+  it does not define (`toolspec_flow_invalid`). Defaults fail closed: an
+  undeclared field is UNTRUSTED, a handle, and readable by the user alone.
+- Thirteen lint rules, FL-01 to FL-13, each with a test. They include the
+  four the SDD names for IFC-03 (a url argument under `recipients: none`, an
+  unknown argument in `integrity_required`, BY_VALUE on undeclared fields, a
+  missing block under the strict profile) and the ones §3.3 and §3.5 assign
+  to the linter.
+- Three fields go beyond the SDD's §5.1 excerpt, because a rule could not be
+  checked without them: `provider` (where the tool runs), `arguments` (the
+  kind of every argument, since the argument schema refuses `format`) and a
+  `disclosure` per source metadata entry. The schema file states why.
+- `scripts/check_toolspec_flow.py [--strict] BUNDLE...` lints a bundle
+  before signing.
+- Not yet wired: the bundle loader does not accept schema version 4 until
+  IFC-03b, so no deployment can carry a block yet.
+
 ### Flow control IFC-01 (label lattice)
 
 - New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).
