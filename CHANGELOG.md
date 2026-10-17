@@ -4,6 +4,31 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-04a (result labelling and handles)
+
+- `remora/flow/labeler.py`: `FlowLabeler.label_result` gives every node of
+  a JSON tool result a label from the ToolSpec `flow.sources` rules and
+  decides what the model sees. A node is shown by value only when its rule
+  says BY_VALUE and its label flows to the model principal; otherwise it and
+  everything under it becomes one handle labelled with the join of the
+  subtree. Every label is joined with the call's argument labels. The
+  labeler is pure: it returns the rendered result, the label to raise the
+  context by and the handle records to store.
+- `remora/flow/handles.py`: fixed-width `⟦h:…⟧` tokens (80 random bits),
+  records valid only in the minting context and its descendants, and
+  `HandleStore.resolve`, which substitutes handles anywhere in a call's
+  arguments and returns a value label per field (`L_h` for a whole-handle
+  field, `L_ctx ⊔ …` otherwise). A foreign, unknown or expired handle is
+  refused with `flow_handle_invalid`.
+- `remora/flow/render.py`: the agent-facing handle reference, with a type
+  tag taken only from a declared field `type` (new optional key in the
+  ToolSpec v4 block).
+- Two readings of the SDD are stated in the module docstrings. Rules match
+  exact paths and are not inherited. A container's structure carries the
+  container's own label.
+- Not yet wired: no dispatcher calls the labeler (IFC-04b), and handles are
+  held in process only; the durable, encrypted backend follows separately.
+
 ### Flow control IFC-03a (ToolSpec v4 `flow` block, parser and linter)
 
 - `schemas/tool_spec_v4.yaml` defines the signed `flow` block: `sources`

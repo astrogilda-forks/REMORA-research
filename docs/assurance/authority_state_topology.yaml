@@ -249,6 +249,24 @@ state:
       in-process store is the bounded LRU used when no durable switch is set;
       strict profiles require one of them.
 
+  # AST-017, not AST-016: AST-016 is the flow context store in the IFC-02a
+  # branch, which is reviewed separately.
+  - id: AST-017
+    symbol: "remora/flow/handles.py::InMemoryHandleBackend"
+    gates: "The values and labels behind the handles the model holds (flow-control SDD v1.3 §3.4, IFC-04)."
+    on_loss: loses_evidence
+    durable_adapter: none
+    tracking: "docs/design/derived-information-flow-control-v1.md section 3.4 (durable handle store, values encrypted at rest)"
+    note: >-
+      Losing a record makes its handle unknown, and a call that names an
+      unknown handle is refused (flow_handle_invalid), so nothing becomes
+      executable that was refused before. A model that retypes the value
+      as a literal gets the context label for it, which can only be as
+      restrictive or more. What is lost is the data and the record of where
+      it came from. The SDD puts handles on the durable backends with values
+      encrypted under the deployment data key; that backend is not built.
+      Not wired into any route yet.
+
 # THE SWITCHES
 #
 # `switches` names the environment variables the durability guard in

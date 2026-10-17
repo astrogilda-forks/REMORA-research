@@ -121,7 +121,7 @@ def test_every_declared_value_is_read():
         "arguments": {"to": {"kind": "email"}},
         "sources": {
             "fields": [
-                {"path": "$.items", "length_public": True,
+                {"path": "$.items", "length_public": True, "type": "list",
                  "readers": {"static": ["user://acme/*", "user://acme/alice"]}},
                 {"path": "$.note", "integrity": "TRUSTED", "readers": {"inherit_args": True}},
                 {"path": "$.doc", "readers": {"resource_acl": "to"}},
@@ -137,6 +137,7 @@ def test_every_declared_value_is_read():
     assert flow.argument_kind("to") == "email" and flow.argument_kind("cc") is None
     items, note, doc, plain = flow.sources.fields
     assert items.length_public is True and note.length_public is False
+    assert items.type == "list" and note.type is None
     # Static readers accept a subtree.
     assert items.readers.kind == "static" and "user://acme/*" in items.readers.values
     assert not items.readers.plus_user and not items.readers.plus_processors
@@ -412,6 +413,8 @@ def test_findings_are_ordered_and_name_the_tool():
     {"provider": "tcb", "arguments": {}, "sources": {"source_metadata": {
         "acl": {"authority": "source_system", "disclosure": "NEVER"}}},
      "sink": {"recipients": "none"}},
+    {"provider": "tcb", "arguments": {}, "sources": {"fields": [
+        {"path": "$", "type": "string[]"}]}, "sink": {"recipients": "none"}},
     {"provider": "tcb", "arguments": {}, "sources": {"default_return_mode": "INLINE"},
      "sink": {"recipients": "none"}},
     {"provider": "tcb", "arguments": {}, "sources": [], "sink": {"recipients": "none"}},

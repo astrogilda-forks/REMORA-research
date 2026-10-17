@@ -56,6 +56,8 @@ __all__ = [
 #: resource (FL-05).
 ARGUMENT_KINDS: Final = ("url", "email", "iban", "resource", "principal", "text", "scalar")
 RETURN_MODES: Final = ("BY_VALUE", "BY_HANDLE")
+#: Declared field types. A handle's type tag is taken from here only.
+FIELD_TYPES: Final = ("string", "bytes", "number", "list", "object")
 DISCLOSURES: Final = ("BY_VALUE", "CHARGE_BUDGET")
 #: Kinds a ``from_args`` recipient rule may map an argument to.
 FROM_ARGS_KINDS: Final = ("email", "principal")
@@ -118,6 +120,8 @@ class FieldRule:
     return_mode: str | None
     public_justification: str | None
     length_public: bool
+    #: The declared type, or None. Never computed from a runtime value.
+    type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -254,7 +258,8 @@ def _readers(value: Any, where: str) -> ReadersRule:
 
 def _field(value: Any, where: str) -> FieldRule:
     raw = _mapping(value, where, ("path", "integrity", "readers", "return_mode",
-                                  "public_justification", "length_public"), ("path",))
+                                  "public_justification", "length_public", "type"),
+                   ("path",))
     path = raw["path"]
     if not isinstance(path, str) or not _PATH.fullmatch(path):
         raise FlowSpecRefused(f"{where}.path {path!r} is not $, $.name... or $[*]...")
@@ -271,6 +276,7 @@ def _field(value: Any, where: str) -> FieldRule:
                      if "return_mode" in raw else None),
         public_justification=justification,
         length_public=_flag(raw.get("length_public", False), f"{where}.length_public"),
+        type=(_choice(raw["type"], FIELD_TYPES, f"{where}.type") if "type" in raw else None),
     )
 
 

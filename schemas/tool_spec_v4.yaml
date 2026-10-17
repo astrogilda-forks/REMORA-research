@@ -49,7 +49,8 @@ optional_fields:
       default_return_mode: "BY_HANDLE; BY_VALUE is refused (an undeclared field is never rendered by value)"
       fields: >-
         list of {path, integrity?, readers?, return_mode?, public_justification?,
-        length_public?}. path is "$", "$.a.b" or "$[*].a" (a field name or
+        length_public?, type?}. type is string, bytes, number, list or object;
+        a handle's type tag comes from it only (absent: "value"). path is "$", "$.a.b" or "$[*].a" (a field name or
         [*] per step). readers is PUBLIC, {static: [patterns]},
         {from_source_metadata: [names]}, {resource_acl: <argument>} or
         {inherit_args: true}, each with optional plus_user and
