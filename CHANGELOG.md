@@ -4,6 +4,20 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Research control matrix (RES-023, RES-024)
+
+- RES-023 covers semantic authority for tool routing: declared contracts,
+  a re-derived intent, the UNKNOWN floor and derivation receipts, evaluated
+  on the sealed C-ext3 and C-ext4 BFCL tracks. Its scope limits come from
+  §39, §81, §82 and §83.
+- RES-024 covers authority-preserving effect mediation (NTA-2: mediator,
+  effect domain, custody split). It builds on the confused deputy (Hardy,
+  1988) and object capabilities (Miller, 2006).
+- Both rows are internal designs (`in_code_citation: false`).
+  docs/09-related-work.md gains §15 and §16 to anchor them.
+- The register's `updated` field moves to 2026-10-17.
+- PRF-043 records that the paper does not cite BFCL.
+
 ### Research (SAP v7 draft and control-evaluation harness, no model call)
 
 - `docs/assurance/statistical_analysis_plan_v7_control_eval.md` (draft, not
