@@ -635,6 +635,8 @@ class TestPolicyBundleHash:
             "remora/policy/observation.py",
             "remora/policy/trap_classifier.py",
             "remora/policy/report.py",
+            # The meet composition of the components (COMP-01, 2026-10-17).
+            "remora/policy/composition.py",
         }
         assert expected_keys == set(manifest.keys())
 

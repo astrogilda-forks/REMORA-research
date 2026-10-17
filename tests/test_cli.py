@@ -143,7 +143,7 @@ def test_remora_provenance_json():
     assert r.returncode == 0, r.stderr
     d = json.loads(r.stdout)
     assert len(d["policy_bundle_hash"]) == 64
-    assert len(d["policy_bundle_manifest"]) == 7
+    assert len(d["policy_bundle_manifest"]) == 8  # composition.py joined (COMP-01)
     assert "remora_version" in d
 
 
