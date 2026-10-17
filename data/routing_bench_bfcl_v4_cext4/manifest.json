@@ -2087,6 +2087,7 @@
     "evaluate": "d1098adab969b26fc4d4b81336fcda928f53c82eb7ee9dcdb39c5b0386365cbb",
     "goal_match": "65c0b5473770a7c7c7e054b1d074589ffd0a0073dc6e434c6addaee75de8a0b1"
   },
+  "locked_at_commit": "324971fc5547d6b69b838cf5c66fe00afb546280",
   "n_clusters": 363,
   "n_episodes": 1562,
   "paired_gain_p_below": 0.01,
@@ -2095,7 +2096,7 @@
   "sap": "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md",
   "schema": "routing_bench_bfcl_v4_cext4_v1",
   "sha256": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4",
-  "status": "sealed_never_run",
+  "status": "locked_never_run",
   "targets": {
     "constructed_wrong_tool_accept": [
       "<=",
