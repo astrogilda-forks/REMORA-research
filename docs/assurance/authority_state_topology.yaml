@@ -255,14 +255,15 @@ state:
     on_loss: reauthorizes
     durable_adapter: "remora/flow/context.py::DurableFlowEventStore"
     reference_implementation: true
+    wired_at: "servers/execution_api.py::_flow_contexts"
     note: >-
       Classed reauthorizes because losing a context's stream resets its label
       to nothing: data the model had already been shown could then be sent to
       a recipient the label would have refused, and a spent budget would be
       spent again. The durable adapter uses the loop-safety store's three
       backends (REMORA_PG_DSN, REMORA_CHAIN_DB, REMORA_STATE_ENDPOINT) and a
-      conditional append with one winner per sequence. Not wired into any
-      route yet; IFC-02b wires it behind REMORA_FLOW_CONTROL.
+      conditional append with one winner per sequence. Wired into
+      POST /v1/contexts behind REMORA_FLOW_CONTROL=1 (IFC-02b).
 
 # THE SWITCHES
 #
@@ -316,6 +317,12 @@ wiring:
       now reads the endpoint switch to name that case
       (UnbackedExecutionOutbox) and to refuse it in production, and the
       production guard no longer admits the endpoint alone.
+
+  - id: ASW-006
+    for: AST-016
+    symbol: "servers/execution_api.py::_flow_contexts"
+    selects: "the flow context store POST /v1/contexts mints into"
+    switches: [REMORA_PG_DSN, REMORA_CHAIN_DB, REMORA_STATE_ENDPOINT]
 
 # What a PASS from this gate does NOT establish.
 #
