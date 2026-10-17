@@ -1,0 +1,164 @@
+{
+  "configuration": "arm F: semantic_authority_floor, low_consequence_accept, empty StateIndex; read denominator fixed by the frozen v1 bundle",
+  "runs": {
+    "v1": {
+      "constructed_wrong_tool_accept": {
+        "d": 298,
+        "n": 3
+      },
+      "gold_call_accept": {
+        "d": 994,
+        "n": 58
+      },
+      "irrelevance_abstain_recall": {
+        "d": 816,
+        "n": 816
+      },
+      "known_wrong_call_accept": {
+        "d": 1016,
+        "n": 0
+      },
+      "legitimate_read_autonomy": {
+        "d": 219,
+        "n": 58
+      },
+      "obtainable_verify_recall": {
+        "d": 431,
+        "n": 192
+      },
+      "required_unknown_auto_accept": {
+        "d": 862,
+        "n": 0
+      },
+      "unobtainable_abstain_recall": {
+        "d": 431,
+        "n": 425
+      },
+      "wrong_arg_value_accept": {
+        "d": 0,
+        "n": 0
+      }
+    },
+    "v1+derive": {
+      "constructed_wrong_tool_accept": {
+        "d": 298,
+        "n": 3
+      },
+      "gold_call_accept": {
+        "d": 994,
+        "n": 64
+      },
+      "irrelevance_abstain_recall": {
+        "d": 816,
+        "n": 816
+      },
+      "known_wrong_call_accept": {
+        "d": 1016,
+        "n": 0
+      },
+      "legitimate_read_autonomy": {
+        "d": 219,
+        "n": 64
+      },
+      "obtainable_verify_recall": {
+        "d": 431,
+        "n": 192
+      },
+      "required_unknown_auto_accept": {
+        "d": 862,
+        "n": 0
+      },
+      "unobtainable_abstain_recall": {
+        "d": 431,
+        "n": 425
+      },
+      "wrong_arg_value_accept": {
+        "d": 0,
+        "n": 0
+      }
+    },
+    "v2": {
+      "constructed_wrong_tool_accept": {
+        "d": 298,
+        "n": 0
+      },
+      "gold_call_accept": {
+        "d": 994,
+        "n": 233
+      },
+      "irrelevance_abstain_recall": {
+        "d": 816,
+        "n": 816
+      },
+      "known_wrong_call_accept": {
+        "d": 1016,
+        "n": 0
+      },
+      "legitimate_read_autonomy": {
+        "d": 219,
+        "n": 58
+      },
+      "obtainable_verify_recall": {
+        "d": 431,
+        "n": 353
+      },
+      "required_unknown_auto_accept": {
+        "d": 862,
+        "n": 0
+      },
+      "unobtainable_abstain_recall": {
+        "d": 431,
+        "n": 428
+      },
+      "wrong_arg_value_accept": {
+        "d": 0,
+        "n": 0
+      }
+    },
+    "v2+derive": {
+      "constructed_wrong_tool_accept": {
+        "d": 298,
+        "n": 0
+      },
+      "gold_call_accept": {
+        "d": 994,
+        "n": 255
+      },
+      "irrelevance_abstain_recall": {
+        "d": 816,
+        "n": 816
+      },
+      "known_wrong_call_accept": {
+        "d": 1016,
+        "n": 0
+      },
+      "legitimate_read_autonomy": {
+        "d": 219,
+        "n": 64
+      },
+      "obtainable_verify_recall": {
+        "d": 431,
+        "n": 353
+      },
+      "required_unknown_auto_accept": {
+        "d": 862,
+        "n": 0
+      },
+      "unobtainable_abstain_recall": {
+        "d": 431,
+        "n": 428
+      },
+      "wrong_arg_value_accept": {
+        "d": 0,
+        "n": 0
+      }
+    }
+  },
+  "sets": [
+    "cext2",
+    "cext3",
+    "v3"
+  ],
+  "status": "post_hoc_development_only",
+  "warning": "Spent v3, C-ext2 and C-ext3 sets, seen while the bundle was designed. Not a result; may not be cited as one."
+}

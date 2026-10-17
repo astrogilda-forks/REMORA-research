@@ -4,6 +4,24 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Routing (semantic bundle v2 and deterministic derivation receipts, development only)
+
+- `remora/toolcall/routing/bfcl_semantic_bundle_v2.py` succeeds the frozen
+  v1 bundle (ADR D1). It authors contracts from the name after the domain
+  prefix and from the declared description. A writing description
+  overrides a reading name. Its lexicon is built per episode and keeps a
+  phrase only if it names exactly one tool in scope. It handles negation.
+- `remora/toolcall/routing/derivation_search.py` proposes derivation
+  receipts by search over the existing transforms. The verifier is
+  unchanged and still decides.
+- `scripts/bfcl_dev_replay.py` replays the three spent BFCL sets under a
+  chosen bundle and writes `artifacts/posthoc/bfcl_dev_replay.json`. On
+  those spent sets, gold calls accepted moved from 58/994 to 255/994 and
+  obtainable VERIFY from 192/431 to 353/431. No safety count rose.
+  These are development numbers and may not be cited as results.
+- Nothing in production uses the v2 bundle; the confirmatory number needs
+  the sealed C-ext4 track (SAP v6).
+
 ### Policy (VerificationPlan v2 S1 and S2: plan types and the evidence check)
 
 - `remora/policy/verification_plan_v2.py` defines the v2 plan, its binding,
