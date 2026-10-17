@@ -4,6 +4,20 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### README for a first-time visitor
+
+- The README now opens with one sentence on what REMORA is, the four
+  decisions, and a two-minute "Try it" block. The block shows real
+  `whatif` output: no model signal reaches ACCEPT for a production
+  `drop_database`.
+- A short section explains why REMORA is built this way.
+- The findings are stated in plain language: blocking is the easy half,
+  usefulness is open, a floor is not a judge, we publish what fails, and
+  the adversarial test is next.
+- The detailed evidence table, the reading path and the step-by-step
+  dispatch path are unchanged but collapsed below. Next steps are grouped
+  by reader: research, code, or another project.
+
 ### Research (SAP v7 draft and control-evaluation harness, no model call)
 
 - `docs/assurance/statistical_analysis_plan_v7_control_eval.md` (draft, not
