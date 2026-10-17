@@ -2172,8 +2172,18 @@ order:
 6. **Owner decisions still open.** The AS-036 independent reviewer, the
    first pilot tenant, and the D5 budget.
 
-Safety constraints carried into every arm: native wrong-call ACCEPT Wilson
-upper bound at most 1 %, irrelevance ABSTAIN at least 95 %, required-UNKNOWN
+An adversarial review of the paper on 2026-10-17 changed this order. The
+owner decided that the paper revision comes first: text corrections, then
+post-hoc re-analysis of existing data. After that come a threat model, an
+attack evaluation of the execution chain, and SAP v7 on a new catalogue with
+model-generated wrong calls. Item 1 becomes part of SAP v7, and items 2, 3
+and 5 wait unless they serve it. The findings and their status are in
+`docs/review/PEER_REVIEW_FINDINGS.md`.
+
+Safety constraints carried into every arm: native wrong-call ACCEPT at most
+1 % as a point estimate (SAP v6). C-ext4's row-level Wilson upper bound was
+1.29 %. A bound of 1 % needs at least 381 wrong-call episodes at zero
+observed, and more once the bound is clustered by tool. The other constraints: irrelevance ABSTAIN at least 95 %, required-UNKNOWN
 ACCEPT zero. The post-hoc steered proposer in override mode accepted one
 more wrong call than arm F (3 against 2 of 699), which is why the shipped
 rule never overrules.

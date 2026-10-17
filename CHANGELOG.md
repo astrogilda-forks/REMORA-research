@@ -4,6 +4,43 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Paper (peer-review level 1: corrections without new numbers)
+
+- New `docs/review/PEER_REVIEW_FINDINGS.md` lists 39 objections from an
+  adversarial review of the paper at `f66c4f7b`. It gives each one's
+  evidence, affected claims, action, owning PR, verification and status. The
+  review used four AI reviewer agents, so it is not an independent review.
+  At the end of this PR, 18 objections are resolved, 3 accepted as
+  limitations, 8 in progress and 10 open. `tests/test_peer_review_findings.py`
+  refuses a RESOLVED entry without a verification.
+- The .md and .tex now state what the evidence supports:
+  - The .tex oracle-count result was reversed against the .md and the
+    artifact. It is now corrected.
+  - The zero-unsafe result is no longer attributed to the deterministic
+    floor.
+  - The C-ext3 joint hypothesis is reported as not supported.
+  - The BFCL tracks are described as routing annotated proposals, and their
+    wrong calls as cross-task substitutions.
+  - C-ext4's targets are called floors, and the refuse-all control and the
+    V2 arm are reported beside them.
+  - AgentHarm Mode 3 cites the twin-pair result (§80). The C-ext3 intents
+    cite the negation limit (§81).
+  - CLAIM-014 gives 60/60 against 0/60.
+  - A new §13.13 states that the execution chain is not evaluated against
+    attacks and that per-call authorization does not stop composed attacks.
+- The .tex gains the limitations the .md already had, and its stale
+  "32-case" cross-domain mention is replaced with the 36-case benchmark.
+- Wording and consistency: "theoretically optimal", "provably", "proves",
+  "immutable" and "non-overlapping CIs" are corrected. Appendix F and the
+  AII regression now match the claim register, and a wrong cross-reference
+  is fixed.
+- The roadmap records that the owner put the paper revision ahead of the
+  remaining roadmap items. Its wrong-call constraint was stated as a Wilson
+  bound; it now reads as SAP v6's point-estimate target.
+- No result file, claim register entry or sealed artifact changed.
+  Re-analyses (clustered bounds, naive baselines, pre-registered pairwise
+  tests) are level 2 and will be separate post-hoc artifacts.
+
 ### CI (sealed replay and replication pack from a clean clone)
 
 - New `sealed-replay` job in `ci.yml`, aggregated into
