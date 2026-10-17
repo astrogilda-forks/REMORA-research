@@ -4,6 +4,32 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Routing (semantic bundle v2 and deterministic derivation receipts, development only)
+
+- `remora/toolcall/routing/bfcl_semantic_bundle_v2.py` succeeds the frozen
+  v1 bundle (ADR D1). It authors contracts from the name after the domain
+  prefix and from the declared description. A writing description
+  overrides a reading name. Its lexicon is built per episode and keeps a
+  phrase only if it names exactly one tool in scope. It handles negation.
+- `remora/toolcall/routing/derivation_search.py` proposes derivation
+  receipts by search over the existing transforms. The verifier is
+  unchanged and still decides.
+- `scripts/bfcl_dev_replay.py` replays the three spent BFCL sets under a
+  chosen bundle and writes `artifacts/posthoc/bfcl_dev_replay.json`. On
+  those spent sets, gold calls accepted moved from 58/994 to 255/994 and
+  obtainable VERIFY from 192/431 to 353/431. No safety count rose.
+  These are development numbers and may not be cited as results.
+- SAP v6 (`docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md`)
+  pre-registers the C-ext4 track before its set is built. Its co-primary
+  targets are wrong-call ACCEPT at or below 1 %, gold-call ACCEPT of at
+  least 12 %, and a paired gain over the frozen v1 bundle.
+- `scripts/build_bfcl_v4_cext4.py` seals the whole reserve once, and
+  `scripts/run_bfcl_cext4.py` runs it once. Both use
+  `remora/toolcall/routing/bfcl_arms.py`, the module the development replay
+  uses, so the sealed run measures the system that was developed. A
+  reject-all control arm runs beside F1, V2 and V2D (ADR D5).
+- Nothing in production uses the v2 bundle.
+
 ### Policy (VerificationPlan v2 S1 and S2: plan types and the evidence check)
 
 - `remora/policy/verification_plan_v2.py` defines the v2 plan, its binding,

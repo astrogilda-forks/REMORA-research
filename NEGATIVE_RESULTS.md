@@ -45,7 +45,9 @@ cites only `open` sections and that no `open` section is missing a theme.
    (SAP v5 §7; a model proposes intents, the deterministic matcher keeps
    sole authority) plus an explicit gate-ordering design for combined
    semantic+argument observations. The same frozen extractor ignores
-   negation (§81), so its successor must handle it before the next run.
+   negation (§81), so its successor must handle it before the next run;
+   bundle v2 (2026-10-17, development only) is that successor and awaits
+   the sealed C-ext4 track.
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -2469,6 +2471,58 @@ Only 4 of the 13 question-form reads gained a cue; the rest ask with
 phrases such as "can you" or "is there". The change is kept unmerged on the
 local branch `wip/qv2-06-interrogative-rejected`; its replay is
 `artifacts/posthoc/bfcl_cext3_interrogative_v3_rejected.json`.
+
+**Development note, 2026-10-17 (POST-HOC, three spent sets, not a result).**
+A successor bundle, `remora/toolcall/routing/bfcl_semantic_bundle_v2.py`,
+was developed against all three spent BFCL holdouts (v3, C-ext2, C-ext3).
+`scripts/bfcl_dev_replay.py` replays arm F at the current commit and writes
+`artifacts/posthoc/bfcl_dev_replay.json`. v1 stays frozen and byte-identical
+to the C-ext3 manifest.
+
+The 102 refutations of the gold tool came from contract authoring and the
+lexicon, not from gate order. There were two causes.
+
+- In names such as `Trains_1_FindTrains` the verb follows a domain prefix
+  and a number. v1 read only the first and last tokens, so the tool became a
+  mutating `update`, and every read task refuted it.
+- The lexicon held verbs and stopwords, so "find", "for" and "times" were
+  grounded as the requested resource.
+
+v2 parses the name after the prefix and reads the tool's declared
+description. When the name and the description disagree about whether a
+tool writes, the writing reading wins. The lexicon is built per episode from
+the tools in scope and keeps a phrase only if it names exactly one of them.
+A task that names the resources of two tools grounds no intent. Negation
+(§81) is handled. A deterministic receipt proposer,
+`remora/toolcall/routing/derivation_search.py`, searches for task spans that
+the existing transforms turn into an argument's value. The verifier and its
+transforms are unchanged.
+
+The table pools the three spent sets.
+
+| Arm, at the current commit | F1 (v1) | V2D (v2 with receipts) |
+|---|---|---|
+| Known wrong-call ACCEPT | 0/1016 | 0/1016 |
+| Constructed wrong-tool ACCEPT | 3/298 | 0/298 |
+| Irrelevance ABSTAIN | 816/816 | 816/816 |
+| Obtainable VERIFY | 192/431 | 353/431 |
+| Unobtainable ABSTAIN | 425/431 | 428/431 |
+| Gold reads ACCEPT (v1 read denominator) | 58/219 | 64/219 |
+| All gold calls ACCEPT | 58/994 | 255/994 |
+
+Most of the gain is in tools v1 misclassified as writes. The read row uses
+v1's classification as its denominator, so it excludes exactly those tools
+and barely moves. Gold writes route VERIFY by design. Of the gold calls v2
+reads as reads, 327 still ground no intent: tasks in other languages,
+questions without a read verb, and synonyms the contracts do not carry.
+
+Interrogative read cues were tried again on v2. They added 11 gold accepts
+and 2 wrong-call accepts, and were not adopted.
+
+These numbers were produced while the sets were visible during design.
+They bound what a sealed track can show; they do not estimate it.
+Confirmation needs C-ext4 under SAP v6.
+
 ## §40 The invariant set and the decision ladder had silently diverged (2026-08-20)
 <!-- finding-status: accepted -->
 
