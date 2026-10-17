@@ -4932,7 +4932,12 @@ gold calls by whether their tool also occurs in the spent development sets.
 other 36, V2D accepted 11 and F1 accepted 8. Almost all of the gain sits on
 tools the bundle's authoring rules were developed against. v1 already did
 reasonably on the unseen tools, so the comparison there is small and
-underpowered.
+underpowered. `scripts/bfcl_cext4_seen_split_posthoc.py` recomputes the
+split from the committed reserve and writes
+`artifacts/posthoc/bfcl_cext4_seen_split.json`; a gold call counts as seen
+when its tool is the proposed tool of some development episode. Under the
+wider definition, any tool offered in a development episode, the unseen group
+shrinks to 19 gold calls (V2D 5, F1 2), which is too few to read.
 
 **Why it matters.** Bundle v2's main repairs are naming rules: the verb
 after a `Domain_N_` prefix, and the class part of a dotted name. Rules

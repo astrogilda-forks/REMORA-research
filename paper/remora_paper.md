@@ -2,11 +2,11 @@
 
 **Stian Skogbrott** (Luftfiber AS) · [https://github.com/darklordVirtual/REMORA-research](https://github.com/darklordVirtual/REMORA-research)
 
-*Paper version v0.12.0 · revision 2026-10-16 · repository release tag `v0.12.0`.*
+*Paper version v0.12.0 · revision 2026-10-17 · repository release tag `v0.12.0`.*
 
 <!-- PAPER_SYNC: this version + revision line is the single authority for the
      paper's version stamp. scripts/check_paper_sync.py requires the SAME
-    "v0.12.0" and "revision 2026-10-16" strings to appear in paper/remora_paper.tex
+    "v0.12.0" and "revision 2026-10-17" strings to appear in paper/remora_paper.tex
      (which compiles the PDF), so the .md, .tex and .pdf can never diverge on
      version, date, or the guarded process claims again. To revise the paper:
      bump both strings here, mirror them in the .tex \paperversion/\date, and
@@ -31,6 +31,9 @@ We report three results.
 <!-- claim:CLAIM-019 wrong_call_accept_pct wrong_call_wilson_upper_pct legitimate_read_autonomy_pct --> <!-- claim:CLAIM-018 wrong_call_accept_pct routing_accuracy_pct -->
 **Third, the routing behaviour transfers to new external data.** In one sealed BFCL v4 run (1,527 episodes) REMORA met all five pre-registered targets. Well-formed wrong calls were accepted 28/258 times (10.9%) and labelled routing accuracy was 91.2% (CLAIM-018, superseded by CLAIM-019 as the wrong-call baseline). A disjoint sealed C-ext3 track (2,799 episodes) added declared tool contracts and verified task intents. It eliminated native wrong-call acceptance, 0/500 (Wilson 95% upper bound 0.76%), while legitimate read autonomy fell to 26.6%. Four of seven pre-registered targets were missed and published as measured (NEGATIVE_RESULTS.md §39, CLAIM-019).
 
+<!-- claim:CLAIM-021 gold_call_accept_pct -->
+A final sealed track, C-ext4, spent the remaining BFCL v4 reserve (1,562 episodes) on a revised bundle. It accepted 29.9% of correct calls against 6.9% for the C-ext3 bundle and accepted no wrong call. The gain sits on tools seen during development (CLAIM-021, NEGATIVE_RESULTS.md §82).
+
 <!-- claim:CLAIM-005 low_trust_correct_pct high_trust_correct_pct -->
 On the research path, low-trust critical-phase items were correct 76.2% of the time versus 36.4% for high-trust items (N=32). Critical-phase routing therefore does not rely on trust alone (CLAIM-005). Every number is bound to a machine-checked claim register, and machine-readable capability and boundary declarations state what the system establishes and what it does not. The component ablation attributes the benchmark's zero-unsafe result to no single component (§11.1, CLAIM-020). One frozen interoperability contract has two independent external reproductions under the repository's recorded independence rule; production enforcement remains unestablished and the system is SHADOW_ONLY.
 
@@ -44,7 +47,7 @@ An operator asks a fleet assistant for the status of vehicle `V-0042`. The assis
 
 The research hypothesis is that agent autonomy becomes more useful when uncertainty determines *what to check*, while deployment-owned authority determines *what may run*. These are different jobs. Deterministic rules bind a call to a declared tool, permitted target and policy, and a hard block cannot be voted away. Probabilistic disagreement and evidence signals can help route an ambiguous proposal toward verification or review; in REMORA they are studied on a separate research path, not entrusted with execution permission. This separation lets us measure routing quality without mistaking model confidence for authority.
 
-The clearest test of that hypothesis concerns a call that passes structural checks but uses the wrong tool for the task. In a sealed C-ext3 study of 2,799 episodes, declared tool contracts and verified task intents reduced native wrong-call acceptance to 0/500 (Wilson 95% upper bound 0.76%). The single-pass arm comparison recorded 24, then 6, then 0 accepts as semantic authority was introduced (§10.9, CLAIM-019). The promising mechanism is explicit semantic authority, not a more confident model vote. The measured property is contract-authorized read, not guaranteed task success or live deployment performance. Its current price matters: the deterministic intent extractor allowed only 26.6% of legitimate reads to proceed autonomously in that study. Bounded verification offers another path to useful autonomy when task state is unknown (§12b, CLAIM-014).
+The clearest test of that hypothesis concerns a call that passes structural checks but uses the wrong tool for the task. In a sealed C-ext3 study of 2,799 episodes, declared tool contracts and verified task intents reduced native wrong-call acceptance to 0/500 (Wilson 95% upper bound 0.76%). The single-pass arm comparison recorded 24, then 6, then 0 accepts as semantic authority was introduced (§10.9, CLAIM-019). The promising mechanism is explicit semantic authority, not a more confident model vote. The measured property is contract-authorized read, not guaranteed task success or live deployment performance. Its current price matters: the deterministic intent extractor allowed only 26.6% of legitimate reads to proceed autonomously in that study. A later sealed track raised correct-call acceptance from 6.9% to 29.9% with a revised bundle and no wrong call accepted, mostly on tools seen in development (§10.9, CLAIM-021). Bounded verification offers another path to useful autonomy when task state is unknown (§12b, CLAIM-014).
 
 REMORA places a decision boundary between a proposed call and its effect. Deployment-owned tool definitions and policy determine what the call is allowed to do. The gate may ACCEPT it, require a bounded lookup (VERIFY), decline autonomous action (ABSTAIN), or send it to a person (ESCALATE). A model's confidence cannot override a hard policy block. ACCEPT permits the next authorization step; it says nothing about whether the action is correct. Execution still requires authority bound to that exact call, a single-use grant and another policy check at dispatch.
 
@@ -60,7 +63,7 @@ This preprint makes five contributions, each bound to committed artifacts:
 
 1. an authority-bound execution chain (signed ToolSpec, exact-call `ExecutionLease`, single-use grant, re-policying at dispatch) whose lifecycle separates authorization, dispatch, execution and verified effect (§4.4);
 2. an argument-resolution ladder in which UNKNOWN is a first-class verdict and a VERIFY names a bounded lookup followed by full re-entry of the router (§4.6, §12b);
-3. sealed external routing evidence on BFCL v4 and a disjoint C-ext3 track that isolates declared semantic authority, with the utility cost published as measured (§10.8, §10.9);
+3. sealed external routing evidence on BFCL v4, a disjoint C-ext3 track that isolates declared semantic authority, and a C-ext4 track that measures a revised bundle against the C-ext3 one, with the utility cost and the limits of the gain published as measured (§10.8, §10.9);
 4. machine-readable capability and boundary declarations with explicit claim ceilings, a claim register that gates every number in this paper, and a negative-results record that includes an ablation attributing the headline safety number to no component (§4.7, §11.1);
 5. frozen interoperability contracts with external run records, one of them independently reproduced, together with contract probes and a formal model contributed to an external federation transport (§4.6.1).
 
@@ -71,6 +74,7 @@ This preprint makes five contributions, each bound to committed artifacts:
 | Fleet-operations validator study | read utility, all-UNKNOWN regime | 0% to 100% | CLAIM-014 |
 | Sealed BFCL v4 (1,527 episodes) | wrong-call acceptance | 28/258 = 10.9% | CLAIM-018, superseded by CLAIM-019 |
 | Sealed C-ext3 (2,799 episodes) | wrong-call acceptance | 0/500, upper bound 0.76% | CLAIM-019 |
+| Sealed C-ext4 (1,562 episodes) | correct-call acceptance; wrong-call acceptance | 87/291 = 29.9% (C-ext3 bundle 6.9%); 0/295 | CLAIM-021 |
 | Component ablation | FAR difference across arms | none (0.000 in every arm) | CLAIM-020 |
 
 Sections 2-8 describe the related work, execution architecture, research observables and decision record. Sections 9-12 give the evaluation and worked cases. Sections 13-16 address limitations, validity, safety and reproduction before the conclusion in §17.
@@ -790,6 +794,28 @@ the user's goal. And the result is a routing-bench measurement: discrimination
 on the governed execution path, where a live deployment supplies the intent and
 contract bundle, remains **unmeasured**.
 
+<!-- claim:CLAIM-021 gold_call_accept_pct obtainable_verify_pct wrong_call_wilson_upper_pct n_clusters -->
+The sealed C-ext4 track measured that price directly. SAP v6 fixed eight
+targets before the remaining BFCL v4 reserve was built into 1,562 episodes over
+363 clusters, ID-disjoint from every spent population. A revised bundle (v2,
+with deterministic derivation receipts) accepted 87/291 = 29.9% of gold calls
+(Wilson 95% CI 24.9% to 35.4%), against 20/291 = 6.9% for the frozen C-ext3
+bundle on the same episodes. Obtainable VERIFY rose from 45/119 to 100/119 =
+84.0%. Every safety count stayed at zero: native wrong-call ACCEPT 0/295
+(Wilson upper bound 1.29%), constructed wrong-tool 0/119 and required-UNKNOWN
+ACCEPT 0/238. All eight targets were met (CLAIM-021).
+
+The gain is narrower than that headline. A descriptive split computed after
+the run puts 76 of the revised bundle's 87 accepts on the 255 gold calls whose
+tool also occurs in the development sets. On the other 36 it accepted 11
+against 8 for the frozen bundle. The revisions are naming rules learned from
+one tool catalogue, and the reserve shares that catalogue. C-ext4 therefore
+does not show generalisation to unseen tool families (NEGATIVE_RESULTS.md
+§82). Of the gold calls, 70.1% still do not proceed autonomously. The state index is empty, so
+the accepted property is still semantically authorized read. No unseen BFCL v4
+live row remains, so a test of generalisation needs a new tool catalogue,
+sealed before any authoring rule is written for it.
+
 ## 11. Ablations
 
 ### 11.1 Component Ablation: A Negative Identification Result
@@ -1086,7 +1112,7 @@ make credibility-pack
 ```
 python -m pytest tests/ -q
 ```
-Expected: 10,301 collected tests across 690 test files (counted at revision 2026-10-16 on master commit `7a51fdec`; the count grows with the suite, so treat CI output as authoritative).
+Expected: 10,850 collected tests across 706 test files (counted at revision 2026-10-17 on master commit `17db5502`; the count grows with the suite, so treat CI output as authoritative).
 
 **Key benchmark reproductions:**
 ```
@@ -1149,7 +1175,7 @@ REMORA makes permission to execute a concrete agent action an explicit, recorded
 
 **Unknown state is a resolution problem.** Absence without declared completeness is UNKNOWN, not UNSUPPORTED; a VERIFY that cannot name a bounded lookup degrades to ABSTAIN; and a resolved value re-enters the whole router rather than patching the prior decision. Under study conditions this recovers read utility from 0% to 100% in the all-UNKNOWN regime with zero corrupt-identifier acceptances, zero cross-tenant lookups, and writes held at VERIFY throughout.
 
-**The routing behaviour transfers.** A sealed BFCL v4 track evaluated the current pipeline once and met all five pre-registered targets: wrong-call acceptance **10.9%** (28/258), irrelevant-tool refusal 100.0%, unobtainable-input refusal 99.0%, obtainable-input verification 97.0%, and required-UNKNOWN autonomous acceptance 0.0%. Labelled routing accuracy was 91.2%. The follow-up sealed C-ext3 track isolated the semantic axis: declared tool contracts with the semantic-authority floor eliminated native wrong-call acceptance (0/500 vs. the 10.9% baseline) while capping read autonomy at 26.6%; safety confirmed, utility misses published as measured.
+**The routing behaviour transfers.** A sealed BFCL v4 track evaluated the current pipeline once and met all five pre-registered targets: wrong-call acceptance **10.9%** (28/258), irrelevant-tool refusal 100.0%, unobtainable-input refusal 99.0%, obtainable-input verification 97.0%, and required-UNKNOWN autonomous acceptance 0.0%. Labelled routing accuracy was 91.2%. The follow-up sealed C-ext3 track isolated the semantic axis: declared tool contracts with the semantic-authority floor eliminated native wrong-call acceptance (0/500 vs. the 10.9% baseline) while capping read autonomy at 26.6%; safety confirmed, utility misses published as measured. A third sealed track, C-ext4, raised correct-call acceptance from 6.9% to 29.9% with every safety count at zero; the gain sits mostly on tools seen in development, so generalisation to unseen tool families is untested.
 
 The current architecture offers two further research interfaces. Typed evidence admission makes the scope and provenance of a claimed observation inspectable; federation publishes digest-pinned packages that an outside verifier can run without turning foreign results into execution authority. The former is not yet wired into effect verification. External run records now exist for the exact-call-binding, fresh-authority and effect-evidence contracts (E-ECB, E-FA, E-EE), recorded as not independent. The E7 runtime-surface contract has two independent external reproductions under the repository's recorded rule, with every boundary-level claim result still NOT_ESTABLISHED. Contract probes and a formal model from this repository found four findings in an external federation transport, all fixed upstream (§4.6.1). The paper's experiment-specific constraints appear beside the reported results and in §14; `NEGATIVE_RESULTS.md` preserves the complete finding history.
 
@@ -1444,7 +1470,7 @@ The enforcing path evaluates a deployment-owned `PolicyObservation` in `remora/p
 | `remora/policy/report.py` | DecisionReport, DecisionAction enum |
 | `remora/audit/hash_chain.py` | SHA-256 hash-chain |
 | `remora/evidence/evidence_router.py` | CriticalEvidenceRouter |
-| `tests/` | 690 test files, 10,301 collected tests (CI-authoritative) |
+| `tests/` | 706 test files, 10,850 collected tests (CI-authoritative) |
 | `results/` | 60+ JSON artifacts |
 
 Per-file line counts were removed on 2026-09-03: they had drifted by up to a factor of two and no claim rested on them.
@@ -1495,7 +1521,7 @@ implemented.
 
 **What REMORA does.** A deterministic policy gate routes each proposed call to ACCEPT, VERIFY, ABSTAIN or ESCALATE before dispatch. An ACCEPT is not an execution. A signed ToolSpec states what the approval covers, and an exact-call `ExecutionLease` binds it to one tool, argument set, target and policy bundle. A single-use grant is consumed at an enforcement point that re-evaluates policy, and authorization, dispatch, execution and verified effect are recorded as distinct claims. When the state an action refers to is unknown, a VERIFY names a bounded lookup and the whole router re-runs on the fresh observation; when no lookup exists, the system abstains. Model consensus cannot override a hard block. Capability and boundary declarations publish claim ceilings and name what is not established.
 
-**Key results.** On a leakage-controlled 700-task tool-call benchmark (effective N=70) the full gate produced 0% unsafe acceptances with higher utility and accuracy than heuristic baselines (CLAIM-001). On 208 AgentHarm scenarios it produced no false authorizations while blocking every benign counterpart (CLAIM-002). Bounded verification restores read utility from 0% to 100% in an all-UNKNOWN regime with zero corrupt-identifier or cross-tenant acceptances (CLAIM-014). On sealed BFCL v4 data the routing met all five pre-registered targets with 10.9% wrong-call acceptance (CLAIM-018, superseded by CLAIM-019). A disjoint sealed C-ext3 track with declared tool contracts eliminated native wrong-call acceptance, 0/500, while capping read autonomy at 26.6% (CLAIM-019).
+**Key results.** On a leakage-controlled 700-task tool-call benchmark (effective N=70) the full gate produced 0% unsafe acceptances with higher utility and accuracy than heuristic baselines (CLAIM-001). On 208 AgentHarm scenarios it produced no false authorizations while blocking every benign counterpart (CLAIM-002). Bounded verification restores read utility from 0% to 100% in an all-UNKNOWN regime with zero corrupt-identifier or cross-tenant acceptances (CLAIM-014). On sealed BFCL v4 data the routing met all five pre-registered targets with 10.9% wrong-call acceptance (CLAIM-018, superseded by CLAIM-019). A disjoint sealed C-ext3 track with declared tool contracts eliminated native wrong-call acceptance, 0/500, while capping read autonomy at 26.6% (CLAIM-019). On the remaining BFCL v4 reserve a revised bundle accepted 29.9% of correct calls against 6.9%, with no wrong call accepted; the gain sits on tools seen in development (CLAIM-021).
 
 **Key limitations.** The component ablation attributes the benchmark's zero-unsafe result to no single component (CLAIM-020); the deterministic attribution rests on the mechanism. Consensus observables are not populated on any governed path. The audit hash chain is tamper-evident, not tamper-proof, without external append-only storage. Custody and dispatch claims hold at the declared governed boundary under the strict execution profile; runtime capability-surface completeness, implementation effect non-transitivity and authoritative execution-context binding are NOT_ESTABLISHED. One frozen contract has independent external reproductions under the repository's recorded rule; production enforcement evidence and Federation adoption are unestablished, and the system is SHADOW_ONLY.
 
