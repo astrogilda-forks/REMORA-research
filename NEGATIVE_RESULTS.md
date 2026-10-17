@@ -4958,3 +4958,76 @@ development sets, so C-ext4 cannot tell the two apart.
 **What follows.** A test of generalisation needs a tool catalogue the
 bundle has never been developed against, sealed before any authoring rule
 is written for it.
+
+## §83 Re-analysis for the peer review widens the zero-count bounds and narrows what the BFCL negatives test (2026-10-17)
+<!-- finding-status: open -->
+
+**Status:** post-hoc and descriptive. No sealed number changes; the
+re-analysis answers findings in `docs/review/PEER_REVIEW_FINDINGS.md`.
+
+`scripts/peer_review_posthoc.py` re-routes C-ext3 and C-ext4, refuses to go
+on unless the published per-arm counts reproduce, and writes
+`artifacts/posthoc/peer_review_level2_v1.json`. C-ext4 reproduces exactly.
+C-ext3 reproduces apart from two arm-F argument counts. Commit `edd9d144`
+moved 79 episodes from VERIFY to ABSTAIN after the seal (see §39). No
+episode moved into or out of ACCEPT, and at the locked commit every count
+reproduces.
+
+**Zero-count bounds, clustered by tool.** The wrong calls share tools, and a
+decision is a function of the tool, so the tool is the conservative unit.
+
+- C-ext3 arm F: 0/500 wrong calls over 106 tools. The upper bound is 3.5 %,
+  not the row-level 0.76 %.
+- C-ext4: 0/295 over 67 tools. The upper bound is 5.42 %, not 1.29 %.
+- CLAIM-001 counted 14 benign-only templates. Over its 56 harmful templates
+  the bound is 6.42 %, not 5.2 %.
+- CLAIM-002's 208 harmful scenarios come from 47 base behaviours. Over those
+  the bound is 7.56 %, not 1.81 %.
+
+**What the BFCL wrong calls test.** Only 4 of the 295 C-ext4 wrong calls,
+and 2 of the 500 in C-ext3, name a tool that the original task offered. The
+rest are tools from other tasks' catalogues. The zero counts therefore say
+almost nothing about confusing two tools of the same task. That is the error
+a model would make. Of V2D's 295 wrong calls, 137 were rejected as not
+matching the goal. The other 158 were held at VERIFY or ESCALATE, as a
+refuse-all policy would hold them.
+
+**Naive baselines on the C-ext4 episodes.** Two rules were scored after the
+fact against the four arms.
+
+- A rule that accepts when two tool-name tokens appear in the task accepted
+  51/291 gold calls. It also accepted 2/295 wrong calls, 1/119 constructed
+  wrong tools and 48/238 calls missing a required argument.
+- With one token, the rule accepted 178/291 gold calls, 6/295 wrong calls
+  and 132/238 calls missing a required argument.
+- V2D accepted 87/291 gold calls and none of the rest.
+- A name rule cannot see arguments, so it is not a safe alternative. It
+  does show that much of the gold-call signal is lexical.
+
+**Paired tests.**
+
+- Counted by tool, V2D's C-ext4 gain over F1 is 19 tools against 2,
+  one-sided p = 1.1×10⁻⁴. The episode-level p was about 1e-18.
+- The C-ext3 arm comparison the SAP pre-registered is now run as exact
+  McNemar:
+  - structural against the full configuration: 24 wrong-call accepts
+    against 0 (p = 1.2×10⁻⁷);
+  - contracts-plus-intent against the full configuration: 6 against 0
+    (p = 0.031);
+  - the full configuration also lost 22 legitimate reads against the
+    structural arm and gained none (p = 4.8×10⁻⁷).
+- Arm F accepted 25 of all 487 C-ext3 gold calls (5.1 %); the published
+  26.6 % is over the 94 the frozen bundle classifies as reads.
+- In C-ext3, 26 of the 199 constructed wrong-tool mutants pass a schema
+  check, and arm F's two wrong-tool accepts are among them. In C-ext4, 19 of
+  119 pass and none was accepted.
+- The CLAIM-005 trust split (16/21 against 4/11) gives Fisher exact
+  p = 0.053.
+
+**What follows.**
+
+- The paper reports the clustered bounds beside the row-level ones.
+- SAP v7 must use wrong calls drawn from the task's own catalogue and from
+  model outputs.
+- SAP v7 must pre-register clustered bounds, and score naive and external
+  baselines on the same episodes.

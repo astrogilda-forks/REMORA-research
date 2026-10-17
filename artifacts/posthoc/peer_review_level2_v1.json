@@ -1,0 +1,467 @@
+{
+  "cext3_all_gold_accept": {
+    "F_confirmatory": [
+      25,
+      487
+    ],
+    "read_denominator": [
+      25,
+      94
+    ]
+  },
+  "cext3_known_drift": {
+    "metrics": {
+      "F_confirmatory.obtainable_verify_recall": "edd9d144",
+      "F_confirmatory.unobtainable_abstain_recall": "edd9d144"
+    },
+    "note": "Commit edd9d144 moved 79 arm-F episodes from VERIFY to ABSTAIN and none into or out of ACCEPT (NEGATIVE_RESULTS.md \u00a739). Every published count reproduces at the locked commit 6a1ae712. C-ext3 entries here are ACCEPT counts only, which the change does not touch."
+  },
+  "cext3_pairwise": {
+    "A_vs_C": {
+      "known_wrong_call_accept": {
+        "a_only": 18,
+        "b_only": 0,
+        "p_two_sided_exact": 7.62939453125e-06
+      },
+      "legitimate_read_autonomy": {
+        "a_only": 8,
+        "b_only": 0,
+        "p_two_sided_exact": 0.0078125
+      }
+    },
+    "A_vs_F": {
+      "known_wrong_call_accept": {
+        "a_only": 24,
+        "b_only": 0,
+        "p_two_sided_exact": 1.1920928955078125e-07
+      },
+      "legitimate_read_autonomy": {
+        "a_only": 22,
+        "b_only": 0,
+        "p_two_sided_exact": 4.76837158203125e-07
+      }
+    },
+    "C_vs_F": {
+      "known_wrong_call_accept": {
+        "a_only": 6,
+        "b_only": 0,
+        "p_two_sided_exact": 0.03125
+      },
+      "legitimate_read_autonomy": {
+        "a_only": 14,
+        "b_only": 0,
+        "p_two_sided_exact": 0.0001220703125
+      }
+    }
+  },
+  "cext4_tool_clustered_paired": {
+    "V2D_over_F1_by_tool": {
+      "p_one_sided": 0.000110626220703125,
+      "tools_a_more": 2,
+      "tools_b_more": 19,
+      "tools_tied_with_an_accept": 14
+    },
+    "episode_level_published_p_one_sided": 1.082931623064623e-18
+  },
+  "claim005_fisher": {
+    "fisher_exact_p_two_sided": 0.0529,
+    "high_trust": [
+      4,
+      11
+    ],
+    "low_trust": [
+      16,
+      21
+    ],
+    "split_rule": "Critical-phase items split at the tau = 0.1 groupthink boundary (low = trust < boundary, high = trust >= boundary). This is the paper's documented operating point, not a parameter tuned to the labels."
+  },
+  "headline_reclustering": {
+    "CLAIM-001": {
+      "benign_only_clusters": 14,
+      "harmful_template_clusters": 56,
+      "published": {
+        "clusters": 70,
+        "unsafe_clusters": 0,
+        "wilson95_upper": 0.052
+      },
+      "wilson95_upper_harmful_clusters": 0.0642
+    },
+    "CLAIM-002": {
+      "behaviour_key": "scenario_id before the first '-'",
+      "harmful_base_behaviours": 47,
+      "published": {
+        "false_accepts": 0,
+        "harmful_scenarios": 208,
+        "wilson95_upper": 0.0181
+      },
+      "wilson95_upper_behaviours": 0.0756
+    }
+  },
+  "in_catalogue_wrong_calls": {
+    "cext3": {
+      "A_structural": {
+        "in_catalogue_accept": [
+          0,
+          2
+        ],
+        "out_of_catalogue": 498
+      },
+      "C_goal_match": {
+        "in_catalogue_accept": [
+          0,
+          2
+        ],
+        "out_of_catalogue": 498
+      },
+      "F_confirmatory": {
+        "in_catalogue_accept": [
+          0,
+          2
+        ],
+        "out_of_catalogue": 498
+      }
+    },
+    "cext4": {
+      "CONTROL": {
+        "in_catalogue_accept": [
+          0,
+          4
+        ],
+        "out_of_catalogue": 291
+      },
+      "F1": {
+        "in_catalogue_accept": [
+          0,
+          4
+        ],
+        "out_of_catalogue": 291
+      },
+      "V2": {
+        "in_catalogue_accept": [
+          0,
+          4
+        ],
+        "out_of_catalogue": 291
+      },
+      "V2D": {
+        "in_catalogue_accept": [
+          0,
+          4
+        ],
+        "out_of_catalogue": 291
+      }
+    }
+  },
+  "inputs_sha256": {
+    "cext3_holdout": "5fdd32c1e048935db0991157b223eb92dd51b61724cac79433c5f062c42b9ee6",
+    "cext4_holdout": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4"
+  },
+  "naive_baselines": {
+    "arms_for_comparison": {
+      "CONTROL": {
+        "constructed_wrong_tool": [
+          0,
+          119
+        ],
+        "gold_call": [
+          0,
+          291
+        ],
+        "known_wrong_call": [
+          0,
+          295
+        ],
+        "required_unknown": [
+          0,
+          238
+        ]
+      },
+      "F1": {
+        "constructed_wrong_tool": [
+          0,
+          119
+        ],
+        "gold_call": [
+          20,
+          291
+        ],
+        "known_wrong_call": [
+          0,
+          295
+        ],
+        "required_unknown": [
+          0,
+          238
+        ]
+      },
+      "V2": {
+        "constructed_wrong_tool": [
+          0,
+          119
+        ],
+        "gold_call": [
+          84,
+          291
+        ],
+        "known_wrong_call": [
+          0,
+          295
+        ],
+        "required_unknown": [
+          0,
+          238
+        ]
+      },
+      "V2D": {
+        "constructed_wrong_tool": [
+          0,
+          119
+        ],
+        "gold_call": [
+          87,
+          291
+        ],
+        "known_wrong_call": [
+          0,
+          295
+        ],
+        "required_unknown": [
+          0,
+          238
+        ]
+      }
+    },
+    "cext4": {
+      "name_overlap_k1": {
+        "constructed_wrong_tool": [
+          29,
+          119
+        ],
+        "gold_call": [
+          178,
+          291
+        ],
+        "known_wrong_call": [
+          6,
+          295
+        ],
+        "required_unknown": [
+          132,
+          238
+        ]
+      },
+      "name_overlap_k2": {
+        "constructed_wrong_tool": [
+          1,
+          119
+        ],
+        "gold_call": [
+          51,
+          291
+        ],
+        "known_wrong_call": [
+          2,
+          295
+        ],
+        "required_unknown": [
+          48,
+          238
+        ]
+      },
+      "schema_only": {
+        "constructed_wrong_tool": [
+          19,
+          119
+        ],
+        "gold_call": [
+          291,
+          291
+        ],
+        "known_wrong_call": [
+          295,
+          295
+        ],
+        "required_unknown": [
+          4,
+          238
+        ]
+      }
+    },
+    "rules": {
+      "name_overlap_k1": "ACCEPT when >= 1 token of the tool name is a word of the task",
+      "name_overlap_k2": "ACCEPT when >= 2 tokens of the tool name are words of the task",
+      "schema_only": "ACCEPT when every required parameter of the proposed tool is present"
+    }
+  },
+  "register": "docs/review/PEER_REVIEW_FINDINGS.md",
+  "reproduction_check": "every published per-arm count of C-ext4 reproduced; every published C-ext3 count reproduced except the known drift below",
+  "schema_valid_wrong_tool": {
+    "cext3": {
+      "A_structural": {
+        "of": 199,
+        "schema_valid": 26,
+        "schema_valid_accept": 13
+      },
+      "C_goal_match": {
+        "of": 199,
+        "schema_valid": 26,
+        "schema_valid_accept": 6
+      },
+      "F_confirmatory": {
+        "of": 199,
+        "schema_valid": 26,
+        "schema_valid_accept": 2
+      }
+    },
+    "cext4": {
+      "CONTROL": {
+        "of": 119,
+        "schema_valid": 19,
+        "schema_valid_accept": 0
+      },
+      "F1": {
+        "of": 119,
+        "schema_valid": 19,
+        "schema_valid_accept": 0
+      },
+      "V2": {
+        "of": 119,
+        "schema_valid": 19,
+        "schema_valid_accept": 0
+      },
+      "V2D": {
+        "of": 119,
+        "schema_valid": 19,
+        "schema_valid_accept": 0
+      }
+    }
+  },
+  "status": "post_hoc_descriptive",
+  "warning": "Specified after the sealed runs, in answer to the 2026-10-17 peer review. Descriptive only; no number here replaces a sealed result.",
+  "wrong_call_clustering": {
+    "cext3": {
+      "A_structural": {
+        "accept": [
+          24,
+          500
+        ],
+        "distinct_proposed_tools": 106,
+        "largest_tool_share": 21,
+        "row_level_wilson95_upper": 0.0704,
+        "tool_clustered_wilson95_upper": 0.093,
+        "tools_with_an_accept": 4
+      },
+      "C_goal_match": {
+        "accept": [
+          6,
+          500
+        ],
+        "distinct_proposed_tools": 106,
+        "largest_tool_share": 21,
+        "row_level_wilson95_upper": 0.0259,
+        "tool_clustered_wilson95_upper": 0.0662,
+        "tools_with_an_accept": 2
+      },
+      "F_confirmatory": {
+        "accept": [
+          0,
+          500
+        ],
+        "distinct_proposed_tools": 106,
+        "largest_tool_share": 21,
+        "row_level_wilson95_upper": 0.0076,
+        "tool_clustered_wilson95_upper": 0.035,
+        "tools_with_an_accept": 0
+      }
+    },
+    "cext4": {
+      "CONTROL": {
+        "accept": [
+          0,
+          295
+        ],
+        "distinct_proposed_tools": 67,
+        "largest_tool_share": 16,
+        "reasons": {
+          "abstain:control": 295
+        },
+        "routes": {
+          "abstain": 295
+        },
+        "row_level_wilson95_upper": 0.0129,
+        "tool_clustered_wilson95_upper": 0.0542,
+        "tools_with_an_accept": 0
+      },
+      "F1": {
+        "accept": [
+          0,
+          295
+        ],
+        "distinct_proposed_tools": 67,
+        "largest_tool_share": 16,
+        "reasons": {
+          "abstain:no_resolver_available": 1,
+          "abstain:tool_does_not_match_goal": 197,
+          "escalate:schema_unverified_verify": 19,
+          "verify:schema_unverified_verify": 7,
+          "verify:semantic_authority_unknown_verify": 70,
+          "verify:ungrounded_argument_values_verify": 1
+        },
+        "routes": {
+          "abstain": 198,
+          "escalate": 19,
+          "verify": 78
+        },
+        "row_level_wilson95_upper": 0.0129,
+        "tool_clustered_wilson95_upper": 0.0542,
+        "tools_with_an_accept": 0
+      },
+      "V2": {
+        "accept": [
+          0,
+          295
+        ],
+        "distinct_proposed_tools": 67,
+        "largest_tool_share": 16,
+        "reasons": {
+          "abstain:tool_does_not_match_goal": 137,
+          "escalate:schema_unverified_verify": 12,
+          "verify:schema_unverified_verify": 14,
+          "verify:semantic_authority_unknown_verify": 131,
+          "verify:ungrounded_argument_values_verify": 1
+        },
+        "routes": {
+          "abstain": 137,
+          "escalate": 12,
+          "verify": 146
+        },
+        "row_level_wilson95_upper": 0.0129,
+        "tool_clustered_wilson95_upper": 0.0542,
+        "tools_with_an_accept": 0
+      },
+      "V2D": {
+        "accept": [
+          0,
+          295
+        ],
+        "distinct_proposed_tools": 67,
+        "largest_tool_share": 16,
+        "reasons": {
+          "abstain:tool_does_not_match_goal": 137,
+          "escalate:schema_unverified_verify": 12,
+          "verify:schema_unverified_verify": 14,
+          "verify:semantic_authority_unknown_verify": 131,
+          "verify:ungrounded_argument_values_verify": 1
+        },
+        "routes": {
+          "abstain": 137,
+          "escalate": 12,
+          "verify": 146
+        },
+        "row_level_wilson95_upper": 0.0129,
+        "tool_clustered_wilson95_upper": 0.0542,
+        "tools_with_an_accept": 0
+      }
+    }
+  }
+}

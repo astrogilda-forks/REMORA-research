@@ -102,6 +102,14 @@ writes nothing, so it adds no evidence beyond showing that CLAIM-021's counts
 follow from committed inputs. `scripts/bfcl_cext4_seen_split_posthoc.py`
 recomputes the post-hoc split in NEGATIVE_RESULTS §82 the same way.
 
+`scripts/peer_review_posthoc.py` recomputes the re-analyses behind
+NEGATIVE_RESULTS §83 and `docs/review/PEER_REVIEW_FINDINGS.md`: clustered
+zero-count bounds, the in-catalogue wrong calls, naive baselines, and the
+paired tests. It re-routes C-ext3 and C-ext4 first and refuses to write
+`artifacts/posthoc/peer_review_level2_v1.json` unless the published counts
+reproduce. The one exception is the documented C-ext3 drift from commit
+`edd9d144`, which moved no episode into or out of ACCEPT.
+
 The `sealed-replay` job in `.github/workflows/ci.yml` runs both replay
 commands and `verify_replication_pack.py --regenerate` on every pull request
 and master push. It uses a fresh full-history clone and only the documented

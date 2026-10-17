@@ -170,35 +170,35 @@ conditions?
 | Evidence | `data/routing_bench_bfcl_v4_cext4/bfcl_holdout.jsonl` (67 distinct `proposed_tool_name` among `:substituted` episodes, maintainer re-count); the reviewer's in-memory re-route. |
 | Affected claims | CLAIM-019, CLAIM-021 |
 | Action | Level 2: a post-hoc script and artifact giving tool-clustered and crossed bounds, the actively rejected count, and CONTROL beside each safety number. The paper now calls the 0.76% bound "row-level" and §14 says clustered bounds are wider and not yet reported. |
-| Owning PR | level-2 PR (not yet opened) |
-| Verification | Pending. The 5.4% and 3.5% figures are the reviewer's and are not yet in a committed artifact. |
-| Status | OPEN |
+| Owning PR | level-2 PR |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): the upper bounds clustered by tool are 3.5% (C-ext3, 106 tools) and 5.42% (C-ext4, 67 tools). V2D actively rejected 137 of 295; the other 158 were held. Both are reported in §10.9, §14 and the headline table of both paper files, and in NEGATIVE_RESULTS.md §83. A crossed task-by-tool bound was not computed; the tool unit is the conservative one, because no tool has an accept. |
+| Status | RESOLVED |
 
 ### PRF-010 BFCL "native" wrong calls are synthetic cross-task substitutions
 
 | Field | Value |
 |---|---|
 | Severity | MAJOR |
-| Claim | Each wrong call is another task's gold call, added to the task's tool list. In C-ext4, 287 of 295 name a tool the original task never offered. These calls are easier to separate than real model errors. |
+| Claim | Each wrong call is another task's gold call added to the task's tool list. The committed count is 291 of 295 in C-ext4 and 498 of 500 in C-ext3 naming a tool the original task never offered. The reviewer's 287 and the maintainer's first rough count of 8 in-catalogue calls were both superseded by the artifact. Such calls are easier to separate than real model errors. |
 | Evidence | `remora/toolcall/routing/sources/bfcl.py` (the `substituted` episode); maintainer re-count on the C-ext4 holdout. |
 | Affected claims | CLAIM-018, CLAIM-019, CLAIM-021 |
 | Action | Disclose the construction in §10.8 and §14 (done). Level 2: report the in-catalogue subset. Level 3: model-generated wrong calls in SAP v7. |
-| Owning PR | level-1 PR (disclosure); level 2 and 3 to follow |
-| Verification | Both files now describe the construction. The 287/295 figure is not yet in a committed artifact, and the subset analysis is not done. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (disclosure); level-2 PR (subset); SAP v7 (new data) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): the in-catalogue subset is 4/295 (C-ext4) and 2/500 (C-ext3), with 0 accepts in every arm. The paper states that the zero counts say almost nothing about confusing two tools of one task. Model-generated wrong calls need new data (SAP v7). |
+| Status | ACCEPTED_LIMITATION |
 
 ### PRF-011 No external or naive baseline on the sealed BFCL episodes
 
 | Field | Value |
 |---|---|
 | Severity | MAJOR |
-| Claim | A name-overlap rule is competitive. The reviewer's two-token rule gave 80/291 gold accepts and 2/295 wrong accepts; the maintainer's re-run with a different tokenizer gave 67/291 and 3/295. V2D gave 87/291 and 0/295. No LLM judge or existing guardrail was run. |
+| Claim | A name-overlap rule may be competitive, and no LLM judge or existing guardrail was run. The reviewer's substring rule gave 80/291 gold and 2/295 wrong; it is superseded by the committed word-match rule below. |
 | Evidence | reviewer computation; maintainer re-run (scratch, not committed). |
 | Affected claims | CLAIM-021, CLAIM-019 |
 | Action | Level 2: committed post-hoc naive arms (name overlap, schema-only) with accept-gold against accept-wrong curves, labelled post hoc. Level 3: external baselines (LLM judge, policy engine) in SAP v7. §14 now states that no such baseline was run. |
-| Owning PR | level-2 PR (not yet opened) |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | level-2 PR (naive rules); SAP v7 (external baselines) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): two-token overlap gives 51/291 gold, 2/295 wrong, 1/119 wrong tool and 48/238 missing-argument accepts. One-token overlap gives 178/291, 6/295, 29/119 and 132/238. Schema-only accepts all 295 wrong calls. V2D gives 87/291 and 0 on every other family. The results are reported in §10.9 and §14 and in §83. External baselines (LLM judge, existing guardrail) still need SAP v7. |
+| Status | IN_PROGRESS |
 
 ### PRF-012 The system routes annotated gold proposals; this was not stated
 
@@ -222,9 +222,9 @@ conditions?
 | Evidence | `remora/toolcall/routing/mutations.py` (the `MISSING_ARG_OBTAINABLE` producer); `bfcl.py` (irrelevance `proposed_name=None`). |
 | Affected claims | CLAIM-018, CLAIM-019, CLAIM-021 |
 | Action | Disclose (done). Level 2: report wrong-tool results on the schema-valid subset. SAP v7: realistic producer names, and irrelevance episodes that propose a plausible call. |
-| Owning PR | level-1 PR (disclosure) |
-| Verification | §10.8 of both files states both construct limits. The schema-valid subset count (19) is the reviewer's and is not yet committed. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (disclosure); level-2 PR (subset) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): 19 of 119 C-ext4 wrong-tool mutants pass a schema check, and none was accepted by any arm. In C-ext3, 26 of 199 pass, and arm F's 2 wrong-tool accepts are among them. The construct cannot change for spent data; SAP v7 must use realistic producer names and proposed irrelevance calls. |
+| Status | ACCEPTED_LIMITATION |
 
 ### PRF-014 The C-ext4 gain sits on tools seen in development
 
@@ -300,8 +300,8 @@ conditions?
 | Evidence | `results/toolcall_benchmark_v2_significance.json`; `docs/assurance/statistical_analysis_plan.md` (H2 not supported; the utility delta reported as post hoc); claim register comment for CLAIM-001. |
 | Affected claims | CLAIM-001, CLAIM-002 |
 | Action | Level 2: recompute both bounds at the harmful-template and behaviour level as post-hoc artifacts. Done: the abstract no longer cites +0.46, and §14 marks it post hoc. |
-| Owning PR | level-2 PR (not yet opened) |
-| Verification | The post-hoc disclosure is in place. The re-clustered bounds are pending, and the figures above are the reviewer's. |
+| Owning PR | level-2 PR; claim-register comment in its own PR (protected path) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): CLAIM-001 has 56 harmful and 14 benign-only templates, giving an upper bound of 6.42%. CLAIM-002 has 47 base behaviours, giving 7.56%. Both are in the headline table and §14 of both paper files. Remaining: the CLAIM-001 register comment that 560 harmful tasks form 70 clusters is still wrong, and the register is a protected path. |
 | Status | IN_PROGRESS |
 
 ### PRF-020 The C-ext4 McNemar p-value ignores tool clustering
@@ -313,9 +313,9 @@ conditions?
 | Evidence | Reviewer re-route; SAP v6 P3. |
 | Affected claims | CLAIM-021 |
 | Action | Level 2: a tool-clustered paired test as a post-hoc artifact. |
-| Owning PR | level-2 PR (not yet opened) |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | level-2 PR |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): 19 tools favour V2D and 2 favour F1, one-sided p = 1.1×10⁻⁴. This is reported in §10.9 of both files beside the episode-level p. |
+| Status | RESOLVED |
 
 ### PRF-021 C-ext3 ran three of six pre-registered arms and no paired test
 
@@ -326,9 +326,9 @@ conditions?
 | Evidence | `scripts/run_bfcl_cext3.py` `_arm_engines`. |
 | Affected claims | CLAIM-019 |
 | Action | Done: the deviation is disclosed in §10.9 of both files. Level 2: post-hoc pairwise tests on the committed C-ext3 episodes. |
-| Owning PR | level-1 PR (disclosure) |
-| Verification | The disclosure is in place; the tests are pending. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (disclosure); level-2 PR (tests) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): exact McNemar gives structural against full 24/0 (p = 1.2×10⁻⁷), contracts-plus-intent against full 6/0 (p = 0.031) and read loss 22/0 (p = 4.8×10⁻⁷). These are reported in §10.9 and §83. Arms B, D and E were never run and cannot be recovered blind. |
+| Status | RESOLVED |
 
 ### PRF-022 Not all C-ext4 arms reported; receipts credited for the gain
 
@@ -352,9 +352,9 @@ conditions?
 | Evidence | SAP v5 §12 deviation 1. |
 | Affected claims | CLAIM-019 |
 | Action | Done: the denominator is now disclosed in §10.9. Level 2: report the all-gold rate from a committed artifact. |
-| Owning PR | level-1 PR (disclosure) |
-| Verification | The disclosure is in place; the all-gold figure is pending. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (disclosure); level-2 PR (figure) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): arm F accepted 25 of 487 gold calls (5.1%), against 25 of 94 frozen-bundle reads. Both are in §10.9 of both files. |
+| Status | RESOLVED |
 
 ### PRF-024 The CLAIM-005 split is exploratory, with a cutpoint chosen on the same items
 
@@ -365,9 +365,9 @@ conditions?
 | Evidence | CLAIM-005; §13.3. |
 | Affected claims | CLAIM-005 |
 | Action | Done: removed from the .md abstract, and labelled exploratory in the .tex. Remaining: label §13.3 of the .md, and commit the p-value as a post-hoc artifact. |
-| Owning PR | level-1 PR (partial) |
-| Verification | Partial. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (abstract, .tex); level-2 PR (p-value, .md §13.3) |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): Fisher's exact test gives p = 0.053. §13.3 (.md) and the .tex paragraph now call the split exploratory and give p. The split artifact says τ = 0.10 is a documented operating point, not tuned to the labels; the reviewer's claim that it was chosen on the same items is recorded but not established. |
+| Status | RESOLVED |
 
 ### PRF-025 CLAIM-014's "0% to 100%" had no n and a zero-by-construction baseline
 

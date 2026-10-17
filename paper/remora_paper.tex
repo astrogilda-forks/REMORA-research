@@ -135,9 +135,11 @@ against 0/60 without validators, a baseline that is zero by construction
 
 Sealed BFCL v4 tracks measure routing within one tool catalogue. REMORA
 routes annotated calls; it does not generate them, and each wrong call is
-another task's correct call substituted into the task. In a sealed C-ext3
+another task's correct call substituted into the task, almost always a
+tool the task never offered. In a sealed C-ext3
 track, declared tool contracts and task intents re-derived from the task text
-accepted 0/500 wrong calls (row-level Wilson 95\% upper bound 0.76\%), but
+accepted 0/500 wrong calls (Wilson 95\% upper bound 0.76\% by row,
+3.5\% clustered by tool), but
 legitimate read autonomy was 26.6\% against a 75\% target, so the
 pre-registered joint hypothesis was not supported (CLAIM-019). A final sealed
 track, C-ext4, spent the remaining BFCL v4 reserve (1{,}562 episodes) on a
@@ -187,9 +189,10 @@ The clearest test of that hypothesis concerns a call that passes
 structural checks but uses the wrong tool for the task. In a sealed
 C-ext3 study of 2{,}799 episodes, declared tool contracts and task
 intents re-derived from the task text reduced acceptance of substituted
-wrong calls to 0/500 (row-level Wilson 95\% upper bound 0.76\%). A
-descriptive single-pass arm comparison recorded 24, then 6, then 0 accepts
-as semantic authority was introduced; no paired test was run
+wrong calls to 0/500 (Wilson 95\% upper bound 0.76\% by row, 3.5\%
+clustered by tool). The arm comparison recorded 24, then 6, then 0 accepts
+as semantic authority was introduced; the paired test was run only after
+the fact
 (\S\ref{sec:wrongcall-implication}, CLAIM-019). The promising mechanism
 is explicit semantic authority, not a more confident model vote. Its
 measured property is contract-authorized read, not guaranteed task success
@@ -293,11 +296,11 @@ the conclusion (\S\ref{sec:conclusion}).
 \toprule
 Study & Result (claim) \\
 \midrule
-Tool-call benchmark, 70 clusters & 0\% unsafe acceptance, Wilson [0.0\%, 5.2\%]; keyword baselines 1.4\%, not significant (CLAIM-001) \\
-AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%]; every benign counterpart also blocked (CLAIM-002) \\
+Tool-call benchmark, 70 clusters & 0\% unsafe acceptance, Wilson [0.0\%, 5.2\%], upper 6.4\% over the 56 harmful templates; keyword baselines 1.4\%, not significant (CLAIM-001) \\
+AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%], upper 7.6\% over the 47 base behaviours; every benign counterpart also blocked (CLAIM-002) \\
 Validator study, all-\textsc{unknown} regime & autonomous valid-identifier reads 0/60 (zero by construction) to 60/60 (CLAIM-014) \\
 Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-018, superseded) \\
-Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% (CLAIM-019) \\
+Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% by row, 3.5\% over its 106 tools (CLAIM-019) \\
 Sealed C-ext4, 1{,}562 episodes & correct-call acceptance 87/291 = 29.9\% (C-ext3 bundle 6.9\%); wrong-call acceptance 0/295, as for a refuse-all control (CLAIM-021) \\
 Component ablation & FAR 0.000 in every arm (CLAIM-020) \\
 \bottomrule
@@ -1501,8 +1504,9 @@ obtainable and unobtainable argument families differ in one producer tool
 whose name spells out the missing argument, so their \textsc{verify} and
 \textsc{abstain} recall checks wiring rather than judgement. Irrelevance
 episodes propose no call, so their \textsc{abstain} recall holds by
-construction. No external or naive baseline was run on the sealed episodes
-(\S\ref{sec:threats}).
+construction. No external baseline was run on the sealed episodes; naive
+rules were scored after the fact (\S\ref{sec:wrongcall-implication},
+\S\ref{sec:threats}).
 
 \subsection{What the Wrong-Call Axis Implies}
 \label{sec:wrongcall-implication}
@@ -1538,12 +1542,16 @@ deterministic bundle, native wrong-call acceptance fell 24/500, then 6/500,
 then 0/500 across the structural, contracts-plus-intent and
 \textsc{unknown}-floor arms (CLAIM-019). That is a descriptive
 single-pass comparison: SAP v5 pre-registered six arms with cluster-level
-McNemar tests, and the run implemented three arms and no paired test. Four
-caveats bound what it measures. The deterministic intent extractor is the
+McNemar tests, and the run implemented three arms and no paired test.
+Exact McNemar tests run after the fact give 24 accepts against 0 for the
+structural arm against the full configuration ($p = 1.2\times10^{-7}$) and 6
+against 0 for contracts-plus-intent ($p = 0.031$); the full configuration
+also lost 22 legitimate reads and gained none (NEGATIVE\_RESULTS.md \S83).
+Four caveats bound what it measures. The deterministic intent extractor is the
 cost carrier: legitimate read autonomy fell to 26.6\% (25/94), far below
 the 75\% co-primary bar, so the pre-registered joint hypothesis was not
 supported. The denominator counts reads under the frozen bundle's own
-classification. The extractor also ignores negation: ``do not cancel''
+classification; over all 487 gold calls arm F accepted 25 (5.1\%). The extractor also ignores negation: ``do not cancel''
 supports a cancel call (NEGATIVE\_RESULTS.md \S81). Its heuristic grammar
 was designed with spent C-ext2 material visible (SAP v5 \S12, deviation 2). The property
 the accept arm establishes is \emph{semantically authorized read}, that the
@@ -1560,7 +1568,8 @@ over 363 clusters, ID-disjoint from every spent population. A revised bundle
 calls (Wilson 95\% CI 24.9\% to 35.4\%), against 20/291 = 6.9\% for the frozen
 C-ext3 bundle on the same episodes. Obtainable \textsc{verify} rose from
 45/119 to 100/119 = 84.0\%. Every safety count stayed at zero: native
-wrong-call \textsc{accept} 0/295 (Wilson upper bound 1.29\%), constructed
+wrong-call \textsc{accept} 0/295 (Wilson upper bound 1.29\% by row, 5.42\%
+over its 67 tools), constructed
 wrong-tool 0/119 and required-\textsc{unknown} \textsc{accept} 0/238. All
 eight targets were met (CLAIM-021). They were floors, fixed after bundle v2
 and its development replays existed; the C-ext3 bars for obtainable
@@ -1581,7 +1590,23 @@ therefore does not show generalisation to unseen tool families
 (NEGATIVE\_RESULTS.md \S82). Of the gold calls, 70.1\% still do not proceed
 autonomously. The state
 index is empty, so the accepted property is still semantically authorized
-read. No unseen BFCL v4 live row remains, so a test of generalisation needs
+read.
+
+A re-analysis run after the peer review (NEGATIVE\_RESULTS.md \S83, post
+hoc) narrows the safety reading further. Only 4 of the 295 wrong calls name
+a tool the original task offered, so the zero count says almost nothing
+about confusing two tools of one task. V2D rejected 137 of them as not
+matching the goal and held the other 158 at \textsc{verify} or
+\textsc{escalate}, as a refuse-all policy would. Counted by tool, V2D's gain
+over the frozen bundle is 19 tools against 2 ($p = 1.1\times10^{-4}$), not
+the episode-level $p$ of about $10^{-18}$. Two naive rules, scored on the
+same episodes, show how much of the signal is lexical. Accepting when two
+tool-name tokens occur in the task accepts 51/291 gold calls and 2/295 wrong
+calls, and also 48/238 calls missing a required argument. With one token it
+accepts 178/291 gold calls, 6/295 wrong calls and 132/238 calls missing an
+argument. V2D accepted 87/291 and none of the others.
+
+No unseen BFCL v4 live row remains, so a test of generalisation needs
 a new tool catalogue, sealed before any authoring rule is written for it.
 
 % =====================================================================
@@ -1869,7 +1894,8 @@ $\chi > 1.45$ (97th percentile) $\Rightarrow$ \textsc{Escalate} with
 \texttt{escalate\_adversarial}.
 
 \paragraph{Critical-phase trust anticorrelation.}
-Exploratory, with a cutpoint chosen on the same items.
+Exploratory: the low/high split is 16/21 against 4/11, Fisher's exact
+$p = 0.053$, and the augmented set uses simulated trust distributions.
 Q4 high-trust: 50\% correct; Q1 low-trust: 75\% correct.
 Confirmed on $N=32$ real-oracle items and replicated qualitatively
 on augmented $N=511$ simulated dataset. No trust threshold separates
@@ -1987,9 +2013,11 @@ real-world costs. The BFCL tracks route annotated gold proposals, and their
 wrong calls are cross-task substitutions, not model errors
 (\S\ref{sec:routing-blind}). Gold-call acceptance is a friction measure on
 correct proposals, not task success, and is not comparable with BFCL
-leaderboard scores. No external or naive baseline (an LLM judge, an existing
-guardrail, a name-overlap rule) was run on the sealed BFCL episodes; every
-comparison is between REMORA configurations and a refuse-all control. The
+leaderboard scores. No external baseline (an LLM judge, an existing
+guardrail) was run on the sealed BFCL episodes. Naive name-overlap and
+schema-only rules were scored after the fact (NEGATIVE\_RESULTS.md \S83);
+every other comparison is between REMORA configurations and a refuse-all
+control. The
 AII composite uses heuristic weights; AROMER reached TRAINED (AII 0.8442)
 and regressed to CAPABLE (0.7885) the same day (CLAIM-006).
 
@@ -2000,7 +2028,10 @@ non-overlapping intervals are not evidence of a difference. Zero-count
 Wilson bounds treat rows as independent. The BFCL wrong calls share
 proposed tools and REMORA's decision depends on the tool, and the AgentHarm
 and tool-call scenarios share base behaviours and templates, so bounds
-clustered at those levels are wider; they are not yet reported. The
+clustered at those levels are wider. Post hoc, the zero-count upper
+bounds are 3.5\% over C-ext3's 106 tools, 5.42\% over C-ext4's 67 tools,
+6.42\% over CLAIM-001's 56 harmful templates and 7.56\% over CLAIM-002's 47
+base behaviours (NEGATIVE\_RESULTS.md \S83). The
 tool-call benchmark's utility gain ($+0.46$) is a post-hoc test, declared
 after the pre-registered hypothesis failed. Wilson intervals are fixed-$N$
 constructions and are not valid under the continuous monitoring that the
