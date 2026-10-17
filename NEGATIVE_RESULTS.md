@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-17: **24 `open`**, **27 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-17: **25 `open`**, **27 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39, §81, §82): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81, §82, §83): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -48,7 +48,10 @@ cites only `open` sections and that no `open` section is missing a theme.
    negation (§81), so its successor must handle it before the next run;
    bundle v2 (2026-10-17) is that successor. On sealed C-ext4 it accepted
    29.9 % of gold calls against 6.9 % for v1, with every safety count at
-   zero (CLAIM-021). The gain sits on tools seen in development (§82).
+   zero (CLAIM-021). The gain sits on tools seen in development (§82). The
+   zero counts are weaker than they look: clustered by tool the upper
+   bounds are 3.5 % and 5.42 %, and almost no wrong call comes from the
+   task's own catalogue (§83).
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
