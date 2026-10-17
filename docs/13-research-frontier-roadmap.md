@@ -2151,6 +2151,27 @@ vocabulary fix was measured and dropped. The order below follows that.
 | 5 | Proposer arm: record the C-ext4 cache under the chosen model | model, provider, budget | cache digest and prompt hashes pinned at lock |
 | 6 | SAP v6: arms F (current), V (step 2), P (V plus proposer), PD (P plus derivation), optional R (P plus validators); targets fixed before sealing from these levers | steps 2 to 5 frozen; the go decision on the reserve | manifest locked, one run, results published as measured. Pre-registered 2026-10-17 as `statistical_analysis_plan_v6_bfcl_utility.md` with arms CONTROL, F1, V2 and V2D; executed once 2026-10-17, 8 of 8 targets met (CLAIM-021; gold-call ACCEPT 29.9 % against 6.9 %, safety counts zero; the gain sits on tools seen in development, NEGATIVE_RESULTS §82); the proposer arm needs its own plan once a model and budget exist |
 
+#### Next steps after C-ext4 (start here, 2026-10-17)
+
+C-ext4 met all eight SAP v6 targets (CLAIM-021). The gain sits on tools seen
+in development (NEGATIVE_RESULTS §82), and the BFCL v4 reserve is spent. In
+order:
+
+1. **New sealed tool catalogue for generalisation.** Pick a tool set the
+   bundle was never developed against and seal it before writing any
+   authoring rule. Write its SAP first, with F1 and V2D as arms.
+2. **Proposer arm.** The 327 gold reads that ground no intent need a model:
+   other languages, questions without a read verb, synonyms. Needs the
+   owner's model, provider and budget (ADR D5) and its own SAP.
+3. **Declared validators in the benchmark (QV2-04).** Gold calls that stop
+   at `no_resolver_available` because the state index is empty.
+4. **Paper.** Add C-ext4 beside C-ext3 in the .md and .tex, then rebuild
+   the PDF on master.
+5. **VerificationPlan v2 S3 and S4.** S3 is the durable task budget, and
+   S4 wires v2 into the engine behind a flag. S4 needs its own review.
+6. **Owner decisions still open.** The AS-036 independent reviewer, the
+   first pilot tenant, and the D5 budget.
+
 Safety constraints carried into every arm: native wrong-call ACCEPT Wilson
 upper bound at most 1 %, irrelevance ABSTAIN at least 95 %, required-UNKNOWN
 ACCEPT zero. The post-hoc steered proposer in override mode accepted one
