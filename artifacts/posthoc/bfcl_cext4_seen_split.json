@@ -1,0 +1,40 @@
+{
+  "arms": [
+    "F1",
+    "V2D"
+  ],
+  "definitions": {
+    "offered": "listed in available_tools of some episode in v3, C-ext2 or C-ext3",
+    "proposed": "proposed tool of some episode in v3, C-ext2 or C-ext3"
+  },
+  "holdout_sha256": "c3a753530971453c1a7b917745e2fe79544c33fd7523f91636dc27ce32522ed4",
+  "primary_definition": "proposed",
+  "split": {
+    "offered": {
+      "seen": {
+        "F1_accept": 18,
+        "V2D_accept": 82,
+        "gold_calls": 272
+      },
+      "unseen": {
+        "F1_accept": 2,
+        "V2D_accept": 5,
+        "gold_calls": 19
+      }
+    },
+    "proposed": {
+      "seen": {
+        "F1_accept": 12,
+        "V2D_accept": 76,
+        "gold_calls": 255
+      },
+      "unseen": {
+        "F1_accept": 8,
+        "V2D_accept": 11,
+        "gold_calls": 36
+      }
+    }
+  },
+  "status": "post_hoc_descriptive",
+  "warning": "Computed after the single C-ext4 run; not pre-registered. Descriptive only, not a confirmatory result."
+}

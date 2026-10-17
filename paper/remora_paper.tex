@@ -79,7 +79,7 @@
 % Paper version - kept in lockstep with paper/remora_paper.md by
 % scripts/check_paper_sync.py (CI-enforced). The version and revision
 % strings below MUST match the .md version line.
-\newcommand{\paperversion}{Preprint v0.12.0, revision 2026-10-16; repository release tag \texttt{v0.12.0}}
+\newcommand{\paperversion}{Preprint v0.12.0, revision 2026-10-17; repository release tag \texttt{v0.12.0}}
 
 \author{
   Stian Skogbrott\thanks{Developer and maintainer of REMORA. Luftfiber AS.
@@ -132,7 +132,11 @@ superseded by CLAIM-019 as the wrong-call baseline). A disjoint sealed
 C-ext3 track with declared tool contracts and verified task intents
 eliminated native wrong-call acceptance, 0/500 (Wilson 95\% upper bound
 0.76\%), while capping legitimate read autonomy at 26.6\%; four of seven
-targets were missed and published as measured (CLAIM-019).
+targets were missed and published as measured (CLAIM-019). A final sealed
+track, C-ext4, spent the remaining BFCL v4 reserve (1{,}562 episodes) on a
+revised bundle. It accepted 29.9\% of correct calls against 6.9\% for the
+C-ext3 bundle and accepted no wrong call. The gain sits on tools seen during
+development (CLAIM-021).
 
 Every number is bound to a machine-checked claim register, and
 machine-readable capability and boundary declarations state what the system
@@ -181,7 +185,10 @@ then 0 accepts as semantic authority was introduced
 is explicit semantic authority, not a more confident model vote. Its
 measured property is contract-authorized read, not guaranteed task success
 or live deployment performance. Its current price matters: the deterministic intent extractor allowed only
-26.6\% of legitimate reads to proceed autonomously in that study.
+26.6\% of legitimate reads to proceed autonomously in that study. A later
+sealed track raised correct-call acceptance from 6.9\% to 29.9\% with a
+revised bundle and no wrong call accepted, mostly on tools seen in
+development (\S\ref{sec:wrongcall-implication}, CLAIM-021).
 Bounded verification offers another path to useful autonomy when task
 state is unknown (\S\ref{sec:casestudy-fleetops}, CLAIM-014).
 
@@ -238,9 +245,10 @@ numbers.
   first-class verdict and a \textsc{verify} names a bounded lookup followed
   by full re-entry of the router (\S\ref{sec:resolution-ladder},
   \S\ref{sec:casestudy-fleetops});
-\item sealed external routing evidence on BFCL v4 and a disjoint C-ext3
-  track that isolates declared semantic authority, with the utility cost
-  published as measured (\S\ref{sec:routing-blind},
+\item sealed external routing evidence on BFCL v4, a disjoint C-ext3
+  track that isolates declared semantic authority, and a C-ext4 track that
+  measures a revised bundle against the C-ext3 one, with the utility cost
+  and the limits of the gain published as measured (\S\ref{sec:routing-blind},
   \S\ref{sec:wrongcall-implication});
 \item machine-readable capability and boundary declarations with explicit
   claim ceilings, a claim register that gates every number in this paper,
@@ -272,6 +280,7 @@ AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.8
 Validator study, all-\textsc{unknown} regime & read utility 0\% to 100\% (CLAIM-014) \\
 Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-018, superseded) \\
 Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% (CLAIM-019) \\
+Sealed C-ext4, 1{,}562 episodes & correct-call acceptance 87/291 = 29.9\% (C-ext3 bundle 6.9\%); wrong-call acceptance 0/295 (CLAIM-021) \\
 Component ablation & FAR 0.000 in every arm (CLAIM-020) \\
 \bottomrule
 \end{tabular}
@@ -1489,8 +1498,41 @@ never unblock one. The authority limit is the design: a model may \emph{propose}
 the intent but may not thereby assert a match, and an intent whose quoted spans
 do not occur in the task text yields \textsc{Unknown}, never \textsc{Supported}.
 
-Its isolated effect remains \textbf{unmeasured}, because the BFCL v4
-confirmation contains no authoritative semantic bundle.
+The sealed C-ext3 track supplied that isolation: under a frozen
+deterministic bundle, native wrong-call acceptance fell 24/500, then 6/500,
+then 0/500 across the structural, contracts-plus-intent and
+\textsc{unknown}-floor arms (CLAIM-019). Three caveats bound what that
+measures. The deterministic intent extractor is the cost carrier: legitimate
+read autonomy fell to 26.6\% (25/94), far below the 75\% bar. The property
+the accept arm establishes is \emph{semantically authorized read}, that the
+call is licensed by a declared contract and a re-derived intent, not that it
+is the right call for the user's goal. And the result is a routing-bench
+measurement: discrimination on the governed execution path, where a live
+deployment supplies the intent and contract bundle, remains
+\textbf{unmeasured}.
+
+The sealed C-ext4 track measured that price directly. SAP v6 fixed eight
+targets before the remaining BFCL v4 reserve was built into 1{,}562 episodes
+over 363 clusters, ID-disjoint from every spent population. A revised bundle
+(v2, with deterministic derivation receipts) accepted 87/291 = 29.9\% of gold
+calls (Wilson 95\% CI 24.9\% to 35.4\%), against 20/291 = 6.9\% for the frozen
+C-ext3 bundle on the same episodes. Obtainable \textsc{verify} rose from
+45/119 to 100/119 = 84.0\%. Every safety count stayed at zero: native
+wrong-call \textsc{accept} 0/295 (Wilson upper bound 1.29\%), constructed
+wrong-tool 0/119 and required-\textsc{unknown} \textsc{accept} 0/238. All
+eight targets were met (CLAIM-021).
+
+The gain is narrower than that headline. A descriptive split computed after
+the run puts 76 of the revised bundle's 87 accepts on the 255 gold calls
+whose tool also occurs in the development sets. On the other 36 it accepted
+11 against 8 for the frozen bundle. The revisions are naming rules learned
+from one tool catalogue, and the reserve shares that catalogue. C-ext4
+therefore does not show generalisation to unseen tool families
+(NEGATIVE\_RESULTS.md \S82). Of the gold calls, 70.1\% still do not proceed
+autonomously. The state
+index is empty, so the accepted property is still semantically authorized
+read. No unseen BFCL v4 live row remains, so a test of generalisation needs
+a new tool catalogue, sealed before any authoring rule is written for it.
 
 % =====================================================================
 \subsection{External Validity: AgentHarm Benchmark (\texorpdfstring{$N=88$}{N=88})}
@@ -1869,7 +1911,7 @@ make benchmark    # all deterministic benchmarks
 make credibility-pack
 \end{lstlisting}
 
-At the revision date the suite collects 10{,}301 tests across 690 test
+At the revision date the suite collects 10{,}850 tests across 706 test
 files (\texttt{python -m pytest tests/ -q}); CI output is authoritative.
 
 Live oracle experiments require \texttt{GROQ\_API\_KEY} (earlier rounds)
@@ -1962,7 +2004,10 @@ accuracy was 91.2\%. The follow-up sealed C-ext3 track isolated the
 semantic axis: declared tool contracts with the semantic-authority floor
 eliminated native wrong-call acceptance (0/500 vs.\ the 10.9\% baseline)
 while capping read autonomy at 26.6\%: safety confirmed, utility
-misses published as measured.
+misses published as measured. A third sealed track, C-ext4, raised
+correct-call acceptance from 6.9\% to 29.9\% with every safety count at
+zero; the gain sits mostly on tools seen in development, so generalisation
+to unseen tool families is untested.
 
 The current architecture offers two further research interfaces. Typed
 evidence admission makes the scope and provenance of a claimed observation

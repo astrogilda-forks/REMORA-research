@@ -4,6 +4,29 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Paper (C-ext4 in the .md and .tex, reproducible §82 split)
+
+- The paper reports C-ext4 (CLAIM-021) beside C-ext3 in the abstract,
+  introduction, contributions, headline table, §10.9, conclusion and
+  summary, with the §82 limit stated where the gain is. Revision
+  2026-10-17.
+- The .tex §10.9 still said the semantic bundle's isolated effect was
+  unmeasured, which C-ext3 had already measured. It now carries the same
+  C-ext3 and C-ext4 text as the .md.
+- `scripts/bfcl_cext4_seen_split_posthoc.py` recomputes the post-hoc
+  seen/unseen split behind §82 and writes
+  `artifacts/posthoc/bfcl_cext4_seen_split.json`. A test recomputes it and
+  checks the artifact, §82 and the paper against each other.
+- `scripts/replay_sealed_cext4.py` replays the sealed C-ext4 track at its
+  locked commit in a temporary worktree, after checking the frozen code and
+  data against the seal hashes, and compares all 36 arm-metric counts with
+  the published result. `--at working-tree` checks today's code for drift.
+  Both pass. Tests cover the comparison and run both replays; the
+  locked-commit one skips on a shallow clone (new skip-reason entry).
+  Documented in docs/06-reproducibility.md.
+- The reproduction section's test count is refreshed (10,850 tests in 706
+  files on master `17db5502`).
+
 ### Evidence (C-ext4: sealed BFCL utility result, CLAIM-021)
 
 - C-ext4 was sealed from the whole remaining BFCL v4 reserve (295 positive,
