@@ -380,7 +380,7 @@ The gate function $\Gamma$ produces one of four outcomes:
 | **ABSTAIN** | Uncertainty or contradiction too high to decide | Blocked |
 | **ESCALATE** | Human review required; hard failure or policy trigger | Blocked |
 
-**ACCEPT** requires: no hard policy block; ordered phase; trust score $\tau$ above a calibrated threshold ($\tau^* \approx 0.203$ in the held-out evaluation protocol; threshold-specific values are reported in Section 10); evidence consistent. Accept does not mean the system *knows* the action is correct, it means the assurance conditions for autonomous execution are met.
+**ACCEPT** requires: no hard policy block; ordered phase; trust score $\tau$ above a calibrated threshold; evidence consistent. The phase and threshold conditions apply on the retired research path only, where the selective rule of Section 10.3 uses $\tau^* = 0.4991$ (the 18th-percentile training-split temperature, SAP v2 held-out round). On the governed path these fields are not set (§5.2). Accept does not mean the system *knows* the action is correct, it means the assurance conditions for autonomous execution are met.
 
 **VERIFY** is issued when the oracle assessment is plausible but dependent on external validation (e.g., a field inspection, a document check, a dual-control approval). It is not a failure, it is a controlled handoff.
 
@@ -1044,7 +1044,7 @@ The retired Groq swarm used three LLaMA *variants* (one weight family, not disti
 
 ### 13.6 In-Sample Calibration Warning
 
-The trust threshold $\tau^* = 0.197$ (in-sample) / $\tau^* = 0.203$ (held-out) and coverage operating points are evaluated on the same N=544 dataset used for threshold selection. The `in_sample_calibration_warning` field in the decision envelope records this explicitly.
+The selective threshold $\tau^* = 0.4991$ was chosen on a 436-item training split and evaluated on the 108-item holdout of the same 544-item corpus. The signal and coverage target came from an earlier run on that corpus (`results/selective_n500_holdout_results.json`). The SAP v1 round locked $\tau^* = 0.203$ and is superseded. The `in_sample_calibration_warning` field in the decision envelope records this explicitly.
 
 The retired round's protocol, interpretation and supersession are preserved in `NEGATIVE_RESULTS.md` (§18). It is not current evidence for a selection rule.
 
@@ -1083,7 +1083,7 @@ Everything in §10 is measured on the research and benchmark path. The authority
 ## 14. Threats to Validity
 
 **Internal validity:**
-- Trust threshold ($\tau^* = 0.197$ in-sample, $0.203$ held-out) is estimated on a limited dataset; overfitting is possible.
+- The selective threshold ($\tau^* = 0.4991$, SAP v2 held-out round) is estimated on a limited dataset; overfitting is possible.
 - REMORA-curated items (13.8% of N=544) may have been selected to favour the routing signal.
 - Tool-call benchmark is synthetic; adversarial patterns may not reflect real deployment failures.
 - The BFCL tracks are an adaptive sequence of looks at one finite pool (v3, C-ext2, C-ext3, C-ext4). Each track was ID-disjoint from the spent ones, but the bundles were developed between looks on the same tool catalogue, and the C-ext4 targets were set with the bundle's development numbers in hand.

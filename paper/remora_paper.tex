@@ -2032,9 +2032,11 @@ achievable with public models, and diversity weighting mitigates residual
 correlation without removing it.
 
 \paragraph{In-sample calibration.}
-The trust threshold ($\tau^* = 0.197$ in-sample, $0.203$ held-out) and the
-coverage operating points are evaluated on the same $N=544$ dataset used to
-select them; the decision envelope records this in
+The selective threshold $\tau^* = 0.4991$ was chosen on a 436-item training
+split and evaluated on the 108-item holdout of the same 544-item corpus, and
+the signal and coverage target were chosen from an earlier run on that corpus
+(\texttt{results/selective\_n500\_holdout\_results.json}); the SAP v1 round
+locked $\tau^* = 0.203$ and is superseded; the decision envelope records this in
 \texttt{in\_sample\_calibration\_warning}.
 
 \paragraph{Evidence retrieval is proxy-based.}
