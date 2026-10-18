@@ -149,3 +149,6 @@ entries:
   - pattern: "live test: set REMORA_LIVE=1 to run against the deployed Worker"
     class: live
     note: "conftest.py marks live tests; addopts deselects them before this skip applies."
+  - pattern: "network test: set REMORA_OTS_NETWORK=1 and put the ots client on PATH"
+    class: live
+    note: "tests/test_ots_seal.py stamps against public OpenTimestamps calendars; only the offline proof checks run in CI."

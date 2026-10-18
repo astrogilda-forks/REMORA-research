@@ -1,0 +1,97 @@
+{
+  "files": [
+    {
+      "path": "data/grounding_holdout_v1/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "49d95d9c4c72c7f90de1ba5e7a7fbfa321f44000de705a327a0fb723e0f555b4"
+    },
+    {
+      "path": "data/routing_bench_bfcl/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "a9b4f044510d4ffc40d50986a90955d1b558e113ea7d54791c85d9f035c069b8"
+    },
+    {
+      "path": "data/routing_bench_bfcl_v4/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "6f6e24404ab45e58b0f5b27c3f8fd5e622d7425a5865a1ee78a9bb6cf120f42a"
+    },
+    {
+      "path": "data/routing_bench_bfcl_v4_cext3/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "d94014f41d7d0206a345f57e8833367731d8c9a4fec19e6a9bfa345c1227493d"
+    },
+    {
+      "path": "data/routing_bench_bfcl_v4_cext4/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "41145789eda89a48f8c2eeda581aa424fa854a33f83f23922dd0feb396063c0d"
+    },
+    {
+      "path": "data/routing_bench_bfcl_v4_cext4/manifest.provenance.json",
+      "role": "provenance_sidecar",
+      "sha256": "ab81713815ff8d31a0d8b497108a73bf29acdb312b8f06fa26b713641b0ebdce"
+    },
+    {
+      "path": "data/routing_bench_holdout/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "f44458e9a7986489cbe0c6c79f240487269305001d567202a3add0e47ad69af5"
+    },
+    {
+      "path": "data/routing_bench_holdout_a/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "f2ac515cd293ab7f4c1a52eb6eb02a1ed5d8f946141a64148784fa8c780a541e"
+    },
+    {
+      "path": "data/routing_bench_holdout_b/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "0a1305b1ed2a821eab30820c007a850129bfdba6f13955b25a67aca58171839f"
+    },
+    {
+      "path": "data/routing_bench_holdout_c/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "582614fcc77a00400aa4d4a1f8bc0994977da1926b70cc9c1f00dbd072b37a3f"
+    },
+    {
+      "path": "data/routing_bench_trackA2/manifest.json",
+      "role": "seal_manifest",
+      "sha256": "6fe71d5bbb153ec59adfef8ff3a3ccce88adbe7d148c4d1d58f51e687c154e7a"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan.md",
+      "role": "sap",
+      "sha256": "0c04f58cced91d279949033eac8c13dab3dfc14fa000e1e2fa233185e2e4bd16"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan_v2.md",
+      "role": "sap",
+      "sha256": "2e959f34dec69d60a658545af5e495a4f34cd3b3857f86409edba9ad9e669a11"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan_v3.md",
+      "role": "sap",
+      "sha256": "b9eedeaaa8c388bc94fbf6ea40116c74e7ecceb91be3dd7805e7691c67d7c557"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan_v4.md",
+      "role": "sap",
+      "sha256": "400912647b5f7841e627284a6a9c98744fb4597ad4da996e7c4db5cad7e7a44b"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan_v5_bfcl_semantic.md",
+      "role": "sap",
+      "sha256": "280d42fc5a62e87b3c873c10cf41c02c3857ba92092c06db9024b3062b8987b6"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md",
+      "role": "sap",
+      "sha256": "1d768ec64d690423c4ccd0e594f026a0d108d63f9b2d4fb52dbf8736e8b9c3de"
+    },
+    {
+      "path": "docs/assurance/statistical_analysis_plan_v7_control_eval.md",
+      "role": "sap",
+      "sha256": "f15b9155ddc7671ac5fae6d2d13fa64b4c9ca320ede6bca0d4cd43b083239d8d"
+    }
+  ],
+  "hash_protocol": "sha256 over committed (LF) bytes; CRLF is normalised to LF before hashing",
+  "schema": "ots_seal_manifest_v1",
+  "selection_rule": "data/*/manifest.json with a 'status' field, its manifest.provenance.json sidecar, docs/assurance/statistical_analysis_plan*.md, and every path in a manifest's 'sap' field"
+}
