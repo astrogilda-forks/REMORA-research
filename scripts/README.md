@@ -34,6 +34,10 @@ build a new track with a new seed and pre-register it.
 producing, run by hand. A demo that stops working is a bug worth fixing, but
 it does not gate anything.
 
+`ots_seal.py` is run by hand after each seal. It stamps a manifest of the
+sealed files with OpenTimestamps and later upgrades and verifies the proof
+(`docs/06-reproducibility.md`, PRF-026).
+
 ## Adding a script
 
 State in the module docstring which of the three groups it belongs to. A

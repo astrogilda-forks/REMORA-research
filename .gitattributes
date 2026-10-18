@@ -34,6 +34,7 @@
 *.parquet binary
 *.pt binary
 *.onnx binary
+*.ots binary
 
 # A delivered third-party package, committed byte for byte: its pre-registration
 # hash covers the CRLF bytes of fault-definitions.json.

@@ -79,7 +79,7 @@ import {
   executeViaCanonicalService,
 } from "./execution_adapter";
 import { buildCodegraphPayload } from "./codegraph";
-import { parseJsonStrict, UnsafeNumberError } from "./json_numbers";
+import { DuplicateMemberError, parseJsonStrict, UnsafeNumberError } from "./json_numbers";
 import {
   appendEnvelope,
   buildEnvelope,
@@ -569,7 +569,9 @@ async function handleExecute(req: Request, env: Env): Promise<Response> {
     // is bound, rather than binding the changed value.
     body = parseJsonStrict(await req.text()) as ToolInput;
   } catch (e) {
-    if (e instanceof UnsafeNumberError) return err(e.message);
+    if (e instanceof UnsafeNumberError || e instanceof DuplicateMemberError) {
+      return err(e.message);
+    }
     return err("Invalid JSON body");
   }
   if (!body.tool || !body.input || !body.session_id) {

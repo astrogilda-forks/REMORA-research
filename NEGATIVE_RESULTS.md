@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-17: **26 `open`**, **27 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-18: **27 `open`**, **28 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -140,6 +140,12 @@ cites only `open` sections and that no `open` section is missing a theme.
    graded evidence channel and fresh paired data, not the spent artifacts.
    Meet composition (§84) keeps the oracle's signal when the oracle is a
    cap: 37 of 44 twins told apart at the hard-block point, against 4.
+16. **Effect evidence attributes nothing to the dispatch** (§85):
+   `EFFECT_VERIFIED` says the declared delta was observed, not that this
+   dispatch produced it. Under every rule except `version_increment` a delta
+   that was already true, or that another writer made, verifies the same way.
+   Closing it needs a baseline or a target-side operation id in the contract,
+   which is a design decision.
 
 <!-- backlog-end -->
 
@@ -5098,3 +5104,89 @@ mapping from oracle verdict to observation is. A cap carries the signal
 through. The graded score that the worker computed does not support a
 useful threshold. Showing discrimination still needs fresh paired data
 (§80).
+
+## §85 EFFECT_VERIFIED does not attribute the observed delta to the dispatch (2026-10-18)
+<!-- finding-status: open -->
+
+**Status:** a stated limit, found by reading the code against its design text
+and pinned by tests. No behaviour changed.
+
+`remora/governance/effect_verification.py` states its rule as comparing "the
+DECLARED DELTA against the version your own write produced", under the
+heading "did the approved thing happen?". `verify_declared_delta` takes the
+contract and the observed object, and nothing about the state before the
+dispatch or about who wrote. So under the `exact`, `hash`, `present` and
+`absent` rules, three cases return the same `EFFECT_VERIFIED` with the same
+reason code:
+
+- the dispatch made the change;
+- the change was already true before the dispatch, and the tool did nothing;
+- another writer made the change.
+
+Only `version_increment` compares against a baseline, so an unchanged version
+is `EFFECT_MISMATCH`. It still does not name the writer, so another writer's
+increment satisfies it.
+
+**What is and is not affected.** The verdict already carries
+`scope: declared_delta_only` and `vantage: same_deployment`, and the paper
+describes effect verification as a separate receipt, not as causation. No
+published claim rests on attribution. What overstates is the module's design
+text, and anyone who reads `EFFECT_VERIFIED` as "the approved action did it".
+An external review of PR #920 (2026-10-18, finding F-03) raised the same gap.
+It was then checked against the code here.
+
+**Related.** The `effect-evidence-v1` interop contract inherits the limit, and
+also has no field for the call binding, the observer or the captured
+decision. `docs/interop/FEDERATION.md` (invocation axes, #918) records that.
+The per-invocation export in `integrations/invocation-evidence/` keeps
+`effect_observed` at NOT_ESTABLISHED for the same reason.
+
+**Evidence.** `tests/test_effect_verification_attribution_limit.py`: the
+verifier has no input for prior state or writer; an already-true delta and
+one the dispatch made get the same verdict; `version_increment` refuses an
+unchanged version and accepts any advance.
+
+**What follows.** Leave the verdict as it is, and do not read attribution
+into it. A fix needs a contract decision first: a declared baseline per
+field, or a target-side operation id or revision that the dispatch returns
+and the reader confirms. Until then, causal attribution is NOT_ESTABLISHED
+for every effect REMORA verifies.
+
+## §86 The Worker edge collapsed repeated JSON members before the API could refuse them (2026-10-18)
+<!-- finding-status: accepted -->
+
+**Status:** found and fixed in the same change. The fix is the edge refusing,
+as it already did for numbers (RMR-CR-013).
+
+The execution API's strict ingress refuses a body with a repeated object
+member (`json_duplicate_member`, `servers/strict_json_ingress.py`). Both
+Workers (`mcp-gateway`, `agent-control`) parsed with `JSON.parse`, which
+keeps the last value. They then re-serialised the call to the API without the
+duplicate, so the API's check never saw it. A body such as
+`"arguments":{"repo":"o/r","repo":"evil/x"}` reached REMORA as `evil/x`. A
+reader that keeps the first value would read `o/r` over the same bytes: a
+proxy capturing the request, a reviewer reading the raw body, or a parser in
+another language. The request reference added in PR #920 makes this sharper.
+Two parties can hold the same `body_sha256` and still read different calls.
+`call_corresponds` would expose the divergence on the capture side, but only
+for a party that recomputes the call hash.
+
+Found while probing JSON ambiguity for the external design review of #920
+(finding F-11 asked for one strict JSON domain on both sides). No exploit in
+a deployment is known or claimed. The gateway is a test deployment, and the
+call that ran is the one REMORA bound and recorded.
+
+**Fix.** `parseJsonStrict` (byte-identical in both Workers) now refuses a
+repeated member name, compared after decoding as the Python ingress compares
+it, with `DuplicateMemberError` (`duplicate_member`). Both edges answer it as
+they answer an unsafe number.
+
+**Evidence.** `workers/mcp-gateway/test/json_numbers.test.ts` (refused and
+accepted bodies, including an escaped duplicate `"\u0061"`).
+`tests/test_worker_unsafe_numbers.py::test_the_worker_refuses_exactly_the_members_the_api_ingress_refuses`
+checks the Worker against `admit_strict_json` body by body.
+
+**What it does not cover.** Other ambiguities between parsers, such as
+Unicode normalisation of member names or byte-order marks, are not tested
+here. The edge and the API agree on the cases above, not on every JSON
+document.

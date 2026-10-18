@@ -382,6 +382,7 @@ pytest_add_cli_args = [
 # one of the mutated modules and is missing here. Cost of the full set: the
 # selection runs in 4.2 s against 2.8 s for the frozen 17.
 pytest_add_cli_args_test_selection = [
+    "tests/test_advisory_assessment_cannot_authorize.py",
     "tests/test_agentavow_edge.py",
     "tests/test_api_execution_surface_binding.py",
     "tests/test_as009_reentry_executor_count.py",
@@ -425,6 +426,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_hostile_review_2026_10_08.py",
     "tests/test_independent_recorder.py",
     "tests/test_interop_boundary_fixtures.py",
+    "tests/test_invocation_evidence_export.py",
     "tests/test_lease_authority_custody.py",
     "tests/test_lease_nonce_durability.py",
     "tests/test_lease_refusal_hooks_contract.py",

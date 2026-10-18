@@ -122,6 +122,50 @@ and master push. It uses a fresh full-history clone and only the documented
 `pip install -e ".[dev]"`. The job fails if a replay test skips, so the
 locked-commit replay cannot pass by being skipped.
 
+### External timestamps of seals
+
+A seal is a set of SHA-256 hashes in a committed manifest. Git history shows
+the order in which they were committed, but the maintainer controls that
+history (PRF-026). `scripts/ots_seal.py` adds an OpenTimestamps proof. It
+writes a manifest of the LF SHA-256 of every sealed file and stamps that
+manifest on the public OpenTimestamps calendars. Only the manifest's 32-byte
+digest is sent. The sealed files are read from the seal records: every
+`data/*/manifest.json` with a `status` field, its `manifest.provenance.json`
+sidecar, every `docs/assurance/statistical_analysis_plan*.md`, and any path in
+a manifest's `sap` field. Files those manifests hash are covered through them.
+
+The client is `opentimestamps-client` 0.7.2, installed in its own virtual
+environment. It is not a project dependency, so the lock pin is unaffected.
+
+```bash
+python -m venv /tmp/ots && /tmp/ots/bin/pip install opentimestamps-client==0.7.2
+export OTS_BIN=/tmp/ots/bin/ots
+python scripts/ots_seal.py stamp   artifacts/timestamps/seal_manifest_<date>.json
+python scripts/ots_seal.py upgrade artifacts/timestamps/seal_manifest_<date>.json.ots
+python scripts/ots_seal.py info    artifacts/timestamps/seal_manifest_<date>.json.ots
+python scripts/ots_seal.py verify  artifacts/timestamps/seal_manifest_<date>.json
+```
+
+A fresh proof is pending: the calendars have the digest but have not yet put
+it in a Bitcoin block. That usually takes a few hours, and the calendars keep
+the pending commitment, so `upgrade` can be run later; it fetches the
+Bitcoin attestation into the proof. Commit the upgraded `.ots` file; the
+manifest does not change. `verify` is offline. It re-hashes every listed
+file, reports any that changed or were sealed after the stamp, and checks
+that the proof commits to the manifest's digest. `verify --network` also runs
+`ots verify`, which needs a Bitcoin node. Without one, `ots --no-bitcoin
+verify` reports the block, and its header can be compared by hand.
+
+A new seal is stamped right after its manifest is locked and before any test
+data is generated or run, and the manifest and pending proof are committed
+together (SAP v7 §10 step 3). A stamp shows that the files existed no later
+than its block. The first stamp, `artifacts/timestamps/seal_manifest_2026-10-18.json`
+(manifest SHA-256 `2be2eafcf7538b499d9dcb99e451598c2b6065d2a05ab0245067200fab76cab7`),
+was made on 2026-10-18. For SAP v1 to v6 and the holdouts already evaluated
+it attests existence from that date only. Their original sealing dates rest
+on git history alone and stay externally unattested. SAP v7 was stamped as a
+draft and needs its own stamp when it is sealed.
+
 ---
 
 ## Claim 1, 0% unsafe execution on 700-task adversarial benchmark

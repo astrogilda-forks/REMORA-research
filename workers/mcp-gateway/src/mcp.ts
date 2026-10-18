@@ -8,7 +8,9 @@ import type { Verification } from "./effect";
 import { dispatchStatus, statusExplanation } from "./outcome";
 import { governedNames, toolsFor } from "./tools";
 import type { GovernedTool } from "./tools";
-import type { AssessResult, ExecuteResult, RemoraClient, ToolCall } from "./remora";
+import type {
+  AssessResult, ExecuteResult, RemoraClient, RequestRef, ToolCall,
+} from "./remora";
 
 export const PROTOCOL_VERSION = "2025-06-18";
 
@@ -48,6 +50,48 @@ export interface Deps {
   newId: () => string;
   /** Deployment configuration, which decides which tool sets are live. */
   env: Record<string, unknown>;
+  /** SHA-256 (lowercase hex) of the HTTP body bytes this message arrived in.
+   *  When set, every tools/call carries a request_ref built from it. */
+  bodySha256?: string;
+}
+
+/** True when a string has no lone surrogate, which JSON.stringify would escape
+ *  and Python's json.dumps(ensure_ascii=False) would not. */
+function wellFormed(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const next = s.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+      i++;
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** The reference REMORA binds into the grant, or undefined when the message
+ *  has no referenceable id or the transport supplied no body digest.
+ *
+ *  The id is recorded in canonical form, not as the bytes on the wire: only a
+ *  string without lone surrogates or a safe integer gets a reference, written
+ *  as JSON.stringify writes the parsed value ("7" becomes "7"; 7 and "7"
+ *  stay distinct). The body digest is what covers the exact bytes. The rule
+ *  is pinned by integrations/invocation-evidence/fixtures/jsonrpc-id-vectors.json,
+ *  which the Python side checks too. */
+export function requestRefFor(req: JsonRpcRequest, deps: Deps): RequestRef | undefined {
+  if (!deps.bodySha256) return undefined;
+  const id = req.id;
+  const referenceable =
+    (typeof id === "string" && wellFormed(id)) ||
+    (typeof id === "number" && Number.isSafeInteger(id));
+  if (!referenceable) return undefined;
+  return {
+    transport: "mcp-streamable-http",
+    jsonrpc_id: JSON.stringify(id),
+    body_sha256: deps.bodySha256,
+  };
 }
 
 const ok = (id: unknown, result: unknown) => ({ jsonrpc: "2.0", id, result });
@@ -122,6 +166,7 @@ async function callTool(
   name: string,
   args: Record<string, unknown>,
   deps: Deps,
+  requestRef?: RequestRef,
 ): Promise<unknown> {
   if (name === "remora_proposal_status") {
     return statusTool(String(args.proposal_id ?? ""), deps);
@@ -166,6 +211,7 @@ async function callTool(
     // and gets that exclusion back.
     target_environment: String(deps.env.REMORA_TARGET_ENVIRONMENT ?? "prod"),
     ...(intent_ref ? { intent_ref } : {}),
+    ...(requestRef ? { request_ref: requestRef } : {}),
   };
 
   const { status, body } = await deps.remora.assess(call);
@@ -328,7 +374,8 @@ export async function handleRpc(
       };
       if (!params.name) return err(req.id, -32602, "missing tool name");
       try {
-        return ok(req.id, await callTool(params.name, params.arguments ?? {}, deps));
+        return ok(req.id, await callTool(
+          params.name, params.arguments ?? {}, deps, requestRefFor(req, deps)));
       } catch (e) {
         return ok(
           req.id,

@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertSafeNumbers,
+  DuplicateMemberError,
   parseJsonStrict,
   unsafeNumberReason,
   UnsafeNumberError,
@@ -64,5 +65,34 @@ describe("the scanner reads the raw text, outside strings", () => {
 
   it("reports syntax errors as JSON.parse does", () => {
     expect(() => parseJsonStrict('{"a":')).toThrow(SyntaxError);
+  });
+});
+
+describe("repeated member names are refused, not collapsed", () => {
+  const refused = (text: string) => {
+    try {
+      parseJsonStrict(text);
+    } catch (e) {
+      return e instanceof DuplicateMemberError ? e.member : `other: ${String(e)}`;
+    }
+    return null;
+  };
+
+  it.each([
+    ['{"a":1,"a":2}', "a"],
+    ['{"params":{"arguments":{"repo":"o/r","repo":"evil/x"}}}', "repo"],
+    ['{"a":1,"\\u0061":2}', "a"],
+    ['[{"x":1},{"y":{"z":1,"z":2}}]', "z"],
+  ])("%s -> %s", (text, member) => {
+    expect(refused(text)).toBe(member);
+  });
+
+  it.each([
+    '{"a":1,"b":{"a":2}}',
+    '[{"a":1},{"a":2}]',
+    '{"a":"\\"a\\"","b":"a"}',
+    '{"a":[{"a":1}],"b":[]}',
+  ])("%s is accepted", (text) => {
+    expect(refused(text)).toBeNull();
   });
 });

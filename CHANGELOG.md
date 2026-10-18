@@ -27,6 +27,89 @@ This file lists externally relevant changes by release. Fine-grained development
   percentage" as an update request and refuted the correct read tool; v3
   sends them to VERIFY instead.
 
+### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §86)
+
+- Both Workers parsed request bodies with `JSON.parse`, which keeps the last
+  value of a repeated member, and re-serialised the call without the
+  duplicate. The API's strict ingress (`json_duplicate_member`) therefore
+  never saw it, and a first-value reader of the same bytes would read another
+  call. `parseJsonStrict` (byte-identical in `mcp-gateway` and
+  `agent-control`) now refuses a repeated member name after decoding, and
+  both edges answer it as they answer an unsafe number.
+- `NEGATIVE_RESULTS.md` §85 (open) records that `EFFECT_VERIFIED` does not
+  attribute the observed delta to the dispatch; §86 (accepted) records this
+  finding and its fix.
+- Three adversarial probes hold, each pinned by a test:
+  - P1: a batch member's grant does not redeem for its sibling, although
+    both share a body digest.
+  - P2: a grant issued before a policy revision is refused unspent, and
+    redeems once the policy is back.
+  - P3: an advisory `assess_tool_call()` ACCEPT carries no grant, nothing on
+    the enforcing path imports it, and the strict gate refuses it.
+    PRF-040 stays OPEN, because the advisory result is still called ACCEPT.
+
+### Interop (effect-evidence-v1 limits found by the invocation axes corpus, #918)
+
+- Probity's `invocation_axes` corpus at `d2bdacc7` (23 cases, 22 bundles)
+  was reproduced locally against the frozen `effect-evidence-v1` verifier: 19
+  bundles agree on the binary observed-effect result. On
+  `bundle_for_other_call`, `dispatched_after_deny` and
+  `observation_from_the_tool` the verifier returns `EFFECT_VERIFIED` and
+  Probity's reader does not.
+- `docs/interop/FEDERATION.md` records why. The v1 input has no field for the
+  call binding, the observer or the captured decision. The first two were
+  already v1 non-claims. Decision correspondence was not, and is now stated as
+  a limit of v1 and v1.1. The frozen package and its records are unchanged,
+  and none of this is a REMORA runtime result.
+- `tests/test_effect_evidence_v1_projection_limits.py` pins the limit: bundles
+  that differ only in one of those facts project to identical v1 input and get
+  identical verdicts.
+
+### Interop (per-invocation evidence export and request binding)
+
+- New `remora/execution/request_ref.py`: a call may carry the request it
+  arrived in, as the transport, the JSON-RPC id's canonical JSON text and the SHA-256 of
+  the body bytes as received. At ACCEPT its digest enters the
+  `AuthorizationContext` and so the signed grant. Redemption under another
+  reference, or with it stripped, is refused as `context_mismatch` before the
+  grant is spent. A context without one hashes exactly as before.
+- The MCP gateway digests the body bytes before decoding and sends the
+  reference on every `tools/call`.
+- On the direct-ACCEPT path the chain now keeps the grant, in
+  `execution_authorized` after the gate has consumed it, and the lease, in
+  `execution_result` after dispatch. The assessed record keeps the
+  authorization context fields the grant's `context_hash` covers.
+- New `GET /v1/execution/proposals/{id}/invocation-evidence`
+  (`remora/execution/invocation_evidence.py`). It returns the three chain
+  entries with the strings their hashes cover, the grant and lease with the
+  bytes their signatures cover, and one Ed25519 signature over the whole under
+  `REMORA/EVIDENCE/v1`. The new key `REMORA_EVIDENCE_SIGNING_KEY_ED25519_PRIVATE`
+  is declared in the credential topology register.
+- New `integrations/invocation-evidence/`: a verifier that imports no REMORA
+  code and needs public keys only, seven fixture cases made through the server
+  path, and a README. Two requests with the same call are told apart:
+  `request_corresponds` is CONTRADICTED for the other request while
+  `call_corresponds` stays ESTABLISHED.
+- `tests/test_invocation_evidence_export.py` (24 tests) and three gateway
+  tests. Four of them attack the chain end to end: a grant presented with
+  another call is refused before dispatch, a denied call gets no grant and
+  no export, an export rewritten to hide a deny is CONTRADICTED, and the
+  tool's own result never becomes an observed effect (`effect_observed` is
+  always NOT_ESTABLISHED). The verifier, the export and the cases are REMORA's own, so nothing
+  here is an independent result.
+- Two findings of an external design review of this PR are fixed. F-10: the
+  JSON-RPC id is recorded in canonical form (a string without lone surrogates
+  or a safe integer, as `JSON.stringify` writes it), not as wire bytes, and the
+  docs no longer say otherwise. `fixtures/jsonrpc-id-vectors.json` (18
+  vectors) is checked by the gateway, the server and the verifier. F-11: the
+  verifier hashes the call over the same JSON domain enforcement accepts
+  (no `default=str`), and it refuses duplicate keys and NaN/Infinity in every
+  JSON it reads, signed or not.
+- The twelve capabilities whose sources this touched (CAP-003, 004, 005,
+  007, 013, 018 to 024) are re-audited and rebound to the code commit, with
+  their evidence tests passing. Their mechanism, status, scope and caveats are
+  unchanged. The boundary declaration and its summary are repinned.
+
 ### Security (MCP gateway readiness fails closed)
 
 - The `/mcp` route acted on readiness problems only when the profile was
@@ -138,6 +221,7 @@ This file lists externally relevant changes by release. Fine-grained development
   property in `tests/policy/test_meet_composition.py`, and the never-weakens
   tests cover monitor and protocol caps. The version label stays
   `RemoraDecisionEngine-v5`; the SDD reserves v6 for the flow rungs.
+
 ### Flow control IFC-03b (ToolSpec v4 at bundle load)
 
 - The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in

@@ -1,0 +1,52 @@
+{
+  "case": "06-grant-signature-forged",
+  "why": "A grant signature flipped and the export re-signed with the evidence key: the exporter cannot stand in for the PDP.",
+  "bundle": "bundle.json",
+  "capture": {
+    "jsonrpc_id": "7",
+    "body": "../../request-7.json",
+    "call": {
+      "name": "read_telemetry",
+      "arguments": {
+        "asset": "P-1"
+      },
+      "target": "staging"
+    }
+  },
+  "expected": {
+    "export_authentic": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "chain_consistent": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "authority_bound": {
+      "result": "CONTRADICTED",
+      "codes": [
+        "grant_not_the_recorded_one"
+      ]
+    },
+    "call_corresponds": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "request_corresponds": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "grant_not_verified"
+      ]
+    },
+    "dispatch_recorded": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "effect_observed": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "no_observation_in_export"
+      ]
+    }
+  }
+}

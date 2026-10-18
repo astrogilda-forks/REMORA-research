@@ -1,0 +1,60 @@
+{
+  "case": "05-export-signature-altered",
+  "why": "One bit of the evidence signature flipped.",
+  "bundle": "bundle.json",
+  "capture": {
+    "jsonrpc_id": "7",
+    "body": "../../request-7.json",
+    "call": {
+      "name": "read_telemetry",
+      "arguments": {
+        "asset": "P-1"
+      },
+      "target": "staging"
+    }
+  },
+  "expected": {
+    "export_authentic": {
+      "result": "CONTRADICTED",
+      "codes": [
+        "evidence_signature_invalid"
+      ]
+    },
+    "chain_consistent": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
+    },
+    "authority_bound": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
+    },
+    "call_corresponds": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
+    },
+    "request_corresponds": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
+    },
+    "dispatch_recorded": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
+    },
+    "effect_observed": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
+    }
+  }
+}
