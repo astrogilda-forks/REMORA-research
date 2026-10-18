@@ -24,16 +24,17 @@
 
 Defined in `servers/api.py:_BUILTIN_ROLE_PERMISSIONS`.
 
-| Role | assess | evidence | execute | rerun | read | review | follow_up |
-|------|--------|----------|---------|-------|------|--------|-----------|
-| admin | yes | yes | yes | yes | yes | yes | yes |
-| operator | yes | yes | yes | yes | yes | no | no |
-| reviewer | no | no | no | no | yes | yes | yes |
-| domain_expert | no | no | no | no | yes | yes | no |
-| senior_authority | no | no | no | no | yes | yes | no |
-| soc_analyst | no | no | no | no | yes | yes | no |
-| legal_counsel | no | no | no | no | yes | yes | no |
-| viewer | no | no | no | no | yes | no | no |
+| Role | assess | evidence | execute | rerun | read | review | follow_up | verify_effect |
+|------|--------|----------|---------|-------|------|--------|-----------|---------------|
+| admin | yes | yes | yes | yes | yes | yes | yes | yes |
+| operator | yes | yes | yes | yes | yes | no | no | no |
+| reviewer | no | no | no | no | yes | yes | yes | no |
+| domain_expert | no | no | no | no | yes | yes | no | no |
+| senior_authority | no | no | no | no | yes | yes | no | no |
+| soc_analyst | no | no | no | no | yes | yes | no | no |
+| legal_counsel | no | no | no | no | yes | yes | no | no |
+| viewer | no | no | no | no | yes | no | no | no |
+| effect_verifier | no | no | no | no | yes | no | no | yes |
 
 **Capability definitions:**
 - `assess`, submit a governance request (`POST /v1/assess`)
@@ -43,6 +44,7 @@ Defined in `servers/api.py:_BUILTIN_ROLE_PERMISSIONS`.
 - `review`, submit human review (`POST /v1/review`)
 - `execute`, execute an approved review item, consuming a one-time grant (`POST /v1/execution/execute`); granted to admin and operator only
 - `follow_up`, add follow-up information (`POST /v1/follow-up`)
+- `verify_effect`, record an observed effect for an executed proposal (`POST /v1/execution/proposals/{id}/effect`). Required in production and under the strict profiles, where the recording principal must also be bound in `REMORA_EFFECT_VERIFIER_BINDINGS` and must not have proposed or executed the call (RMR-AUD-004). A development deployment outside the strict profiles also accepts `execute` and marks a receipt from the executor `self_attested`.
 
 (`assess` also gates `POST /v1/execution/assess`; `review` gates `POST /v1/execution/approve`.)
 

@@ -159,6 +159,15 @@ class SurfaceRuntime:
             if postcondition is not None:
                 if postcondition.tool_id != tool_name:
                     raise ValueError("postcondition_tool_mismatch")
+                # RMR-AUD-004: a selector field that is also a call argument
+                # must name the object this call targets. Otherwise the
+                # contract describes another object, and a read of that one
+                # would settle this call's effect.
+                if isinstance(arguments, Mapping):
+                    for name, selected in postcondition.target_selector.items():
+                        if name in arguments and not frozen_json.strict_equal(
+                                selected, arguments[name]):
+                            raise ValueError("postcondition_target_not_call_argument")
                 self._contracts[assessment.assessment_id] = json.loads(canonical_json(dict(
                     tool_id=postcondition.tool_id, reader=postcondition.reader,
                     target_selector=frozen_json.thaw(postcondition.target_selector),

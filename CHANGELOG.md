@@ -4,6 +4,54 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (effect evidence follows an authorized dispatch; audit keeps every approval, RMR-AUD-004/005)
+
+An external audit on 2026-10-18 reproduced these on the Python runtime.
+
+- **Effect after a deny.** `resolve_lineage` read only the last
+  `execution_result`. A trail that also held an ABSTAIN assessment or a
+  rejection accepted an effect receipt, and the proposal read
+  `EFFECT_VERIFIED`. The lineage now requires an assessment that may
+  dispatch, no rejection, an approval for a VERIFY or ESCALATE decision, and
+  an `execution_authorized` record with `pep_allowed: true` for the same
+  grant and call. Refusals: `dispatched_after_deny`,
+  `assessment_decision_unknown`, `dispatched_without_approval`,
+  `dispatch_not_authorized`. The surface runtime, whose chain has no decision
+  records, opts out explicitly (`require_decision_path=False`).
+- **The executor as its own verifier.** Recording an effect needed the
+  `execute` capability, and with `REMORA_EFFECT_VERIFIER_BINDINGS` unset the
+  verifier identity only had to equal the principal, so the agent that ran a
+  call could attest to it. There is now a `verify_effect` capability and an
+  `effect_verifier` role. In production and under the strict profiles:
+  - `verify_effect` is required;
+  - the bindings must be set (503 `effect_verifier_bindings_required`);
+  - a principal that proposed or executed the call is refused (403
+    `verifier_is_executor`).
+
+  A development deployment outside the strict profiles still accepts
+  `execute` and the executor's own receipt. The record and the projection
+  then carry `self_attested: true`.
+- **Evidence about another object.** `verify_declared_delta` never read
+  `PostconditionContract.target_selector`. An observed selector field that
+  differs now returns `EFFECT_UNOBSERVABLE` with
+  `postcondition_target_mismatch`. A selector field the reader does not
+  return is still not compared. The surface runtime refuses a contract whose
+  selector names another object than the call's arguments
+  (`postcondition_target_not_call_argument`).
+- **Dropped audit events.** The outbox key for `approved` named only the
+  item, so an approval after an expired or invalidated one was dropped from
+  the chain. The same held for a second re-gate refusal on one item. The key
+  now carries the approval's issue time, or a per-attempt id for refusals.
+  The key of a first approval changes bytes; the event does not.
+- **State stuck at REFUSED.** `current_state` returned `REFUSED` once any
+  refusal had been recorded. It is now a fold in chain order. A binding or
+  context refusal leaves the approval standing (`AUTHORIZED`). An expired or
+  invalidated approval returns to `REVIEW_PENDING` until it is approved
+  again. An effect counts only when its lineage holds.
+- Not changed: the frozen `effect-evidence-v1` schema and its reference
+  verifier, the Worker gateway's effect submission, and the review-queue
+  re-gate.
+
 ### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §86)
 
 - Both Workers parsed request bodies with `JSON.parse`, which keeps the last

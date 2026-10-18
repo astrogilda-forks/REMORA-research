@@ -62,9 +62,14 @@ def _event(name: str, payload: dict | None = None, *, at: datetime | None = None
 
 
 def _dispatched(*, executed: bool = True, unknown: bool = False, **over):
+    # The decision path a real chain records (RMR-AUD-004): an assessment that
+    # may dispatch and an allowed authorization for this grant and call.
     return [
-        _event("assessed", at=DISPATCHED_AT - timedelta(seconds=30)),
-        _event("execution_authorized", at=DISPATCHED_AT - timedelta(seconds=1)),
+        _event("assessed", {"decision": "accept"},
+               at=DISPATCHED_AT - timedelta(seconds=30)),
+        _event("execution_authorized", {
+            "grant_jti": JTI, "tool_call_hash": CALL_HASH, "pep_allowed": True},
+            at=DISPATCHED_AT - timedelta(seconds=1)),
         _event("execution_result", {
             "tool_call_hash": CALL_HASH, "grant_jti": JTI,
             "tool_executed": executed, "state_unknown": unknown, **over}),
@@ -318,6 +323,9 @@ def test_an_unknown_dispatch_can_also_be_resolved_to_mismatch():
 
 def test_the_latest_dispatch_supersedes_an_earlier_one():
     events = _dispatched()
+    events.append(_event("execution_authorized", {
+        "grant_jti": "jti-retry", "tool_call_hash": CALL_HASH,
+        "pep_allowed": True}, at=DISPATCHED_AT))
     events.append(_event("execution_result", {
         "tool_call_hash": CALL_HASH, "grant_jti": "jti-retry",
         "tool_executed": True}, at=DISPATCHED_AT + timedelta(seconds=1)))

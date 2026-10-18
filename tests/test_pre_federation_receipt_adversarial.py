@@ -24,7 +24,12 @@ DIGEST = "d" * 64
 
 def _events():
     attempted = datetime.now(UTC) - timedelta(seconds=5)
-    return [{
+    # The decision path a real chain records ahead of the dispatch.
+    return [{"event": "assessed", "payload": {"decision": "accept"}},
+            {"event": "execution_authorized", "payload": {
+                "grant_jti": JTI, "tool_call_hash": CALL_HASH,
+                "pep_allowed": True}},
+            {
         "event": "execution_result",
         "timestamp": attempted.isoformat(),
         "payload": {

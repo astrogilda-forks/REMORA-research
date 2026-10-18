@@ -2899,13 +2899,35 @@ def _effect_audit_is_durable() -> bool:
 def record_effect_verification(tenant: str, verification: Any, *,
                                submitted_by: str = "",
                                dispatch_id: str = "",
-                               settled_dispatch_id: str = "") -> dict[str, Any]:
+                               settled_dispatch_id: str = "",
+                               self_attested: bool = False) -> dict[str, Any]:
     """Append one effect verification to the tenant audit chain (see
     remora.execution.projections for the appending/never-editing contract)."""
     return _record_effect_verification_impl(
         _CHAIN, tenant, verification, submitted_by=submitted_by,
         dispatch_id=dispatch_id, settled_dispatch_id=settled_dispatch_id,
+        self_attested=self_attested,
     )
+
+
+def _effect_separation_required() -> bool:
+    """Whether an effect verifier must be independent of the call (RMR-AUD-004).
+
+    True in production and under the strict runtime profiles. There the
+    verifier holds the ``verify_effect`` capability, its identity comes from
+    ``REMORA_EFFECT_VERIFIER_BINDINGS``, and it is neither the proposer nor the
+    executor of the call. A development deployment outside the strict profiles
+    may still record a receipt from the executing principal, marked
+    ``self_attested`` so it is never read as an independent observation.
+    """
+    from remora.profiles import (
+        STRICT_PROFILES,
+        current_runtime_profile,
+        deployment_environment,
+    )
+
+    return (deployment_environment() == "production"
+            or current_runtime_profile() in STRICT_PROFILES)
 
 
 def _current_state(events: list[dict[str, Any]],
@@ -3013,7 +3035,17 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
     tenant, role, principal = _auth(request)
     from servers import api as api_mod
 
-    api_mod._require_tenant_capability(role, tenant, "execute")
+    separation = _effect_separation_required()
+    # RMR-AUD-004: recording an effect is its own capability. It used to be
+    # "execute", so the agent that ran a call could attest to its effect.
+    # Outside production and the strict profiles "execute" is still accepted,
+    # and the record is marked self-attested below when it is one.
+    try:
+        api_mod._require_tenant_capability(role, tenant, "verify_effect")
+    except HTTPException:
+        if separation:
+            raise
+        api_mod._require_tenant_capability(role, tenant, "execute")
     events = _proposal_events(tenant, proposal_id)
     if not events:
         raise HTTPException(status_code=404, detail="proposal not found")
@@ -3028,6 +3060,16 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
                     "uniqueness and its audit evidence commit together; "
                     "REMORA_STATE_ENDPOINT does not yet store the tenant "
                     "audit chain"),
+        )
+    if separation and not _verifier_bindings():
+        # Unset bindings mean "the verifier is whoever submits", which in a
+        # deployment where the agent holds the receipt credential is the agent.
+        raise HTTPException(
+            status_code=503,
+            detail=("effect receipt refused (effect_verifier_bindings_required): "
+                    "production and the strict profiles require "
+                    "REMORA_EFFECT_VERIFIER_BINDINGS to name which principal "
+                    "observes effects under which verifier identity"),
         )
 
     # NOT defaulted to the server clock: substituting our time for a missing
@@ -3076,6 +3118,16 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
             detail=f"effect receipt refused ({exc.reason}): {exc.detail}",
         ) from exc
 
+    # A principal that proposed or executed the call is not an independent
+    # observer of its effect, whatever verifier identity it is bound to.
+    self_attested = principal in lineage.executors
+    if self_attested and separation:
+        raise HTTPException(
+            status_code=403,
+            detail=(f"effect receipt refused (verifier_is_executor): "
+                    f"{principal!r} proposed or executed this call and may not "
+                    "attest to its effect"))
+
     # The record names the governed tool and spec, so both come from the
     # assessment in the chain. Copying them from the request let a receipt
     # store evidence about a tool or spec the dispatch never ran under.
@@ -3117,6 +3169,7 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
             dispatch_id=lineage.dispatch_id,
             settled_dispatch_id=(lineage.dispatch_id
                                  if status.is_terminal else ""),
+            self_attested=self_attested,
         )
     except EffectVerificationReplay as exc:
         raise HTTPException(
@@ -3135,6 +3188,7 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
         "dispatch_id": lineage.dispatch_id,
         "reason_code": req.reason_code,
         "verifier_identity": req.verifier_identity,
+        "self_attested": self_attested,
         # RMR-CR-008: an attestation by a verifier of this deployment, about
         # the declared delta only.
         "vantage": verification.vantage,

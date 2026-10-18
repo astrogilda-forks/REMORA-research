@@ -150,9 +150,12 @@ def approve_item(
         chain, tenant, str(proposal_id or ""), required=require_execution_context)
     if (context.digest() if context is not None else "") != item.observation.execution_context_hash:
         raise ExecutionContextRefused("execution_context_review_mismatch")
-    # Deterministic, and once per item: an approval is terminal for the
-    # pending state, so the same key can never name two different events.
-    key = encode_key(tenant, "approved", item_id)
+    # Deterministic per approval, not per item (RMR-AUD-005). An expired or
+    # invalidated approval returns the item to pending, so one item can be
+    # approved more than once. A key naming only the item made every later
+    # approval collide with the first, and the outbox dropped it. The issue
+    # instant identifies this approval and is the same on a retried append.
+    key = ""
     append = appender(chain, transactional_append)
     entry: Any = None
     try:
@@ -164,6 +167,8 @@ def approve_item(
                 item_id, approver=principal,
                 approval_ttl=timedelta(seconds=approval_ttl_seconds),
             )
+            key = encode_key(tenant, "approved", item_id,
+                             approval.issued_at.isoformat())
             # REM-047: INSIDE the transaction that records the approval. It
             # used to be appended after the commit, so a crash in between left
             # an approved item with no audit event and a verifier unable to

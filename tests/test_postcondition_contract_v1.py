@@ -117,6 +117,8 @@ EXPECTED_REASON_CODES = {
     "postcondition_verified",
     "postcondition_field_mismatch",
     "postcondition_object_absent",
+    # RMR-AUD-004: the reader returned another object than the selector names.
+    "postcondition_target_mismatch",
     "postcondition_version_not_advanced",
     "postcondition_read_timeout",
     "postcondition_reader_error",

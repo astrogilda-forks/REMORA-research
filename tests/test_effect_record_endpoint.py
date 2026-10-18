@@ -68,8 +68,12 @@ def _make_client(monkeypatch, tmp_path, *, tenant="acme"):
     # equal the principal, which is fail-closed: before this binding existed
     # the verifier name arrived in the request body, so anyone authorised to
     # record receipts could type a permitted name.
+    #
+    # The reader is its own service (RMR-AUD-004): receipts arrive under
+    # reader-svc, while employee-1 proposes and executes. A receipt from the
+    # executor is a self-attestation and never settles the proposal.
     monkeypatch.setenv("REMORA_EFFECT_VERIFIER_BINDINGS",
-                       "employee-1=acme.reader/v1")
+                       "reader-svc=acme.reader/v1")
     monkeypatch.setenv("REMORA_LEASE_SIGNING_KEY", "rec-lease-key")
     monkeypatch.setenv("REMORA_ENV", "development")
     monkeypatch.setenv("REMORA_TOOL_REGISTRY_MODULE",
@@ -83,11 +87,14 @@ def _make_client(monkeypatch, tmp_path, *, tenant="acme"):
     import servers.api as api_mod
     import servers.execution_api as exec_mod
 
-    state = {"tenant": tenant}
+    state = {"tenant": tenant, "effect_principal": "reader-svc"}
     monkeypatch.setattr(api_mod, "_authenticate",
                         lambda request: (state["tenant"], "reviewer"))
-    monkeypatch.setattr(api_mod, "_authenticated_principal",
-                        lambda request: "employee-1")
+    monkeypatch.setattr(
+        api_mod, "_authenticated_principal",
+        lambda request: (state["effect_principal"]
+                         if request.url.path.endswith("/effect")
+                         else "employee-1"))
     monkeypatch.setattr(api_mod, "_require_tenant_capability",
                         lambda role, tenant, cap: None)
     monkeypatch.setattr(api_mod, "_enforce_review_approval_role",
@@ -434,7 +441,7 @@ def test_the_provenance_is_stored_not_merely_accepted(client) -> None:
     assert payload["verifier_version"] == "reader-2.1.0"
     assert payload["dispatch_id"], "the dispatch it attests to"
     assert payload["tool_call_hash"], "the call it attests to"
-    assert payload["submitted_by"] == "employee-1", (
+    assert payload["submitted_by"] == "reader-svc", (
         "who submitted, kept separate from who observed")
 
 
