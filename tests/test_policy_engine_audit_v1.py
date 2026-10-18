@@ -635,6 +635,9 @@ class TestPolicyBundleHash:
             "remora/policy/observation.py",
             "remora/policy/trap_classifier.py",
             "remora/policy/report.py",
+            # IFC-03: the flow lattice and ToolSpec flow rules (SDD v1.3).
+            "remora/flow/label.py",
+            "remora/flow/spec.py",
         }
         assert expected_keys == set(manifest.keys())
 

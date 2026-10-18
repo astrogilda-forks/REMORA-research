@@ -167,6 +167,10 @@ EXPECTED_REASON_CODES = {
     "toolspec_effect_policy_invalid",
     # Additive 2026-10-12: a schema keyword nothing enforces does not load.
     "toolspec_argument_schema_unsupported",
+    # Additive 2026-10-18 (IFC-03): the flow block of schema version 4.
+    "toolspec_flow_requires_v4",
+    "toolspec_flow_invalid",
+    "toolspec_flow_lint_failed",
 }
 
 
