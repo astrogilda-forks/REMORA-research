@@ -36,6 +36,7 @@ This file lists externally relevant changes by release. Fine-grained development
 - Not changed: the `/v1/execution` path, the engine, hard guards, and the
   action-gate adapters in `remora/adapters/`, which forward caller labels to
   a gateway and do not call `assess_tool_call`.
+
 ### Security (MCP gateway readiness fails closed)
 
 - The `/mcp` route acted on readiness problems only when the profile was
