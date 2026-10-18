@@ -9,7 +9,9 @@ argument that cannot be mapped to a canonical principal (a display-name
 email, a URL with user information or a non-http scheme, an IBAN that does
 not parse, a resource with no ACL resolver) is returned as unresolved; the
 check counts it as a confidentiality violation, because no reader set can be
-shown to contain it.
+shown to contain it. A rule that derives recipients from arguments, all of
+which are null, empty or missing, names every argument it reads as
+unresolved: such a call would leave the tool to choose its recipients.
 
 :func:`flow_check` is the SDD's pseudo-code::
 
@@ -112,9 +114,12 @@ def recipients(flow: FlowSpec, resolved_args: Mapping[str, Any], *,
     rule = flow.sink.recipients
     found: set[str] = set()
     unresolved: list[str] = []
+    seen_values = False
 
     def add(argument: str, compute: Callable[[Any], Iterable[str]]) -> None:
+        nonlocal seen_values
         for value in _values(resolved_args.get(argument)):
+            seen_values = True
             try:
                 found.update(compute(value))
             except (ResourceRefused, TypeError, ValueError):
@@ -136,6 +141,12 @@ def recipients(flow: FlowSpec, resolved_args: Mapping[str, Any], *,
         add(str(rule.argument), acl)
     elif rule.kind == "static":
         found.update(rule.static)
+    if rule.kind not in ("none", "static") and not seen_values:
+        # A rule derived from arguments that hold no value names no one, so
+        # the tool decides where the payload goes (RMR-AUD-007). An empty
+        # rule is unresolved, not "nobody"; one absent argument (a cc
+        # beside a to) is not.
+        unresolved.extend(rule.arguments())
     if flow.provider != "tcb":
         found.add(flow.provider)
     return frozenset(found), tuple(dict.fromkeys(unresolved))

@@ -22,6 +22,7 @@ from remora.flow.spec import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+USER = "user://acme/alice"
 
 
 def _schema(**props):
@@ -43,6 +44,17 @@ SEND_EMAIL = {
 }
 SEND_EMAIL_SCHEMA = _schema(to=1, cc=1, subject=1, body=1)
 
+# The SDD §5.1 excerpt declares $[*].subject BY_VALUE with no rule for the
+# list or its items. Under §3.2.1 those containers are handles, so the
+# subject would never be shown: FL-14 refuses the excerpt as written
+# (test_fl14_refuses_the_sdd_inbox_excerpt_as_written). The fixture adds the
+# two container rules the excerpt needs.
+GET_INBOX_CONTAINERS = [
+    {"path": "$", "readers": {"static": [USER], "plus_processors": True},
+     "return_mode": "BY_VALUE"},
+    {"path": "$[*]", "readers": {"static": [USER], "plus_processors": True},
+     "return_mode": "BY_VALUE"},
+]
 GET_INBOX = {
     "provider": "tcb",
     "arguments": {},
@@ -58,6 +70,7 @@ GET_INBOX = {
              "readers": {"from_source_metadata": ["delivery_recipients"],
                          "plus_user": True, "plus_processors": True},
              "return_mode": "BY_VALUE"},
+            *GET_INBOX_CONTAINERS,
         ],
         "source_metadata": {
             "delivery_recipients": {"authority": "source_system",
@@ -102,7 +115,7 @@ def test_parse_reads_the_declared_meaning():
     flow = parse_flow(GET_INBOX)
     assert flow.provider == "tcb"
     assert flow.sources.default_integrity is Integrity.UNTRUSTED
-    body, subject = flow.sources.fields
+    body, subject, *_containers = flow.sources.fields
     assert body.path == "$[*].body" and body.return_mode == "BY_HANDLE"
     assert subject.return_mode == "BY_VALUE"
     assert body.readers.kind == "from_source_metadata"
@@ -171,6 +184,78 @@ def test_fl01_a_url_argument_under_no_recipients():
     flow = copy.deepcopy(GET_WEBPAGE)
     flow["sink"] = {"recipients": "none"}
     assert "FL-01" in _rules(flow, _schema(url=1), action_type="read", effect_mode="NONE")
+
+
+@pytest.mark.parametrize("recipients", [
+    {"static": ["ext://trusted.example"]},
+    {"from_args": {"to": "email"}},
+])
+def test_fl01_a_url_argument_must_be_the_url_host_of_rule(recipients):
+    """RMR-AUD-007: a url is fetched, so it reaches its host whatever other
+    recipients the block declares (SDD §3.5: url_host_of makes a tool a sink)."""
+    flow = {"provider": "tcb",
+            "arguments": {"url": {"kind": "url"}, "to": {"kind": "email"}},
+            "sources": {}, "sink": {"recipients": recipients}}
+    assert "FL-01" in _rules(flow, _schema(url=1, to=1))
+
+
+def test_fl01_a_writer_names_every_email_and_iban_argument_as_a_recipient():
+    flow = copy.deepcopy(SEND_EMAIL)
+    flow["arguments"]["bcc"] = {"kind": "email"}
+    assert "FL-01" in _rules(flow, _schema(to=1, cc=1, bcc=1, subject=1, body=1))
+    pay = {"provider": "tcb",
+           "arguments": {"path": {"kind": "resource"}, "iban": {"kind": "iban"}},
+           "sources": {}, "sink": {"recipients": {"resource_of": "path"}}}
+    assert "FL-01" in _rules(pay, _schema(path=1, iban=1), action_type="write")
+
+
+def test_fl01_an_email_a_read_only_tool_looks_up_reaches_no_one():
+    """Looking up a contact by address sends nothing to the address. The SDD
+    refuses only url arguments under none; email and iban count as
+    recipients when the tool writes."""
+    flow = {"provider": "tcb", "arguments": {"email": {"kind": "email"},
+                                             "iban": {"kind": "iban"}},
+            "sources": {}, "sink": {"recipients": "none"}}
+    assert "FL-01" not in _rules(flow, _schema(email=1, iban=1), action_type="read",
+                                 effect_mode="NONE")
+
+
+@pytest.mark.parametrize("fields", [
+    [{"path": "$.status", "readers": "PUBLIC", "public_justification": "an enum",
+      "return_mode": "BY_VALUE"}],
+    [{"path": "$", "readers": {"static": [USER], "plus_processors": True},
+      "return_mode": "BY_VALUE"},
+     {"path": "$[*].subject", "readers": "PUBLIC", "public_justification": "t",
+      "return_mode": "BY_VALUE"}],
+])
+def test_fl14_a_by_value_rule_under_a_container_rendered_as_a_handle(fields):
+    """RMR-AUD-008: a container with no BY_VALUE rule becomes one handle
+    (SDD §3.2.1, §3.3: structure is data), so a BY_VALUE rule below it is
+    never reached. The linter refuses the rule instead of letting the author
+    believe the field is shown."""
+    flow = {"provider": "tcb", "arguments": {}, "sources": {"fields": fields},
+            "sink": {"recipients": "none"}}
+    assert "FL-14" in _rules(flow, _schema(), action_type="read", effect_mode="NONE")
+
+
+def test_fl14_refuses_the_sdd_inbox_excerpt_as_written():
+    excerpt = copy.deepcopy(GET_INBOX)
+    excerpt["sources"]["fields"] = [
+        f for f in excerpt["sources"]["fields"] if f not in GET_INBOX_CONTAINERS]
+    assert _rules(excerpt, _schema(), action_type="read", effect_mode="NONE") == {"FL-14"}
+
+
+def test_fl14_holds_when_every_container_on_the_path_is_shown():
+    flow = {"provider": "tcb", "arguments": {}, "sources": {"fields": [
+        {"path": "$", "readers": {"static": [USER], "plus_processors": True},
+         "return_mode": "BY_VALUE"},
+        {"path": "$.status", "readers": "PUBLIC", "public_justification": "an enum",
+         "return_mode": "BY_VALUE"},
+        # A handle below an undeclared container is never dead: its label
+        # still joins the container's handle.
+        {"path": "$.notes[*].body", "return_mode": "BY_HANDLE"},
+    ]}, "sink": {"recipients": "none"}}
+    assert "FL-14" not in _rules(flow, _schema(), action_type="read", effect_mode="NONE")
 
 
 @pytest.mark.parametrize("mutate", [

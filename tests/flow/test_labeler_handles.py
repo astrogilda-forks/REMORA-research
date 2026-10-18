@@ -286,6 +286,40 @@ def test_a_whole_handle_field_keeps_a_non_string_value():
     assert res.args["note"] == 'see {"rows":[1,2]}'
 
 
+def test_a_handle_reference_object_resolves_as_a_whole_handle():
+    """RMR-AUD-008: the model is shown {"$handle", "$type"} and may pass that
+    object back. Its bytes come only from the handle, so it resolves to the
+    value with L_value = L_h, as the bare token does."""
+    store = _store(_record(H1, {"rows": [1, 2]}, TRUSTED_PARAM))
+    ref = {HANDLE_KEY: handle_token(H1), TYPE_KEY: "string"}
+    res = store.resolve("acme", ("ctx_a",), {"data": ref, "token": handle_token(H1)},
+                        context_label=L_CTX)
+    assert res.args["data"] == {"rows": [1, 2]} == res.args["token"]
+    assert res.value_labels["data"] == TRUSTED_PARAM == res.value_labels["token"]
+
+
+@pytest.mark.parametrize("ref", [
+    {HANDLE_KEY: handle_token(H1), TYPE_KEY: "number"},          # not the record's tag
+    {HANDLE_KEY: handle_token(H1), TYPE_KEY: "string", "x": 1},  # extra literal key
+    {HANDLE_KEY: f"see {handle_token(H1)}", TYPE_KEY: "string"},  # not one whole token
+])
+def test_an_altered_handle_reference_is_literal_and_carries_the_context(ref):
+    """Anything the model changed in a reference is its own text, so the
+    field keeps L_ctx and is not unwrapped."""
+    store = _store(_record(H1, "x", SECRET))
+    res = store.resolve("acme", ("ctx_a",), {"data": ref}, context_label=L_CTX)
+    assert res.value_labels["data"] == join(L_CTX, SECRET)
+    assert isinstance(res.args["data"], dict) and HANDLE_KEY in res.args["data"]
+
+
+def test_an_unknown_handle_reference_is_refused():
+    store = _store()
+    with pytest.raises(FlowHandleInvalid):
+        store.resolve("acme", ("ctx_a",),
+                      {"data": {HANDLE_KEY: handle_token(H2), TYPE_KEY: "string"}},
+                      context_label=L_CTX)
+
+
 def test_handles_inside_nested_arguments_are_resolved_and_labelled():
     store = _store(_record(H1, "x", SECRET))
     res = store.resolve("acme", ("ctx_a",), {"items": [{"t": handle_token(H1)}]},

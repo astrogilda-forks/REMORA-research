@@ -72,7 +72,7 @@ optional_fields:
       control_integrity_required: "bool; absent means false"
 
 lint_rules:
-  FL-01: "an argument of kind url under recipients: none -> refuse"
+  FL-01: "an argument of kind url under recipients: none, or that is not the url_host_of argument; or, on a tool that is not read-only, an argument of kind email or iban that the recipients rule does not name -> refuse"
   FL-02: "integrity_required, payload_args, roles_accepted or a recipients rule names an unknown argument -> refuse"
   FL-03: "default_return_mode BY_VALUE (BY_VALUE on an undeclared field) -> refuse"
   FL-04: "readers PUBLIC without a public_justification -> refuse"
@@ -85,6 +85,7 @@ lint_rules:
   FL-11: "a tool that is not read-only with recipients: none -> refuse"
   FL-12: "a from_args kind that differs from the argument's declared kind -> refuse"
   FL-13: "flow missing under the strict profile -> refuse (at registry load; IFC-03b)"
+  FL-14: "a BY_VALUE field rule under a container path with no BY_VALUE rule (the container renders as one handle, so the field is never shown) -> refuse"
 
 reason_codes_added:
   - toolspec_flow_requires_v4

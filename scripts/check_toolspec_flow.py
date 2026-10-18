@@ -7,7 +7,7 @@ Usage: check_toolspec_flow.py [--strict] BUNDLE [BUNDLE ...]
 
 A bundle is the YAML or JSON a deployment signs: a mapping with
 ``tool_specs``. Each spec's ``flow`` block is parsed and checked against
-lint rules FL-01 to FL-12. ``--strict`` adds FL-13: every spec must carry a
+lint rules FL-01 to FL-12 and FL-14. ``--strict`` adds FL-13: every spec must carry a
 block, as the strict runtime profile will require at registry load.
 
 Exit 0 when every block is clean, 1 when any rule fails or a block cannot be
