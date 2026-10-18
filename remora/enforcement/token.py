@@ -217,6 +217,13 @@ class AuthorizationContext:
     #: (:mod:`remora.execution.request_ref`). Absent by default for the same
     #: reason as the task fields: a context without one hashes as before.
     request_ref_hash: str = ""
+    #: A service identity the proposal named to execute on the principal's
+    #: behalf, admitted at assess time against the deployment's per-tenant
+    #: declaration. Absent by default and omitted from the hash when empty,
+    #: like the task fields, so a context naming no delegate hashes exactly as
+    #: before. Bound here so a delegate cannot be added or swapped after the
+    #: grant or the approval it rides on.
+    delegated_executor: str = ""
 
     def hash(self) -> str:
         # The optional fields are omitted rather than defaulted to "" (see
@@ -257,6 +264,7 @@ class AuthorizationContext:
                 "task_id",
                 "execution_context_hash",
                 "request_ref_hash",
+                "delegated_executor",
             )
             if (getattr(self, name) or "") != (getattr(other, name) or "")
         ]

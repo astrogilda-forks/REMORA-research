@@ -34,6 +34,14 @@ Semantics, in the order an item lives through them:
      tier selects the role allowed to approve, which the engine's action
      does not express, so a changed tier voids the approval
      (``reviewed_risk_tier_changed``) even when the fresh action is VERIFY.
+   - the approval covers only the approval policy it was granted under. An
+     approval records the approver's role, the role the tier required and a
+     hash of that requirement (``approval_policy_hash``). When the caller
+     passes the requirement in force now and it differs, as after an edited
+     risk-profile file and a restart, the approval is void
+     (``approval_policy_changed``). An approval with no such record is void
+     too (``approval_policy_unbound``): a requirement that cannot be compared
+     is not one that held.
 
 All state changes append to a hash-chained :class:`ChainedEventLog`
 (tamper-evident; same discipline as the decision audit chain). The queue is
@@ -43,10 +51,11 @@ above are storage-invariant.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from typing import Any
 
 from remora.execution.outcome import DispatchOutcome
 from remora.governance.degradation import ChainedEvent, ChainedEventLog
@@ -73,12 +82,36 @@ _SEVERITY: dict[DecisionAction, int] = {
 _EXECUTABLE = (DecisionAction.ACCEPT, DecisionAction.VERIFY)
 
 
-def _approval_survives(
-    fresh_action: DecisionAction, approved_action: DecisionAction
-) -> bool:
-    """Step 4c: an executable fresh action no stricter than the approval."""
+def _approval_survives(fresh: Any, approval: Approval) -> bool:
+    """Step 4c: whether ``fresh`` (a decision report) is within ``approval``.
+
+    An approved VERIFY covers an executable fresh action no stricter than
+    itself. An approved ESCALATE, when the reasons the reviewer saw were
+    recorded, covers a fresh ACCEPT, VERIFY or ESCALATE whose reasons are all
+    among them: the reviewer approved exactly that escalation, so re-deciding
+    the same observation must not void it (RMR-AUD-002), while a new reason is
+    something nobody approved. A fresh ABSTAIN never executes. Without recorded
+    reasons (an item enqueued by a caller that passed none) the earlier rule
+    holds and a fresh ESCALATE is void.
+    """
+    fresh_action = fresh.action
+    approved_action = approval.approved_action
+    if (approved_action is DecisionAction.ESCALATE
+            and approval.approved_reasons is not None):
+        return (fresh_action in (*_EXECUTABLE, DecisionAction.ESCALATE)
+                and set(_reason_values(fresh)) <= set(approval.approved_reasons))
+    if (approved_action is DecisionAction.VERIFY
+            and approval.approved_reasons is not None
+            and fresh_action is DecisionAction.VERIFY):
+        return set(_reason_values(fresh)) <= set(approval.approved_reasons)
     return (fresh_action in _EXECUTABLE
             and _SEVERITY[fresh_action] <= _SEVERITY[approved_action])
+
+
+def _reason_values(report: object) -> tuple[str, ...]:
+    """A decision's reasons as sorted, unique wire values."""
+    return tuple(sorted({str(getattr(r, "value", r))
+                         for r in getattr(report, "reasons", ()) or ()}))
 
 
 def _reviewed_tier(observation: PolicyObservation) -> str | None:
@@ -91,6 +124,23 @@ def _reviewed_tier(observation: PolicyObservation) -> str | None:
     """
     tier = observation.risk_tier
     return tier.strip().lower() if isinstance(tier, str) else None
+
+
+def _approval_policy_refusal(
+    approval: Approval, current_policy_hash: str | None
+) -> str | None:
+    """Why ``approval`` does not hold under ``current_policy_hash``, or None.
+
+    None as the current hash means the caller checks no policy. An approval
+    without a recorded hash cannot be compared and fails closed.
+    """
+    if current_policy_hash is None:
+        return None
+    if not approval.approval_policy_hash:
+        return "approval_policy_unbound"
+    if approval.approval_policy_hash != current_policy_hash:
+        return "approval_policy_changed"
+    return None
 
 
 _OUTCOME_STATUS: dict[DispatchOutcome, ItemStatus] = {}
@@ -154,6 +204,18 @@ class Approval:
     expires_at: datetime
     tool_call_hash: str | None
     observation_hash: str
+    #: The authenticated role the approver acted in, the role the item's tier
+    #: required (None when the tier names none) and the hash of that
+    #: requirement as the deployment resolved it. The defaults keep an
+    #: approval persisted before these existed loadable; it is then voided at
+    #: execution as ``approval_policy_unbound`` when the caller checks.
+    approver_role: str | None = None
+    required_role: str | None = None
+    approval_policy_hash: str | None = None
+    #: The decision reasons the reviewer approved, sorted. Recorded when the
+    #: item was enqueued with its reasons; an approved ESCALATE then survives
+    #: re-decision only within them (step 4c). None when they were not given.
+    approved_reasons: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -165,6 +227,9 @@ class PendingReview:
     queue_deadline: datetime
     status: ItemStatus = ItemStatus.PENDING
     approval: Approval | None = None
+    #: The reasons behind ``requested_action``, sorted; None when the caller
+    #: enqueued without them.
+    requested_reasons: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -245,6 +310,8 @@ class ReviewQueue:
         observation: PolicyObservation,
         requested_action: DecisionAction,
         queue_ttl: timedelta | None = None,
+        *,
+        reasons: Iterable[str] | None = None,
     ) -> PendingReview:
         if requested_action not in (DecisionAction.VERIFY, DecisionAction.ESCALATE):
             raise ValueError(
@@ -258,6 +325,8 @@ class ReviewQueue:
             requested_action=requested_action,
             enqueued_at=now,
             queue_deadline=now + (queue_ttl or self._default_queue_ttl),
+            requested_reasons=(tuple(sorted({str(r) for r in reasons}))
+                               if reasons is not None else None),
         )
         self._items[item.item_id] = item
         self._log.append(
@@ -368,15 +437,26 @@ class ReviewQueue:
         item_id: str,
         approver: str,
         approval_ttl: timedelta,
+        *,
+        approver_role: str | None = None,
+        required_role: str | None = None,
+        approval_policy_hash: str | None = None,
     ) -> Approval:
         with self._lock:
-            return self._approve_locked(item_id, approver, approval_ttl)
+            return self._approve_locked(
+                item_id, approver, approval_ttl,
+                approver_role=approver_role, required_role=required_role,
+                approval_policy_hash=approval_policy_hash)
 
     def _approve_locked(
         self,
         item_id: str,
         approver: str,
         approval_ttl: timedelta,
+        *,
+        approver_role: str | None,
+        required_role: str | None,
+        approval_policy_hash: str | None,
     ) -> Approval:
         if approval_ttl <= timedelta(0) or approval_ttl > MAX_APPROVAL_TTL:
             raise ValueError(
@@ -400,6 +480,10 @@ class ReviewQueue:
             expires_at=now + approval_ttl,
             tool_call_hash=item.observation.tool_call_hash,
             observation_hash=_observation_hash(item.observation),
+            approver_role=approver_role,
+            required_role=required_role,
+            approval_policy_hash=approval_policy_hash,
+            approved_reasons=item.requested_reasons,
         )
         item.status = ItemStatus.APPROVED
         item.approval = approval
@@ -423,15 +507,28 @@ class ReviewQueue:
         item_id: str,
         fresh_observation: PolicyObservation,
         now: datetime | None = None,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome:
+        """Re-gate an approved item on a fresh observation.
+
+        ``approval_policy_hash`` is the approval requirement in force now for
+        the fresh observation's tier. When given, an approval granted under a
+        different requirement, or recorded without one, is void. None leaves
+        the policy unchecked, for library callers that resolve no roles.
+        """
         with self._lock:
-            return self._execute_locked(item_id, fresh_observation, now)
+            return self._execute_locked(
+                item_id, fresh_observation, now,
+                approval_policy_hash=approval_policy_hash)
 
     def _execute_locked(
         self,
         item_id: str,
         fresh_observation: PolicyObservation,
         now: datetime | None,
+        *,
+        approval_policy_hash: str | None,
     ) -> ExecutionOutcome:
         item = self._items[item_id]
         now = now or self._now_fn()
@@ -544,6 +641,7 @@ class ReviewQueue:
             item.status = ItemStatus.PENDING
             item.approval = None
             item.requested_action = fresh.action
+            item.requested_reasons = _reason_values(fresh)
             item.observation = fresh_observation
             item.queue_deadline = now + self._default_queue_ttl
             self._log.append(
@@ -565,7 +663,39 @@ class ReviewQueue:
                 "current tier",
             )
 
-        if _approval_survives(fresh.action, approval.approved_action):
+        # 4b''. Approval policy: the requirement that decided who could
+        # approve must be the one in force now. Checked after the tier, which
+        # names the more specific cause when both moved.
+        policy_refusal = _approval_policy_refusal(approval, approval_policy_hash)
+        if policy_refusal is not None:
+            item.status = ItemStatus.PENDING
+            item.approval = None
+            item.requested_action = fresh.action
+            item.requested_reasons = _reason_values(fresh)
+            item.observation = fresh_observation
+            item.queue_deadline = now + self._default_queue_ttl
+            self._log.append(
+                "approval_invalidated",
+                {
+                    "item_id": item_id,
+                    "reason": policy_refusal,
+                    "approver_role": approval.approver_role,
+                    "required_role": approval.required_role,
+                    "approved_policy_hash": approval.approval_policy_hash,
+                    "current_policy_hash": approval_policy_hash,
+                    "approved_action": approval.approved_action.value,
+                    "fresh_action": fresh.action.value,
+                },
+            )
+            return ExecutionOutcome(
+                ExecutionDecision.APPROVAL_INVALIDATED,
+                fresh.action,
+                "the approval requirement differs from the one the approval "
+                "was granted under, or the approval records none; approval "
+                "voided and item re-queued for review under the current rule",
+            )
+
+        if _approval_survives(fresh, approval):
             item.status = ItemStatus.AUTHORIZED
             self._log.append(
                 "authorized",
@@ -586,6 +716,7 @@ class ReviewQueue:
         item.status = ItemStatus.PENDING
         item.approval = None
         item.requested_action = fresh.action
+        item.requested_reasons = _reason_values(fresh)
         item.observation = fresh_observation
         item.queue_deadline = now + self._default_queue_ttl
         self._log.append(
@@ -593,6 +724,9 @@ class ReviewQueue:
             {
                 "item_id": item_id,
                 "approved_action": approval.approved_action.value,
+                "approved_reasons": (list(approval.approved_reasons)
+                                     if approval.approved_reasons is not None
+                                     else None),
                 "fresh_action": fresh.action.value,
                 "fresh_reasons": [r.value for r in fresh.reasons],
             },
@@ -613,6 +747,8 @@ class ReviewQueue:
         self,
         item_id: str,
         fresh_observation: PolicyObservation,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome:
         """Re-decide an AUTHORIZED item on an observation built at dispatch.
 
@@ -655,8 +791,15 @@ class ReviewQueue:
                     "risk tier at dispatch differs from the one the approval "
                     "was reviewed at",
                 )
+            if _approval_policy_refusal(approval, approval_policy_hash) is not None:
+                return ExecutionOutcome(
+                    ExecutionDecision.APPROVAL_INVALIDATED,
+                    None,
+                    "approval requirement at dispatch differs from the one "
+                    "the approval was granted under",
+                )
             fresh = self._engine.decide(fresh_observation)
-            if _approval_survives(fresh.action, approval.approved_action):
+            if _approval_survives(fresh, approval):
                 return ExecutionOutcome(
                     ExecutionDecision.EXECUTE,
                     fresh.action,

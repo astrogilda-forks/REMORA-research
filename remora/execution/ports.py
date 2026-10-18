@@ -29,6 +29,7 @@ own with their own tests.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -292,12 +293,21 @@ class ReviewQueuePort(Protocol):
         observation: PolicyObservation,
         requested_action: DecisionAction,
         queue_ttl: timedelta | None = None,
+        *,
+        reasons: Iterable[str] | None = None,
     ) -> PendingReview: ...
 
     def expire_due(self, now: datetime | None = None) -> list[PendingReview]: ...
 
     def approve(
-        self, item_id: str, approver: str, approval_ttl: timedelta
+        self,
+        item_id: str,
+        approver: str,
+        approval_ttl: timedelta,
+        *,
+        approver_role: str | None = None,
+        required_role: str | None = None,
+        approval_policy_hash: str | None = None,
     ) -> Approval: ...
 
     def reject(
@@ -309,12 +319,16 @@ class ReviewQueuePort(Protocol):
         item_id: str,
         fresh_observation: PolicyObservation,
         now: datetime | None = None,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome: ...
 
     def regate_authorized(
         self,
         item_id: str,
         fresh_observation: PolicyObservation,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome: ...
 
     def record_execution_outcome(

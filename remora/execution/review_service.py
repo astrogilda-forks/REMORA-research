@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -76,6 +77,36 @@ def proposer_of(chain: AuditChainPort, tenant: str, proposal_id: str) -> str | N
     return actors.pop() if len(actors) == 1 else None
 
 
+def delegate_of(chain: AuditChainPort, tenant: str, proposal_id: str) -> str:
+    """The delegated executor ``proposal_id`` named, or "" when none.
+
+    Read from the same ``assessed`` record as :func:`proposer_of`, where the
+    assess path wrote it after admitting the delegation. "" also when the
+    record is missing or not unique; execution refuses those separately.
+    """
+    delegates = {
+        str(e.payload.get("delegated_executor") or "")
+        for e in chain.entries(tenant)
+        if e.payload.get("proposal_id") == proposal_id
+        and e.payload.get("event") == "assessed"
+    }
+    return delegates.pop() if len(delegates) == 1 else ""
+
+
+@dataclass(frozen=True)
+class ApprovalAuthority:
+    """The authority an approval is granted under, as the deployment resolved it.
+
+    Returned by the injected ``authorize_approval`` hook after it admitted the
+    approver, and stored on the approval, so execution can tell whether the
+    requirement that admitted this approver still holds.
+    """
+
+    approver_role: str
+    required_role: str | None
+    policy_hash: str
+
+
 class ReviewConflict(RemoraError):
     """The item is not in an approvable/rejectable state (route maps to 409).
 
@@ -104,7 +135,7 @@ def approve_item(
     transaction: Callable[[str], AbstractContextManager[ReviewQueuePort]],
     item_tenant: dict[str, str],
     chain: AuditChainPort,
-    authorize_approval: Callable[[Any], None],
+    authorize_approval: Callable[[Any], ApprovalAuthority | None],
     lifecycle_guard: Callable[..., None],
     note_proposal_id: Callable[[Any], None],
     transactional_append: TransactionalAppendPort | None = None,
@@ -130,11 +161,20 @@ def approve_item(
         raise ReviewNotFound(item_id) from exc
 
     # Profile-specific approval role (review-8 finding): injected — the
-    # deployment's policy decides who may approve at this risk tier.
-    authorize_approval(item)
+    # deployment's policy decides who may approve at this risk tier. What it
+    # resolved is kept with the approval, so a later change to that policy
+    # voids the approval at execution instead of being inherited by it.
+    authority = authorize_approval(item)
 
     proposal_id = getattr(item.observation, "proposal_id", None)
     proposer = proposer_of(chain, tenant, str(proposal_id or ""))
+    delegate = delegate_of(chain, tenant, str(proposal_id or ""))
+    if delegate and delegate == principal:
+        # Whatever the profile: the identity that will execute must not be
+        # the one that approved, or delegation is a way to approve oneself.
+        raise SeparationOfDutiesRefused(
+            "the approver is the delegated executor of this call",
+            reason="approver_is_delegated_executor")
     if require_distinct_approver:
         # Before anything is written: a refused self-approval leaves the item
         # pending for a different principal. Unknown is refused too; a
@@ -163,6 +203,9 @@ def approve_item(
             approval = q.approve(
                 item_id, approver=principal,
                 approval_ttl=timedelta(seconds=approval_ttl_seconds),
+                approver_role=authority.approver_role if authority else None,
+                required_role=authority.required_role if authority else None,
+                approval_policy_hash=authority.policy_hash if authority else None,
             )
             # REM-047: INSIDE the transaction that records the approval. It
             # used to be appended after the commit, so a crash in between left
@@ -178,6 +221,18 @@ def approve_item(
                 "on_behalf_of": on_behalf_of,
                 "item_id": item_id,
                 "expires_at": approval.expires_at.isoformat(),
+                # The authority the approval was granted under, so the record
+                # shows which requirement admitted this approver.
+                "approver_role": approval.approver_role,
+                "required_role": approval.required_role,
+                "approval_policy_hash": approval.approval_policy_hash,
+                # The reasons approved; an approved ESCALATE survives
+                # re-decision only within them.
+                "approved_reasons": (list(approval.approved_reasons)
+                                     if approval.approved_reasons is not None
+                                     else None),
+                # What the reviewer approved includes who may execute it.
+                **({"delegated_executor": delegate} if delegate else {}),
             }, key=key)
     except (KeyError, ValueError) as exc:
         # The queue's own message is not repeated to the caller: it is raised
@@ -195,13 +250,16 @@ def approve_item(
     lifecycle_guard("REVIEW_PENDING", "human_approval")
 
     note_proposal_id(proposal_id)
-    return {
+    response: dict[str, Any] = {
         "status": "approved",
         "proposal_id": proposal_id,
         "item_id": item_id,
         "expires_at": approval.expires_at.isoformat(),
         "audit": audit_ref(entry, key=key),
     }
+    if delegate:
+        response["delegated_executor"] = delegate
+    return response
 
 
 def reject_item(

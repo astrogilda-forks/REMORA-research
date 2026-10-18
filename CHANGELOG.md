@@ -4,6 +4,97 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Review path binds the intent authority (RMR-AUD-006, part 3)
+
+- An item approved under one intent authority executed under another, and the
+  new `intent_authority_hash` was signed into the grant, the lease and the
+  audit record. The review path now compares it with the `assessed` record,
+  as ACCEPT-token redemption does. A difference is 409 `context_mismatch`
+  with `intent_authority_hash` in `mismatched`, and the approval is not
+  consumed.
+
+### Review path binds the whole proposal (RMR-AUD-001, binding part)
+
+- The proposal fields outside `canonical_tool_call_hash` (`schema_valid`,
+  `rollback_available`, `untrusted_context`, `intent_ref`, `derivations`, task,
+  `plan`, `task_type`, `delegated_executor`) could differ between assess and
+  execute. A call assessed as ESCALATE because of one downgrade could be
+  approved and then executed as a VERIFY by dropping it and adding another.
+  The `assessed` record now carries `proposal_envelope_hash`, and
+  `POST /v1/execution/execute` refuses a different proposal with 409
+  `binding_refused` before the approval is touched. Items assessed before this
+  change carry no hash and are refused, so they must be proposed again.
+  `tests/test_execution_api.py::test_riskier_world_invalidates_approval_at_execution`
+  simulated a riskier world by re-presenting `rollback_available=false`. That
+  is now a refused proposal, so the test makes the world change on the server
+  side, and a new test pins the refusal.
+
+### Approved escalations execute (RMR-AUD-002)
+
+- An approved ESCALATE re-decided on the observation the reviewer saw was
+  ESCALATE again, and the re-gate voided every fresh ESCALATE, so no approved
+  escalation could execute. The review queue now records each item's decision
+  reasons (`requested_reasons`), and the approval records them as
+  `approved_reasons` (also on the `approved` event). An approved ESCALATE
+  survives a fresh ACCEPT, VERIFY or ESCALATE whose reasons are all among the
+  approved ones. A new reason or a fresh ABSTAIN still voids it. Items
+  enqueued without reasons keep the earlier rule.
+
+### Delegated execution and approval policy binding
+
+Follow-ups to the review-path binding below. The default stays fail-closed.
+
+- Opt-in delegated execution. A proposal may name `delegated_executor`. It is
+  admitted at `POST /v1/execution/assess` only when
+  `tenant_access.<tenant>.delegated_executors` in the risk-profile config
+  declares that service identity for the proposing agent. Otherwise the
+  assessment is refused with 409 `delegate_not_declared`,
+  `delegate_cross_tenant` or `delegate_is_proposer`. The shipped config
+  declares none. The delegate is recorded in the `assessed` record, bound into
+  the `AuthorizationContext` hash, shown by `GET /proposals/{id}` and
+  `POST /approve` and recorded on the `approved` event. It may execute on the
+  review path and redeem the ACCEPT token. A delegate added, swapped or stripped
+  after assessment, or any other principal, is `context_mismatch`. The delegate
+  cannot approve the item (403 `approver_is_delegated_executor`).
+  `execution_authorized` records `acting_for`. Without a delegation, behaviour
+  is unchanged.
+- Approvals are bound to the requirement that admitted the approver. The
+  approval and the `approved` event record `approver_role`, `required_role`
+  and `approval_policy_hash`. At execution, and at the async worker's
+  dispatch re-gate, a requirement that changed (for example an edited
+  `schemas/risk-profiles.yaml` and a restart with the item in a durable queue)
+  voids the approval as `approval_invalidated` (`approval_policy_changed`) and
+  returns the item for approval under the current rule. An approval without
+  the record, including one persisted before this change, is voided the same
+  way (`approval_policy_unbound`). Durable approvals pending at upgrade
+  therefore need approving again.
+- `AuthorizationContext` gains `delegated_executor`, which enters the hash
+  only when set, so existing tokens and golden vectors are unchanged.
+
+### Review path binds actor, task and reviewed risk tier (behaviour change)
+
+Fixes the two review-path defects measured by the execution-chain attack
+evaluation (PR #932, `scripts/execution_chain_attack_eval.py`).
+
+- `POST /v1/execution/execute` refuses an approved item presented by a
+  principal other than the proposer, or under a task other than the
+  proposal's (including a task stripped or added), with 409
+  `context_mismatch` and an `execution_context_refused` chain record naming
+  the mismatched fields. The comparison is the ACCEPT token's
+  `AuthorizationContext` hash, with the approved side read from the
+  `assessed` record. It runs before the queue is touched, so the approval
+  stays usable by its proposer. A proposal whose assessment cannot be read
+  back is refused as `context_unbound`.
+- `ReviewQueue.execute` and `ReviewQueue.regate_authorized` void an approval
+  when the observation's risk tier differs from the one the approval was
+  reviewed at (`reviewed_risk_tier_changed`), even when the fresh decision is
+  still VERIFY. The item re-enters the queue with the fresh observation, so
+  re-approval is checked against the role the current tier requires
+  (`domain_expert` at high, `senior_authority` at critical).
+- Callers that executed another principal's approved item, or relied on an
+  approval surviving a relabel, now get a refusal. ACCEPT-token and lease
+  semantics are unchanged.
+
 ### Breaking: library labels need a registry to reach ACCEPT (PRF-040)
 
 - `assess_tool_call` and `what_if_tool_call` take `registry=`, a mapping
