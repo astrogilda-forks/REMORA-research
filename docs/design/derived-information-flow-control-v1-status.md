@@ -9,6 +9,10 @@ recorded as ADRs and listed at the end.
 
 Statuses: NOT_STARTED, IN_PROGRESS, DONE, BLOCKED (with the reason).
 
+IFC-05b, IFC-07, IFC-08 and IFC-14 are also prerequisites of the
+compositional authority work packages CAPR-03 to CAPR-05 and CAPR-09
+(`docs/design/compositional-authority-preservation-v1.md`).
+
 ## Release order
 
 | Step | Work package | Priority | Status | PR | Missing / note |
