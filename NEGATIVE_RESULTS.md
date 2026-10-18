@@ -138,7 +138,7 @@ cites only `open` sections and that no `open` section is missing a theme.
    CLAIM-002 score separates globally but not below 10 % false blocks. The
    harness's oracle arms never reached the engine. Measuring this needs a
    graded evidence channel and fresh paired data, not the spent artifacts.
-16. **Exfiltration through allowed calls** (§84): the execution chain refused
+16. **Exfiltration through allowed calls** (§87): the execution chain refused
    every replay, substitution, forgery and expiry attack in the catalogue,
    and the secret reached the sink in all 11 exfiltration attacks. No
    decision reads argument content or data flow; the flow check exists as a
@@ -2625,7 +2625,7 @@ sections again.
 | MCE bucket bias and absent cross-domain episodes (§15, §16) | Structural AROMER ceilings: the buckets get no organic traffic and crossDomainCases=0. Needs diverse deployment context | Medium |
 | Authoritative tool metadata still caller-supplied on the advisory path (§14/M4) | Raise-only clamp shipped 2026-08-05 (declared risk cannot undercut the heuristic floor; clamps recorded, unset stays unset). Full authority still needs the signed ToolSpec registry (FT-03) | Medium |
 | External replication, REM-021, field evidence (§1, §4) | Cannot be closed from inside this repository | Medium |
-| Exfiltration through allowed calls (§84) | The chain refused replay, substitution, forgery and expiry; the secret reached the sink in 11 of 11 exfiltration attacks on REMORA and on the policy-only gateway. The library flow check blocked 10 of 10 but is not wired to a decision | **High** |
+| Exfiltration through allowed calls (§87) | The chain refused replay, substitution, forgery and expiry; the secret reached the sink in 11 of 11 exfiltration attacks on REMORA and on the policy-only gateway. The library flow check blocked 10 of 10 but is not wired to a decision | **High** |
 | Five held-out faults survive v1.7 (§73) | List validation stops after 32 items, non-dict `Mapping` skips validation, `slots`, case-insensitive enum lookup, `as_dict` key order; every decision fault of probe 4 is killed | Low |
 
 ### Accepted negative results — do not "fix" these
@@ -5042,7 +5042,7 @@ fact against the four arms.
 - SAP v7 must pre-register clustered bounds, and score naive and external
   baselines on the same episodes.
 
-## §84 The execution chain stops replay, substitution and forgery, and leaks every exfiltration built from allowed calls (2026-10-18)
+## §87 The execution chain stops replay, substitution and forgery, and leaks every exfiltration built from allowed calls (2026-10-18)
 <!-- finding-status: open -->
 
 **Status:** post-hoc and descriptive. The catalogue was written after the

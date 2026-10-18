@@ -176,7 +176,7 @@ This file lists externally relevant changes by release. Fine-grained development
 - REMORA ran 4 of 37 chain attacks (replay, substitution, ToolSpec change,
   cross-context reuse, forgery, expiry) and the gateway 31. The secret
   reached the sink in all 11 exfiltration attacks on both. NEGATIVE_RESULTS
-  §84 has the table and the four chain attacks REMORA did not stop.
+  §87 has the table and the four chain attacks REMORA did not stop.
 
 ### Evidence (peer-review level 2: post-hoc re-analysis, no sealed number changed)
 

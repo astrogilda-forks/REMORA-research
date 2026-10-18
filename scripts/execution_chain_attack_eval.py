@@ -268,6 +268,13 @@ class World:
         import pytest
         from fastapi.testclient import TestClient
 
+        # Imported before the environment is changed: the server builds
+        # module-level state (the decision engine among it) from the
+        # environment at import, and that state must outlive this world
+        # unchanged when the eval runs inside a test session.
+        import servers.api  # noqa: F401
+        import servers.execution_api  # noqa: F401
+
         self.workdir = workdir
         self.mp = pytest.MonkeyPatch()
         self.tools: dict[str, Callable[..., Any]] = dict(ORIGINAL_TOOLS)

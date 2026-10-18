@@ -7,10 +7,10 @@ REMORA's ``/v1/execution`` path, a policy-only gateway, the library flow check
 and the advisory library path, and writes
 ``artifacts/posthoc/execution_chain_attack_eval_v1.json`` (PRF-015, PRF-041).
 
-The pins below guard published results in NEGATIVE_RESULTS.md §84 and in
+The pins below guard published results in NEGATIVE_RESULTS.md §87 and in
 PRF-015 and PRF-041. A pin that fails because REMORA's behaviour changed is
 not a test to edit into passing: regenerate the artifact with ``--write`` and
-update §84 and the register in the same change. The library-arm pins describe
+update §87 and the register in the same change. The library-arm pins describe
 master before the PRF-040 fix; that fix must regenerate the artifact with
 ``--library-label "library path after PRF-040 fix"``.
 """
@@ -129,7 +129,7 @@ def test_the_flow_check_blocks_a_benign_fetch_after_a_secret_read(evaluation):
     assert (row["outcome"], row["reason"]) == ("refused", "flow_conf_viol")
 
 
-# ── pinned outcomes (NEGATIVE_RESULTS.md §84, PRF-015, PRF-041) ─────────────
+# ── pinned outcomes (NEGATIVE_RESULTS.md §87, PRF-015, PRF-041) ─────────────
 
 CHAIN_CLASSES = ("replay", "argument_substitution", "forged_authorization",
                  "expired_authorization")

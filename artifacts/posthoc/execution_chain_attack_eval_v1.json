@@ -42,11 +42,11 @@
     "toolspec_bundle": "HMAC-signed, one spec per tool, callable digests measured"
   },
   "provenance": {
-    "git_commit_at_generation": "b64e3cc1ba01cc8cf6c7b95dc95cd99da5b69d79",
+    "git_commit_at_generation": "d3d690ebbdfb8b689e8ee4dd4ecba72bb069699b",
     "randomness": "none; proposal ids and timestamps never enter a row",
     "reproduce": "python scripts/execution_chain_attack_eval.py --check",
     "script": "scripts/execution_chain_attack_eval.py",
-    "script_sha256": "855d426da7377a23e251ad72cbad76e56a56149b52ae05d79a27b4b3e5c401af"
+    "script_sha256": "37bac8610b109773d13ff641bdd3a679dbf1165762658729fc319971ae9511eb"
   },
   "rows": [
     {
