@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Federation interop (invocation axes reproduction)
+
+- `.github/workflows/probity-invocation-axes-reproduction.yml` runs Probity's
+  `invocation_axes` reader from agent-evidence-vectors at a pinned commit, then
+  hands each of its execution bundles to the effect-evidence-v1 reference
+  verifier at the frozen revision. It records where the two agree on the
+  observed effect and fails if the split changes. It is a `REPRODUCTION` and
+  advances nothing.
+
 ### Flow control IFC-01 (label lattice)
 
 - New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).
