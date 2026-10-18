@@ -62,6 +62,8 @@ RECEIPT_DOMAIN = SignatureDomain.EFFECT_RECEIPT
 #: produced the state it reports.
 CREDENTIAL_SCOPES = ("read_only", "read_write")
 
+_KEYS_VARIABLE = "REMORA_EFFECT_VERIFIER_KEYS"
+
 _REQUIRED = ("proposal_id", "grant_jti", "tool_call_hash", "tenant",
              "observed", "observed_at")
 _OPTIONAL = ("source_revision", "pre_state_revision", "claimed_status")
@@ -214,10 +216,17 @@ class VerifierKeyRegistry:
         return cls(records)
 
     @classmethod
-    def from_env(cls, environ: Mapping[str, str] | None = None) -> VerifierKeyRegistry:
-        """``REMORA_EFFECT_VERIFIER_KEYS``: a JSON list, or a path to one."""
-        env = os.environ if environ is None else environ
-        raw = str(env.get("REMORA_EFFECT_VERIFIER_KEYS", "")).strip()
+    def from_env(cls, settings: Mapping[str, str] | None = None) -> VerifierKeyRegistry:
+        """``REMORA_EFFECT_VERIFIER_KEYS``: a JSON list, or a path to one.
+
+        ``settings`` replaces the process environment in tests.
+        """
+        if settings is None:
+            # Read by name so the credential topology scan sees the reader
+            # (docs/assurance/credential_topology.yaml).
+            raw = os.environ.get("REMORA_EFFECT_VERIFIER_KEYS", "").strip()
+        else:
+            raw = str(settings.get(_KEYS_VARIABLE, "")).strip()
         if not raw:
             return cls()
         text = raw if raw.startswith("[") else Path(raw).read_text(encoding="utf-8")
@@ -253,7 +262,10 @@ def verify_signed_receipt(
             f"the receipt signature does not verify under {RECEIPT_DOMAIN.value} "
             f"({result.reason})")
     record = registry.record(result.kid)
-    assert record is not None  # verify() found it by this kid
+    if record is None:  # pragma: no cover - verify() found it by this kid
+        raise ReceiptRefused(
+            "receipt_signature_unknown_kid",
+            f"verifier key {result.kid} is not registered")
     if receipt.tenant != tenant:
         raise ReceiptRefused(
             "receipt_tenant_mismatch",

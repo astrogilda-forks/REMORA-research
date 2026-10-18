@@ -111,6 +111,16 @@ def test_a_reviewed_decision_needs_an_approval(decision) -> None:
     assert exc.value.reason == "dispatched_without_approval"
 
 
+@pytest.mark.parametrize("voided", ["execution_approval_expired",
+                                    "execution_approval_invalidated"])
+def test_a_voided_approval_does_not_authorize_a_later_dispatch(voided) -> None:
+    chain = [_ev("assessed", decision="verify"), _ev("approved", actor="human-1"),
+             _ev(voided), _authorized(), _result()]
+    with pytest.raises(ReceiptRefused) as exc:
+        resolve_lineage(chain)
+    assert exc.value.reason == "dispatched_without_approval"
+
+
 @pytest.mark.parametrize("authorized", [
     None,
     _authorized(pep_allowed=False),

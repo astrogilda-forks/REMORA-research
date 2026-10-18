@@ -539,6 +539,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/execution/proposals/{proposal_id}/effect-receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Signed Effect Receipt
+         * @description Compute and record an effect verdict from a signed receipt (CAPR-07/08).
+         *
+         *     The digest endpoint above records an attestation. This one records a
+         *     verdict REMORA computed: the contract comes from the signed ToolSpec v5
+         *     ``postcondition`` block and the approved arguments, the observation from
+         *     a receipt signed by a registered verifier key, and the vantage from that
+         *     key's registry record. A status the receipt claims is kept beside the
+         *     computed one and never replaces it.
+         */
+        post: operations["record_signed_effect_receipt_v1_execution_proposals__proposal_id__effect_receipt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution/proposals/{proposal_id}/envelope": {
         parameters: {
             query?: never;
@@ -1510,6 +1537,20 @@ export interface components {
             source_of_decision: string;
         };
         /**
+         * ReceiptSignatureModel
+         * @description A detached Ed25519 signature under ``REMORA/EFFECT-RECEIPT/v1``.
+         */
+        ReceiptSignatureModel: {
+            /** Algorithm */
+            algorithm: string;
+            /** Domain */
+            domain: string;
+            /** Kid */
+            kid: string;
+            /** Signature */
+            signature: string;
+        };
+        /**
          * RejectRequest
          * @description Record a reviewer's refusal of a pending item.
          */
@@ -1616,6 +1657,28 @@ export interface components {
             tool_matches_goal?: boolean | null;
             /** Ungrounded Arguments */
             ungrounded_arguments?: string[];
+        };
+        /**
+         * SignedEffectReceiptRequest
+         * @description A signed observation from a verifier domain (CAPR-06 to CAPR-08).
+         *
+         *     Unlike :class:`EffectVerificationRequest` this carries no verdict to
+         *     record. ``receipt`` holds what the verifier read, signed by a key the
+         *     deployment registered; ``arguments`` are the approved call's arguments,
+         *     accepted only when they hash to the dispatched call. REMORA instantiates
+         *     the contract from the signed ToolSpec and computes the verdict itself.
+         *     See ``docs/design/compositional-authority-preservation-v1.md`` §4.
+         */
+        SignedEffectReceiptRequest: {
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** Receipt */
+            receipt: {
+                [key: string]: unknown;
+            };
+            signature: components["schemas"]["ReceiptSignatureModel"];
         };
         /**
          * ToolCallRequest
@@ -2744,6 +2807,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_signed_effect_receipt_v1_execution_proposals__proposal_id__effect_receipt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignedEffectReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description REMORA computed the verdict and appended it to the audit chain. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No such proposal for this tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The receipt cannot be bound or evaluated. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description No verifier keys are registered. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };

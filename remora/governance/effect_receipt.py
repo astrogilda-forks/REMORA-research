@@ -206,23 +206,33 @@ def _authorization_of(events: Sequence[Mapping[str, Any]],
         raise ReceiptRefused(
             "dispatched_after_deny",
             "a reviewer rejected this proposal: no dispatch was allowed")
-    if _DISPATCHABLE[decision] and not any(
-            e.get("event") == "approved" for e in events):
-        raise ReceiptRefused(
-            "dispatched_without_approval",
-            f"a {decision} decision needs an approval before dispatch, and the "
-            "audit trail has none")
     jti = str(result.get("grant_jti", ""))
     call_hash = str(result.get("tool_call_hash", ""))
+    approved_live = False
     for event in events:
-        if event.get("event") != "execution_authorized":
+        ev_name = event.get("event")
+        if ev_name == "approved":
+            approved_live = True
+        elif ev_name in ("execution_approval_expired", "execution_approval_invalidated"):
+            approved_live = False
+        if ev_name != "execution_authorized":
             continue
         auth = _payload(event)
         # ``is True``: the string "true" is not an allowed PEP check.
         if (auth.get("pep_allowed") is True and jti
                 and str(auth.get("grant_jti", "")) == jti
                 and str(auth.get("tool_call_hash", "")) == call_hash):
+            if _DISPATCHABLE[decision] and not approved_live:
+                raise ReceiptRefused(
+                    "dispatched_without_approval",
+                    f"a {decision} decision needs an unvoided approval before "
+                    "dispatch, and the audit trail has none")
             return auth
+    if _DISPATCHABLE[decision] and not approved_live:
+        raise ReceiptRefused(
+            "dispatched_without_approval",
+            f"a {decision} decision needs an approval before dispatch, and the "
+            "audit trail has none")
     raise ReceiptRefused(
         "dispatch_not_authorized",
         "no allowed execution_authorized record names this dispatch's grant "
