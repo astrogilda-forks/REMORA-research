@@ -681,6 +681,7 @@ from remora.execution.review_service import (
     reject_item as _reject_item,
 )
 from remora.execution.service import (
+    ApprovalContextRefused,
     TokenRefused,
     ToolSpecChanged,
 )
@@ -2572,6 +2573,8 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ToolSpecChanged as exc:
+        raise HTTPException(status_code=409, detail=exc.reason) from exc
+    except ApprovalContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ReviewNotFound as exc:
         raise HTTPException(status_code=404, detail="review item not found") from exc

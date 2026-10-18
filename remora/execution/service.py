@@ -497,6 +497,86 @@ class ToolSpecChanged(RemoraError):
     reason = "toolspec_changed_between_assess_and_dispatch"
 
 
+class ApprovalContextRefused(RemoraError):
+    """The approved item is presented by another actor or under another task
+    than the proposal it was approved for (route maps to 409).
+
+    ``reason`` is the wire detail and uses the ACCEPT path's vocabulary:
+    ``context_mismatch`` when a bound field differs, ``context_unbound``
+    when the proposal's assessment cannot be read back to compare against.
+    """
+
+    code = "approval_context_refused"
+    category = "execution"
+
+    def __init__(self, message: str, *, reason: str,
+                 mismatched: tuple[str, ...] = ()) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.mismatched = mismatched
+
+
+#: The AuthorizationContext fields the review path binds to the proposal.
+#: The ACCEPT token binds all of its fields because nothing is decided again
+#: at redemption. The review path re-decides on a fresh observation, so the
+#: other fields are covered elsewhere: the target and arguments by the queue's
+#: payload binding (tool_call_hash), the ToolSpec hash by FT-03, the policy
+#: bundle and intent authority by the fresh decision, the reviewed risk tier
+#: by ReviewQueue step 4b', and the execution context by the queue's own
+#: binding.
+_REVIEW_BOUND_FIELDS = ("principal", "context_id", "task_id")
+
+
+def approved_context_refusal(
+    chain: AuditChainPort,
+    tenant: str,
+    proposal_id: str,
+    current: AuthorizationContext,
+) -> ApprovalContextRefused | None:
+    """The refusal for presenting an approved item under ``current``, or None.
+
+    The approved context is ``current`` with the bound fields replaced by
+    what the proposal's ``assessed`` record says: the authenticated proposer
+    and its task. Both sides are :class:`AuthorizationContext` values built by
+    :func:`authorization_context` and compared by hash, the comparison the
+    ACCEPT token makes at redemption.
+
+    Same actor means the proposer. The ACCEPT token and the lease bind the
+    proposing principal and accept no other, and the risk profiles define no
+    executor role distinct from the proposer. The agent is the attacker in the
+    threat model, so another agent in the tenant is not this one's delegate.
+    A proposal whose assessment is missing, or recorded more than once, is
+    refused rather than compared with nothing.
+
+    Read-only, and it reads the chain, so it runs before the execute
+    transaction opens (see ``assessed_record``).
+    """
+    assessed = [
+        e.payload for e in chain.entries(tenant)
+        if e.payload.get("event") == "assessed"
+        and e.payload.get("proposal_id") == proposal_id
+    ] if proposal_id else []
+    if len(assessed) != 1 or not str(assessed[0].get("actor") or ""):
+        return ApprovalContextRefused(
+            "the proposal this item was approved for cannot be read back",
+            reason="context_unbound")
+    record = assessed[0]
+    approved = dataclasses.replace(
+        current,
+        principal=str(record.get("actor") or ""),
+        context_id=str(record.get("context_id") or ""),
+        task_id=str(record.get("task_id") or ""),
+    )
+    if approved.hash() == current.hash():
+        return None
+    return ApprovalContextRefused(
+        "authorization context refused: this item was approved for a "
+        "different actor or task than the one presented here",
+        reason="context_mismatch",
+        mismatched=tuple(f for f in _REVIEW_BOUND_FIELDS
+                         if getattr(approved, f) != getattr(current, f)))
+
+
 def execute_approved_item(
     *,
     tenant: str,
@@ -570,6 +650,21 @@ def execute_approved_item(
         )
 
     fresh_obs, fresh_semantic = build_observation(tool_call, tenant)
+    # The approval belongs to the proposal's actor and task, as an ACCEPT
+    # token does. Read from the chain here, outside any transaction, for the
+    # reason assessed_record gives; raised inside the transaction, after the
+    # tenant check and before the queue is touched, so an unknown item still
+    # answers not-found and a refused presentation neither consumes nor voids
+    # the approval for the actor and task it was granted to.
+    context_refusal = approved_context_refusal(
+        chain, tenant, assessed_proposal_id,
+        authorization_context(
+            tenant=tenant, principal=principal, semantic=fresh_semantic,
+            target_environment=tool_call.target_environment or "",
+            policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+            toolspec_hash=str(toolspec_identity["hash"]),
+            task=task_identity_of(tool_call),
+        ))
     context = historical_context(
         chain, tenant, assessed_proposal_id, required=require_execution_context)
     fresh_obs = _bind_execution_context(
@@ -585,6 +680,8 @@ def execute_approved_item(
         with transaction(tenant) as q:
             if item_tenant.get(item_id) != tenant:
                 raise not_found(item_id)
+            if context_refusal is not None:
+                raise context_refusal
             q.expire_due()
             proposal_id = getattr(q.item(item_id).observation,
                                   "proposal_id", None)
@@ -644,6 +741,18 @@ def execute_approved_item(
                     # its own identity for theirs.
                     requested_by=principal,
                 )
+    except ApprovalContextRefused as exc:
+        # After the rollback, like the ACCEPT path's execution_context_refused
+        # record: nothing in the queue changed, so nothing commits with it.
+        chain.append(tenant, {
+            "event": "execution_context_refused",
+            "proposal_id": assessed_proposal_id or None,
+            "actor": principal,
+            "item_id": item_id,
+            "detail": exc.reason,
+            "mismatched": list(exc.mismatched),
+        })
+        raise
     except (KeyError, ValueError) as exc:
         raise conflict(str(exc)) from exc
 
