@@ -20,7 +20,11 @@ WORKFLOW = ROOT / ".github" / "workflows" / "supply-chain.yml"
 
 # Raising these caps is a deliberate act, not a drive-by edit.
 MAX_ALLOWLISTED_PATHS = 4
-MAX_ALLOWLISTED_REGEXES = 8
+# 8 -> 9 (2026-10-18): the invocation-evidence README row naming the public
+# signature domain "REMORA/EVIDENCE/v1" (commit 226245bb, line 20). gitleaks
+# scans each commit, so rewording later cannot clear it; the entry is anchored
+# to that one table row.
+MAX_ALLOWLISTED_REGEXES = 9
 
 #: An allowlist entry must be anchored to something specific to this
 #: repository. A bare value like "dev-token" reads as narrow but suppresses
