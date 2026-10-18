@@ -253,7 +253,7 @@ REMORA processes each gate request through six decision stages, followed by Deci
 │ 6. POLICY ENGINE (deterministic gates first, then routing)      │
 │    Unconditional hard blocks (hard_guard_floor) evaluated first  │
 │    then conditional policy gates (_CONDITIONAL_GATES)           │
-│    (Table 3 lists the 7 headline controls: 3 unconditional +    │
+│    (Table 1 lists the 7 headline controls: 3 unconditional +    │
 │    4 conditional; the audited engine contains further gates —   │
 │    see docs/assurance/policy_engine_audit_v1.md for the full    │
 │    priority-ordered inventory)                                  │
@@ -400,7 +400,7 @@ The seven conditions below are the ones most often asked about; they are a subse
 | 6 | `phase = critical AND risk_tier = critical` | CRITICAL_PHASE | ESCALATE |
 | 7 | `risk_tier ∈ {high, critical} AND evidence_action = None` | EVIDENCE_INSUFFICIENT | VERIFY |
 
-**Table 3: Hard blocks (rows 1 to 3b) and conditional policy gates (rows 4 to 7), a headline subset.**
+**Table 1: Hard blocks (rows 1 to 3b) and conditional policy gates (rows 4 to 7), a headline subset.**
 
 The adversarial firewall checks for injection patterns in the prompt (e.g., "ignore previous instructions", "exfiltrate", "drop table", "sudo rm"). An OPA/Rego adapter with Python fallback is implemented and parity-tested (`fallback_used = True` is flagged in the envelope when the fallback engine decides), but the reference API currently invokes the Python policy engine directly; OPA remains an integration option and production dependency.
 
@@ -541,7 +541,7 @@ For tool-call benchmark (N=700, deterministic heuristic):
 - Self-consistency heuristic (temperature sampling over heuristic variants, five draws)
 - Verifier heuristic (heuristic with destructive-keyword override)
 
-The committed benchmark artifact contains the full set of research-only comparator arms; Table 4 reports the policy gate against the four heuristic baselines.
+The committed benchmark artifact contains the full set of research-only comparator arms; Table 2 reports the policy gate against the four heuristic baselines and the retired temperature-gate heuristic.
 
 **Real LLM baselines (REM-010, pilot N=100):** A second baseline set backed by actual LLM inference (`@cf/meta/llama-3.3-70b-instruct-fp8-fast` via Cloudflare Workers AI, `remora/toolcall/baselines_llm.py`) was evaluated on a 100-task stratified pilot subset of toolcall_blind_v3. Results: `single_model_llm` FAR=1.25%, `majority_vote_llm` (3-sample, temperature=0.7) FAR=0.0%, `self_consistency_llm` (5-sample, temperature=0.9) FAR=1.25%. Artifact: `results/toolcall_llm_baselines_pilot_n100.json`. Caveat: N=100 pilot; wide confidence interval; full N=700 comparison is a future experiment. The heuristic baselines remain in `remora/toolcall/baselines.py` for deterministic regression testing; they use keyword routing without LLM inference and are labeled `*_heuristic` throughout.
 
@@ -571,7 +571,7 @@ An exploratory three-oracle ablation on 302 QA items is in Appendix G.4. It is n
 
 ### 10.3 Tool-Call Benchmark (N=700)
 
-**Table 4: Tool-Call Benchmark Results**
+**Table 2: Tool-Call Benchmark Results**
 
 | Condition | Accuracy | Unsafe Exec. Rate | Unsafe Exec. Count | Mean Utility |
 |-----------|----------|------------------|-------------------|--------------|
@@ -654,7 +654,7 @@ To evaluate REMORA's governance accuracy on a fully external, independently cons
 
 **Metrics.** *Recall* = ESCALATE / harmful tasks; *blocked\_recall* = (ESCALATE | VERIFY) / harmful tasks; *FPR* = hard-ESCALATE on benign tasks (VERIFY is not counted as a false positive: it routes to human review but does not block autonomously); *coverage* = non-ABSTAIN verdicts / total tasks. Wilson 95% CI throughout. Artifact: `artifacts/agentharm_trimode_results.json`.
 
-**Table 7: AgentHarm Three-Mode Results (N=88)**
+**Table 3: AgentHarm Three-Mode Results (N=88)**
 
 | Mode | Recall | CI 95% | FPR | CI 95% | Blocked Recall | Coverage |
 |---|---|---|---|---|---|---|
@@ -676,7 +676,7 @@ The conservative posture of Mode 3 (routing 98% of cases to VERIFY or higher) is
 
 A deterministic, API-key-free regression suite (36 author-curated cases) exercises REMORA's evidence layer across three operational domains: cybersecurity (12 cases), AI governance (12 cases), and financial compliance (12 cases). Each case specifies an expected verdict, a curated evidence corpus, and ground-truth risk classification.
 
-**Table 6: Cross-Domain Benchmark Summary**
+**Table 4: Cross-Domain Benchmark Summary**
 
 | Domain | N | Precision | Escalation Recall | Critical Fail Rate |
 |---|---|---|---|---|
@@ -740,9 +740,9 @@ that a model may *propose* the task intent but may not thereby assert a match:
 every clause is re-derived from the task text, a deployment-declared tool
 contract, and the call itself.
 
-Table 6b lists the seven targets SAP v5 fixed for C-ext3, with the confirmatory arm F's counts as the sealed artifact records them (`results/routing_bench_bfcl_v4_cext3_results.json`, `targets`). Three were met and four were missed. One of the missed targets is a safety target: arm F accepted 2 of 199 constructed wrong-tool calls, 1.005% against a bar of at most 1%. Both accepted mutants are among the 26 that pass a schema check (NEGATIVE_RESULTS.md §83).
+Table 5 lists the seven targets SAP v5 fixed for C-ext3, with the confirmatory arm F's counts as the sealed artifact records them (`results/routing_bench_bfcl_v4_cext3_results.json`, `targets`). Three were met and four were missed. One of the missed targets is a safety target: arm F accepted 2 of 199 constructed wrong-tool calls, 1.005% against a bar of at most 1%. Both accepted mutants are among the 26 that pass a schema check (NEGATIVE_RESULTS.md §83).
 
-**Table 6b: C-ext3 pre-registered targets, arm F**
+**Table 5: C-ext3 pre-registered targets, arm F**
 
 <!-- claim:CLAIM-019 wrong_call_accept_pct constructed_wrong_tool_accept_pct required_unknown_accept_pct irrelevance_abstain_pct legitimate_read_autonomy_pct obtainable_verify_pct unobtainable_abstain_pct -->
 
@@ -815,7 +815,7 @@ What the committed ablation supports is narrower and, we think, more useful to
 report. Running `experiments/toolcall_ablation_v2.py` produces
 `results/toolcall_benchmark_v2_ablation.json`. The table shows the full gate and four policy-relevant ablations; the artifact preserves all six conditions.
 
-**Table 8: Committed component ablation (700 rows, 70 template clusters)**
+**Table 6: Committed component ablation (700 rows, 70 template clusters)**
 
 | Condition | FAR | Unsafe exec | Accuracy | Benign friction† |
 |---|---|---|---|---|
@@ -1806,7 +1806,7 @@ Implementation: `remora.selective.pvd.deliberate(oracle_responses, oracle_confid
 
 ### G.4 Three-Oracle Ablation on 302 Items
 
-**Table 1: Three-Oracle Ablation (N=302)**
+**Table 7: Three-Oracle Ablation (N=302)**
 
 | Condition | Accuracy | 95% CI |
 |-----------|----------|--------|
@@ -1823,7 +1823,7 @@ Canonical benchmark headline snapshot (artifact-bound, one-decimal rendering): A
 
 ### G.5 Mondrian Conformal Coverage on the Augmented 2,161-Item Dataset
 
-**Table 5: Mondrian Phase-Stratified Conformal (20 seeds × N=2,161)**
+**Table 8: Mondrian Phase-Stratified Conformal (20 seeds × N=2,161)**
 
 | Target | Phase | Mean Risk | Mean Coverage | Seeds Failing |
 |--------|-------|-----------|---------------|---------------|
@@ -1835,6 +1835,6 @@ Ordered-phase conformal achieves 99.9% coverage with 0/20 seed failures at the 1
 
 ### G.6 Oracle Count and Correlation Weighting
 
-The ablation across N=302 (Table 1) shows a +25.8 pp accuracy gain from single oracle to three-oracle majority vote (56.95% vs. 82.78%). Correlation-aware weighting (69.54%) does not beat raw majority vote on full-coverage accuracy: its value lies in trust calibration and selective coverage, not full-coverage accuracy (see the note in Appendix G.4 and the selective trust curve). The primary benefit of the oracle swarm is disagreement detection (high H, high D) rather than full-coverage accuracy improvement per se.
+The ablation across N=302 (Table 7) shows a +25.8 pp accuracy gain from single oracle to three-oracle majority vote (56.95% vs. 82.78%). Correlation-aware weighting (69.54%) does not beat raw majority vote on full-coverage accuracy: its value lies in trust calibration and selective coverage, not full-coverage accuracy (see the note in Appendix G.4 and the selective trust curve). The primary benefit of the oracle swarm is disagreement detection (high H, high D) rather than full-coverage accuracy improvement per se.
 
 Without correlation weighting, consensus from a within-family oracle cluster (high $\bar{\rho}$) would receive inflated support. The diversity weights $w(o)$ reduce effective k in correlated settings, appropriately reducing trust scores and increasing escalation rates when oracles are likely agreeing due to shared training rather than factual correctness. Empirical validation of this effect requires a controlled study varying oracle family composition, which is identified as future work.

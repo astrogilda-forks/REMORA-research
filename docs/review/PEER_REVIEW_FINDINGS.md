@@ -519,9 +519,9 @@ conditions?
 | Evidence | `paper/remora_paper.md`. |
 | Affected claims | none |
 | Action | Renumber the tables and every reference to them. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | level-1 remainder PR (stacked on #927) |
+| Verification | At `fix/claims-and-paper-2026-10-18` the numbered .md tables ran 3, 1, 4, 5, 7, 6, 6b, 8 in document order, with no Table 2. After the PRF-018 appendix move they are renumbered 1 to 8 in document order: hard blocks (§6.2) 1, tool-call benchmark (§10.3) 2, AgentHarm (§10.6) 3, cross-domain (§10.7) 4, C-ext3 targets (§10.9) 5, component ablation (§11.1) 6, three-oracle ablation (Appendix G.4) 7, Mondrian (Appendix G.5) 8. Every in-text reference was rewritten with the same mapping, including the Figure 1 box and §9.2; a grep for `Table [0-9]` in document order returns 1, 1, 2, 2, 3, 4, 5, 5, 6, 7, 8, 7, the last being the Appendix G.6 back-reference to the Appendix G.4 table. No other repository document cites a paper table by number. The .tex numbers its tables automatically. |
+| Status | RESOLVED |
 
 ### PRF-036 Internal codenames are used without definition
 
