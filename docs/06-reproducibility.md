@@ -102,6 +102,12 @@ writes nothing, so it adds no evidence beyond showing that CLAIM-021's counts
 follow from committed inputs. `scripts/bfcl_cext4_seen_split_posthoc.py`
 recomputes the post-hoc split in NEGATIVE_RESULTS §82 the same way.
 
+`scripts/bfcl_v3_extractor_dev_compare.py --check` reproduces the
+development comparison of bundle v3's intent extractor with v2's on the three
+spent sets. It first confirms that its routing loop with the v2 extractor
+equals `bfcl_arms.route_arm("V2D")` row for row. It never reads the sealed
+C-ext4 set, and its numbers are development numbers.
+
 `scripts/peer_review_posthoc.py` recomputes the re-analyses behind
 NEGATIVE_RESULTS §83 and `docs/review/PEER_REVIEW_FINDINGS.md`: clustered
 zero-count bounds, the in-catalogue wrong calls, naive baselines, and the
