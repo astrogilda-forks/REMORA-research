@@ -79,9 +79,60 @@ export function assertSafeNumbers(text: string): void {
   }
 }
 
-/** JSON.parse that refuses numbers a JavaScript round trip would change. */
+/** A repeated object member name. JSON.parse keeps the last value, and the
+ *  Worker then re-serialises without the duplicate, so the execution API's
+ *  strict ingress (servers/strict_json_ingress.py, json_duplicate_member)
+ *  never sees it. A reader that keeps the first value (a proxy, a reviewer,
+ *  another language) would read a different call than REMORA authorizes,
+ *  over the same body bytes. Names are compared after decoding, as the
+ *  Python ingress compares them. */
+export class DuplicateMemberError extends Error {
+  readonly reason = "duplicate_member";
+  constructor(readonly member: string, readonly offset: number) {
+    super(`duplicate_member: ${JSON.stringify(member).slice(0, 40)} at offset ${offset}`);
+    this.name = "DuplicateMemberError";
+  }
+}
+
+/** Throw DuplicateMemberError for the first repeated member name. The text
+ *  must already be valid JSON (JSON.parse ran first). */
+export function assertUniqueMembers(text: string): void {
+  const stack: (Set<string> | null)[] = [];
+  let expectKey = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "\"") {
+      const start = i;
+      for (i++; i < text.length && text[i] !== "\""; i++) {
+        if (text[i] === "\\") i++;
+      }
+      const top = stack[stack.length - 1];
+      if (expectKey && top) {
+        const name = JSON.parse(text.slice(start, i + 1)) as string;
+        if (top.has(name)) throw new DuplicateMemberError(name, start);
+        top.add(name);
+        expectKey = false;
+      }
+    } else if (ch === "{") {
+      stack.push(new Set());
+      expectKey = true;
+    } else if (ch === "[") {
+      stack.push(null);
+      expectKey = false;
+    } else if (ch === "}" || ch === "]") {
+      stack.pop();
+      expectKey = false;
+    } else if (ch === ",") {
+      expectKey = stack[stack.length - 1] != null;
+    }
+  }
+}
+
+/** JSON.parse that refuses numbers a JavaScript round trip would change and
+ *  repeated member names it would silently collapse. */
 export function parseJsonStrict(text: string): unknown {
   const value: unknown = JSON.parse(text); // syntax errors first, as before
   assertSafeNumbers(text);
+  assertUniqueMembers(text);
   return value;
 }

@@ -1,0 +1,8 @@
+{
+  "demo": true,
+  "notice": "DEMO KEYS made for these fixtures. The private halves existed only in the generating process and were discarded.",
+  "tenant": "fixture-tenant",
+  "grant_public_key_hex": "2ab0765b469a08b9a4be3855202cae4127b411de327a7a95a42dc1f6a092417e",
+  "lease_public_key_hex": "1a838991199a288b9971adb0c370ba715d89b3adef892dbe0744e3fd6789135b",
+  "evidence_public_key_hex": "85b346a14431365bf09663502c5108d3d0a8cb3209a0f94acf35c4ac6c66a74f"
+}

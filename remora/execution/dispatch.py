@@ -65,6 +65,7 @@ def dispatch_under_lease(
     plan: PlanBinding | None = None,
     capability_set: EffectiveCapabilitySet | None = None,
     surface_digest: str = "",
+    report_lease: bool = False,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -99,6 +100,11 @@ def dispatch_under_lease(
     re-verifies the whole binding against the concrete call before anything
     runs, exactly as it does for a locally issued one. The only thing that
     changes is who signed it.
+
+    ``report_lease`` adds the lease minted here, as ``lease``, to a result the
+    dispatcher returned: its nonce is spent by then, and the caller records
+    it as evidence. A presented lease, a forwarded one and a refusal before
+    dispatch are never reported.
     """
     tool_execution: dict[str, Any] = {"executed": False}
     if not gate_allowed:
@@ -264,6 +270,8 @@ def dispatch_under_lease(
             tool_execution["effect_graph"] = graph.to_dict()
         return tool_execution
     tool_execution["executed"] = dres.executed
+    if report_lease and presented_lease is None:
+        tool_execution["lease"] = lease.to_dict()
     # Reported by the dispatcher, never inferred from the refusal reason.
     tool_execution["dispatch_began"] = dres.dispatch_began
     # Read the identity back off the dispatch result rather than the local

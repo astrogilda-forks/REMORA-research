@@ -592,6 +592,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/execution/proposals/{proposal_id}/invocation-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Invocation Evidence
+         * @description The signed per-invocation export (remora/execution/invocation_evidence.py).
+         *
+         *     Unlike ``/evidence`` it carries the signed grant and lease with the exact
+         *     bytes their signatures cover, the chain entries with the strings their
+         *     hashes cover, and a signature over the whole, so a verifier holding only
+         *     public keys can check it without this service.
+         */
+        get: operations["export_invocation_evidence_v1_execution_proposals__proposal_id__invocation_evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution/proposals/{proposal_id}/lifecycle": {
         parameters: {
             query?: never;
@@ -1494,6 +1519,22 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * RequestRefModel
+         * @description The request a call arrived in (remora/execution/request_ref.py).
+         *
+         *     Set by the front end that received the request, never derived here: the
+         *     transport, the JSON-RPC id's canonical JSON text, and the SHA-256 of the body bytes
+         *     as received. Bound into the ACCEPT grant's authorization context.
+         */
+        RequestRefModel: {
+            /** Body Sha256 */
+            body_sha256: string;
+            /** Jsonrpc Id */
+            jsonrpc_id: string;
+            /** Transport */
+            transport: string;
+        };
         /** RerunRequest */
         RerunRequest: {
             /** Request Id */
@@ -1622,6 +1663,7 @@ export interface components {
             /** Intent Ref */
             intent_ref?: string | null;
             plan?: components["schemas"]["PlanProposal"] | null;
+            request_ref?: components["schemas"]["RequestRefModel"] | null;
             /** Rollback Available */
             rollback_available?: boolean | null;
             /** Schema Valid */
@@ -2822,6 +2864,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_invocation_evidence_v1_execution_proposals__proposal_id__invocation_evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One executed direct-ACCEPT invocation, signed under REMORA/EVIDENCE/v1 for offline verification. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No such proposal for this tenant. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The proposal is not one executed direct ACCEPT with its grant recorded. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description No evidence signing key is configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };

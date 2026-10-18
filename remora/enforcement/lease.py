@@ -388,6 +388,10 @@ class ExecutionLease:
             key, ExecutionLease._canonical_payload(fields), hashlib.sha256
         ).hexdigest()
 
+    def signed_payload(self) -> bytes:
+        """The exact bytes this lease's signature covers, before any domain tag."""
+        return ExecutionLease._canonical_payload(self._signed_fields())
+
     def digest(self) -> str:
         """Identity of this exact lease: its signed fields and its signature.
 

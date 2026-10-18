@@ -1,0 +1,50 @@
+{
+  "case": "03-other-export-same-call",
+  "why": "The export of request 8, a valid export of an identical call, against a capture of request 7.",
+  "bundle": "bundle.json",
+  "capture": {
+    "jsonrpc_id": "7",
+    "body": "../../request-7.json",
+    "call": {
+      "name": "read_telemetry",
+      "arguments": {
+        "asset": "P-1"
+      },
+      "target": "staging"
+    }
+  },
+  "expected": {
+    "export_authentic": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "chain_consistent": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "authority_bound": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "call_corresponds": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "request_corresponds": {
+      "result": "CONTRADICTED",
+      "codes": [
+        "request_ref_mismatch"
+      ]
+    },
+    "dispatch_recorded": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "effect_observed": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "no_observation_in_export"
+      ]
+    }
+  }
+}

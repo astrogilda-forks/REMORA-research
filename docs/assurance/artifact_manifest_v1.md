@@ -223,6 +223,7 @@ must not change unless the benchmark is re-run under a documented protocol.
 | `artifacts/benchmark_n500_locked.json` | `6618dfde3ec1aec8d5a27f832b1998113dc1ba4945c85f3a0d6df70f1d1eff28` | 415749 | 2026-05-31T22:38:13 | N=500 locked benchmark data |
 | `artifacts/agentharm_test_public_results.json` | `c5be1c536723f5cb3631f39cb9e8563eba78b2a5282ec27776b9be36388d9283` | 35303 | 2026-06-04T00:51:25 | AgentHarm test_public live results |
 | `artifacts/domain_benchmark_results.json` | `10275f3ea6525aad1802aafb890881575b3d10868f11a8e13e566a3773defea5` | 21010 | 2026-06-03T22:54:13 | Cross-domain benchmark (cyber + AI governance + finance) |
+| `artifacts/timestamps/seal_manifest_2026-10-18.json` | `2be2eafcf7538b499d9dcb99e451598c2b6065d2a05ab0245067200fab76cab7` | 3721 | 2026-10-18 | OpenTimestamps seal manifest (PRF-026): LF SHA-256 of 18 sealed files, stamped 2026-10-18. Its `.ots` proof is not listed, since `upgrade` rewrites it. `ots_seal.py verify` checks that the proof commits to this manifest (added 2026-10-18) |
 
 ---
 

@@ -213,26 +213,17 @@ class AuthorizationContext:
     context_id: str = ""
     task_id: str = ""
     execution_context_hash: str = ""
+    #: Digest of the request the call arrived in
+    #: (:mod:`remora.execution.request_ref`). Absent by default for the same
+    #: reason as the task fields: a context without one hashes as before.
+    request_ref_hash: str = ""
 
     def hash(self) -> str:
-        fields = {
-            "intent_authority_hash": self.intent_authority_hash or "",
-            "policy_bundle_hash": self.policy_bundle_hash or "",
-            "principal": self.principal or "",
-            "target_environment": self.target_environment or "",
-            "tenant": self.tenant or "",
-            "toolspec_hash": self.toolspec_hash or "",
-        }
-        # Omitted rather than defaulted to "": a key present with an empty
-        # value changes the preimage exactly as much as a populated one, so
-        # defaulting would rewrite the hash of every existing context.
-        if self.context_id:
-            fields["context_id"] = self.context_id
-        if self.task_id:
-            fields["task_id"] = self.task_id
-        if self.execution_context_hash:
-            fields["execution_context_hash"] = self.execution_context_hash
-        canonical = json.dumps(fields, sort_keys=True, separators=(",", ":"))
+        # The optional fields are omitted rather than defaulted to "" (see
+        # to_dict): a key present with an empty value changes the preimage
+        # exactly as much as a populated one, so defaulting would rewrite the
+        # hash of every existing context.
+        canonical = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode()).hexdigest()
 
     def task_identity(self) -> "TaskIdentity | None":
@@ -265,9 +256,29 @@ class AuthorizationContext:
                 "context_id",
                 "task_id",
                 "execution_context_hash",
+                "request_ref_hash",
             )
             if (getattr(self, name) or "") != (getattr(other, name) or "")
         ]
+
+    def to_dict(self) -> dict[str, str]:
+        """The fields :meth:`hash` covers, under the same omit-when-empty rule.
+
+        Exported beside a grant so a verifier can recompute ``context_hash``
+        without importing this class.
+        """
+        out = {
+            "intent_authority_hash": self.intent_authority_hash or "",
+            "policy_bundle_hash": self.policy_bundle_hash or "",
+            "principal": self.principal or "",
+            "target_environment": self.target_environment or "",
+            "tenant": self.tenant or "",
+            "toolspec_hash": self.toolspec_hash or "",
+        }
+        for name in ("context_id", "task_id", "execution_context_hash", "request_ref_hash"):
+            if getattr(self, name):
+                out[name] = getattr(self, name)
+        return out
 
 
 def _canonical_payload(
@@ -503,6 +514,14 @@ class PolicyDecisionToken:
             format=token_format,
         )
 
+    def signed_payload(self) -> bytes:
+        """The exact bytes this token's signature covers, before any domain tag."""
+        return _canonical_payload(
+            self.action, self.observation_hash, self.request_id, self.issued_at,
+            self.expires_at, self.jti, self.audience, self.kid, self.issuer,
+            self.context_hash, self.format,
+        )
+
     def verify_historical(self) -> TokenVerificationResult:
         """The signature only, as evidence: never an authorization (CR-011).
 
@@ -609,11 +628,7 @@ class PolicyDecisionToken:
                 is_signed=True,
             )
 
-        payload = _canonical_payload(
-            self.action, self.observation_hash, self.request_id, self.issued_at,
-            self.expires_at, self.jti, self.audience, self.kid, self.issuer,
-            self.context_hash, self.format,
-        )
+        payload = self.signed_payload()
 
         if self.kid:
             current_kid = _current_kid()
@@ -678,11 +693,7 @@ class PolicyDecisionToken:
         if not keys:
             return TokenVerificationResult(
                 verified=False, reason="no_verification_key", is_signed=True)
-        payload = _canonical_payload(
-            self.action, self.observation_hash, self.request_id, self.issued_at,
-            self.expires_at, self.jti, self.audience, self.kid, self.issuer,
-            self.context_hash, self.format,
-        )
+        payload = self.signed_payload()
         domain = SignatureDomain.POLICY_GRANT_ASYMMETRIC
         result = verify(domain, payload,
                         Signature(ALGORITHM, domain.value, self.kid, self.signature),

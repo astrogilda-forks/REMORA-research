@@ -87,4 +87,10 @@ regexes = [
   # The same block's unauthenticated health check, matched by the rule's
   # multi-line region rather than by any secret in it.
   '''curl -s localhost:8000/v1/health''',
+  # integrations/invocation-evidence/README.md, commit 226245bb, line 20 — a
+  # table row naming the signature DOMAIN tag "REMORA/EVIDENCE/v1" after the
+  # words "the evidence key". The rule reads "key, `...`" as a key and its
+  # value; the value is the public domain constant from
+  # remora/crypto/domain_signing.py, not key material. Anchored to the row.
+  '''\| the export as a whole \| the evidence key, `REMORA/EVIDENCE/v1` \|''',
 ]
