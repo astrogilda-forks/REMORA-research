@@ -183,6 +183,21 @@ def test_terminal_refusals_still_read_refused(terminal) -> None:
     assert current_state(chain, None) == "REFUSED"
 
 
+@pytest.mark.parametrize("payload,expected", [
+    ({"tool_executed": True}, "SUCCEEDED"),
+    ({"tool_executed": False, "state_unknown": True}, "UNKNOWN"),
+    ({"tool_executed": False}, "REFUSED"),
+])
+def test_a_result_without_an_outbox_projection_is_not_stuck_dispatching(
+    payload, expected,
+) -> None:
+    # current_state without a dispatch row must still read the recorded
+    # result: a chain ending in execution_result never stays DISPATCHING.
+    chain = _review_chain()
+    chain[-1] = _result(**payload)
+    assert current_state(chain, None) == expected
+
+
 # ── the declared target must be the observed object ─────────────────────────
 
 def _contract() -> PostconditionContract:

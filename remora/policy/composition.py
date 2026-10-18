@@ -16,6 +16,14 @@ and an approver could then redeem a call that needed a higher authority.
 Ties are resolved by component order, earliest first, so a decision that
 first-match and meet agree on keeps its reasons unchanged.
 
+A refusal that review cannot lift ranks below every other cap (RMR-AUD-003).
+ESCALATE opens a review item on the execution path; a cross-tenant argument or
+an intent the deployment never authorised has no such route. Under the tie
+``ABSTAIN ≡ ESCALATE`` an ESCALATE guard listed earlier (``schema_valid=False``,
+``adversarial_detected``) won the tie and turned the refusal into a review
+item. A cap is non-approvable when its reason is in ``NON_APPROVABLE_REASONS``
+or its source says so (``approvable=False``).
+
 External components (a learned monitor or an LLM judge, an RF-04 control
 protocol) enter as caps with their own reason codes and can only lower a
 decision.
@@ -28,7 +36,15 @@ from typing import Final
 
 from remora.policy.report import DecisionAction, DecisionReason
 
-__all__ = ["EXECUTABILITY", "EXTERNAL_CAP_REASONS", "Cap", "executability", "meet"]
+__all__ = [
+    "EXECUTABILITY",
+    "EXTERNAL_CAP_REASONS",
+    "NON_APPROVABLE_REASONS",
+    "Cap",
+    "executability",
+    "meet",
+    "rank",
+]
 
 #: How far an action lets a call proceed without further authority.
 EXECUTABILITY: Final[dict[DecisionAction, int]] = {
@@ -45,6 +61,17 @@ EXTERNAL_CAP_REASONS: Final = frozenset({
 })
 
 
+#: Refusals no reviewer can lift: nothing downstream can supply the authority
+#: or the tenant scope the call lacks. The OPA adapter keeps the same set.
+NON_APPROVABLE_REASONS: Final = frozenset({
+    DecisionReason.CROSS_TENANT_ARGUMENT_BLOCKED,
+    DecisionReason.INTENT_PROVENANCE_REQUIRED,
+})
+
+#: Below every action in ``EXECUTABILITY``.
+_NON_APPROVABLE_RANK: Final = -1
+
+
 def executability(action: DecisionAction) -> int:
     return EXECUTABILITY[action]
 
@@ -56,13 +83,24 @@ class Cap:
     source: str
     action: DecisionAction
     reason: DecisionReason
+    approvable: bool = True
+
+
+def rank(cap: Cap) -> int:
+    """A cap's place in the meet: its executability, or below all of them for
+    an ABSTAIN no review can lift."""
+    if cap.action is DecisionAction.ABSTAIN and (
+        not cap.approvable or cap.reason in NON_APPROVABLE_REASONS
+    ):
+        return _NON_APPROVABLE_RANK
+    return executability(cap.action)
 
 
 def meet(caps: Iterable[Cap]) -> Cap:
     """The least executable cap; the earliest one among equals."""
     chosen: Cap | None = None
     for cap in caps:
-        if chosen is None or executability(cap.action) < executability(chosen.action):
+        if chosen is None or rank(cap) < rank(chosen):
             chosen = cap
     if chosen is None:
         raise ValueError("meet of no caps")

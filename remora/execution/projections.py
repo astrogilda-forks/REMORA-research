@@ -247,7 +247,16 @@ def _fold_state(events: list[dict[str, Any]]) -> str:
             state = "REVIEW_PENDING"
         elif name in _ATTEMPT_REFUSALS:
             continue
-        elif name.startswith("execution_") and name != "execution_result":
+        elif name == "execution_result":
+            # The dispatch record exists but no outbox projection was passed:
+            # a chain that ends here must not read DISPATCHING for good.
+            if payload.get("tool_executed") is True:
+                state = "SUCCEEDED"
+            elif payload.get("state_unknown") is True:
+                state = "UNKNOWN"
+            else:
+                state = "REFUSED"
+        elif name.startswith("execution_"):
             # Grant refused, ToolSpec changed, or a refusal this fold does not
             # know: terminal unless a later record shows the lifecycle moving.
             state = "REFUSED"

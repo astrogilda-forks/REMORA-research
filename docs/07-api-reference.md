@@ -583,10 +583,12 @@ off by default because callers must first send the fields. The loop limits
 are defaults that no study has calibrated.
 
 **Meet composition (COMP-01):** every decision is the least executable of
-its components (`ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT`). The components are
-the cascade, the hard-guard floor, each conditional gate that fires, and any
-external cap. A stricter component that fires after the first match still
-binds, and its reason is appended. Library callers can pass `caps` to
+its components (`ABSTAIN < ESCALATE < VERIFY < ACCEPT`). ABSTAIN is lowest
+because it has no approval route; ESCALATE has one. The components are the
+cascade, every hard guard that fires, every conditional gate that fires, the
+rest of the policy as it would decide without them, and any external cap. A
+stricter component that fires after the first match still binds, and its
+reason is appended. Library callers can pass `caps` to
 `RemoraDecisionEngine.decide` and `explain`, with reason `monitor_cap` for a
 learned monitor or `protocol_cap` for a control protocol. A cap can only
 lower a decision ([ADR](architecture/ADR-flow-meet-composition.md)).
