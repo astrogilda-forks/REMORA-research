@@ -27,11 +27,14 @@
 
 schema_version: 4
 extends: tool_spec_v3.yaml
-status: partial
-# IFC-03a implements the parser and linter. The bundle loader accepts
-# schema_version 4, refuses `flow` below it, and refuses a missing block under
-# the strict profile in IFC-03b (protected path); until then no loaded bundle
-# can carry a flow block.
+status: implemented
+implemented_at: "2026-10-18"
+# The bundle loader (remora/toolcall/toolspec.py) accepts schema_version 4,
+# refuses `flow` below it (toolspec_flow_requires_v4), and parses and lints
+# every block at load, so a signed block that breaks a rule does not load
+# (toolspec_flow_invalid, toolspec_flow_lint_failed). FL-13 is checked at
+# startup (remora/toolcall/runtime_profile.py): under a strict profile with
+# REMORA_FLOW_CONTROL=1, a spec without a block refuses the process.
 
 optional_fields:
   flow:

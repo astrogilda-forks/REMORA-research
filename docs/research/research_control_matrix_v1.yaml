@@ -61,7 +61,7 @@
 # is documented, not invisible.
 
 schema_version: "1"
-updated: "2026-10-04"
+updated: "2026-10-17"
 
 maturity_levels:
   - implemented_and_tested
@@ -1212,6 +1212,149 @@ entries:
       - ltt-2021
       - agentharm-2024
 
+  - id: RES-023
+    title: "Semantic authority for tool routing: declared tool contracts, a re-derived task intent and an UNKNOWN floor"
+    source:
+      citation: "REMORA internal design: SAP v5 (semantic authority, sealed C-ext3) and SAP v6 (semantic bundle v2 with derivation receipts, sealed C-ext4); not an external publication."
+      sections:
+        - "docs/assurance/statistical_analysis_plan_v5_bfcl_semantic.md"
+        - "docs/assurance/statistical_analysis_plan_v6_bfcl_utility.md"
+      builds_on:
+        - "Patil, S. G., Zhang, T., Wang, X., & Gonzalez, J. E. (2023). Gorilla: Large Language Model Connected with Massive APIs. arXiv:2305.15334. Its Berkeley Function Calling Leaderboard (BFCL v4, upstream repository ShishirPatil/gorilla) is the evaluation substrate, not the mechanism."
+    concepts:
+      - structural_validity_is_not_semantic_correctness
+      - declared_tool_contract
+      - intent_re_derived_from_task_text
+      - unknown_fit_is_not_autonomy
+      - value_grounding_and_derivation_receipts
+    controls:
+      - tool_matches_goal_gate
+      - expected_effect_matches_gate
+      - semantic_authority_unknown_floor
+      - argument_value_grounding
+      - deterministic_derivation_receipts
+    code:
+      - remora/toolcall/routing/goal_match.py
+      - remora/toolcall/routing/tool_contract.py
+      - remora/toolcall/routing/bfcl_semantic_bundle.py
+      - remora/toolcall/routing/bfcl_semantic_bundle_v2.py
+      - remora/toolcall/routing/derivation.py
+      - remora/toolcall/routing/derivation_search.py
+      - remora/toolcall/routing/evaluate.py
+      - remora/toolcall/routing/bfcl_arms.py
+      - remora/toolcall/routing/sources/bfcl.py
+      - remora/policy/decision_engine.py
+      - scripts/run_bfcl_cext3.py
+      - scripts/run_bfcl_cext4.py
+      - scripts/replay_sealed_cext4.py
+      - results/routing_bench_bfcl_v4_cext3_results.json
+      - results/routing_bench_bfcl_v4_cext4_results.json
+    tests:
+      - tests/test_goal_match.py
+      - tests/test_semantic_bundle.py
+      - tests/test_bfcl_semantic_bundle_v2.py
+      - tests/test_semantic_authority_floor.py
+      - tests/test_intent_claim_boundaries.py
+      - tests/test_derivation_receipt.py
+      - tests/test_derivation_search.py
+      - tests/test_routing_bfcl_adapter.py
+      - tests/test_bfcl_cext4_harness.py
+      - tests/test_replay_sealed_cext4.py
+      - tests/test_bfcl_cext4_seen_split.py
+      - tests/test_peer_review_posthoc.py
+    evidence: >-
+      Two sealed, pre-registered BFCL v4 tracks, each run once. C-ext3
+      (CLAIM-019): with contracts, intent and the UNKNOWN floor, no
+      substituted wrong call was accepted (0/500; Wilson upper 0.76 % by
+      row, 3.5 % clustered by tool), but read autonomy was 26.6 % against a
+      75 % target, so the joint hypothesis was not supported
+      (NEGATIVE_RESULTS.md §39). C-ext4 (CLAIM-021): bundle v2 accepted
+      87/291 correct calls against 20/291 for the frozen bundle, with no
+      wrong call accepted; the gain sits on tools seen in development (§82).
+      The sealed run replays exactly at its locked commit in CI
+      (scripts/replay_sealed_cext4.py). Post-hoc re-analysis (§83) shows
+      that 4 of the 295 C-ext4 wrong calls name a tool the task offered.
+    maturity: implemented_and_tested
+    scope_boundary: >-
+      Measured on one tool catalogue (BFCL v4 live), where REMORA routes
+      annotated gold proposals rather than generating calls. The wrong calls
+      are other tasks' correct calls substituted into the task, not errors a
+      model made. Transfer to an unseen catalogue, model-made wrong calls and
+      external baselines are untested. The BFCL bundles are benchmark
+      bundles: no deployment bundle imports them, and the v1 intent extractor
+      ignores negation (§81). The governed path supplies its own contracts
+      and intents.
+    related_work_section: "docs/09-related-work.md §15"
+    in_code_citation: false
+    compendium_refs: []
+    compendium_note: "Internal design evaluated on an external benchmark; the benchmark is the substrate, not a cited mechanism."
+
+  - id: RES-024
+    title: "Authority-preserving effect mediation: a tool's nested effects stay inside a declared ceiling on credentials it does not hold (NTA-2)"
+    source:
+      citation: "REMORA internal design: docs/design/authority-preserving-capability-mediation-v1.md (NTA-2, phases 1 to 3); not an external publication."
+      sections:
+        - "docs/design/authority-preserving-capability-mediation-v1.md"
+        - "experiments/authority_preserving_capability_mediation/PREREGISTERED.md"
+      builds_on:
+        - "Hardy, N. (1988). The Confused Deputy (or why capabilities might have been invented). ACM SIGOPS Operating Systems Review 22(4):36-38."
+        - "Miller, M. S. (2006). Robust Composition: Towards a Unified Approach to Access Control and Concurrency Control. PhD thesis, Johns Hopkins University (no ambient authority)."
+    concepts:
+      - authorization_does_not_propagate_through_reachability
+      - no_ambient_authority
+      - declared_downstream_ceiling
+      - credential_custody_outside_the_tool
+    controls:
+      - capability_mediator
+      - downstream_ceiling
+      - resolved_effect_graph
+      - effect_domain_custody_split
+      - direct_access_gate
+    code:
+      - remora/capabilities/resource.py
+      - remora/enforcement/capability_mediator.py
+      - remora/enforcement/effect_domain.py
+      - remora/enforcement/effect_client.py
+      - remora/enforcement/effect_graph.py
+      - remora/enforcement/lease.py
+      - experiments/authority_preserving_capability_mediation.py
+      - results/authority_preserving_capability_mediation_v1.json
+    tests:
+      - tests/capabilities/test_capability_resource.py
+      - tests/capabilities/test_capability_mediation.py
+      - tests/capabilities/test_capability_mediation_concurrency.py
+      - tests/capabilities/test_dispatcher_mediation.py
+      - tests/capabilities/test_effect_domain.py
+      - tests/capabilities/test_effect_domain_server.py
+      - tests/capabilities/test_effect_graph.py
+      - tests/capabilities/test_mediation_server_path.py
+      - tests/test_capability_mediation_study.py
+      - tests/test_effect_mediation_policy.py
+    evidence: >-
+      The pre-registered experiment
+      (results/authority_preserving_capability_mediation_v1.json) used an
+      author-written corpus. With capability minimization alone, every unsafe
+      class produced its effect. The in-process mediator stopped all classes
+      but direct use of the credential in the tool's process. The
+      three-domain split, with the tool in a separate process holding no
+      credential, stopped all eight unsafe classes, and no legitimate nested
+      effect was blocked. Seven of eight predictions were met; P6 missed
+      (NEGATIVE_RESULTS.md §63).
+    maturity: implemented_and_tested
+    scope_boundary: >-
+      Opt-in and research profile. Mediation binds only tools registered as
+      mediated, and the downstream ceiling is a deployment declaration REMORA
+      does not check for correctness. A tool process without credentials can
+      still reach the network unless the deployment isolates it; the
+      flow-control SDD (IFC-12) adds that isolation. The corpus is
+      author-written, so the experiment shows layer attribution, not
+      real-world rates. REMORA takes the object-capability principle, not an
+      object-capability language or runtime.
+    related_work_section: "docs/09-related-work.md §16"
+    in_code_citation: false
+    compendium_refs: []
+    compendium_note: "Internal design; its conceptual origin (confused deputy, object capabilities) predates the AI-assurance compendium's scope."
+
 landscape:
   source: "docs/researchpapers/kompendium_ai_assurance_3utgave.md"
   source_status: "local-only working document (gitignored, not published; ~201 works, 2. edition figure). compendium_refs are validated against this file when present locally and skipped in CI where it is absent."
@@ -1408,6 +1551,21 @@ bibliography:
       note: >-
         AgentHarm external validation (CLAIM-002). Imported historical artifact:
         it cannot be regenerated from this repository.
+    - id: patil-2025-bfcl
+      surname: "Patil"
+      year: "2025"
+      role: evaluation_source
+      code: [scripts/build_bfcl_v4_cext4.py]
+      anchor: "BFCL"
+      note: "Berkeley Function Calling Leaderboard; the BFCL v4 rows behind the sealed routing tracks (CLAIM-018, CLAIM-019, CLAIM-021)."
+    - id: patil-2023-gorilla
+      surname: "Patil"
+      year: "2023"
+      arxiv: "2305.15334"
+      role: evaluation_source
+      code: [scripts/build_bfcl_v4_cext4.py]
+      anchor: "gorilla"
+      note: "Gorilla project; the upstream repository the BFCL v4 data is pinned from."
 
     # ── Standards, regulation and third-party tooling ───────────────────────
     - id: european-2024-regulation
@@ -1429,12 +1587,15 @@ bibliography:
       note: "OPA/Rego adapter, failing closed to the Python engine."
 
     # ── Related-work positioning: argued against, not built on ──────────────
+    - {id: anderson-1972-computer, surname: "Anderson", year: "1972", role: positioning_only, note: "Reference monitor; named as a known mechanism REMORA integrates."}
     - {id: angelopoulos-2021-gentle, surname: "Angelopoulos", year: "2021", arxiv: "2107.07511", role: positioning_only, note: "Conformal tutorial; framing only."}
+    - {id: birgisson-2014-macaroons, surname: "Birgisson", year: "2014", role: positioning_only, note: "Macaroons - capabilities with caveats; named as a known mechanism REMORA integrates."}
     - {id: bloomfield-2010-safety, surname: "Bloomfield", year: "2010", role: positioning_only}
     - {id: chennabasappa-2025-llamafirewall, surname: "Chennabasappa", year: "2025", arxiv: "2505.03574", role: positioning_only, note: "LlamaFirewall - closest industrial system in scope."}
     - {id: choi-2026-membrane, surname: "Choi", year: "2026", arxiv: "2606.05743", role: positioning_only, note: "Membrane; contrasted with AROMER's never-weaken constraint."}
     - {id: chow-1970-optimum, surname: "Chow", year: "1970", role: positioning_only, note: "Origin of the error-reject tradeoff."}
     - {id: corsi-2021-formal, surname: "Corsi", year: "2021", role: positioning_only}
+    - {id: crosby-2009-efficient, surname: "Crosby", year: "2009", role: positioning_only, note: "Tamper-evident logging; named as a known mechanism REMORA integrates."}
     - {id: debenedetti-2024-agentdojo, surname: "Debenedetti", year: "2024", role: positioning_only, note: "AgentDojo - named as a required replication target, not run."}
     - {id: debenedetti-2025-defeating, surname: "Debenedetti", year: "2025", arxiv: "2503.18813", role: positioning_only, note: "CaMeL; shelf SHELF-008."}
     - {id: dong-2025-evaluating, surname: "Dong", year: "2025", arxiv: "2502.11347", role: positioning_only, note: "TEE attestation sketch; hardware integration pending."}
@@ -1443,6 +1604,7 @@ bibliography:
     - {id: ge-2026-governance, surname: "Ge", year: "2026", arxiv: "2603.07191", role: positioning_only}
     - {id: guldimann-2024-compl, surname: "Guldimann", year: "2024", arxiv: "2410.07959", role: positioning_only, note: "COMPL-AI."}
     - {id: guo-2017-calibration, surname: "Guo", year: "2017", role: positioning_only, note: "Calibration; REMORA deliberately does not calibrate per-oracle."}
+    - {id: hardy-1988-confused, surname: "Hardy", year: "1988", role: positioning_only, note: "Confused deputy; frames AIRGuard's authority confusion."}
     - {id: inan-2023-llama, surname: "Inan", year: "2023", arxiv: "2312.06674", role: positioning_only, note: "Llama Guard - content guardrail, contrasted with action gating."}
     - {id: kadavath-2022-language, surname: "Kadavath", year: "2022", arxiv: "2207.05221", role: positioning_only, note: "Self-knowledge; motivates structural over self-reported uncertainty."}
     - {id: kelly-1998-arguing, surname: "Kelly", year: "1998", role: positioning_only, note: "Assurance cases; DecisionEnvelope populates one node."}
@@ -1731,6 +1893,7 @@ bibliography:
     - {identifier: "arXiv:2608.27141", work: "Wu et al. (2026), Safety Does Not Compose", code: [remora/governance/task_identity.py], recorded_as: wu-2026-safety-does-not-compose}
     - {identifier: "arXiv:2608.27443", work: "Yan (2026), user-authored permission policies", code: [remora/governance/task_identity.py], recorded_as: yan-2026-permission-policies}
     - {identifier: "RFC 3161", work: "Time-Stamp Protocol", code: [remora/audit/hash_chain.py, remora/audit/merkle.py, remora/governance/envelope.py], recorded_as: rfc-3161-timestamping}
+    - {identifier: "RFC 6962", work: "Laurie, Langley & Kasper (2013), Certificate Transparency", code: [remora/interop/acta_e6/consumer.py], note: "Cited for its Merkle tree hash only (leaf 0x00, node 0x01, split at the largest power of two below the count), which the VeritasActa/e6-fixture README names as the receipt range root. No transparency-log property is claimed."}
     - {identifier: "RFC 8785", work: "JSON Canonicalization Scheme", code: [remora/interop/jcs.py, remora/enforcement/runtime_identity.py], recorded_as: rfc-8785-jcs}
     - {identifier: "RFC 6901", work: "JavaScript Object Notation (JSON) Pointer", code: [remora/policy/verification_plan_v2.py], note: "Cited as the syntax of a VerificationPlan v2 target pointer. A format reference, not a mechanism source: the module is library-only until S4 wires it."}
     - {identifier: "arXiv:2609.03340", work: "Chen, Wang & Brinton (2026), Fresh Memory, Stale Plans", code: [remora/governance/plan_binding.py], recorded_as: chen-2026-fresh-memory-stale-plans}

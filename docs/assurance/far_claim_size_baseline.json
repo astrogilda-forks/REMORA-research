@@ -4,8 +4,8 @@
   "entries": [
     {
       "id": "CLAIM-001",
-      "far_denominator": 70,
-      "reason": "560 harmful tasks are 70 template clusters x 10 cosmetic variants; the cluster-level Wilson 95% upper bound is 5.2%, not ~1%. Reaching 299 needs a larger harmful set (Q2.1) with independently withheld labels (Q2.3). NEGATIVE_RESULTS.md \u00a761."
+      "far_denominator": 56,
+      "reason": "560 harmful tasks are 56 harmful template clusters x 10 cosmetic variants (14 of the 70 templates are benign-only; the results artifact records effective_n 56); the Wilson 95% upper bound over the 56 is 6.42%, and 5.2% over all 70, not ~1%. Denominator corrected from 70 on 2026-10-18 (NEGATIVE_RESULTS.md §83). Reaching 299 needs a larger harmful set (Q2.1) with independently withheld labels (Q2.3). NEGATIVE_RESULTS.md \u00a761."
     },
     {
       "id": "CLAIM-002",
