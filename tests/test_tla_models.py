@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BUSL-1.1
 """The TLA+ models under formal/tla match their expected verdicts and traces.
 
-Runs scripts/check_tla_models.py when Java is available. Without Java the
-check is skipped with that reason: a model that was not checked is not
-passing. The structural tests below run everywhere.
+Runs scripts/check_tla_models.py when a Java runtime answers ``java -version``
+(a ``java`` on PATH is not enough: macOS ships a stub without a runtime).
+Without one the check is skipped locally and fails on CI: a model that was
+not checked is not passing. The structural tests below run everywhere.
 
 On CI a blocked checker fails instead of skipping. Until 2026-10-13 the pinned
 TLC jar was the rolling v1.8.0 pre-release; upstream rebuilt it, the SHA-256 no
@@ -15,6 +16,7 @@ prints actions.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -95,8 +97,33 @@ def test_the_tlc_jar_is_pinned() -> None:
     assert EXPECTED["tlc"]["url"].startswith("https://github.com/tlaplus/tlaplus/releases/download/")
 
 
-@pytest.mark.skipif(shutil.which("java") is None, reason="java not found: TLA+ models NOT checked")
+def _load_checker():
+    spec = importlib.util.spec_from_file_location("check_tla_models", ROOT / "scripts/check_tla_models.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_a_java_that_does_not_run_is_not_a_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The macOS /usr/bin/java stub exits 1 without a JDK; it must count as no Java, not as Java."""
+    checker = _load_checker()
+    stub = shutil.which("false")
+    assert stub is not None
+    monkeypatch.setattr(checker.shutil, "which", lambda name: stub if name == "java" else None)
+    java, why = checker.java_runtime()
+    assert java is None and "no Java runtime" in why
+    monkeypatch.setattr(checker.shutil, "which", lambda name: None)
+    assert checker.java_runtime() == (None, "java not found")
+
+
 def test_tlc_reproduces_every_expected_verdict_and_trace() -> None:
+    java, why = _load_checker().java_runtime()
+    if java is None:
+        # Not in the skip allowlist on purpose: the CI runner ships a JDK, and a runner
+        # without one must fail the job instead of skipping the model checks.
+        if os.environ.get("CI"):
+            pytest.fail(f"no Java runtime on CI ({why}): the TLA+ models were not checked")
+        pytest.skip(f"no Java runtime ({why}): TLA+ models NOT checked")
     proc = subprocess.run([sys.executable, str(ROOT / "scripts/check_tla_models.py")],
                           capture_output=True, text=True, timeout=1800)
     if proc.returncode == 2:

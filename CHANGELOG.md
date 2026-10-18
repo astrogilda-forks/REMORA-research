@@ -4,6 +4,117 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (MCP gateway readiness fails closed)
+
+- The `/mcp` route acted on readiness problems only when the profile was
+  exactly `production`. An unset or misspelt profile (`prod`) served calls
+  with every problem reported and none acted on. It now refuses on any
+  readiness problem in any profile.
+- `REMORA_API_URL` (the local direct transport) skipped Cloudflare Access
+  verification in any deployment that set it. Admission now allows it only
+  under the `development` profile, and readiness names it as a problem
+  everywhere else. Found by an internal code review on 2026-10-18.
+
+### Federation interop (invocation axes reproduction)
+
+- `.github/workflows/probity-invocation-axes-reproduction.yml` runs Probity's
+  `invocation_axes` reader from agent-evidence-vectors at a pinned commit, then
+  hands each of its execution bundles to the effect-evidence-v1 reference
+  verifier at the frozen revision. It records where the two agree on the
+  observed effect and fails if the split changes. It is a `REPRODUCTION` and
+  advances nothing.
+- The job also asserts the corpus shape at the pinned reader: 23 unique
+  cases, 22 paired bundles, and `no_execution_bundle` as the only case
+  without one. The split alone stayed green if bundles went missing. The
+  agreement it reports is named `observed_effect_binary_agree`, because it
+  compares only REMORA's `EFFECT_VERIFIED` with the reader's `ESTABLISHED`.
+### Interop (E6 consumer for Veritas Acta receipts, author run)
+
+- New `remora/interop/acta_e6/` (EXPERIMENTAL): a paying-side consumer for
+  edge E6, written from the `VeritasActa/e6-fixture` `v1.1.0` README alone.
+  It uses its own Ed25519 (`cryptography`) and JCS (`remora.interop.jcs`)
+  and does not call `@veritasacta/verify`. Results stay in Acta's
+  vocabulary and are not admitted as REMORA evidence.
+- `scripts/run_acta_e6.py` checks the `SHA256SUMS` pin and every file, runs
+  the cases and a signature-blind control, and writes
+  `integrations/acta-e6/records/remora-e6-consumer-v1.1.0.json`. From a
+  fresh clone at `8d8fc50a` (`SHA256SUMS` `08731bb7…`), the consumer agrees
+  with 12 of 12 cases on the verdict, all eight claims, every code and
+  `payment_ready`. The control agrees with 9 of 12. It returns `PASS` on case
+  12 and differs on 07 and 08 in codes only, with the verdict still `FAIL`.
+- REMORA wrote and ran the consumer, so this is a second implementation's
+  author run, not an independent record under the boundary map's rule.
+- `tests/test_acta_e6_consumer.py`: 12 tests over the vendored subset, the
+  committed record, pin refusals and the failure paths no case reaches.
+### Evidence COMP-01 (AgentHarm re-score, post hoc)
+
+- `scripts/comp01_agentharm_rescore.py` writes
+  `artifacts/posthoc/comp01_agentharm_rescore_v1.json`, recorded as
+  NEGATIVE_RESULTS §84. CLAIM-002 is unchanged.
+- **Composition set** (88 trimode tasks), at the hard-block point:
+
+  | Arm | Harmful stopped | Twin pairs told apart | AUROC |
+  |---|---|---|---|
+  | Old composition | 6/44 | 4 | 0.545 |
+  | Meet composition (oracle as a monitor cap) | 44/44 | 37 | 0.920 |
+  | Oracle alone | 44/44 | 38 | 0.932 |
+
+  The meet blocks 7 of 44 benign tasks. H6 holds.
+- **Threshold set** (CLAIM-002's 416 rows): the threshold calibrated on a
+  development half split by behaviour blocks nothing at a 10 % false-block
+  budget. Blocking starts only at a 50 % budget.
+
+### README for a first-time visitor
+
+- The README now opens with one sentence on what REMORA is, the four
+  decisions, and a two-minute "Try it" block. The block shows real
+  `whatif` output: no model signal reaches ACCEPT for a production
+  `drop_database`.
+- A short section explains why REMORA is built this way.
+- The findings are stated in plain language: blocking is the easy half,
+  usefulness is open, a floor is not a judge, we publish what fails, and
+  the adversarial test is next.
+- The detailed evidence table, the reading path and the step-by-step
+  dispatch path are unchanged but collapsed below. Next steps are grouped
+  by reader: research, code, or another project.
+
+### Research control matrix (RES-023, RES-024)
+
+- RES-023 covers semantic authority for tool routing: declared contracts,
+  a re-derived intent, the UNKNOWN floor and derivation receipts, evaluated
+  on the sealed C-ext3 and C-ext4 BFCL tracks. Its scope limits come from
+  §39, §81, §82 and §83.
+- RES-024 covers authority-preserving effect mediation (NTA-2: mediator,
+  effect domain, custody split). It builds on the confused deputy (Hardy,
+  1988) and object capabilities (Miller, 2006).
+- Both rows are internal designs (`in_code_citation: false`).
+  docs/09-related-work.md gains §15 and §16 to anchor them.
+- The register's `updated` field moves to 2026-10-17.
+- PRF-043 records that the paper does not cite BFCL.
+
+### Policy COMP-01 (meet composition, P-MONO)
+
+- `RemoraDecisionEngine.decide` now returns the least executable of its
+  component groups (`ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT`). The groups are
+  the cascade, the hard-guard floor, the conditional-gate group, and any
+  external `caps` (new reason codes `monitor_cap` and `protocol_cap`).
+  Before, a first-match VERIFY from the taint floor masked a conditional
+  gate's ESCALATE or ABSTAIN, so an ordinary approver could redeem a call
+  another component had sent to a higher authority.
+- Decisions change only in the stricter direction. On a 30,000-observation
+  search in two engine configurations, 1,784 masked decisions were found.
+  The OPA golden cases, the tool-call benchmark, C-ext4 and the AROMER arena
+  are unchanged. One C-ext3 episode moves from VERIFY to ABSTAIN, and no
+  published count changes.
+- §3.9 composes groups, so the order inside `_CONDITIONAL_GATES` is kept. A
+  per-gate meet would have turned 13 benign AROMER arena VERIFYs into false
+  ESCALATEs. `docs/architecture/ADR-flow-meet-composition.md` records this
+  finding.
+- `composition.py` joins the policy bundle hash. `explain()` takes the same
+  caps and shows a `meet_composition` row. P-MONO is checked as a Hypothesis
+  property in `tests/policy/test_meet_composition.py`, and the never-weakens
+  tests cover monitor and protocol caps. The version label stays
+  `RemoraDecisionEngine-v5`; the SDD reserves v6 for the flow rungs.
 ### Flow control IFC-03b (ToolSpec v4 at bundle load)
 
 - The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in
@@ -14,7 +125,7 @@ This file lists externally relevant changes by release. Fine-grained development
 - Under a strict runtime profile with `REMORA_FLOW_CONTROL=1`, startup
   refuses a bundle in which any spec has no block (FL-13).
 - `remora/flow/label.py` and `remora/flow/spec.py` join the policy bundle
-  hash, which now covers nine files. Every envelope's `policy_bundle_hash`
+  hash, which now covers ten files including COMP-01 composition. Every envelope's `policy_bundle_hash`
   changes value with this release.
 - Contracts touched: three additive reason codes in
   `schemas/tool_spec_v1.yaml`; `schemas/tool_spec_v4.yaml` is now

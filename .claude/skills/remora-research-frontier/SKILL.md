@@ -16,7 +16,7 @@ before quoting any status from the sibling files.
 | Question | Canonical file | Gate |
 |---|---|---|
 | Is method X implemented, and how mature? | `docs/research/research_control_matrix_v1.yaml` (RES-001..021, `maturity`, `code`, `tests`, bibliography with `role`) | `check_claim_provenance.py` |
-| Is paper Y adopted, scoped or declined? | `docs/research/research_shelf_v1.yaml` (SHELF-001..041, `adoption`, `verification`) | `check_research_shelf.py` |
+| Is paper Y adopted, scoped or declined? | `docs/research/research_shelf_v1.yaml` (SHELF-001..059, `adoption`, `verification`) | `check_research_shelf.py` |
 | What is the planned work package? | `docs/13-research-frontier-roadmap.md` (RF-01..13, §0 coverage, §11 excluded, §12 intake) | prose ratchet |
 | What number may I quote? | `docs/assurance/claim_register_v1.yaml` (CLAIM-001..020) + `docs/assurance/evidence_levels.md` | `check_claim_sync.py`, `check_no_overclaims.py` |
 | What was tried and failed? | `NEGATIVE_RESULTS.md` (open / accepted / superseded tables near the end) | `check_negative_results_status.py` |

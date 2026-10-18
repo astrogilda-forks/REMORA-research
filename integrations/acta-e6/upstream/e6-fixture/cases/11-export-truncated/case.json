@@ -1,0 +1,42 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "11-export-truncated",
+  "title": "An export that leaves out its last receipt",
+  "additional": "Beyond the ten core cases; it shows what the manifest is for.",
+  "change": "chain.jsonl leaves out the period's last receipt (86, sha256:103f6bbd70e0048776e6089e68d18feb4557b07aee2ab65966075c2492b41dad, signed billable), and bill.json leaves it out too (its line's quantity and amount lowered to match). The manifest is the real one.",
+  "why": "Every remaining receipt verifies and links, and the bill matches the export exactly, so a consumer without the manifest would pass it. The signed manifest's count, last sequence, head and root show that a receipt is missing.",
+  "inputs": {
+    "receipts": "chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "scope"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "FAIL",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "scope": [
+        "count_mismatch",
+        "sequence_mismatch",
+        "head_mismatch",
+        "root_mismatch"
+      ]
+    },
+    "payment_ready": false
+  }
+}

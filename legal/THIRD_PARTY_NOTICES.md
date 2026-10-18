@@ -25,6 +25,7 @@ and `frontend/package-lock.json` for the exact resolved versions).
 | ARC-Challenge / MMLU-Pro | AI2 / TIGER-Lab | Referenced benchmark materials | Respective dataset licenses; not relicensed |
 | Open Policy Agent (OPA) | openpolicyagent.org | Pinned binary in CI; Rego adapter target | Apache License 2.0 (upstream project's own license); not bundled |
 | TRACE v0.2 JSON Schema | agentrust-io/trace-spec `schema/trace-claim.json` at `4c7d6ec` | Vendored unchanged as `integrations/agentrust-trace/upstream/trace-claim.json` to validate the REMORA mapping offline | Community Specification License 1.0 (upstream project's own license); not relicensed |
+| E6 producer fixture (demo receipts, manifest, bills, keys, cases) | VeritasActa/e6-fixture `v1.1.0` at `8d8fc50` | Vendored subset unchanged as `integrations/acta-e6/upstream/e6-fixture/` to run REMORA's E6 consumer offline | Apache License 2.0 (upstream project's own license, `LICENSE` vendored with it); not relicensed |
 | Business Source License text | MariaDB Corporation Ab | License text in `LICENSE` / `LICENSES/BUSL-1.1.txt` | Used under MariaDB's permission subject to the Covenants of Licensor |
 | Model outputs (Groq/Cloudflare-hosted Llama, Qwen, Mistral) | Respective providers | Stored oracle responses in committed result artifacts | Provider terms of service; review before commercial redistribution |
 

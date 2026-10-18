@@ -15,7 +15,9 @@ production, which is the opposite of the intent.
 """
 from __future__ import annotations
 
+import builtins
 import importlib
+import io
 import sys
 
 import pytest
@@ -102,8 +104,20 @@ def durable_paths(tmp_path, monkeypatch):
 
     An in-memory SQLite database is empty on every per-operation connect, so
     it is not durable and the guard now refuses it. These tests are about
-    surface selection, not storage, so they get files that behave.
+    surface selection, not storage. Fix the mount table input to durable
+    storage too: tmp_path can live on tmpfs or a container's overlay layer.
+    Patching this input survives _reload_api's fresh module import, so the
+    real filesystem classifier and import-time startup guards still run.
+    The actual overlay refusal is covered in test_ephemeral_durable_state.
     """
+    real_open = builtins.open
+
+    def durable_mounts(file, *args, **kwargs):
+        if file == "/proc/mounts":
+            return io.StringIO("fixture / ext4 rw 0 0\n")
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", durable_mounts)
     monkeypatch.setenv("REMORA_CHAIN_DB", str(tmp_path / "chain.db"))
     monkeypatch.setenv("REMORA_CONTROL_PLANE_DB", str(tmp_path / "control.db"))
 

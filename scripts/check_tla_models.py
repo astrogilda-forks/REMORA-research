@@ -118,14 +118,33 @@ def check_one(java: str, jar: Path, name: str, module: str = "LeaseRetry") -> di
     return {"result": "error", "output_tail": out[-800:]}
 
 
+def java_runtime() -> tuple[str | None, str]:
+    """Return (path to a java that runs, "") or (None, why not).
+
+    ``shutil.which("java")`` is not enough: macOS ships /usr/bin/java as a stub
+    that exits 1 with "Unable to locate a Java Runtime" when no JDK is
+    installed, and every model then reported an error instead of BLOCKED.
+    """
+    java = shutil.which("java")
+    if java is None:
+        return None, "java not found"
+    try:
+        proc = subprocess.run([java, "-version"], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"java -version did not run ({type(exc).__name__})"
+    if proc.returncode != 0:
+        return None, "java -version failed: no Java runtime answers"
+    return java, ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--jar")
     args = ap.parse_args()
     expected = json.loads(EXPECTED.read_text(encoding="utf-8"))
-    java = shutil.which("java")
+    java, why = java_runtime()
     if java is None:
-        print("BLOCKED: java not found; the TLA+ models were not checked")
+        print(f"BLOCKED: {why}; the TLA+ models were not checked")
         return 2
     jar = _jar(expected["tlc"], args.jar)
     if jar is None:

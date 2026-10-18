@@ -37,7 +37,7 @@
 # A `remora_results` key is a hard error.
 
 schema_version: "1"
-updated: "2026-09-28"
+updated: "2026-10-18"
 
 components:
 
@@ -1018,3 +1018,345 @@ components:
       Much of this exists: argument grounding, DerivationReceipt and ArgumentValueEvidence (RF-02). Any work extends those structures rather than adding a provenance store. Candidate (proposal P1.4); no decision taken.
     adoption: UNEVALUATED
     remaining: "Evaluate after WS7 items 1-3 (quality program)."
+
+  # ── Paper related work verified for PRF-017 (2026-10-18) ───────────────────
+  # Cited in paper §2.11 as positioning_only or standard_or_regulation. None is
+  # adopted; each entry records what REMORA does not do.
+
+  - id: SHELF-042
+    name: "Information-flow control planner with confidentiality and integrity labels"
+    source:
+      title: "Securing AI Agents with Information-Flow Control"
+      authors: >-
+        Manuel Costa, Boris Köpf, Aashish Kolluri, Andrew Paverd, Mark
+        Russinovich, Ahmed Salem, Shruti Tople, Lukas Wutschitz, Santiago
+        Zanella-Béguelin
+      venue: "arXiv preprint (v2)"
+      url: "https://arxiv.org/abs/2505.23643v2"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors present FIDES, a planner that tracks confidentiality and
+        integrity labels and deterministically enforces policies, and report
+        that its AgentDojo evaluation completes a broad range of tasks with
+        security guarantees. Their setup, their claims.
+    roadmap_ref: "RF-02"
+    remora_status: >-
+      REMORA propagates no confidentiality or integrity labels across calls and
+      claims no trajectory-level or data-flow property (paper §13.13).
+      Positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-043
+    name: "System-level information-flow control for LLM systems (f-secure)"
+    source:
+      title: "System-Level Defense against Indirect Prompt Injection Attacks: An Information Flow Control Perspective"
+      authors: "Fangzhou Wu, Ethan Cecchetti, Chaowei Xiao"
+      venue: "arXiv preprint (v2)"
+      url: "https://arxiv.org/abs/2409.19091v2"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors give formal models of existing and f-secure LLM systems, in
+        which a security monitor filters untrusted input out of planning, and
+        report case studies and benchmarks showing robust security with
+        preserved functionality and efficiency. Their setup, their claims.
+    roadmap_ref: "RF-02"
+    remora_status: >-
+      REMORA has no planner-level information-flow monitor. Positioning only
+      in paper §2.11; the "Wu et al. 2024" named in PRF-017.
+    adoption: UNEVALUATED
+
+  - id: SHELF-044
+    name: "Execution isolation between LLM apps"
+    source:
+      title: "IsolateGPT: An Execution Isolation Architecture for LLM-Based Agentic Systems"
+      authors: "Yuhao Wu, Franziska Roesner, Tadayoshi Kohno, Ning Zhang, Umar Iqbal"
+      venue: "NDSS 2025 (arXiv v2; v1 titled SecGPT)"
+      url: "https://arxiv.org/abs/2403.04960v2"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors report protection against many security, privacy and safety
+        issues of non-isolated LLM systems without loss of functionality, with
+        performance overhead under 30% for three-quarters of tested queries.
+        Their setup, their numbers.
+    remora_status: >-
+      Not implemented or measured. Positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-045
+    name: "Just-in-time contextual security policies"
+    source:
+      title: "Contextual Agent Security: A Policy for Every Purpose"
+      authors: "Lillian Tsai, Eugene Bagdasarian"
+      venue: "HotOS 2025 (arXiv v3)"
+      url: "https://arxiv.org/abs/2501.17070v3"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Position paper proposing Conseca, a framework to generate
+        just-in-time, contextual and human-verifiable security policies. No
+        quantitative result is reported in the abstract.
+    remora_status: >-
+      REMORA's hard-block floor is fixed and versioned, not generated per
+      context. Positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-046
+    name: "Masked re-execution to detect indirect prompt injection"
+    source:
+      title: "MELON: Provable Defense Against Indirect Prompt Injection Attacks in AI Agents"
+      authors: "Kaijie Zhu, Xianjun Yang, Jindong Wang, Wenbo Guo, William Yang Wang"
+      venue: "ICML 2025 (arXiv v4)"
+      url: "https://arxiv.org/abs/2502.05174v4"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors report that on AgentDojo MELON outperforms state-of-the-art
+        defenses in both attack prevention and utility preservation, and that
+        MELON-Aug improves further. Their setup, their claims.
+    remora_status: >-
+      REMORA does not re-execute trajectories. Not implemented or measured;
+      positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-047
+    name: "Test-time task-alignment check per tool call"
+    source:
+      title: "The Task Shield: Enforcing Task Alignment to Defend Against Indirect Prompt Injection in LLM Agents"
+      authors: "Feiran Jia, Tong Wu, Xin Qin, Anna Squicciarini"
+      venue: "ACL 2025 (Long Papers), pp. 29680-29697 (arXiv v1)"
+      url: "https://arxiv.org/abs/2412.16682v1"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors report on AgentDojo with GPT-4o an attack success rate of
+        2.07% at 69.79% task utility. Their setup, their numbers.
+    remora_status: >-
+      Not implemented or measured. Positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-048
+    name: "Spotlighting: provenance-marking input transformations"
+    source:
+      title: "Defending Against Indirect Prompt Injection Attacks With Spotlighting"
+      authors: "Keegan Hines, Gary Lopez, Matthew Hall, Federico Zarfati, Yonatan Zunger, Emre Kiciman"
+      venue: "arXiv preprint (v1)"
+      url: "https://arxiv.org/abs/2403.14720v1"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors report that with GPT-family models spotlighting reduces attack
+        success from greater than 50% to below 2% with minimal impact on task
+        efficacy. Their setup, their numbers.
+    remora_status: >-
+      Model-side defense upstream of REMORA's tool-call boundary. Not
+      implemented or measured; positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-049
+    name: "Structured queries: separate prompt and data channels"
+    source:
+      title: "StruQ: Defending Against Prompt Injection with Structured Queries"
+      authors: "Sizhe Chen, Julien Piet, Chawin Sitawarin, David Wagner"
+      venue: "USENIX Security 2025 (arXiv v2)"
+      url: "https://arxiv.org/abs/2402.06363v2"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors report significantly improved resistance to prompt injection
+        with little or no impact on utility. Their setup, their claims.
+    remora_status: >-
+      REMORA trains no models. Not implemented or measured; positioning only
+      in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-050
+    name: "Preference optimization against prompt injection"
+    source:
+      title: "SecAlign: Defending Against Prompt Injection with Preference Optimization"
+      authors: >-
+        Sizhe Chen, Arman Zharmagambetov, Saeed Mahloujifar, Kamalika
+        Chaudhuri, David Wagner, Chuan Guo
+      venue: "ACM CCS 2025 (arXiv v3)"
+      url: "https://arxiv.org/abs/2410.05451v3"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors report that SecAlign reduces the success rates of various
+        prompt injections to below 10%, with utility similar to the model
+        before defensive training. Their setup, their numbers.
+    remora_status: >-
+      REMORA trains no models. Not implemented or measured; positioning only
+      in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-051
+    name: "Design patterns for prompt-injection-resistant agents"
+    source:
+      title: "Design Patterns for Securing LLM Agents against Prompt Injections"
+      authors: >-
+        Luca Beurer-Kellner, Beat Buesser, Ana-Maria Creţu, Edoardo
+        Debenedetti, Daniel Dobos, Daniel Fabian, Marc Fischer, David
+        Froelicher, Kathrin Grosse, Daniel Naeff, Ezinwanne Ozoani, Andrew
+        Paverd, Florian Tramèr, Václav Volhejn
+      venue: "arXiv preprint (v3)"
+      url: "https://arxiv.org/abs/2506.08837v3"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors propose design patterns with provable resistance to prompt
+        injection and analyse their utility and security trade-offs through
+        case studies. No quantitative result is reported in the abstract.
+    roadmap_ref: "RF-02"
+    remora_status: >-
+      Framing only in paper §2.11. No pattern is claimed as implemented.
+    adoption: UNEVALUATED
+
+  - id: SHELF-052
+    name: "Model Context Protocol specification"
+    source:
+      title: "Model Context Protocol specification, revision 2025-11-25"
+      authors: "Model Context Protocol contributors"
+      venue: "Specification (modelcontextprotocol.io)"
+      url: "https://modelcontextprotocol.io/specification/2025-11-25"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Specification, no empirical results. It states that MCP cannot enforce
+        its security principles at the protocol level and that tool annotations
+        should be considered untrusted unless obtained from a trusted server.
+    remora_status: >-
+      Paper §2.11 quotes both statements. REMORA binds approvals to a signed
+      ToolSpec; no MCP conformance is claimed.
+    adoption: UNEVALUATED
+
+  - id: SHELF-053
+    name: "Biscuit attenuable authorization tokens"
+    source:
+      title: "Eclipse Biscuit: an authorization token with decentralized verification"
+      authors: "Geoffroy Couprie, Clément Delafargue, Cédric Corbière (maintainers)"
+      venue: "Project website"
+      url: "https://www.biscuitsec.org/"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Project documentation, no empirical results. Public-key signed tokens,
+        offline attenuation by the holder, Datalog policies and revocation
+        identifiers.
+    remora_status: >-
+      Token-level precedent for the exact-call lease in paper §2.11. REMORA
+      does not use Biscuit.
+    adoption: UNEVALUATED
+
+  - id: SHELF-054
+    name: "OAuth 2.0 Rich Authorization Requests"
+    source:
+      title: "OAuth 2.0 Rich Authorization Requests (RFC 9396)"
+      authors: "T. Lodderstedt, J. Richer, B. Campbell"
+      venue: "IETF RFC 9396, Standards Track, May 2023"
+      url: "https://www.rfc-editor.org/rfc/rfc9396.html"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Standard, no empirical results. Defines the authorization_details
+        request parameter for structured authorization beyond scope strings.
+    remora_status: >-
+      Compared with the exact-call lease in paper §2.11. REMORA does not
+      implement RAR.
+    adoption: UNEVALUATED
+
+  - id: SHELF-055
+    name: "XACML 3.0 attribute-based access control"
+    source:
+      title: "eXtensible Access Control Markup Language (XACML) Version 3.0"
+      authors: "OASIS; Erik Rissanen (editor)"
+      venue: "OASIS Standard, 22 January 2013"
+      url: "https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Standard, no empirical results. Defines among other terms the policy
+        decision point (PDP) and policy enforcement point (PEP).
+    remora_status: >-
+      Source of the PDP/PEP vocabulary in paper §4.4. REMORA does not use
+      XACML policies.
+    adoption: UNEVALUATED
+
+  - id: SHELF-056
+    name: "Cedar analyzable authorization language"
+    source:
+      title: "Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization"
+      authors: >-
+        Joseph W. Cutler, Craig Disselkoen, Aaron Eline, Shaobo He, Kyle
+        Headley, Michael Hicks, Kesha Hietala, Eleftherios Ioannidis, John
+        Kastner, Anwar Mamat, Darin McAdams, Matt McCutchen, Neha Rungta,
+        Emina Torlak, Andrew Wells
+      venue: "Proc. ACM Program. Lang. 8 (OOPSLA1), 670-697, 2024; doi 10.1145/3649835 (arXiv v2)"
+      url: "https://arxiv.org/abs/2403.04651v2"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Authors model Cedar in Lean and prove properties of its design, and
+        report that compared with OpenFGA and Rego it has (subjectively)
+        equally or more readable policies and (objectively) performs far
+        better. Their setup, their claims.
+    remora_status: >-
+      REMORA's policies are Python with an OPA/Rego adapter. Cedar is not
+      used. Positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-057
+    name: "Forward-secure audit logs"
+    source:
+      title: "Secure Audit Logs to Support Computer Forensics"
+      authors: "Bruce Schneier, John Kelsey"
+      venue: "ACM Transactions on Information and System Security 2(2), 159-176, 1999 (per Crossref; the author's page says v.1 n.3)"
+      url: "https://doi.org/10.1145/317087.317089"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Scheme, no empirical results. Log entries written before the logging
+        machine's compromise are unreadable to the attacker and cannot be
+        changed or deleted undetectably.
+    roadmap_ref: "RF-08"
+    remora_status: >-
+      REMORA's audit chain is a per-tenant SHA-256 hash chain with no
+      forward-secure keying (paper §8.2). Positioning only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-058
+    name: "Certificate Transparency v1"
+    source:
+      title: "Certificate Transparency (RFC 6962)"
+      authors: "B. Laurie, A. Langley, E. Kasper"
+      venue: "IETF RFC 6962, Experimental, June 2013"
+      url: "https://www.rfc-editor.org/rfc/rfc6962.html"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Protocol, no empirical results. Append-only Merkle-tree logs audited
+        by third parties.
+    roadmap_ref: "RF-08"
+    remora_status: >-
+      REMORA's audit chain is not anchored in an external log. Positioning
+      only in paper §2.11.
+    adoption: UNEVALUATED
+
+  - id: SHELF-059
+    name: "Certificate Transparency v2"
+    source:
+      title: "Certificate Transparency Version 2.0 (RFC 9162)"
+      authors: "B. Laurie, E. Messeri, R. Stradling"
+      venue: "IETF RFC 9162, Experimental, December 2021 (obsoletes RFC 6962)"
+      url: "https://www.rfc-editor.org/rfc/rfc9162.html"
+      verification: VERIFIED_RETRIEVED
+      verified: "2026-10-18"
+      reported_results: >-
+        Protocol, no empirical results. Version 2.0 of the Certificate
+        Transparency log protocol.
+    roadmap_ref: "RF-08"
+    remora_status: >-
+      Same role as SHELF-058. Positioning only in paper §2.11.
+    adoption: UNEVALUATED

@@ -84,7 +84,25 @@ def _run(tool: str, args: dict) -> tuple[list, str]:
         return sent, str(m.HANDLERS[tool](copy.deepcopy(args)))
 
 
-CASES = [(t["name"], p) for t in m.TOOLS for p in t["inputSchema"]["properties"]]
+#: Parameters the generic check below cannot observe, each with the test that does.
+#: remora_session_status.session_dir: two empty session directories give the same
+#: status text, so changing the directory changes nothing the generic check can see.
+#: Until 2026-10-18 this was a skip inside the parametrised test, which ran both
+#: handler calls first and would also have skipped any parameter added to the tool
+#: later. Here the exclusion names the parameter, and a new one is checked.
+COVERED_ELSEWHERE = {
+    ("remora_session_status", "session_dir"): "test_session_dir_selects_the_session_state",
+}
+
+CASES = [(t["name"], p) for t in m.TOOLS for p in t["inputSchema"]["properties"]
+         if (t["name"], p) not in COVERED_ELSEWHERE]
+
+
+def test_every_excluded_parameter_exists_and_has_its_test() -> None:
+    params = {(t["name"], p) for t in m.TOOLS for p in t["inputSchema"]["properties"]}
+    for case, test_name in COVERED_ELSEWHERE.items():
+        assert case in params, f"{case} is excluded but no longer a parameter"
+        assert callable(globals().get(test_name)), f"{case} names a missing test {test_name}"
 
 
 @pytest.mark.parametrize("tool,param", CASES, ids=[f"{t}.{p}" for t, p in CASES])
@@ -97,8 +115,6 @@ def test_parameter_reaches_the_request_or_says_it_does_not(tool: str, param: str
     changed = {**base, param: _sample(tool, param, props[param], 1)}
     sent0, out0 = _run(tool, base)
     sent1, out1 = _run(tool, changed)
-    if tool == "remora_session_status":
-        pytest.skip("checked by test_session_dir_selects_the_session_state")
     if tool in LOCAL:
         assert out0 != out1, f"{tool}.{param} changes nothing the local handler returns"
         return

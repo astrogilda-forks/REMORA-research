@@ -191,7 +191,7 @@ file mutations are executed. See `docs/benchmarks/README.md`.
 
 ---
 
-## Claim 2, 88% selective accuracy on held-out split
+## Claim 2, selective accuracy on held-out split (CLAIM-004, superseded): 100% at 16.7% coverage, directional
 
 ```bash
 make holdout   # python scripts/selective_n500_holdout.py

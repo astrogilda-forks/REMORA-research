@@ -87,4 +87,7 @@ def test_production_startup_accepts_a_file_chain_db(monkeypatch, tmp_path) -> No
     """And the same guard passes a real file, so the refusal is specific."""
     from servers import api as api_mod
     _production_env(monkeypatch, tmp_path, str(tmp_path / "chain.db"))
+    # This isolates file-vs-memory policy from the host's temporary filesystem.
+    # Overlay refusal itself is covered in test_ephemeral_durable_state.
+    monkeypatch.setattr(api_mod, "filesystem_type_for", lambda _path: "ext4")
     api_mod._validate_production_prerequisites()
