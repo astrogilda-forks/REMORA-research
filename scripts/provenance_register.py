@@ -8,7 +8,8 @@ Three records, all reproducible from the pinned inputs (legal/PROVENANCE.md):
 1. For every term in ``docs/assurance/provenance_concepts_v1.yaml``, the first
    commit on the snapshot's history that introduced it as its own token
    (``git log -G`` with a word boundary, not a substring search), with author
-   date, committer date, signature status and up to eight paths. A term buried
+   date, committer date, whether the commit object is signed (``E``, not
+   verified here) or not (``N``), and up to eight paths. A term buried
    inside a longer token, such as ``regate`` inside ``aggregate``, does not count.
 2. For every listed module, winnowing fingerprints of its token stream at the
    snapshot commit (Schleimer, Wilkerson and Aiken, 2003, the method behind
@@ -131,16 +132,36 @@ def introducing_paths(term: str, sha: str) -> list[str]:
     return sorted(paths)
 
 
+def signature_status(sha: str) -> str:
+    """``"E"`` when the commit object carries a signature, ``"N"`` when it does not.
+
+    The register records whether a commit was signed, not whether the signature
+    verifies. ``git log --format=%G?`` answers the second question, and its answer
+    depends on the machine: with gpg but without the signer's key it says ``E``
+    (cannot be checked), without gpg it says ``N`` for the same signed commit,
+    with the key ``G``. A register built from it did not reproduce across clones.
+    The ``gpgsig`` header of the commit object is the same in every clone. A
+    signed commit is recorded as ``E``, git's letter for a signature that was not
+    checked, which is what this register does; verification is the job of
+    scripts/check_provenance_signatures.py.
+    """
+    raw = _git("cat-file", "commit", sha).stdout
+    headers = raw.split("\n\n", 1)[0]
+    signed = any(ln.startswith(("gpgsig ", "gpgsig-sha256 ")) for ln in headers.splitlines())
+    return "E" if signed else "N"
+
+
 def first_introduction(term: str, snapshot: str) -> dict:
     """The first commit in the snapshot's history whose patch adds the term as its own token."""
     proc = _git(
-        "log", "--reverse", "--format=%H%x09%aI%x09%cI%x09%G?%x09%s",
+        "log", "--reverse", "--format=%H%x09%aI%x09%cI%x09%s",
         "-G", term_pattern(term), snapshot,
     )
     line = next((ln for ln in proc.stdout.splitlines() if ln.strip()), "")
     if not line:
         return {"term": term, "found": False}
-    sha, authored, committed, signature, subject = line.split("\t", 4)
+    sha, authored, committed, subject = line.split("\t", 3)
+    signature = signature_status(sha)
     paths = introducing_paths(term, sha)
     return {
         "term": term, "found": True, "commit": sha, "authored": authored, "committed": committed,
