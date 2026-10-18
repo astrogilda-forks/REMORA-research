@@ -13,12 +13,12 @@ Statuses: NOT_STARTED, IN_PROGRESS, DONE, BLOCKED (with the reason).
 
 | Step | Work package | Priority | Status | PR | Missing / note |
 |---|---|---|---|---|---|
-| 1 | COMP-01 Meet composition and AgentHarm re-score | P0 | NOT_STARTED | | |
-| 1 | IFC-01 Label lattice | P0 | NOT_STARTED | | |
-| 2 | IFC-02 Context store and minting | P0 | NOT_STARTED | | |
-| 2 | IFC-03 ToolSpec v4 `flow` block, linter, signing | P0 | NOT_STARTED | | |
-| 2 | IFC-04 Result labelling and handles | P0 | NOT_STARTED | | |
-| 2 | IFC-05 Flow check and decision rungs | P0 | NOT_STARTED | | |
+| 1 | COMP-01 Meet composition and AgentHarm re-score | P0 | IN_PROGRESS | #907 (open) | Meet composition is in open PR #907. Nothing is on master yet; the AgentHarm re-score is not started. |
+| 1 | IFC-01 Label lattice | P0 | DONE | #906 | Every acceptance law is a Hypothesis property in `tests/flow/test_label_lattice.py`. Not wired into any decision. |
+| 2 | IFC-02 Context store and minting | P0 | DONE | #910 (02a), #912 (02b) | `tests/flow/test_context_store.py` and `tests/flow/test_contexts_route.py` cover every acceptance item. The Postgres cases skip without `REMORA_PG_DSN` and run in the CI Postgres job. |
+| 2 | IFC-03 ToolSpec v4 `flow` block, linter, signing | P0 | IN_PROGRESS | #913 (03a, merged via #916); #914 (03b, open) | Schema, parser and lint rules FL-01 to FL-13 have tests in `tests/flow/test_toolspec_flow.py`. Missing on master: refusal of a spec without `flow` at registry load under the strict profile, and bundle hash coverage in `remora/policy/versioning.py`. Both are in #914. |
+| 2 | IFC-04 Result labelling and handles | P0 | IN_PROGRESS | #915 (04a, merged via #916) | Handle length hiding, foreign-handle refusal and `test_resolve_value_labels` pass in `tests/flow/test_labeler_handles.py`. Missing (IFC-04b): the `GovernedToolDispatcher.dispatch` change with `DispatchResult.rendered_result`, and the commit-before-return fault-injection test. |
+| 2 | IFC-05 Flow check and decision rungs | P0 | IN_PROGRESS | #916 (05a) | `recipients` and `flow_check` pass the four mandatory invariant tests in `tests/flow/test_flow_check.py`. Missing (IFC-05b): rungs F1 to F6 in `hard_guard_floor`, `RemoraDecisionEngine-v6`, v5 golden cases unchanged with flow off, a golden case per F-rung, and the test that a client-supplied `flow` is ignored. No decision reads the verdict yet. |
 | 2 | IFC-06 Dispatch-time re-check | P0 | NOT_STARTED | | |
 | 3 | IFC-11 Mediation completeness, execution API | P0 | NOT_STARTED | | |
 | 3 | IFC-12 Enforced egress and network isolation | P0 | NOT_STARTED | | |
@@ -76,4 +76,10 @@ The frontier model of §7.3 is therefore a Claude model.
 
 ## Implementation findings (ADRs)
 
-None yet.
+No ADR has been filed. One deviation from the SDD is recorded in a merged
+commit and in the schema file:
+
+- IFC-03a (`52cbcd35`, #913): `schemas/tool_spec_v4.yaml` adds three fields
+  beyond the SDD's §5.1 excerpt (`provider`, argument kinds and
+  `disclosure`), because lint rules the SDD assigns to the linter cannot be
+  checked without them. The schema file states the reason for each.

@@ -908,9 +908,30 @@ items:
     section: "compendium-audit P5 / K13-4"
     title: "Path-level (trajectory) governance policies"
     gate: P4
-    status: NOT_STARTED
-    artifacts: []
+    status: IN_PROGRESS
+    artifacts:
+      - docs/design/derived-information-flow-control-v1.md
+      - docs/design/derived-information-flow-control-v1-status.md
+      - remora/flow/label.py
+      - remora/flow/context.py
+      - remora/flow/spec.py
+      - remora/flow/labeler.py
+      - remora/flow/check.py
+      - tests/flow/test_label_lattice.py
+      - tests/flow/test_context_store.py
+      - tests/flow/test_flow_check.py
     notes: >
+      PROGRESS 2026-10-18: scoped by the derived information-flow control SDD
+      v1.3 (#905), whose context high-water label is the session-wide record
+      of untrusted-content contact this item asks for. On master: IFC-01 label
+      lattice (#906), IFC-02 context store and POST /v1/contexts (#910, #912),
+      IFC-03a ToolSpec v4 flow block and linter, IFC-04a result labelling and
+      handles, IFC-05a recipients and flow_check (#913, #915, #916, merged via
+      #916). Nothing blocks a call yet: no decision reads the flow verdict
+      until IFC-05b wires rungs F1 to F6 into hard_guard_floor, and the
+      dispatcher does not label results until IFC-04b. Per-package status is
+      in docs/design/derived-information-flow-control-v1-status.md. The DONE
+      criterion below is unchanged.
       The compendium requires policies expressed over execution PATHS (sequences
       of states and actions), not single tool calls — e.g. "never external
       communication or mutation after contact with untrusted content" — a rule

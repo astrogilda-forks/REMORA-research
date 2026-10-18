@@ -515,7 +515,7 @@ conditions?
 | Field | Value |
 |---|---|
 | Severity | NIT |
-| Claim | The tables run 1, 3, 4, 5, 7, 6, 8, with no Table 2. |
+| Claim | The table captions run 3, 1, 4, 5, 7, 6, 8 in document order, with no Table 2. |
 | Evidence | `paper/remora_paper.md`. |
 | Affected claims | none |
 | Action | Renumber the tables and every reference to them. |
