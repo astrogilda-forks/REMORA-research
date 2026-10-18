@@ -12,7 +12,8 @@ Files covered
 The hash covers the files that together determine the governance outcome of any
 decision: the engine itself, its extracted decision thresholds and trace value
 objects, the invariants, the trap classifier, the observation schema, and the
-DecisionReport contract (report.py).
+DecisionReport contract (report.py), and the meet composition that combines
+the components (composition.py, COMP-01).
 Changing any one of these changes the composite hash. (thresholds.py and
 trace.py were split out of decision_engine.py 2026-07-29 and added here so no
 decision-relevant bytes leave hash coverage.)
@@ -50,6 +51,12 @@ _POLICY_SOURCE_FILES: tuple[str, ...] = (
     "remora/policy/observation.py",
     "remora/policy/trap_classifier.py",
     "remora/policy/report.py",
+    "remora/policy/composition.py",
+    # Derived flow control (IFC-03): the label lattice and the ToolSpec flow
+    # rules decide which signed bundles load and, from IFC-05, which flows a
+    # decision admits.
+    "remora/flow/label.py",
+    "remora/flow/spec.py",
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
