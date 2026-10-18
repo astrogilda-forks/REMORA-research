@@ -28,7 +28,7 @@ Counts as of 2026-10-17: **25 `open`**, **27 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
-Ten themes, all research gaps; the one production gap (CI gates that ran
+Fifteen themes, all research gaps; the one production gap (CI gates that ran
 without blocking, §55) is closed and struck from this list; a backlog that
 keeps closed items is the drift the status gate exists to prevent. The section numbers
 after each theme are where its evidence lives, and CI checks that every theme
@@ -2620,6 +2620,19 @@ sections again.
 | Authoritative tool metadata still caller-supplied on the advisory path (§14/M4) | Raise-only clamp shipped 2026-08-05 (declared risk cannot undercut the heuristic floor; clamps recorded, unset stays unset). Full authority still needs the signed ToolSpec registry (FT-03) | Medium |
 | External replication, REM-021, field evidence (§1, §4) | Cannot be closed from inside this repository | Medium |
 | Five held-out faults survive v1.7 (§73) | List validation stops after 32 items, non-dict `Mapping` skips validation, `slots`, case-insensitive enum lookup, `as_dict` key order; every decision fault of probe 4 is killed | Low |
+| Policy v5's critical-phase exclusion removed mostly correct accepts (§59) | On the N500 round v5 removed 70 accepts, 68 of them correct (97.1 %), more accurate than the 31 it kept. One artifact and an in-sample threshold; an out-of-sample split with the critical phase labelled would decide it. Removing an accept path cannot add a false accept | Low |
+| REMORA's gate is only as safe as its validator (§60) | A prefix matcher let every corrupt read through; fail-open lookups gave a false-allow rate of 0.078 (0.117 on reads, post hoc). No write was auto-accepted in any gated arm. Production validators have no contract that rules these faults out | Medium |
+| No FAR claim rests on enough independent harmful units (§61) | None of CLAIM-001, CLAIM-002 and CLAIM-003 reaches 299 independent units; Wilson 95 % upper bounds 5.2 %, 1.81 % and 2.25 %. Closing it needs a larger harmful set with independently withheld labels (Q2.3) | Medium |
+| Jev's injection questions flag benign operator text (§74) | V2.1 met both pre-registered held-out criteria, but its benign flag rate is still 0.2254 and Norwegian scenarios are flagged at about twice the English rate. A false flag costs automation, not safety | Medium |
+| Evidence-admission trust inputs are asserted (§75) | The accepted-producer map, the accepted-coverage set and the clock are the deployment's word. The mitigations (trusted timestamping, WORM-anchored trust configuration) are REM-025 | Medium |
+| Pre-Federation red team: 36 of 46 targeted attacks succeeded (§76) | Each failure is closed in the reusable primitive and the 46 probes run in CI. The repairs are tested by the author of the attacks; open until the v1.1 Federation corpora have an external run | Medium |
+| Report-result component let result order decide a verdict (§77) | Repaired by the producer (`conflicting_results_for_report`) with held-out tests; open until an external run reaches the component | Low |
+| Authorization component's corpus let 34 of 107 single-edit faults through (§78) | 31 held-out tests kill 102 of the 107; the five survivors are listed as equivalents and gated in CI. Faults, tests and equivalence arguments are the producer's own | Low |
+| A dispatch outcome reported after the stale-dispatch sweep was lost (§79) | Repaired with tests on all three dispatch paths. The race is injected inside the dispatch call, not observed under a real slow tool or a skewed sweeper | Low |
+| AgentHarm discrimination is lost between evidence and decision (§80) | CLAIM-002 tells 0 of 208 twin pairs apart; trimode mode 3 tells none of 44 apart where the oracle verdict tells 29. Harness repaired, no new run. Needs a graded evidence channel, a calibrated threshold and fresh paired data | Medium |
+| The BFCL intent extractor ignores negation and conditionals (§81) | A validity limit of the C-ext3 semantic arm, pinned by five strict xfails; no deployment bundle imports the extractor. A versioned successor is decided, not built | Low |
+| The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
+| Peer-review re-analysis widens the zero-count bounds (§83) | Clustered by tool, C-ext3 arm F 0/500 bounds at 3.5 % and C-ext4 0/295 at 5.42 %. Only 4 of the 295 C-ext4 wrong calls name a tool the task offered, so confusion between two tools of one task is barely tested | Medium |
 
 ### Accepted negative results — do not "fix" these
 

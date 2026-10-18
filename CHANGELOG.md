@@ -37,6 +37,30 @@ This file lists externally relevant changes by release. Fine-grained development
   action-gate adapters in `remora/adapters/`, which forward caller labels to
   a gateway and do not call `assess_tool_call`.
 
+### Policy COMP-01 (meet composition, P-MONO)
+
+- `RemoraDecisionEngine.decide` now returns the least executable of its
+  component groups (`ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT`). The groups are
+  the cascade, the hard-guard floor, the conditional-gate group, and any
+  external `caps` (new reason codes `monitor_cap` and `protocol_cap`).
+  Before, a first-match VERIFY from the taint floor masked a conditional
+  gate's ESCALATE or ABSTAIN, so an ordinary approver could redeem a call
+  another component had sent to a higher authority.
+- Decisions change only in the stricter direction. On a 30,000-observation
+  search in two engine configurations, 1,784 masked decisions were found.
+  The OPA golden cases, the tool-call benchmark, C-ext4 and the AROMER arena
+  are unchanged. One C-ext3 episode moves from VERIFY to ABSTAIN, and no
+  published count changes.
+- §3.9 composes groups, so the order inside `_CONDITIONAL_GATES` is kept. A
+  per-gate meet would have turned 13 benign AROMER arena VERIFYs into false
+  ESCALATEs. `docs/architecture/ADR-flow-meet-composition.md` records this
+  finding.
+- `composition.py` joins the policy bundle hash. `explain()` takes the same
+  caps and shows a `meet_composition` row. P-MONO is checked as a Hypothesis
+  property in `tests/policy/test_meet_composition.py`, and the never-weakens
+  tests cover monitor and protocol caps. The version label stays
+  `RemoraDecisionEngine-v5`; the SDD reserves v6 for the flow rungs.
+
 ### Flow control IFC-03b (ToolSpec v4 at bundle load)
 
 - The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in
@@ -47,7 +71,7 @@ This file lists externally relevant changes by release. Fine-grained development
 - Under a strict runtime profile with `REMORA_FLOW_CONTROL=1`, startup
   refuses a bundle in which any spec has no block (FL-13).
 - `remora/flow/label.py` and `remora/flow/spec.py` join the policy bundle
-  hash, which now covers nine files. Every envelope's `policy_bundle_hash`
+  hash, which now covers ten files including COMP-01 composition. Every envelope's `policy_bundle_hash`
   changes value with this release.
 - Contracts touched: three additive reason codes in
   `schemas/tool_spec_v1.yaml`; `schemas/tool_spec_v4.yaml` is now

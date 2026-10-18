@@ -635,6 +635,8 @@ class TestPolicyBundleHash:
             "remora/policy/observation.py",
             "remora/policy/trap_classifier.py",
             "remora/policy/report.py",
+            # The meet composition of the components (COMP-01, 2026-10-17).
+            "remora/policy/composition.py",
             # IFC-03: the flow lattice and ToolSpec flow rules (SDD v1.3).
             "remora/flow/label.py",
             "remora/flow/spec.py",
