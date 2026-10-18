@@ -17,8 +17,8 @@ This file lists externally relevant changes by release. Fine-grained development
 
 - The proposal fields outside `canonical_tool_call_hash` (`schema_valid`,
   `rollback_available`, `untrusted_context`, `intent_ref`, `derivations`, task,
-  `plan`, `task_type`, `delegated_executor`) could differ between assess and
-  execute. A call assessed as ESCALATE because of one downgrade could be
+  `plan`, `task_type`, `request_ref`, `delegated_executor`) could differ
+  between assess and execute. A call assessed as ESCALATE because of one downgrade could be
   approved and then executed as a VERIFY by dropping it and adding another.
   The `assessed` record now carries `proposal_envelope_hash`, and
   `POST /v1/execution/execute` refuses a different proposal with 409

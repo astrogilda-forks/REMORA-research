@@ -5235,12 +5235,12 @@ the attacker never held.
 
 Two findings from the first run of this catalogue are closed since the
 table above was first written. The review path now binds the executing
-actor and task through the `AuthorizationContext` comparison (both reuse
-attacks refuse `context_mismatch`), and an approval is voided when the
-reviewed risk tier changed (`approval_invalidated` on the medium-to-high
-and medium-to-critical relabels). The harness bypasses
+actor and task through the `AuthorizationContext` comparison; both reuse
+attacks refuse `context_mismatch`. An approval is voided when the reviewed
+risk tier changed (`approval_invalidated` on the medium-to-high and
+medium-to-critical relabels). The harness bypasses
 `_enforce_review_approval_role`, so whether a tenant profile would demand
-a different approver for critical risk is still untested here — the
+a different approver for critical risk is still untested here. The
 approval is now voided before that question is reached.
 
 **What REMORA did not stop.**
@@ -5264,11 +5264,11 @@ reads a flow verdict yet (IFC-05b), so this measures the library, not
 enforcement.
 
 **The advisory library, after the PRF-040 fix.** `assess_tool_call`
-without a registry caps caller labels at VERIFY, so R2's `xfer` call
-labelled low/read no longer reaches ACCEPT — and neither do the two benign
+without a registry caps caller labels at VERIFY. R2's `xfer` call
+labelled low/read no longer reaches ACCEPT, and neither do the two benign
 controls in this arm, which carry no registry either. The label-laundering
 route measured before the fix is closed at the decision layer by the
-registry cap, not by a flow verdict: the exfiltration rows on the `remora`
+registry cap, not by a flow verdict. The exfiltration rows on the `remora`
 arm above still run, so the library row must not be read as IFC
 enforcement.
 
