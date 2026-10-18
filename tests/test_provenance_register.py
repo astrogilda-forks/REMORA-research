@@ -145,6 +145,25 @@ def test_fingerprints_ignore_formatting_and_comments() -> None:
     assert PR.fingerprints(a) == PR.fingerprints(b)
 
 
+def test_signature_status_reads_the_commit_object_not_the_local_keyring(monkeypatch: pytest.MonkeyPatch) -> None:
+    """%G? said E with gpg and N without it for the same commit; the gpgsig header says the same everywhere."""
+    signed = ("tree 0\nparent 1\nauthor a <a> 0 +0000\ncommitter a <a> 0 +0000\n"
+              "gpgsig -----BEGIN SSH SIGNATURE-----\n xyz\n -----END SSH SIGNATURE-----\n\nsubject\n")
+    unsigned = "tree 0\nauthor a <a> 0 +0000\ncommitter a <a> 0 +0000\n\nsubject\n\ngpgsig in the message body\n"
+    objects = {"s": signed, "u": unsigned, "s256": signed.replace("gpgsig ", "gpgsig-sha256 ")}
+    monkeypatch.setattr(PR, "_git", lambda *args, **kw: subprocess.CompletedProcess(args, 0, objects[args[-1]], ""))
+    assert PR.signature_status("s") == "E"
+    assert PR.signature_status("s256") == "E"
+    assert PR.signature_status("u") == "N"
+
+
+@needs_history
+def test_recorded_signature_status_matches_the_commit_objects() -> None:
+    for concept in REGISTER["concepts"]:
+        for first in concept["first"]:
+            assert PR.signature_status(first["commit"]) == first["signature"], (concept["id"], first["term"])
+
+
 @needs_history
 @pytest.mark.slow
 def test_register_reproduces_from_git_history() -> None:

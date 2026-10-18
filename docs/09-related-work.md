@@ -658,6 +658,32 @@ correct, and a corpus written with a survivor list in view shows the repair,
 not generalisation. The blind protocol in `docs/design/evidence-
 sufficiency-v1.3.md` section 8 is what could show that.
 
+## 15. Semantic Authority for Tool Routing
+
+A structurally valid call can still be the wrong call for the task. The
+function-calling literature measures how often a model picks the right tool
+and arguments. Gorilla and the Berkeley Function Calling Leaderboard (BFCL)
+come from Patil and colleagues. REMORA uses BFCL as the evaluation substrate, through its
+upstream repository. REMORA asks a different question. Given a proposed
+call, is it licensed by a declared tool contract and an intent re-derived
+from the task text? An UNKNOWN fit must stop autonomy rather than pass.
+This is an internal design (SAP v5 and v6). The sealed BFCL v4 tracks
+(CLAIM-019, CLAIM-021) evaluate it, with their limits recorded in
+NEGATIVE_RESULTS §39, §81, §82 and §83: one tool catalogue, cross-task
+substituted wrong calls, and annotated proposals rather than generated
+ones.
+
+## 16. Authority-Preserving Effect Mediation
+
+Authorizing a tool does not authorize everything its implementation can
+reach. That is the confused-deputy problem (Hardy, 1988), and the reason
+object-capability systems avoid ambient authority (Miller, 2006). REMORA's
+NTA-2 mediation applies the idea at the effect boundary. A tool's nested
+effects go through a mediator inside a declared downstream ceiling, on
+credentials that an effect domain holds and the tool's process does not.
+REMORA takes the principle, not an object-capability language or runtime.
+The mediation is enforced only on paths that register a tool as mediated.
+
 ## Positioning Statement
 
 REMORA is a nested governance control plane for long-running agentic AI:

@@ -158,4 +158,3 @@ class TestExternalCapsNeverWeaken:
         for action in _ALL_ACTIONS:
             report = ENGINE.decide(obs, caps=[Cap("monitor", action, DecisionReason.MONITOR_CAP)])
             assert report.action is DecisionAction.ESCALATE
-

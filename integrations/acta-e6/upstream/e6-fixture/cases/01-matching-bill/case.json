@@ -1,0 +1,32 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "01-matching-bill",
+  "title": "The matching bill",
+  "change": "Nothing: the receipts, manifest, bill and keys as supplied.",
+  "why": "Every claim of the evidence layer holds, so the verdict is PASS. payment_ready stays false: price and amount are a separate claim against the contract.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "../../bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "PASS",
+    "decisive": [],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "PASS",
+      "coverage_receipts_to_bill": "PASS",
+      "uniqueness": "PASS",
+      "quantities": "PASS",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {},
+    "payment_ready": false
+  }
+}

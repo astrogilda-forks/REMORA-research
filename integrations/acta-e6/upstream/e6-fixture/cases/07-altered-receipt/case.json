@@ -1,0 +1,42 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "07-altered-receipt",
+  "title": "An altered receipt",
+  "change": "chain.jsonl alters receipt 38 after signing: its outcome is changed from not billable (no_substantive_answer) to billable (resolved_assumed, rule J12) and its signature is left as it was. bill.json bills it under its new ID (sha256:9af2e75ec2f31ba4fdb740b6ad6d7ee6d12825efb1c06fb6606b440212f68619) on line L1 instead of excluding it.",
+  "why": "Signatures: the verifier finds the altered receipt invalid and the next link broken, and the receipts no longer match the manifest's root. The bill and the altered receipts agree with each other, so a consumer that checked neither the signatures nor the manifest would pass this bill.",
+  "inputs": {
+    "receipts": "chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "signatures"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "FAIL",
+      "scope": "FAIL",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "signatures": [
+        "invalid_signature",
+        "chain_break"
+      ],
+      "scope": [
+        "root_mismatch"
+      ]
+    },
+    "payment_ready": false
+  }
+}

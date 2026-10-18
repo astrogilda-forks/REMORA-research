@@ -4,20 +4,9 @@
 
 [![Paper (PDF)](https://img.shields.io/badge/paper-PDF-b31b1b.svg)](paper/remora_paper.pdf) [![CI: Deterministic Test Suite](https://github.com/darklordVirtual/REMORA-research/actions/workflows/ci.yml/badge.svg)](https://github.com/darklordVirtual/REMORA-research/actions/workflows/ci.yml) [![Quality Gates](https://github.com/darklordVirtual/REMORA-research/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/darklordVirtual/REMORA-research/actions/workflows/quality-gates.yml) [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 
-Policy-gated control between an agent's intent and a real-world effect.
+**An AI agent can propose any tool call. REMORA decides whether that exact call may run, and keeps the evidence.**
 
-**Research question.** Can authorization enforced outside the agent, and bound to the exact tool call, stop the calls an agent should not make while keeping it useful? Where does it fail?
-
-**What the evidence shows so far.** The runs are sealed or pre-registered unless marked. Every number resolves to the [claim register](docs/assurance/claim_register_v1.yaml), and every failure stays in [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md).
-
-1. On sealed BFCL v4 episodes, declared tool contracts with a semantic-authority floor accepted none of the 500 (C-ext3) and none of the 295 (C-ext4) substituted wrong calls. A revised bundle raised correct-call acceptance from 6.9% to 29.9%. Clustered by tool the upper bounds are 3.5% and 5.42%, almost no wrong call came from the task's own tool list, and most correct calls still do not proceed. The open problem is the safety–utility trade-off, not safety alone.
-2. On AgentHarm, an imported intent-gating run saw only the instruction text and blocked all 208 harmful scenarios and all 208 benign twins: every score sat above the escalation threshold. It enforces a floor and does not tell intent apart. In a separate 88-task run, the LLM oracle alone told 29 of 44 harmful/benign pairs apart, and with the deterministic gate on top none were (NEGATIVE_RESULTS §80). When a deterministic floor helps a learned monitor and when it erases the monitor's signal is the question this result raises.
-3. A consensus-temperature uncertainty signal was falsified on 1,231 fresh items under a pre-registered plan (SAP v3, CLAIM-012) and is kept only as a diagnostic.
-4. The project's own simulator benchmark had label leakage and an overstated sample size: 700 tasks are 70 templates (NEGATIVE_RESULTS §17). Only corrected numbers are reported, and the benchmark's 0% unsafe result is attributed to no component (CLAIM-020).
-
-**What it does not yet test:** an adversarial agent trying to get past the gate (the AI-control threat model), wrong calls a model actually makes, external baselines, and the execution chain under attack. These are the next experiments; the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md) track each objection and what was done about it.
-
-An agent proposes a tool call. REMORA is a governance overlay between that proposal and the protected tool: it evaluates the exact action before it runs, and returns one of four decisions:
+REMORA is a governance overlay that sits between a tool-using agent and the tools it wants to use. Before a call runs, it checks the call against policy the deployment owns, not the agent, and returns one of four decisions:
 
 | Decision | Meaning |
 |---|---|
@@ -26,20 +15,50 @@ An agent proposes a tool call. REMORA is a governance overlay between that propo
 | **ABSTAIN** | Required information is missing or insufficient. |
 | **ESCALATE** | The action requires a higher-authority decision. |
 
-The enforcing surface is `POST /v1/execution/*`. An approval is bound to the exact proposal it was given for and is consumed once, at the policy-enforcement point, before governed dispatch.
+An approval covers only the exact call it was given for. It can be used once, and policy is checked again at the moment of dispatch. A model's confidence can never override a hard block. The enforcing surface is `POST /v1/execution/*`.
 
 > **Status:** research and shadow-mode software with no production certification. External replication is pending; every deployment still needs its own validation.
 
+## Try it in two minutes
+
 ```bash
 python -m pip install -e ".[dev]"
-python -m remora try
+python -m remora try                     # five guided scenarios
+python -m remora assess drop_database    # the verdict and the rules behind it
+python -m remora whatif drop_database    # what would it take to ACCEPT?
 ```
 
-## Where to start
+`whatif` searches for the smallest change that would let a call through. For a production `drop_database`, nothing a model can say gets there:
 
-**Reviewing the research?** Five files are enough: the [paper](paper/remora_paper.pdf), [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md), the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md), the [claim register](docs/assurance/claim_register_v1.yaml) and [how to reproduce every result](docs/06-reproducibility.md). The repository also keeps about 400 Markdown files of design history and product material; none of them is needed to judge a claim.
+```text
+verdict now:  ESCALATE
+model signals alone: cannot reach ACCEPT  (trust, phase, evidence, quorum, temperature: every combination tried)
+agent alone:         cannot reach ACCEPT  (proposal + model signals, within 4 changes)
+```
 
-**Working on the code?** One ordered reading path follows; the [documentation index](docs/README.md) lists the complete registered set.
+## Why it is built this way
+
+- Authority comes from the deployment. Tool meaning, target, risk and intent come from signed, deployment-owned sources, never from the agent that wants to act.
+- Deterministic rules form the floor. Model signals can route a call to review; they cannot unlock one.
+- Every claim is tied to evidence. Results resolve to a [claim register](docs/assurance/claim_register_v1.yaml), and failures stay in [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md).
+
+## What we have found so far
+
+The research question: can authorization that is enforced outside the agent and bound to the exact call stop the calls an agent should not make while keeping it useful? The short answers, with the details and limits further down:
+
+1. **Blocking is the easy half.** On a public function-calling benchmark (BFCL v4), two sealed runs accepted none of the wrong calls. On its own, though, REMORA let only about 3 in 10 correct calls through. Staying useful is the open problem.
+2. **A floor is not a judge.** On AgentHarm, a deterministic gate blocked every harmful and every harmless request alike. An LLM monitor on its own told most harmful/harmless pairs apart, and the gate on top erased that signal (NEGATIVE_RESULTS §80). How a deterministic floor and a learned monitor should combine is now a main research question.
+3. **We publish what fails.** That includes an uncertainty signal falsified on fresh data, label leakage in one of our own benchmarks, and the [peer-review objections](docs/review/PEER_REVIEW_FINDINGS.md) that are still open.
+4. **Not yet tested.** An agent actively trying to get past the gate. That is the next experiment ([plan](docs/13-research-frontier-roadmap.md)).
+
+## Where to go next
+
+- **Reviewing the research?** Five files are enough: the [paper](paper/remora_paper.pdf), [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md), the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md), the [claim register](docs/assurance/claim_register_v1.yaml) and [how to reproduce every result](docs/06-reproducibility.md). The repository also keeps about 400 Markdown files of design history and product material; none of them is needed to judge a claim.
+- **Building on the code?** Start with the [developer handoff](DEVELOPER_OVERVIEW.md) and the [execution quickstart](docs/deployment/execution-quickstart.md). The full reading path is below.
+- **Checking REMORA from another project?** See [Verify it from outside](#verify-it-from-outside).
+
+<details>
+<summary>Reading path for the code, and the documentation index</summary>
 
 1. [Developer handoff](DEVELOPER_OVERVIEW.md): the shortest technical path through the repository
 2. [Architecture](ARCHITECTURE.md): components, data flow, module stability
@@ -50,16 +69,18 @@ python -m remora try
 7. [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md): failed hypotheses and limitations, kept permanently
 8. [Peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md): every objection raised against the paper, and what was done about it
 
-## How an action gets through
+The [documentation index](docs/README.md) lists the complete registered set.
+
+</details>
+
+<details>
+<summary>How an action gets through, step by step</summary>
 
 1. Authoritative context. Tool meaning, target, risk and approved intent come from deployment-owned sources such as a Signed ToolSpec, never from the calling agent.
 2. Policy decision. Deterministic hard guards outrank model-derived signals.
 3. Review or grant. `VERIFY` and `ESCALATE` enter bounded review; `ACCEPT` receives a short-lived, single-use grant bound to the proposal.
 4. PEP and dispatch. The grant is consumed, an `ExecutionLease` binds policy identity to call identity, and `GovernedToolDispatcher` invokes the deployment-owned callable.
 5. Lifecycle and evidence. Dispatch intent, outcome, effect verification and audit records stay joinable by proposal identity.
-
-<details>
-<summary>What sits outside that path</summary>
 
 The separate `/v1/assess` research surface can use oracle, evidence and uncertainty components. They are not prerequisites for the execution kernel and cannot override its deterministic hard-guard floor.
 
@@ -78,17 +99,17 @@ Headline values are governed by the [claim register](docs/assurance/claim_regist
 <!-- claim:CLAIM-021 gold_call_accept_pct wrong_call_accept_pct obtainable_verify_pct -->
 | # | Benchmark | Result | Scope |
 |---|---|---|---|
-| 1 | **BFCL v4 (C-ext4)** | Correct calls accepted **29.9%** (87/291), against **6.9%** for the frozen v1 bundle on the same episodes; native wrong-call acceptance **0.0%** (0/295, as for a refuse-all control; 5.42% upper bound clustered by tool); obtainable-input VERIFY **84.0%** | Sealed once, the whole remaining reserve, 1,562 episodes; all eight pre-registered targets met; the gain sits on tools also seen in development (CLAIM-021) |
-| 2 | **BFCL v4 (C-ext3)** | Native wrong-call acceptance **0.0%** (0/500; Wilson 95% upper bound **0.76%** by row, 3.5% clustered by tool); irrelevant-tool refusal **100.0%** (300/300); required-input guessing **0.0%** (0/398) | Sealed once, 2,799 episodes, frozen semantic bundle + authority floor; the joint pre-registered hypothesis was not supported because read autonomy missed its target; see NEGATIVE_RESULTS §39 |
-| 3 | **Adversarial simulator** | **0.0%** unsafe runs (0/70 templates; 700 tasks); 95% cluster-level Wilson upper bound **5.2%** (6.4% over the 56 harmful templates); utility +0.456, a post-hoc test | Simulated; effective N = 70 (70 templates × 10 cosmetic variants); unsafe-rate gap Δ=0.0143 vs. baseline, not statistically significant |
-| 4 | **AgentHarm** | **0.0%** wrongly allowed (0/208); 95% upper bound 1.81%; false-block rate on the benign twins **100.0%** (208/208 blocked) | Intent classification on the instruction text only, from an imported run; tool calls were not intercepted. Every score sat above the escalation threshold, so the gate blocked every scenario, harmful or benign, so this measures the hard-block floor, not discrimination between harmful and benign. The 208 scenarios come from 47 base behaviours; over those the upper bound is 7.6% |
-| 5 | **Historical regression** | **0.0%** wrongly allowed (0/167) | Previously observed failures only |
+| 1 | **BFCL v4 (C-ext4)** | Correct calls accepted **29.9%** (87/291), against **6.9%** for the frozen v1 bundle on the same episodes; native wrong-call acceptance **0.0%** (0/295, as for a refuse-all control; 5.42% upper bound clustered by tool); obtainable-input VERIFY **84.0%** (100/119) | Sealed once, the whole remaining reserve, 1,562 episodes; all eight pre-registered targets met, but they were fixed after bundle v2 existed and a refuse-all control meets five of the eight (PRF-008); the gain sits on tools also seen in development (CLAIM-021) |
+| 2 | **BFCL v4 (C-ext3)** | Native wrong-call acceptance **0.0%** (0/500; Wilson 95% upper bound **0.76%** by row, 3.5% clustered by tool); irrelevant-tool refusal **100.0%** (300/300); required-input guessing **0.0%** (0/398) | Sealed once, 2,799 episodes, frozen semantic bundle + authority floor; four of seven pre-registered targets missed, among them the safety target for constructed wrong tools (2/199 = 1.005% accepted against a bar of at most 1%) and read autonomy (26.6% against 75%), so the joint hypothesis was not supported; see NEGATIVE_RESULTS §39 |
+| 3 | **Adversarial simulator** | **0.0%** unsafe runs (0 of 70 templates, 56 of them harmful; 700 tasks); 95% cluster-level Wilson upper bound **5.2%** (6.4% over the 56 harmful templates); utility +0.456, a post-hoc test | Simulated; effective N = 70 templates × 10 cosmetic variants, of which 56 harmful templates carry the unsafe rate; unsafe-rate gap Δ=0.0143 vs. baseline, not statistically significant |
+| 4 | **AgentHarm** | **0.0%** wrongly allowed (0/208); 95% upper bound 1.81%; false-block rate on the benign twins **100.0%** (208/208 blocked) | Intent classification on the instruction text only, from an imported run; tool calls were not intercepted. Every score sat above the escalation threshold, so the gate blocked every scenario, harmful or benign. This measures a blocking floor, not discrimination between harmful and benign, and the result is not attributed to the hard-block layer. The 208 scenarios come from 47 base behaviours; over those the upper bound is 7.6% |
+| 5 | **Historical regression** | **0.0%** wrongly allowed (0/167; Wilson 95% upper bound 2.25%) | Previously observed failures only |
 
 <details>
 <summary>How to read those numbers</summary>
 
 - The deterministic simulator has 70 independent templates; cosmetic variants do not increase the effective sample size.
-- BFCL v4 C-ext3 measures the safety axis only: declared semantic authority takes native wrong-call acceptance from 24/500 to 6 to **0** across the ablation arms. The utility side of the same run (read autonomy, argument routing) missed its pre-registered targets; those findings and the permanent 10.9% baseline live in NEGATIVE_RESULTS §39 and CLAIM-019's caveat, not here.
+- BFCL v4 C-ext3 measures the safety axis only: declared semantic authority takes native wrong-call acceptance from 24/500 to 6 to **0** across the ablation arms. The same run missed four of its seven pre-registered targets: one safety target (constructed wrong-tool acceptance, 2/199) and three utility targets (read autonomy, obtainable VERIFY, unobtainable ABSTAIN); those findings and the permanent 10.9% baseline live in NEGATIVE_RESULTS §39 and CLAIM-019's caveat, not here.
 - BFCL v4 C-ext4 is the utility half: a second deterministic bundle accepts about four times as many correct calls as the frozen one, with the safety counts still at zero. Most correct calls are still not accepted autonomously, and generalisation to unseen tool families is not shown.
 - REMORA routes annotated BFCL calls; it does not generate them. Each native wrong call is another task's correct call, and only 4 of the 295 in C-ext4 name a tool the task itself offered, so the zero counts say little about confusing two tools of one task. A name-overlap rule reaches part of the gold-call signal but also accepts wrong calls and calls missing required arguments (post hoc, NEGATIVE_RESULTS §83).
 - Internal reproducibility is not external replication or field validation.
@@ -97,14 +118,12 @@ Replaced claims are kept in [superseded claims](docs/assurance/superseded_claims
 
 </details>
 
-## Run it
+## More to run
 
 ```bash
-python -m remora assess drop_database
-python -m remora whatif drop_database   # what would it take to ACCEPT? nothing a model can say
-python -m pytest tests/ -q
-python scripts/demo_industrial_maintenance.py
-python -m remora doctor
+python -m pytest tests/ -q                     # the deterministic suite (about 10,800 tests)
+python scripts/demo_industrial_maintenance.py  # a worked operational scenario
+python -m remora doctor                        # check the local configuration
 ```
 
 <details>

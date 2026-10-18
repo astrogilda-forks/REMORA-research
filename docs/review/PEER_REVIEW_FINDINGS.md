@@ -116,9 +116,9 @@ conditions?
 | Evidence | `paper/remora_paper.md` abstract and Table at `f66c4f7b`; `docs/assurance/claim_register_v1.yaml` CLAIM-001/002. |
 | Affected claims | CLAIM-001, CLAIM-002 |
 | Action | Add the caveats and remove "same rules". |
-| Owning PR | level-1 PR |
-| Verification | The abstract and table in both files now carry the baselines, the non-significance, every benign counterpart blocked, "imported intent-gating run" and "simulator". Still missing: the missed pre-registered FBR floor (≤40%) is not stated beside the table. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR; FBR floor in the level-1 remainder PR (stacked on #927) |
+| Verification | The abstract and table in both files now carry the baselines, the non-significance, every benign counterpart blocked, "imported intent-gating run" and "simulator". The AgentHarm row of the headline table in both files now states FBR 100% against the pre-registered floor of at most 40%, missed, with a note citing `artifacts/verify_protocols/agentharm_rescore_v1.json` (`fbr_target` "<=40%", `fbr_target_met` false) and NEGATIVE_RESULTS.md §19. The claim register records the same floor as `missed` under CLAIM-002 `utility_floors`. The note says the floor was fixed for the re-scoring of the 208 benign scenarios, as the artifact does. |
+| Status | RESOLVED |
 
 ### PRF-005 The safety result was attributed to the deterministic floor without evidence
 
@@ -285,9 +285,9 @@ conditions?
 | Evidence | Zero grep hits in the bibliography at `f66c4f7b`. |
 | Affected claims | none |
 | Action | Add a classical-foundations paragraph and an IFC/isolation subsection, with every reference verified against its source and given a role in the research control matrix (bibliography parity is CI-gated). |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | #929 (stacked on #927) |
+| Verification | #927 added Anderson 1972, Hardy 1988, Birgisson et al. 2014 and Crosby & Wallach 2009. This PR adds four §2.11 paragraphs in .md and .tex (information-flow control and isolation; prompt-injection defenses; protocols, authorization tokens and policy languages; tamper-evident logs) and 18 references, each checked on 2026-10-18 against its primary source: the arXiv export API for title, authors and current version (FIDES 2505.23643v2; Wu, Cecchetti & Xiao 2409.19091v2, the IFC paper meant by "Wu et al. 2024"; IsolateGPT 2403.04960v2, whose v1 is titled SecGPT; Conseca 2501.17070v3; MELON 2502.05174v4; Task Shield 2412.16682v1; Spotlighting 2403.14720v1; StruQ 2402.06363v2; SecAlign 2410.05451v3; Beurer-Kellner et al. 2506.08837v3; Cedar 2403.04651v2), Crossref for Cedar (PACMPL 8 OOPSLA1), Task Shield (ACL 2025) and Schneier & Kelsey (ACM TISSEC 2(2), 159–176; Schneier's own page says v.1 n.3, Crossref was followed), rfc-editor.org for RFC 9396, 6962 and 9162, docs.oasis-open.org for XACML 3.0, modelcontextprotocol.io for MCP revision 2025-11-25, and biscuitsec.org for Biscuit. Each has a role in `docs/research/research_control_matrix_v1.yaml`; `generate_research_control_matrix.py --check` and `check_paper_sync.py` pass. Each paragraph states what REMORA does not do, including that it propagates no labels across calls and claims no trajectory-level property. No reference was dropped as unverifiable. Each of the 18 also has a `VERIFIED_RETRIEVED` entry, adoption `UNEVALUATED`, in `docs/research/research_shelf_v1.yaml` (SHELF-042 to SHELF-059), with the authors' reported results labelled as theirs; `check_research_shelf.py` passes. |
+| Status | RESOLVED |
 
 ### PRF-018 Positioning was inconsistent with the evidence
 
@@ -298,9 +298,9 @@ conditions?
 | Evidence | §2.11, §5.2, §17. |
 | Affected claims | none |
 | Action | Reframe as a systems artifact plus evaluation method (owner decision 2026-10-17). Move the ensemble, debate, conformal and calibration material to an appendix. |
-| Owning PR | level-1 PR (reframing sentences) |
-| Verification | Done: the abstract, contributions and §2.11 state the reframing in both files. Remaining: the consensus and conformal material is still in the body. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (reframing sentences); appendix move in the level-1 remainder PR (stacked on #927) |
+| Verification | Done: the abstract, contributions and §2.11 state the reframing in both files. The ensemble, conformal and calibration material of the body is now in appendices. In the .md, Appendix G holds the oracle swarm, canonicalizer and weighting (§4.1 to §4.3), the observable definitions (§5.1), the PhaseAwareGuardrail, weighted conformal selector and PVD-inspired score (§7.1 to §7.3), the three-oracle ablation (§10.2), Mondrian coverage (§10.5) and the oracle-count and weighting ablations (§11.2, §11.3). Each body heading keeps its number with a short pointer, so section references from §2 and from other documents stay valid. In the .tex the same material moved to three new appendices (`app:consensus`, `app:selection`, `app:mondrian`) beside the existing `app:crc`; a label/ref scan finds no duplicate label and no undefined reference. Every removed line is present in the appendix except the edited cross-references and the old CRC stub, whose caveat the new combined stub keeps. The §2 related-work subsections on ensembles, debate, conformal prediction and calibration were not moved: §2 belongs to a concurrent PR. |
+| Status | RESOLVED |
 
 ### PRF-019 Clustering units for CLAIM-001 and CLAIM-002, and post-hoc utility test
 
@@ -311,9 +311,9 @@ conditions?
 | Evidence | `results/toolcall_benchmark_v2_significance.json`; `docs/assurance/statistical_analysis_plan.md` (H2 not supported; the utility delta reported as post hoc); claim register comment for CLAIM-001. |
 | Affected claims | CLAIM-001, CLAIM-002 |
 | Action | Level 2: recompute both bounds at the harmful-template and behaviour level as post-hoc artifacts. Done: the abstract no longer cites +0.46, and §14 marks it post hoc. |
-| Owning PR | level-2 PR; claim-register comment in its own PR (protected path) |
-| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): CLAIM-001 has 56 harmful and 14 benign-only templates, giving an upper bound of 6.42%. CLAIM-002 has 47 base behaviours, giving 7.56%. Both are in the headline table and §14 of both paper files. Remaining: the CLAIM-001 register comment that 560 harmful tasks form 70 clusters is still wrong, and the register is a protected path. |
-| Status | IN_PROGRESS |
+| Owning PR | level-2 PR; register comment in #927 |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): CLAIM-001 has 56 harmful and 14 benign-only templates, giving an upper bound of 6.42%. CLAIM-002 has 47 base behaviours, giving 7.56%. Both are in the headline table and §14 of both paper files. The CLAIM-001 register comment was corrected in #927 (branch `fix/claims-and-paper-2026-10-18`): it now says the 560 harmful tasks collapse to 56 harmful template clusters, that 14 of the 70 templates are benign-only, and that `far_denominator` was corrected from 70 on 2026-10-18; the CLAIM-001 statement cites the 6.42% bound as post hoc. This finding is resolved once #927 is merged. |
+| Status | RESOLVED |
 
 ### PRF-020 The C-ext4 McNemar p-value ignores tool clustering
 
@@ -427,10 +427,10 @@ conditions?
 | Claim | Against the omitted temperature-gate baseline the utility gain is +0.26, not +0.46. |
 | Evidence | `results/toolcall_benchmark_v2_significance.json` (reviewer). |
 | Affected claims | CLAIM-001 |
-| Action | Done: the abstract no longer cites the accuracy comparison. Remaining: show the retired baseline row in §10.3, or scope +0.46 to the keyword heuristics. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Action | Done: the abstract no longer cites the accuracy comparison. Show the retired temperature-gate row in §10.3 and scope +0.46 to the keyword heuristics. |
+| Owning PR | level-1 remainder PR (stacked on #927) |
+| Verification | `results/toolcall_benchmark_v2_significance.json` (`comparisons.remora_temperature_gate_heuristic`) gives a utility delta of +0.259 (95% CI [0.154, 0.371], one-sided p ≈ 1e-4) at the same 1.4% unsafe rate; `results/toolcall_benchmark_v2_results.json` gives that arm accuracy 0.60 and mean utility 0.361. Both files now show this row in the tool-call table (§10.3) and state +0.456 against each keyword heuristic and +0.259 against the temperature gate, in §10.3, §14 and §17. The claim-register statement for CLAIM-001 already says "+0.46 vs heuristics" and was not changed. |
+| Status | RESOLVED |
 
 ### PRF-029 The .tex had a thinner limitations section and different results sections from the .md
 
@@ -519,9 +519,9 @@ conditions?
 | Evidence | `paper/remora_paper.md`. |
 | Affected claims | none |
 | Action | Renumber the tables and every reference to them. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | level-1 remainder PR (stacked on #927) |
+| Verification | At `fix/claims-and-paper-2026-10-18` the numbered .md tables ran 3, 1, 4, 5, 7, 6, 6b, 8 in document order, with no Table 2. After the PRF-018 appendix move they are renumbered 1 to 8 in document order: hard blocks (§6.2) 1, tool-call benchmark (§10.3) 2, AgentHarm (§10.6) 3, cross-domain (§10.7) 4, C-ext3 targets (§10.9) 5, component ablation (§11.1) 6, three-oracle ablation (Appendix G.4) 7, Mondrian (Appendix G.5) 8. Every in-text reference was rewritten with the same mapping, including the Figure 1 box and §9.2; a grep for `Table [0-9]` in document order returns 1, 1, 2, 2, 3, 4, 5, 5, 6, 7, 8, 7, the last being the Appendix G.6 back-reference to the Appendix G.4 table. No other repository document cites a paper table by number. The .tex numbers its tables automatically. |
+| Status | RESOLVED |
 
 ### PRF-036 Internal codenames are used without definition
 
@@ -532,9 +532,9 @@ conditions?
 | Evidence | Abstract and body. |
 | Affected claims | none |
 | Action | Add a short glossary, or define each at first use. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | level-1 remainder PR (stacked on #927) |
+| Verification | Both files now carry an "Identifiers used in this paper" list directly after the keywords, before §1. It defines CLAIM-NNN, REM-NNN, CAP-NNN, RMR-CR-NNN, NEGATIVE_RESULTS.md §N, SAP vN, C-ext2/3/4, arm F, F1, V2D, E-ECB, E-FA, E-EE, E7, CP-F1 to CP-F4, the declaration status values, SHADOW_ONLY, AROMER and AII. The abstract now glosses SHADOW_ONLY where it is first used. The F1/V2D definitions were checked against SAP v6 §4 (Arms) and the arm F definition against SAP v5 §5. |
+| Status | RESOLVED |
 
 ### PRF-037 "Eliminated" for a zero count with an upper bound
 
@@ -558,9 +558,9 @@ conditions?
 | Evidence | §2.11; the reviewer flagged uncertainty rather than error. |
 | Affected claims | none |
 | Action | Pin the arXiv versions and re-check each figure. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | #929 (stacked on #927) |
+| Verification | Checked 2026-10-18 against the arXiv HTML and abstracts of every version. Progent: v1 reports 41.2% to 2.2%; v2 (2025-08-30) reports 39.9% to 1.0% for LLM-generated policies with gpt-4o, at 76.3% utility against 79.4% undefended (manual policies reach 0%); v3 (2026-05-14) repeats 39.9% to 1.0%. The paper now pins v2 and names the policy mode, model and utility. CaMeL: v1 reports 67%, v2 (2025-06-24) reports 77% "with provable security (compared to 84% with an undefended system)"; the paper pins v2, adds the 84% baseline and attributes "provable security" to the authors. AIRGuard (2605.28914v1): "authority confusion" and action-time least privilege match the abstract. PCAA (2606.04104v1) has five checkpoints, so the paper now says "five checkpoints, from pre-action admissibility through approval to outcome closure" instead of naming three. PoE (2607.05397v1) proves soundness "under explicit cryptographic and deployment assumptions"; the .md said cryptographic only and now says both. Michael & Roesner (2607.13718v2): 21 proposals confirmed; the survey says "none of the proposals we review achieve all three", so the paper's "no existing system simultaneously achieves" is narrowed to "none of them". All six references now carry the version read. |
+| Status | RESOLVED |
 
 ### PRF-039 The roadmap stated the C-ext4 safety constraint as a Wilson upper bound
 
@@ -613,4 +613,17 @@ conditions?
 | Owning PR | not yet opened |
 | Verification | Pending. |
 | Status | OPEN |
+
+### PRF-043 The paper uses BFCL v4 as its main evidence without citing it
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The abstract, §10.8 and §10.9 rest on BFCL v4, but the bibliography has no entry for Gorilla or the Berkeley Function Calling Leaderboard (Patil et al.). |
+| Evidence | A grep for Patil, Gorilla and Berkeley Function Calling in paper/remora_paper.md returns nothing (2026-10-17). The code cites the upstream repository (remora/toolcall/routing/sources/bfcl.py), and the research control matrix now records it under RES-023. |
+| Affected claims | CLAIM-018, CLAIM-019, CLAIM-021 |
+| Action | Added BFCL and Gorilla references to both bibliographies and assigned their roles in the research control matrix (RES-023 and bibliography entries). |
+| Owning PR | #927, reconciled with #909 |
+| Verification | 2026-10-18: `check_paper_sync.py` passes with 73 paired bibliography entries; `generate_research_control_matrix.py --check` passes. Both bibliographies cite BFCL/Gorilla. |
+| Status | RESOLVED |
 

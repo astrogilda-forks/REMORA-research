@@ -35,7 +35,7 @@ Tiers: A changes design or evaluation now · B supports method or benchmark
 | 19 | Distributed Attacks in Persistent-State AI Control (Hills, Caspary, Cooper Stickland, 2026) | 2607.02514 | RES-012 loop state, SHELF-006/031, NR §2/§8 | absent | P1 falsification: harm spread over individually legitimate actions. |
 | 20 | AgentAbstain: Do LLM Agents Know When Not to Act? (Liu et al., 2026) | 2607.10059 | SHELF-011 `SCOPED`, RF-09 | shelf entry | Promote the adapter, not a new abstention algorithm. Tests abstention before the effect boundary. |
 | 21 | Auditable Agents (Nian et al., 2026) | 2604.05485 | PROV-01, RES-009/013/017 | absent | Cheap: five-dimension auditability card with ESTABLISHED/PARTIAL/NOT_ESTABLISHED. |
-| 22 | Design Patterns for Securing LLM Agents against Prompt Injections (Beurer-Kellner et al., 2025) | 2506.08837 | RF-02/10 framing | absent | Low priority; cite in related work. |
+| 22 | Design Patterns for Securing LLM Agents against Prompt Injections (Beurer-Kellner et al., 2025) | 2506.08837 | RF-02/10 framing | cited in paper §2.11 (2026-10-18) | Done: cited in related work, `positioning_only`. |
 | 23 | AgentDojo (Debenedetti et al., 2024) | 2406.13352 | RF-09, SHELF-010 | adapter + pinned excerpt; matrix says `positioning_only` | Register drift: "adapter available, full benchmark not run". |
 
 ## Tier B
@@ -118,6 +118,38 @@ roadmap section, a shelf or matrix row and a pre-registered target.
 | ISO/IEC 42001 | little verified mapping | only if commercially required |
 | OWASP Top 10 for LLM / Agentic Top 10 | mapping + evidence corpus | refresh version terminology |
 | GDM AI Control roadmap, UK AISI Loss of Oversight, METR tool-call spoofing incident | not integrated | threat checklist candidates; retrieve primary documents first |
+
+## Paper related work verified 2026-10-18 (PRF-017, PRF-038)
+
+Resolved against the arXiv export API (title, authors, latest version),
+Crossref, rfc-editor.org, docs.oasis-open.org, modelcontextprotocol.io and
+biscuitsec.org. All are `positioning_only` or `standard_or_regulation` in the
+matrix bibliography, on the research shelf as SHELF-042 to SHELF-059
+(`UNEVALUATED`), and cited in paper §2.11.
+
+| Work | Id / version read | Note |
+|---|---|---|
+| FIDES, Securing AI Agents with Information-Flow Control (Costa et al., 2025) | 2505.23643v2 | IFC planner with labels |
+| f-secure LLM system (Wu, Cecchetti, Xiao, 2024) | 2409.19091v2 | the "Wu et al. 2024" IFC paper |
+| IsolateGPT (Wu, Roesner, Kohno, Zhang, Iqbal; NDSS 2025) | 2403.04960v2 | v1 titled SecGPT |
+| Conseca, Contextual Agent Security (Tsai & Bagdasarian; HotOS 2025) | 2501.17070v3 | |
+| MELON (Zhu et al.; ICML 2025) | 2502.05174v4 | |
+| Task Shield (Jia et al.; ACL 2025 long, 29680–29697) | 2412.16682v1 | doi 10.18653/v1/2025.acl-long.1435 |
+| Spotlighting (Hines et al., 2024) | 2403.14720v1 | |
+| StruQ (Chen et al.; USENIX Security 2025) | 2402.06363v2 | |
+| SecAlign (Chen et al.; ACM CCS 2025) | 2410.05451v3 | |
+| Cedar (Cutler et al.; PACMPL 8 OOPSLA1, 670–697) | 2403.04651v2 | doi 10.1145/3649835 |
+| Schneier & Kelsey, Secure audit logs (ACM TISSEC 2(2), 159–176, 1999) | doi 10.1145/317087.317089 | Schneier's own page says v.1 n.3; Crossref says 2(2) |
+| RFC 9396 OAuth RAR (Standards Track, 2023); RFC 6962 / RFC 9162 CT (Experimental) | rfc-editor.org | 9162 obsoletes 6962 |
+| XACML 3.0 (OASIS Standard, 22 Jan 2013, ed. Rissanen) | docs.oasis-open.org | defines PDP/PEP |
+| MCP specification | revision 2025-11-25 | says MCP cannot enforce security at protocol level |
+
+Comparator versions pinned for PRF-038: Progent 2504.11703v2 (39.9% to 1.0%,
+LLM-generated policies, gpt-4o; v1 said 41.2% to 2.2%; v3 repeats v2), CaMeL
+2503.18813v2 (77% vs 84% undefended; v1 said 67%), AIRGuard 2605.28914v1,
+PCAA 2606.04104v1 (five checkpoints), PoE 2607.05397v1 (cryptographic and
+deployment assumptions), Michael & Roesner 2607.13718v2 (21 proposals; none
+achieves all three goals).
 
 ## Suggested order of work (research integrity before new mechanisms)
 

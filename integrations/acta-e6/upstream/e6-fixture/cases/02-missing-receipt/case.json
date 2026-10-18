@@ -1,0 +1,38 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "02-missing-receipt",
+  "title": "A missing receipt",
+  "change": "bill.json bills one more receipt on line L2, sha256:05ed10102cdc9c38e5e729ae0ae1bc79c1a6cb4ccbf760e072f3711fab7efc9f, with the line's quantity and amount raised to match. No receipt has that ID.",
+  "why": "Bill to receipts coverage: a billed item with no signed receipt behind it is an invented line.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "coverage_bill_to_receipts"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "FAIL",
+      "coverage_receipts_to_bill": "PASS",
+      "uniqueness": "PASS",
+      "quantities": "PASS",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "coverage_bill_to_receipts": [
+        "unknown_receipt"
+      ]
+    },
+    "payment_ready": false
+  }
+}
