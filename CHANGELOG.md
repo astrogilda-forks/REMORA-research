@@ -4,6 +4,23 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Interop (effect-evidence-v1 limits found by the invocation axes corpus, #918)
+
+- Probity's `invocation_axes` corpus at `d2bdacc7` (23 cases, 22 bundles)
+  was reproduced locally against the frozen `effect-evidence-v1` verifier: 19
+  bundles agree on the binary observed-effect result. On
+  `bundle_for_other_call`, `dispatched_after_deny` and
+  `observation_from_the_tool` the verifier returns `EFFECT_VERIFIED` and
+  Probity's reader does not.
+- `docs/interop/FEDERATION.md` records why. The v1 input has no field for the
+  call binding, the observer or the captured decision. The first two were
+  already v1 non-claims. Decision correspondence was not, and is now stated as
+  a limit of v1 and v1.1. The frozen package and its records are unchanged,
+  and none of this is a REMORA runtime result.
+- `tests/test_effect_evidence_v1_projection_limits.py` pins the limit: bundles
+  that differ only in one of those facts project to identical v1 input and get
+  identical verdicts.
+
 ### Interop (per-invocation evidence export and request binding)
 
 - New `remora/execution/request_ref.py`: a call may carry the request it
