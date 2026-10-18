@@ -279,6 +279,31 @@ def test_a_forged_grant_is_contradicted_even_under_a_valid_export(world, verifie
     assert outcome["claims"]["request_corresponds"]["result"] != "ESTABLISHED"
 
 
+def test_exporter_cannot_rebind_a_valid_grant_to_another_request(world, verifier):
+    """A valid PDP signature binds its context, not an exporter's replacement."""
+    client, _ = world
+    proposal_id, _ = _run(client, _ref(BODY, "7"))
+    body = json.loads(base64.b64decode(_export(client, proposal_id).json()["payload_b64"]))
+    replacement = _ref(OTHER_BODY, "8")
+    digest = verifier._request_ref_digest(replacement)
+    body["request_ref"] = replacement
+    body["authorization_context"]["request_ref_hash"] = digest
+    for entry in body["chain"]:
+        payload = json.loads(entry["payload_canonical"])
+        payload["request_ref_hash"] = digest
+        if "request_ref" in payload:
+            payload["request_ref"] = replacement
+        if "authorization_context" in payload:
+            payload["authorization_context"] = body["authorization_context"]
+        entry["payload_canonical"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        entry["entry_hash"] = verifier._entry_hash(entry, TENANT)
+    outcome = _check(verifier, _resign(body), capture_ref=replacement)
+    assert outcome["claims"]["export_authentic"]["result"] == "ESTABLISHED"
+    assert outcome["claims"]["chain_consistent"]["result"] == "ESTABLISHED"
+    assert "context_not_signed_one" in outcome["claims"]["authority_bound"]["codes"]
+    assert outcome["claims"]["request_corresponds"]["result"] != "ESTABLISHED"
+
+
 def test_export_refusals(world, monkeypatch):
     client, _ = world
     assert _export(client, "no-such-proposal").status_code == 404

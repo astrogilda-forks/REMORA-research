@@ -358,6 +358,9 @@ def verify(
             authority.contradict("context_tenant_or_principal_mismatch")
         if policy_bundle_hash is not None and context.get("policy_bundle_hash") != policy_bundle_hash:
             authority.contradict("policy_bundle_hash_mismatch")
+        # Request correspondence relies on this signed context, not merely
+        # on a valid signature over a grant from some other request.
+        grant_verified = not authority.contradicted
 
     lease_section = body.get("lease")
     if lease_section is None:

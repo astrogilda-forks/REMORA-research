@@ -599,7 +599,7 @@ near-optimal selection of information-gathering actions.
 explicit, falsifiable criterion: VERIFY-vs-ABSTAIN is not "mid trust vs low
 trust" but "an affordable verification exists that would change the decision
 vs it does not." This gives a principled, per-action reason for each split
-that is more precise than a trust threshold, and, crucially, a *measurable*
+that is more precise than a trust threshold, and a *measurable*
 target (realized risk reduction) against which the cascade's implicit boundary
 can be audited retrospectively.
 
