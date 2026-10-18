@@ -43,12 +43,43 @@ def _critical_obs(**kwargs) -> PolicyObservation:
     return PolicyObservation(**defaults)
 
 
-def _low_risk_obs() -> PolicyObservation:
-    return PolicyObservation(
+def _accepted_obs(**kwargs) -> PolicyObservation:
+    """A read the engine ACCEPTs, with every actionable concept's signals already in place.
+
+    Until 2026-10-18 the tests used ``risk_tier="low", action_type="network_read"``
+    with nothing else. The engine does not ACCEPT that (``network_read`` is not a
+    known action type: VERIFY; as ``read`` it falls to the default-safe ABSTAIN),
+    so every test that needed an ACCEPT skipped. This observation carries the
+    ordered high-trust signals of tests/test_review_fixes_nonfinite.py, and each
+    concept's ``signal_mapping`` already holds, so do(concept=True) is a no-op.
+
+    ``risk_tier`` is ``high`` because ``approved_change_window`` maps risk_tier to
+    ``"high"`` unconditionally: on a ``low`` observation the intervention raises
+    the tier and turns ACCEPT into VERIFY, so PS would be 1 for a change that
+    makes the verdict worse.
+    """
+    defaults = dict(
         question="Read router ARP table",
-        risk_tier="low",
-        action_type="network_read",
+        risk_tier="high",
+        action_type="read",
+        target_environment="staging",
+        phase="ordered",
+        trust_score=0.9,
+        final_H=0.3,
+        final_D=0.08,
+        evidence_action="answer",
+        evidence_confidence=0.85,
+        state_transition_uncertain=False,
+        counterfactual_passed=True,
+        rollback_available=True,
     )
+    defaults.update(kwargs)
+    return PolicyObservation(**defaults)
+
+
+def _assert_accepts(engine: RemoraDecisionEngine, obs: PolicyObservation) -> None:
+    report = engine.decide(obs)
+    assert report.action.value == "accept", f"fixture no longer ACCEPTed: {report.action} {report.reasons}"
 
 
 # ---------------------------------------------------------------------------
@@ -86,31 +117,16 @@ class TestScoreConcepts:
         # argument_tainted is a VERIFY floor (decision_engine.py:272).
         # For PS=1, taint must be the ONLY block — so use a low-risk obs that
         # gives ACCEPT without taint, then add taint and check PS.
-        clean_obs = PolicyObservation(
-            question="Read router ARP table",
-            risk_tier="low",
-            action_type="network_read",
-        )
-        if engine.decide(clean_obs).action.value != "accept":
-            pytest.skip("clean low-risk obs is not ACCEPT; cannot isolate taint-only block")
-        obs = PolicyObservation(
-            question="Read router ARP table",
-            risk_tier="low",
-            action_type="network_read",
-            argument_tainted=True,
-        )
-        factual = engine.decide(obs).action.value
-        if factual == "accept":
-            pytest.skip("argument_tainted=True doesn't block for low-risk obs in this engine config")
+        _assert_accepts(engine, _accepted_obs())
+        obs = _accepted_obs(argument_tainted=True)
+        assert engine.decide(obs).action.value != "accept", "a tainted argument must block"
         scores = {s.concept_name: s for s in score_concepts(obs, engine, model)}
         # source_provenance_verified sets argument_tainted=False → removes the only block
         assert scores["source_provenance_verified"].ps == 1.0
 
     def test_accept_observation_all_ps_zero(self, engine, model):
-        obs = _low_risk_obs()
-        report = engine.decide(obs)
-        if report.action.value != "accept":
-            pytest.skip("low_risk_obs not ACCEPT in this engine config")
+        obs = _accepted_obs()
+        _assert_accepts(engine, obs)
         scores = score_concepts(obs, engine, model)
         # For an ACCEPT observation, do(concept=True) cannot improve the verdict
         for s in scores:
@@ -150,9 +166,8 @@ class TestScoreConcepts:
 
 class TestFindMinimalSufficientInterventions:
     def test_accept_obs_returns_size_zero(self, engine, model):
-        obs = _low_risk_obs()
-        if engine.decide(obs).action.value != "accept":
-            pytest.skip("low_risk_obs not ACCEPT in this engine config")
+        obs = _accepted_obs()
+        _assert_accepts(engine, obs)
         result = find_minimal_sufficient_interventions(obs, engine, model)
         assert result.minimum_size == 0
         assert result.minimal_sets == []
@@ -259,11 +274,9 @@ class TestComputeConceptAttribution:
             assert (a.mean_ps, a.mean_pn) >= (b.mean_ps, b.mean_pn)
 
     def test_all_accept_log_returns_zero_scores(self, engine, model):
-        obs_log = [_low_risk_obs(), _low_risk_obs()]
-        # Only include if they are actually ACCEPT
-        accept_log = [o for o in obs_log if engine.decide(o).action.value == "accept"]
-        if not accept_log:
-            pytest.skip("No ACCEPT observations in this engine config")
+        accept_log = [_accepted_obs(), _accepted_obs(question="Read router BGP summary")]
+        for o in accept_log:
+            _assert_accepts(engine, o)
         results = compute_concept_attribution(accept_log, engine, model)
         for r in results:
             assert r.mean_ps == 0.0
