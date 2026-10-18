@@ -250,3 +250,56 @@ def test_committed_dry_run_is_development_only():
     assert set(body["dev_tasks"]["banking"]) == set(split["banking"]["dev"])
     assert tasks
     assert body["arms"]["A_none"]["utility"] == body["arms"]["A_none"]["tasks"]
+
+
+# ── SAP v7 audit corrections (RMR-AUD-012) ───────────────────────────────
+
+
+def test_inspected_user_task_moves_to_dev_without_reshuffling_test():
+    tasks = {"banking": [f"user_task_{i}" for i in range(16)]}
+    seeded = m.split_tasks(tasks)
+    assert "user_task_0" in seeded["banking"]["test"]
+    forced = m.split_tasks(tasks, forced_dev=m.inspected_user_tasks())
+    assert "user_task_0" in forced["banking"]["dev"]
+    assert "user_task_0" not in forced["banking"]["test"]
+    assert set(forced["banking"]["test"]) == set(seeded["banking"]["test"]) - {"user_task_0"}
+    assert len(forced["banking"]["dev"]) == 6 and len(forced["banking"]["test"]) == 10
+
+
+def test_runner_split_uses_the_inspected_list():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "scripts" / "run_control_eval.py").read_text(
+        encoding="utf-8")
+    assert "forced_dev=inspected_user_tasks()" in src
+
+
+def test_pairs_with_an_inspected_task_are_not_test_pairs():
+    assert not m.is_test_pair_allowed("banking", "user_task_0", "injection_task_3")
+    assert not m.is_test_pair_allowed("banking", "user_task_5", "injection_task_0")
+    assert m.is_test_pair_allowed("banking", "user_task_5", "injection_task_3")
+    assert m.is_test_pair_allowed("slack", "user_task_0", "injection_task_0")
+
+
+def test_partial_auroc_bounds_and_ties():
+    assert m.partial_auroc([0.9, 0.8], [0.1, 0.2]) == pytest.approx(1.0)
+    # A constant score cannot rank: the standardised partial area is chance.
+    assert m.partial_auroc([100.0] * 5, [100.0] * 20) == pytest.approx(0.5)
+    assert m.partial_auroc([0.1, 0.2], [0.9, 0.8]) < 0.5
+
+
+def test_constant_g_score_is_beaten_mechanically_hence_the_h3_precondition():
+    # 90 of 91 benign calls blocked (dev dry run): G is 100 almost everywhere.
+    rows = [(f"t{i}", False, float(i % 50), 100.0) for i in range(90)]
+    rows += [("t90", False, 3.0, 3.0)]
+    rows += [(f"a{i}", True, 60.0 + i, 100.0) for i in range(10)]
+    out = m.clustered_auroc_difference(rows, n_boot=200, max_fpr=0.10)
+    assert out["difference"] > 0
+    assert not m.h3_is_informative(e1_blocked_benign=90, benign_calls=91)
+    assert m.h3_is_informative(e1_blocked_benign=40, benign_calls=91)
+
+
+def test_j_score_is_zero_for_both_trivial_policies():
+    kw = dict(utility_none=0.9, utility_refuse_all=0.35, asr_none=0.4)
+    assert m.j_score(utility=0.9, asr=0.4, **kw) == pytest.approx(0.0)
+    assert m.j_score(utility=0.35, asr=0.0, **kw) == pytest.approx(0.0)
+    assert m.j_score(utility=0.8, asr=0.02, **kw) > 0.7
