@@ -160,6 +160,7 @@ export async function verifyAccessJwt(
 
 export interface AdmissionEnv {
   REMORA_API_URL?: string;
+  REMORA_DEPLOYMENT_PROFILE?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
 }
@@ -171,8 +172,14 @@ export async function admitMcp(
   deps: Partial<Pick<AccessConfig, "fetchJwks" | "now" | "cache">> = {},
 ): Promise<Admission> {
   // The direct transport exists only in the development config (wrangler.dev
-  // .toml); there is no edge in front of a local run to verify against.
-  if (env.REMORA_API_URL) return { ok: true, subject: "development" };
+  // .toml); there is no edge in front of a local run to verify against. The
+  // profile must say so: REMORA_API_URL alone used to skip Access in any
+  // deployment that happened to set it.
+  if (env.REMORA_API_URL) {
+    return String(env.REMORA_DEPLOYMENT_PROFILE ?? "").trim() === "development"
+      ? { ok: true, subject: "development" }
+      : { ok: false, status: 503, reason: "direct_transport_outside_development" };
+  }
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
     return { ok: false, status: 503, reason: "access_not_configured" };
   }
@@ -225,8 +232,13 @@ export function productionReadiness(env: ReadinessEnv): {
   if (!(DEPLOYMENT_PROFILES as readonly string[]).includes(profile)) {
     return { profile, problems: ["deployment_profile_unknown"] };
   }
-  if (profile !== "production") return { profile, problems: [] };
   const problems: string[] = [];
+  // The direct transport skips Access verification, so it is a problem in
+  // every profile but development.
+  if (env.REMORA_API_URL && profile !== "development") {
+    problems.push("direct_transport_outside_development");
+  }
+  if (profile !== "production") return { profile, problems };
   if (!env.REMORA_PG_DSN) problems.push("durable_audit_chain_missing");
   if (!env.EXECUTION || !env.REMORA_LEASE_ED25519_PRIVATE || !env.REMORA_LEASE_ED25519_PUBLIC) {
     problems.push("custody_split_missing");

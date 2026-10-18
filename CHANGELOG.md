@@ -4,6 +4,17 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (MCP gateway readiness fails closed)
+
+- The `/mcp` route acted on readiness problems only when the profile was
+  exactly `production`. An unset or misspelt profile (`prod`) served calls
+  with every problem reported and none acted on. It now refuses on any
+  readiness problem in any profile.
+- `REMORA_API_URL` (the local direct transport) skipped Cloudflare Access
+  verification in any deployment that set it. Admission now allows it only
+  under the `development` profile, and readiness names it as a problem
+  everywhere else. Found by an internal code review on 2026-10-18.
+
 ### Federation interop (invocation axes reproduction)
 
 - `.github/workflows/probity-invocation-axes-reproduction.yml` runs Probity's
