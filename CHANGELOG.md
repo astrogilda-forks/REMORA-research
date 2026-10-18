@@ -4,6 +4,25 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Interop (E6 consumer for Veritas Acta receipts, author run)
+
+- New `remora/interop/acta_e6/` (EXPERIMENTAL): a paying-side consumer for
+  edge E6, written from the `VeritasActa/e6-fixture` `v1.1.0` README alone.
+  It uses its own Ed25519 (`cryptography`) and JCS (`remora.interop.jcs`)
+  and does not call `@veritasacta/verify`. Results stay in Acta's
+  vocabulary and are not admitted as REMORA evidence.
+- `scripts/run_acta_e6.py` checks the `SHA256SUMS` pin and every file, runs
+  the cases and a signature-blind control, and writes
+  `integrations/acta-e6/records/remora-e6-consumer-v1.1.0.json`. From a
+  fresh clone at `8d8fc50a` (`SHA256SUMS` `08731bb7…`), the consumer agrees
+  with 12 of 12 cases on the verdict, all eight claims, every code and
+  `payment_ready`. The control agrees with 9 of 12. It returns `PASS` on case
+  12 and differs on 07 and 08 in codes only, with the verdict still `FAIL`.
+- REMORA wrote and ran the consumer, so this is a second implementation's
+  author run, not an independent record under the boundary map's rule.
+- `tests/test_acta_e6_consumer.py`: 12 tests over the vendored subset, the
+  committed record, pin refusals and the failure paths no case reaches.
+
 ### Flow control IFC-01 (label lattice)
 
 - New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).

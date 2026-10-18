@@ -1,0 +1,41 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "10-verifier-unavailable",
+  "title": "The verifier is unavailable",
+  "change": "The inputs are the matching ones; the consumer runs with no verifier it can use (here a path that does not exist).",
+  "why": "With no verifier no signature can be established, so the consumer abstains rather than passing or failing. Nor is a missing verifier a FAIL: under Node a missing script also exits 1, but with no JSON.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "../../bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "unavailable"
+  },
+  "expected": {
+    "verdict": "ABSTAIN",
+    "decisive": [
+      "signatures"
+    ],
+    "claims": {
+      "keys": "ABSTAIN",
+      "signatures": "ABSTAIN",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "keys": [
+        "verifier_unavailable"
+      ],
+      "signatures": [
+        "verifier_unavailable"
+      ]
+    },
+    "payment_ready": false
+  }
+}

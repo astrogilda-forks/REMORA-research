@@ -1,0 +1,42 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "08-unexpected-signer",
+  "title": "An unexpected signer",
+  "change": "chain.jsonl, manifest.json and bill.json are a complete, self-consistent bundle for the same August outcomes, signed by a different demo key (kid sb:issuer:C4T82bZnZxSY, fingerprint sha256:3c5001f87c1d6bd0d1377866e0b3c01e037fd57ad4aede1f89b0808ba06c3d03). supplied-keys.json is the keys document that came with that bundle, naming that key. The consumer is given the pinned keys document (../../keys.json), as in every case.",
+  "why": "Keys: the records name a key the pinned keys document does not hold. Every record verifies under the self-supplied key and none under the pinned one, so a consumer that took the bundle's own keys document would pass this bundle.",
+  "inputs": {
+    "receipts": "chain.jsonl",
+    "manifest": "manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "keys"
+    ],
+    "claims": {
+      "keys": "FAIL",
+      "signatures": "FAIL",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "keys": [
+        "unexpected_signer"
+      ],
+      "signatures": [
+        "invalid_signature",
+        "manifest_signature_invalid"
+      ]
+    },
+    "payment_ready": false
+  }
+}
