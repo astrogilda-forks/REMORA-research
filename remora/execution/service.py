@@ -24,7 +24,6 @@ from remora.enforcement.outbox import OutboxState
 from remora.enforcement.token import AuthorizationContext, PolicyDecisionToken
 from remora.errors import RemoraError
 from remora.execution.outcome import DispatchOutcome, classify_outcome
-from remora.execution.request_ref import RequestRef, request_ref_of
 from remora.execution.ports import (
     AuditChainPort,
     DispatchOutboxPort,
@@ -36,6 +35,7 @@ from remora.execution.ports import (
     appender,
     audit_ref,
 )
+from remora.execution.request_ref import RequestRef, request_ref_of
 from remora.governance.audit_outbox import encode_key
 from remora.governance.execution_identity import (
     ExecutionContextProvider,
