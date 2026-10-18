@@ -402,7 +402,7 @@ conditions?
 | Evidence | SAP v6. |
 | Affected claims | CLAIM-019, CLAIM-021 |
 | Action | Stamp every seal with OpenTimestamps before any data is built (owner decision 2026-10-18; only digests go to the public calendars). SAP v7 is also registered on OSF before the run. |
-| Owning PR | feat/ots-external-timestamps |
+| Owning PR | #930 |
 | Verification | `scripts/ots_seal.py` (tested by `tests/test_ots_seal.py`) builds a manifest of the LF SHA-256 of every sealed file named by the seal records and stamps it. `artifacts/timestamps/seal_manifest_2026-10-18.json` (SHA-256 `2be2eafcf7538b499d9dcb99e451598c2b6065d2a05ab0245067200fab76cab7`, 18 files) was stamped on 2026-10-18 on four calendars. Its proof is pending until the Bitcoin attestation is fetched with `ots_seal.py upgrade` and committed. The stamp attests existence from 2026-10-18 only: the sealing dates of SAP v5 and v6 and the evaluated holdouts rest on git history alone and stay unattested, an accepted limitation for that evidence. SAP v7 §10 now requires a stamp after the lock and before the first test-split episode. Remaining: the upgraded proof, and the v7 stamp at its seal. |
 | Status | IN_PROGRESS |
 
