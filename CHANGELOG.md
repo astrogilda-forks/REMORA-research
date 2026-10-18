@@ -4,6 +4,26 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-02b (`POST /v1/contexts`)
+
+- `POST /v1/contexts` mints a flow context for the authenticated principal
+  and returns `context_id` and `label_epoch`. The caller cannot choose the
+  id, the label or the epoch (extra fields are a 422). A child named by
+  `parent_context_id` starts at its parent's label.
+- **Refusals:** 409 `flow_control_disabled` unless `REMORA_FLOW_CONTROL=1`;
+  403 `principal_mismatch` for a user principal outside the caller's tenant;
+  403 `processing_not_authorized` for a processor the processing policy
+  (`REMORA_FLOW_PROCESSING_POLICY`) does not authorize; 404
+  `flow_context_unknown`; 503 `flow_state_unavailable`. Without a
+  processing policy nothing is authorized.
+- Each mint is recorded on the tenant chain as `flow_context_minted`.
+- The store uses the same three durable switches as the loop-safety store,
+  declared as wiring point ASW-006 for AST-016, and the Postgres cases now
+  run in the CI Postgres job.
+- Contracts touched: `schemas/openapi.json` and the generated TypeScript
+  client gain the route. No existing route changes. Labels are not yet
+  raised by any tool result; that is IFC-03.
+
 ### Flow control IFC-02a (context store)
 
 - `remora/flow/context.py` adds `FlowContextStore`, which provides `mint`,
