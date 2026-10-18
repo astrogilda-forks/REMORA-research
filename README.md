@@ -4,20 +4,9 @@
 
 [![Paper (PDF)](https://img.shields.io/badge/paper-PDF-b31b1b.svg)](paper/remora_paper.pdf) [![CI: Deterministic Test Suite](https://github.com/darklordVirtual/REMORA-research/actions/workflows/ci.yml/badge.svg)](https://github.com/darklordVirtual/REMORA-research/actions/workflows/ci.yml) [![Quality Gates](https://github.com/darklordVirtual/REMORA-research/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/darklordVirtual/REMORA-research/actions/workflows/quality-gates.yml) [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 
-Policy-gated control between an agent's intent and a real-world effect.
+**An AI agent can propose any tool call. REMORA decides whether that exact call may run, and keeps the evidence.**
 
-**Research question.** Can authorization enforced outside the agent, and bound to the exact tool call, stop the calls an agent should not make while keeping it useful? Where does it fail?
-
-**What the evidence shows so far.** The runs are sealed or pre-registered unless marked. Every number resolves to the [claim register](docs/assurance/claim_register_v1.yaml), and every failure stays in [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md).
-
-1. On sealed BFCL v4 episodes, declared tool contracts with a semantic-authority floor accepted none of the 500 (C-ext3) and none of the 295 (C-ext4) substituted wrong calls. A revised bundle raised correct-call acceptance from 6.9% to 29.9%. Clustered by tool the upper bounds are 3.5% and 5.42%, almost no wrong call came from the task's own tool list, and most correct calls still do not proceed. The open problem is the safety–utility trade-off, not safety alone.
-2. On AgentHarm, an imported intent-gating run saw only the instruction text and blocked all 208 harmful scenarios and all 208 benign twins: every score sat above the escalation threshold. It enforces a floor and does not tell intent apart. In a separate 88-task run, the LLM oracle alone told 29 of 44 harmful/benign pairs apart, and with the deterministic gate on top none were (NEGATIVE_RESULTS §80). When a deterministic floor helps a learned monitor and when it erases the monitor's signal is the question this result raises.
-3. A consensus-temperature uncertainty signal was falsified on 1,231 fresh items under a pre-registered plan (SAP v3, CLAIM-012) and is kept only as a diagnostic.
-4. The project's own simulator benchmark had label leakage and an overstated sample size: 700 tasks are 70 templates (NEGATIVE_RESULTS §17). Only corrected numbers are reported, and the benchmark's 0% unsafe result is attributed to no component (CLAIM-020).
-
-**What it does not yet test:** an adversarial agent trying to get past the gate (the AI-control threat model), wrong calls a model actually makes, external baselines, and the execution chain under attack. These are the next experiments; the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md) track each objection and what was done about it.
-
-An agent proposes a tool call. REMORA is a governance overlay between that proposal and the protected tool: it evaluates the exact action before it runs, and returns one of four decisions:
+REMORA is a governance overlay that sits between a tool-using agent and the tools it wants to use. Before a call runs, it checks the call against policy the deployment owns, not the agent, and returns one of four decisions:
 
 | Decision | Meaning |
 |---|---|
@@ -26,20 +15,50 @@ An agent proposes a tool call. REMORA is a governance overlay between that propo
 | **ABSTAIN** | Required information is missing or insufficient. |
 | **ESCALATE** | The action requires a higher-authority decision. |
 
-The enforcing surface is `POST /v1/execution/*`. An approval is bound to the exact proposal it was given for and is consumed once, at the policy-enforcement point, before governed dispatch.
+An approval covers only the exact call it was given for. It can be used once, and policy is checked again at the moment of dispatch. A model's confidence can never override a hard block. The enforcing surface is `POST /v1/execution/*`.
 
 > **Status:** research and shadow-mode software with no production certification. External replication is pending; every deployment still needs its own validation.
 
+## Try it in two minutes
+
 ```bash
 python -m pip install -e ".[dev]"
-python -m remora try
+python -m remora try                     # five guided scenarios
+python -m remora assess drop_database    # the verdict and the rules behind it
+python -m remora whatif drop_database    # what would it take to ACCEPT?
 ```
 
-## Where to start
+`whatif` searches for the smallest change that would let a call through. For a production `drop_database`, nothing a model can say gets there:
 
-**Reviewing the research?** Five files are enough: the [paper](paper/remora_paper.pdf), [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md), the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md), the [claim register](docs/assurance/claim_register_v1.yaml) and [how to reproduce every result](docs/06-reproducibility.md). The repository also keeps about 400 Markdown files of design history and product material; none of them is needed to judge a claim.
+```text
+verdict now:  ESCALATE
+model signals alone: cannot reach ACCEPT  (trust, phase, evidence, quorum, temperature: every combination tried)
+agent alone:         cannot reach ACCEPT  (proposal + model signals, within 4 changes)
+```
 
-**Working on the code?** One ordered reading path follows; the [documentation index](docs/README.md) lists the complete registered set.
+## Why it is built this way
+
+- Authority comes from the deployment. Tool meaning, target, risk and intent come from signed, deployment-owned sources, never from the agent that wants to act.
+- Deterministic rules form the floor. Model signals can route a call to review; they cannot unlock one.
+- Every claim is tied to evidence. Results resolve to a [claim register](docs/assurance/claim_register_v1.yaml), and failures stay in [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md).
+
+## What we have found so far
+
+The research question: can authorization that is enforced outside the agent and bound to the exact call stop the calls an agent should not make while keeping it useful? The short answers, with the details and limits further down:
+
+1. **Blocking is the easy half.** On a public function-calling benchmark (BFCL v4), two sealed runs accepted none of the wrong calls. On its own, though, REMORA let only about 3 in 10 correct calls through. Staying useful is the open problem.
+2. **A floor is not a judge.** On AgentHarm, a deterministic gate blocked every harmful and every harmless request alike. An LLM monitor on its own told most harmful/harmless pairs apart, and the gate on top erased that signal (NEGATIVE_RESULTS §80). How a deterministic floor and a learned monitor should combine is now a main research question.
+3. **We publish what fails.** That includes an uncertainty signal falsified on fresh data, label leakage in one of our own benchmarks, and the [peer-review objections](docs/review/PEER_REVIEW_FINDINGS.md) that are still open.
+4. **Not yet tested.** An agent actively trying to get past the gate. That is the next experiment ([plan](docs/13-research-frontier-roadmap.md)).
+
+## Where to go next
+
+- **Reviewing the research?** Five files are enough: the [paper](paper/remora_paper.pdf), [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md), the [peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md), the [claim register](docs/assurance/claim_register_v1.yaml) and [how to reproduce every result](docs/06-reproducibility.md). The repository also keeps about 400 Markdown files of design history and product material; none of them is needed to judge a claim.
+- **Building on the code?** Start with the [developer handoff](DEVELOPER_OVERVIEW.md) and the [execution quickstart](docs/deployment/execution-quickstart.md). The full reading path is below.
+- **Checking REMORA from another project?** See [Verify it from outside](#verify-it-from-outside).
+
+<details>
+<summary>Reading path for the code, and the documentation index</summary>
 
 1. [Developer handoff](DEVELOPER_OVERVIEW.md): the shortest technical path through the repository
 2. [Architecture](ARCHITECTURE.md): components, data flow, module stability
@@ -50,16 +69,18 @@ python -m remora try
 7. [NEGATIVE_RESULTS.md](NEGATIVE_RESULTS.md): failed hypotheses and limitations, kept permanently
 8. [Peer-review findings](docs/review/PEER_REVIEW_FINDINGS.md): every objection raised against the paper, and what was done about it
 
-## How an action gets through
+The [documentation index](docs/README.md) lists the complete registered set.
+
+</details>
+
+<details>
+<summary>How an action gets through, step by step</summary>
 
 1. Authoritative context. Tool meaning, target, risk and approved intent come from deployment-owned sources such as a Signed ToolSpec, never from the calling agent.
 2. Policy decision. Deterministic hard guards outrank model-derived signals.
 3. Review or grant. `VERIFY` and `ESCALATE` enter bounded review; `ACCEPT` receives a short-lived, single-use grant bound to the proposal.
 4. PEP and dispatch. The grant is consumed, an `ExecutionLease` binds policy identity to call identity, and `GovernedToolDispatcher` invokes the deployment-owned callable.
 5. Lifecycle and evidence. Dispatch intent, outcome, effect verification and audit records stay joinable by proposal identity.
-
-<details>
-<summary>What sits outside that path</summary>
 
 The separate `/v1/assess` research surface can use oracle, evidence and uncertainty components. They are not prerequisites for the execution kernel and cannot override its deterministic hard-guard floor.
 
@@ -97,14 +118,12 @@ Replaced claims are kept in [superseded claims](docs/assurance/superseded_claims
 
 </details>
 
-## Run it
+## More to run
 
 ```bash
-python -m remora assess drop_database
-python -m remora whatif drop_database   # what would it take to ACCEPT? nothing a model can say
-python -m pytest tests/ -q
-python scripts/demo_industrial_maintenance.py
-python -m remora doctor
+python -m pytest tests/ -q                     # the deterministic suite (about 10,800 tests)
+python scripts/demo_industrial_maintenance.py  # a worked operational scenario
+python -m remora doctor                        # check the local configuration
 ```
 
 <details>
