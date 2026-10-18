@@ -61,7 +61,7 @@
 # is documented, not invisible.
 
 schema_version: "1"
-updated: "2026-10-17"
+updated: "2026-10-18"
 
 maturity_levels:
   - implemented_and_tested
@@ -1577,6 +1577,12 @@ bibliography:
       note: "EU AI Act Art. 12/14 mapped at runtime; no conformity assessment claimed."
     - {id: international-2016-iec, surname: "International", year: "2016", role: standard_or_regulation, note: "IEC 61511 SIL framing in the case study."}
     - {id: standards-2021-norsok, surname: "Standards", year: "2021", role: standard_or_regulation, note: "NORSOK D-010 well-barrier framing in the case study."}
+    - {id: model-2025-mcp, surname: "Model", year: "2025", role: standard_or_regulation, url: "https://modelcontextprotocol.io/specification/2025-11-25", note: "MCP specification revision 2025-11-25. The paper quotes its statements that MCP cannot enforce security at the protocol level and that tool annotations are untrusted; REMORA binds approvals to a signed ToolSpec instead. No MCP conformance is claimed. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: lodderstedt-2023-rar, surname: "Lodderstedt", year: "2023", role: standard_or_regulation, note: "OAuth 2.0 Rich Authorization Requests, RFC 9396 (Standards Track). Structured authorization_details; compared with the exact-call lease. REMORA does not implement RAR. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: oasis-2013-xacml, surname: "OASIS", year: "2013", role: standard_or_regulation, note: "XACML 3.0 OASIS Standard (22 January 2013, ed. E. Rissanen). Source of the PDP/PEP vocabulary in paper 4.4; REMORA does not use XACML policies. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: laurie-2013-ct, surname: "Laurie", year: "2013", role: standard_or_regulation, note: "Certificate Transparency, RFC 6962 (Experimental). Append-only audited Merkle logs; REMORA's audit chain is not anchored in such a log. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: laurie-2021-ct, surname: "Laurie", year: "2021", role: standard_or_regulation, note: "Certificate Transparency 2.0, RFC 9162 (Experimental), obsoletes RFC 6962. Same role as laurie-2013-ct. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: biscuit-2026-eclipse, surname: "Biscuit", year: "2026", role: standard_or_regulation, url: "https://www.biscuitsec.org/", note: "Eclipse Biscuit authorization tokens (public-key signed, offline attenuation, Datalog checks); website accessed 2026-10-18, year is the access year. Token-level precedent for the lease; REMORA does not use Biscuit. Verified against the primary source 2026-10-18 (PRF-017)."}
     - id: open-2024-open
       surname: "Open"
       year: "2024"
@@ -1597,7 +1603,7 @@ bibliography:
     - {id: corsi-2021-formal, surname: "Corsi", year: "2021", role: positioning_only}
     - {id: crosby-2009-efficient, surname: "Crosby", year: "2009", role: positioning_only, note: "Tamper-evident logging; named as a known mechanism REMORA integrates."}
     - {id: debenedetti-2024-agentdojo, surname: "Debenedetti", year: "2024", role: positioning_only, note: "AgentDojo - named as a required replication target, not run."}
-    - {id: debenedetti-2025-defeating, surname: "Debenedetti", year: "2025", arxiv: "2503.18813", role: positioning_only, note: "CaMeL; shelf SHELF-008."}
+    - {id: debenedetti-2025-defeating, surname: "Debenedetti", year: "2025", arxiv: "2503.18813", role: positioning_only, note: "CaMeL; shelf SHELF-008. Pinned to arXiv v2 (2025-06-24): 77% of AgentDojo tasks with provable security vs 84% undefended; v1 reported 67%. Checked 2026-10-18 (PRF-038)."}
     - {id: dong-2025-evaluating, surname: "Dong", year: "2025", arxiv: "2502.11347", role: positioning_only, note: "TEE attestation sketch; hardware integration pending."}
     - {id: du-2024-improving, surname: "Du", year: "2024", role: positioning_only, note: "Multi-agent debate; REMORA's dissensus is a one-shot analogue."}
     - {id: endsley-1995-toward, surname: "Endsley", year: "1995", role: positioning_only, note: "Situation awareness; supervision framing only."}
@@ -1620,7 +1626,7 @@ bibliography:
     - {id: ruan-2024-identifying, surname: "Ruan", year: "2024", role: positioning_only, note: "ToolEmu anticipates the Shadow Mode counterfactual idea."}
     - {id: shamsujjoha-2024-taxonomy, surname: "Shamsujjoha", year: "2024", arxiv: "2408.02205", role: positioning_only, note: "Swiss-cheese guardrail taxonomy."}
     - {id: sharma-2025-constitutional, surname: "Sharma", year: "2025", arxiv: "2501.18837", role: positioning_only, note: "Constitutional classifiers."}
-    - {id: shi-2025-progent, surname: "Shi", year: "2025", arxiv: "2504.11703", role: positioning_only, note: "Progent; shelf SHELF-009. Defines the (safety, friction) frontier."}
+    - {id: shi-2025-progent, surname: "Shi", year: "2025", arxiv: "2504.11703", role: positioning_only, note: "Progent; shelf SHELF-009. Defines the (safety, friction) frontier. Pinned to arXiv v2 (2025-08-30): LLM-generated policies, gpt-4o, AgentDojo ASR 39.9% to 1.0%, utility 76.3% vs 79.4%; v3 (2026-05-14) repeats 39.9% to 1.0%; v1 reported 41.2% to 2.2%. Checked 2026-10-18 (PRF-038)."}
     - {id: wang-2026-pcaa, surname: "Wang", year: "2026", arxiv: "2606.04104", role: positioning_only, note: "Proof-Carrying Agent Actions - runtime-portable action certificate; REMORA trades portability for exact-call binding to one kernel."}
     - {id: wang-2023b-lora, surname: "Wang", year: "2023b", arxiv: "2310.00035", doi: "10.48550/arXiv.2310.00035", role: positioning_only, note: "LoRA ensembles; motivates but does not validate heterogeneous aggregation."}
     - {id: wang-2025-agentspec, surname: "Wang", year: "2025", arxiv: "2503.18666", role: positioning_only, note: "AgentSpec - DSL near-isomorphic to REMORA's policy invariants."}
@@ -1631,6 +1637,18 @@ bibliography:
     - {id: yuan-2024-judge, surname: "Yuan", year: "2024", role: positioning_only, note: "R-Judge."}
     - {id: zhan-2024-injecagent, surname: "Zhan", year: "2024", role: positioning_only, note: "InjecAgent."}
     - {id: zhang-2024-calibrating, surname: "Zhang", year: "2024", arxiv: "2404.02655", role: positioning_only, note: "Confidence elicitation by fidelity."}
+    - {id: wu-2024-fsecure, surname: "Wu", year: "2024", arxiv: "2409.19091", role: positioning_only, note: "f-secure LLM system (Wu, Cecchetti, Xiao), arXiv v2: information-flow control with a security monitor over the planner. The 'Wu et al. 2024' of PRF-017. Baseline for a data-flow extension; REMORA claims no trajectory-level or data-flow property. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: costa-2025-fides, surname: "Costa", year: "2025", arxiv: "2505.23643", role: positioning_only, note: "FIDES, arXiv v2: planner with confidentiality/integrity labels and deterministic policy enforcement. REMORA propagates no labels across calls. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: wu-2025-isolategpt, surname: "Wu", year: "2025", arxiv: "2403.04960", role: positioning_only, note: "IsolateGPT (NDSS 2025; arXiv v1 titled SecGPT): execution isolation between LLM apps. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: hines-2024-spotlighting, surname: "Hines", year: "2024", arxiv: "2403.14720", role: positioning_only, note: "Spotlighting, arXiv v1: input transformation to mark provenance. Upstream model-side defense; not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: chen-2025a-struq, surname: "Chen", year: "2025a", arxiv: "2402.06363", role: positioning_only, note: "StruQ (USENIX Security 2025), arXiv v2: structured prompt/data channels plus fine-tuning. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: chen-2025b-secalign, surname: "Chen", year: "2025b", arxiv: "2410.05451", role: positioning_only, note: "SecAlign (ACM CCS 2025), arXiv v3: preference optimization against prompt injection. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: jia-2025-taskshield, surname: "Jia", year: "2025", arxiv: "2412.16682", role: positioning_only, note: "Task Shield (ACL 2025 long, pp. 29680-29697), arXiv v1: test-time task-alignment check per tool call. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: zhu-2025-melon, surname: "Zhu", year: "2025", arxiv: "2502.05174", role: positioning_only, note: "MELON (ICML 2025), arXiv v4: masked re-execution to detect indirect prompt injection. REMORA does not re-execute trajectories. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: tsai-2025-conseca, surname: "Tsai", year: "2025", arxiv: "2501.17070", role: positioning_only, note: "Conseca (HotOS 2025), arXiv v3: just-in-time contextual policies; contrasted with REMORA's fixed, versioned hard-block floor. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: beurerkellner-2025-patterns, surname: "Beurer-Kellner", year: "2025", arxiv: "2506.08837", role: positioning_only, note: "Design patterns for securing LLM agents against prompt injections, arXiv v3. Framing only. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: cutler-2024-cedar, surname: "Cutler", year: "2024", arxiv: "2403.04651", doi: "10.1145/3649835", role: positioning_only, note: "Cedar (PACMPL 8 OOPSLA1, 670-697): analyzable authorization language with Lean proofs. REMORA does not use Cedar. Verified against the primary source 2026-10-18 (PRF-017)."}
+    - {id: schneier-1999-secure, surname: "Schneier", year: "1999", doi: "10.1145/317087.317089", role: positioning_only, note: "Secure audit logs (ACM TISSEC 2(2):159-176; volume/issue per Crossref). REMORA's chain has no forward-secure keying. Verified against the primary source 2026-10-18 (PRF-017)."}
 
   # Sources that ground code or a matrix line but are NOT cited in the paper.
   # Recorded so the reconciliation is bidirectional: a code citation with no
