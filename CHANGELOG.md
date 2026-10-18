@@ -12,6 +12,44 @@ This file lists externally relevant changes by release. Fine-grained development
   verifier at the frozen revision. It records where the two agree on the
   observed effect and fails if the split changes. It is a `REPRODUCTION` and
   advances nothing.
+### Flow control IFC-02b (`POST /v1/contexts`)
+
+- `POST /v1/contexts` mints a flow context for the authenticated principal
+  and returns `context_id` and `label_epoch`. The caller cannot choose the
+  id, the label or the epoch (extra fields are a 422). A child named by
+  `parent_context_id` starts at its parent's label.
+- **Refusals:** 409 `flow_control_disabled` unless `REMORA_FLOW_CONTROL=1`;
+  403 `principal_mismatch` for a user principal outside the caller's tenant;
+  403 `processing_not_authorized` for a processor the processing policy
+  (`REMORA_FLOW_PROCESSING_POLICY`) does not authorize; 404
+  `flow_context_unknown`; 503 `flow_state_unavailable`. Without a
+  processing policy nothing is authorized.
+- Each mint is recorded on the tenant chain as `flow_context_minted`.
+- The store uses the same three durable switches as the loop-safety store,
+  declared as wiring point ASW-006 for AST-016, and the Postgres cases now
+  run in the CI Postgres job.
+- Contracts touched: `schemas/openapi.json` and the generated TypeScript
+  client gain the route. No existing route changes. Labels are not yet
+  raised by any tool result; that is IFC-03.
+
+### Flow control IFC-02a (context store)
+
+- `remora/flow/context.py` adds `FlowContextStore`, which provides `mint`,
+  `fork`, `load`, `raise_label` and `charge_budget`.
+- **Contexts:** ids are minted server-side (`ctx_` + 128 random bits). A
+  fork inherits its parent's label and shares the root context's budget
+  ledger.
+- **The label:** it only rises, and there is no lowering or reset API. Every
+  raise keeps `flows_to(label, model_principal)`.
+- **Minting:** refused with `processing_not_authorized` unless the
+  deployment's processing policy authorizes each processor.
+- **Event store:** the flow event stream is separate from the loop-safety
+  stream, so a loop reset cannot lower a label. `append_if(expected_seq)`
+  gives exactly one winner per sequence on the in-process, SQLite, Postgres
+  and D1 backends. Concurrency is tested with eight threads on each,
+  Postgres in the CI Postgres job. An unreachable store raises
+  `FlowStoreUnavailable` and never reads as empty.
+- The HTTP route `POST /v1/contexts` follows in IFC-02b (protected path).
 
 ### Flow control IFC-01 (label lattice)
 
