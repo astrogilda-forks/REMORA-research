@@ -73,13 +73,14 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from remora.governance.envelope import DecisionEnvelope
 from remora.policy.decision_engine import PolicyTrace, RemoraDecisionEngine
 from remora.policy.report import DecisionAction, DecisionReport
+from remora.toolcall.label_caps import RISK_ORDER as _RISK_ORDER
+from remora.toolcall.label_caps import LabelCapReason
 
 if TYPE_CHECKING:
     from remora.policy.whatif import WhatIfReport
@@ -112,12 +113,6 @@ _NAME_INFERENCE: tuple[tuple[tuple[str, ...], str, str], ...] = (
 )
 
 
-#: Strictness order for the raise-only clamp. Anything outside this map
-#: (typos, custom tiers) is never clamped — the engine's own validation
-#: owns unknown tiers.
-_RISK_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-
-
 def infer_risk_and_type(name: str) -> tuple[str | None, str | None]:
     """Return ``(action_type, risk_tier)`` inferred from a tool name.
 
@@ -139,18 +134,6 @@ def infer_risk_and_type(name: str) -> tuple[str | None, str | None]:
 
 #: A deployment-owned mapping: tool name -> {"risk_tier", "action_type", ...}.
 ToolRegistry = Mapping[str, Mapping[str, Any]]
-
-
-class LabelCapReason(str, Enum):
-    """Why an ACCEPT was lowered to VERIFY on the library path.
-
-    Appended to ``DecisionReport.reasons`` and so to the envelope's
-    ``policy_triggers``. The engine itself never emits these.
-    """
-
-    CALLER_LABELS_UNTRUSTED = "caller_labels_untrusted"
-    TOOL_NOT_IN_REGISTRY = "tool_not_in_registry"
-    REGISTRY_LABEL_CONFLICT = "registry_label_conflict"
 
 
 #: Same entry keys as the REMORA_TOOL_METADATA_FILE declaration

@@ -2432,8 +2432,9 @@ def _assess_labels(req: AssessRequest) -> _AssessLabels:
     ``tool_call`` there is no tool identity to look up, so the labels are
     the caller's own and cannot produce ACCEPT.
     """
-    from remora.assess import LabelCapReason, _RISK_ORDER
     from remora.toolcall.deployment_registry import resolve_tool_metadata
+    from remora.toolcall.label_caps import RISK_ORDER as _RISK_ORDER
+    from remora.toolcall.label_caps import LabelCapReason
     from servers.execution_api import _effective_target_environment
 
     if req.tool_call is None:
@@ -3069,7 +3070,7 @@ def rerun(req: RerunRequest, request: Request) -> dict | JSONResponse:
     # registry cannot be consulted again. The labels keep ACCEPT only when
     # the original assessment took them from the registry; a record without
     # a label_source predates this rule and is treated as the caller's.
-    from remora.assess import LabelCapReason
+    from remora.toolcall.label_caps import LabelCapReason
 
     prior_record = _CONTROL_PLANE_STORE.get_audit_record(
         request_id=req.request_id, tenant_id=tenant_id)

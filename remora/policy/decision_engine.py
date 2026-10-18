@@ -759,7 +759,10 @@ _MATRIX_GATES: frozenset[str] = frozenset({
 })
 #: Estimators over facts the matrix already decides on; they yield to it.
 _ESTIMATOR_GATES: frozenset[str] = frozenset({"minimax_gate", "trap_escalate", "trap_verify"})
-assert {g.name for g in _CONDITIONAL_GATES} >= _MATRIX_GATES | _ESTIMATOR_GATES
+if not {g.name for g in _CONDITIONAL_GATES} >= _MATRIX_GATES | _ESTIMATOR_GATES:
+    raise AssertionError(
+        "a matrix or estimator gate is missing from _CONDITIONAL_GATES: "
+        f"{sorted((_MATRIX_GATES | _ESTIMATOR_GATES) - {g.name for g in _CONDITIONAL_GATES})}")
 
 
 # ---------------------------------------------------------------------------

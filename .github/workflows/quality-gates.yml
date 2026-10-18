@@ -73,16 +73,6 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          # Node 24 bundles npm 11. The regenerated package-lock.json requires
-          # npm >= 11 for `npm ci` — npm 10 (bundled with Node 22) rejects it
-          # with missing @emnapi/* lock entries (verified 2026-07-20).
-          node-version: "24"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
       - name: Install package and test deps
         run: |
           python -m pip install --upgrade pip
@@ -222,6 +212,28 @@ jobs:
       - name: Quality report
         run: python scripts/quality_report.py
 
+  frontend:
+    # Split from `verify` 2026-10-18: the coverage pass is the long pole
+    # (~10-14 min) and the frontend chain ran serially after it (~4-5 min).
+    # As a parallel job the workflow's wall time is the coverage run, not
+    # coverage-plus-frontend. Every gate that ran in `verify` still runs —
+    # nothing was dropped or weakened, only moved.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Node 24 bundles npm 11. The regenerated package-lock.json requires
+          # npm >= 11 for `npm ci` — npm 10 (bundled with Node 22) rejects it
+          # with missing @emnapi/* lock entries (verified 2026-07-20).
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Install frontend deps
         working-directory: frontend
         # The lockfile was regenerated with npm 11, which records optional
@@ -258,8 +270,9 @@ jobs:
 
       - name: Generated API types drift gate
         # src/generated/remora-api.ts is generated from schemas/openapi.json
-        # (itself drift-gated above). Regenerate and diff: a contract change
-        # that skips regeneration is a red build, not silent client drift.
+        # (drift-gated in the verify job). Regenerate and diff: a contract
+        # change that skips regeneration is a red build, not silent client
+        # drift.
         working-directory: frontend
         run: |
           npm run api:types
@@ -448,7 +461,7 @@ jobs:
     # success. A leg that errors before it starts (runner lost, queue
     # timeout) reads as failure here, not as absence.
     if: always()
-    needs: [verify, worker-envelope-parity, worker-typecheck, replay-heavy, federation-port-adapter]
+    needs: [verify, frontend, worker-envelope-parity, worker-typecheck, replay-heavy, federation-port-adapter]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every aggregated leg succeeded
