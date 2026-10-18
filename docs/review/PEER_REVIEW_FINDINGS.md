@@ -208,7 +208,7 @@ conditions?
 | Affected claims | CLAIM-021, CLAIM-019 |
 | Action | Level 2: committed post-hoc naive arms (name overlap, schema-only) with accept-gold against accept-wrong curves, labelled post hoc. Level 3: external baselines (LLM judge, policy engine) in SAP v7. §14 now states that no such baseline was run. |
 | Owning PR | level-2 PR (naive rules); SAP v7 (external baselines) |
-| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): two-token overlap gives 51/291 gold, 2/295 wrong, 1/119 wrong tool and 48/238 missing-argument accepts. One-token overlap gives 178/291, 6/295, 29/119 and 132/238. Schema-only accepts all 295 wrong calls. V2D gives 87/291 and 0 on every other family. The results are reported in §10.9 and §14 and in §83. External baselines (LLM judge, existing guardrail) still need SAP v7. |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): two-token overlap gives 51/291 gold, 2/295 wrong, 1/119 wrong tool and 48/238 missing-argument accepts. One-token overlap gives 178/291, 6/295, 29/119 and 132/238. Schema-only accepts all 295 wrong calls. V2D gives 87/291 and 0 on every other family. The results are reported in §10.9 and §14 and in §83. External baselines (LLM judge, existing guardrail) still need SAP v7. Pre-registered, not run: SAP v7 §14 (Q7, draft addendum of 2026-10-18) fixes an LLM judge (`claude-sonnet-5-5`, frozen prompt, matched-safety threshold), Invariant Guardrails as the policy engine, hypotheses H5 to H7 and their thresholds, on BFCL v4 multi-turn at gorilla `6ea57973` with model-generated wrong calls. No data yet; owner approval and sealing are pending (§15.5). |
 | Status | IN_PROGRESS |
 
 ### PRF-012 The system routes annotated gold proposals; this was not stated
@@ -259,9 +259,9 @@ conditions?
 | Evidence | §4.4, §10, §2.11 ("covers injection and oracle compromise"). |
 | Affected claims | none (no claim measures the chain) |
 | Action | Level 3: a threat-model section and an attack evaluation against a policy-only gateway baseline. New §13.13 and contribution 1 now state that the chain is not evaluated. |
-| Owning PR | level-1 PR (disclosure); level 3 to follow |
-| Verification | Pending for the evaluation. |
-| Status | OPEN |
+| Owning PR | level-1 PR (disclosure); evaluation in the evidence/execution-chain-attack-eval PR; threat model in #927 |
+| Verification | The attack evaluation exists: `scripts/execution_chain_attack_eval.py`, `artifacts/posthoc/execution_chain_attack_eval_v1.json`, `tests/test_execution_chain_attack_eval.py`, NEGATIVE_RESULTS.md §87. It drives `/v1/execution` (signed ToolSpec bundle, ACCEPT token, review grant, lease, dispatch re-check) and a policy-only gateway that takes the same proposal-time decision. Over replay, argument substitution, ToolSpec redeploy or callable swap, cross-task/actor/tenant reuse, forgery and expiry, REMORA ran 0 of 37 attacks and the gateway 31. REMORA ran all 16 benign controls. The four attacks that ran on REMORA in the first measurement are closed: the review path now binds the executing actor and task through the `AuthorizationContext` comparison (both refuse `context_mismatch`), and a reviewed risk tier that changed voids the approval (`approval_invalidated`). Remaining: the threat-model section (#927), which should cite the artifact; the evaluation is the author's own catalogue in one profile with in-process state and HMAC signing; the harness bypasses `_enforce_review_approval_role`, so the approver-role path for a raised tier is unmeasured. |
+| Status | IN_PROGRESS |
 
 ### PRF-016 Per-call authorization does not stop attacks composed of allowed calls
 
@@ -585,7 +585,7 @@ conditions?
 | Affected claims | none (no claim measures the library path) |
 | Action | Level 3: the threat model must state that labels from the agent are untrusted. The library API should refuse caller labels by default, or mark its result advisory in the type; a test should pin that an untrusted label cannot raise autonomy. |
 | Owning PR | #934 (owner decision 2026-10-18: registry requirement). The change is in `remora/assess.py` and `remora/cli.py`; nothing under `remora/policy/` changed. |
-| Verification | `assess_tool_call` and `what_if_tool_call` take `registry=`. Labels from the caller or from name inference cannot produce ACCEPT: an engine ACCEPT is lowered to VERIFY with the reason `caller_labels_untrusted`, recorded in the envelope. A tool missing from a supplied registry is assessed as critical/unknown, and `should_execute` requires `label_source == "registry"`. The attack call above now returns VERIFY. Tests in `tests/test_assess_registry.py`: `test_prf040_attack_without_registry_is_not_accepted`, `test_prf041_exfil_read_without_registry_is_not_accepted`, `test_registry_classifying_xfer_honestly_does_not_accept`, `test_caller_labels_cannot_lower_a_registry_classification`, `test_registry_low_risk_read_still_accepts`, `test_unknown_tool_in_registry_fails_closed`, `test_no_caller_label_combination_accepts_without_registry` (Hypothesis, 300 examples) and `test_exhaustive_caller_labels_never_accept_without_registry`; CLI tests `test_remora_assess_caller_labels_never_accept` and `test_live_accept_on_caller_labels_is_capped_in_decision_and_envelope` in `tests/test_cli.py`. Still open: `trust_score`/`phase` remain caller stand-ins and can lift a registry-classified low-risk read to ACCEPT; the registry binds a name, not a callable; the action-gate adapters in `remora/adapters/` forward caller labels to a gateway and were not changed; the threat-model statement belongs to level 3 (PRF-015). |
+| Verification | `assess_tool_call` and `what_if_tool_call` take `registry=`. Labels from the caller or from name inference cannot produce ACCEPT: an engine ACCEPT is lowered to VERIFY with the reason `caller_labels_untrusted`, recorded in the envelope. A tool missing from a supplied registry is assessed as critical/unknown, and `should_execute` requires `label_source == "registry"`. The attack call above now returns VERIFY. Tests in `tests/test_assess_registry.py`: `test_prf040_attack_without_registry_is_not_accepted`, `test_prf041_exfil_read_without_registry_is_not_accepted`, `test_registry_classifying_xfer_honestly_does_not_accept`, `test_caller_labels_cannot_lower_a_registry_classification`, `test_registry_low_risk_read_still_accepts`, `test_unknown_tool_in_registry_fails_closed`, `test_no_caller_label_combination_accepts_without_registry` (Hypothesis, 300 examples) and `test_exhaustive_caller_labels_never_accept_without_registry`; CLI tests `test_remora_assess_caller_labels_never_accept` and `test_live_accept_on_caller_labels_is_capped_in_decision_and_envelope` in `tests/test_cli.py`. The same cap now covers `/v1/assess` and the action-gate adapters in `remora/adapters/` (RMR-AUD-011): the route resolves labels from the server registry and the adapters take `registry=`, so a caller label cannot reach ACCEPT on either path. Still open: `trust_score`/`phase` remain caller stand-ins and can lift a registry-classified low-risk read to ACCEPT; the registry binds a name, not a callable; the threat-model statement belongs to level 3 (PRF-015). |
 | Status | RESOLVED |
 
 ### PRF-041 No assessment of argument content, so a read tool can exfiltrate
@@ -597,9 +597,9 @@ conditions?
 | Evidence | Reproduced 2026-10-17 on `bce4bfeb`. On the server path, taint comes from a request field the agent can omit. §13.13 of the paper already disclaims trajectory-level and data-flow enforcement. Since the PRF-040 fix the call with caller labels returns VERIFY, but the same call with a registry that classifies `http_get` as a low-risk read still returns ACCEPT, so this finding stands. |
 | Affected claims | none |
 | Action | Level 3: put argument-content and destination policy in the threat model, and measure exfiltration in the attack evaluation (PRF-015) against a policy-only and an information-flow baseline. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | evidence/execution-chain-attack-eval PR (measurement) |
+| Verification | Measured in `artifacts/posthoc/execution_chain_attack_eval_v1.json` (`scripts/execution_chain_attack_eval.py`, `tests/test_execution_chain_attack_eval.py`, NEGATIVE_RESULTS.md §87). On `/v1/execution` with `REMORA_LOW_CONSEQUENCE_ACCEPT=1`, `/assess` gives the exfiltrating `http_get` the same ACCEPT as a benign one, and the secret reached the sink in 6 of 6 read-exfiltration and 5 of 5 composed read-then-send attacks, on REMORA and on the policy-only baseline alike. Declaring the untrusted context did not change the decision, because without a semantic bundle it never reaches the observation. The information-flow baseline is `remora.flow.check.flow_check`, applied by the harness and labelled library_only: it refused 10 of 10 and also refused 1 of 4 benign controls. Remaining: argument-content and destination policy in the threat model (#927), and a decision path that reads the flow verdict (IFC-05b); the grounded-read path was not configured and is unmeasured. |
+| Status | IN_PROGRESS |
 
 ### PRF-042 The injection pattern list misses simple paraphrases
 
@@ -611,7 +611,7 @@ conditions?
 | Affected claims | none |
 | Action | Do not grow the list as a defence. State in the threat model that pattern matching is a hint, and measure injection with an external benchmark (AgentDojo or InjecAgent) in level 3. |
 | Owning PR | not yet opened |
-| Verification | Pending. |
+| Verification | Pending. Pre-registered, not run: SAP v7 §13 (Q6, draft addendum of 2026-10-18) runs InjecAgent at `f19c9f2c` through `/v1/execution/assess` against allow-all and a policy-only gateway, with a registry fixed before any agent output, benign twin controls, hypotheses H4a and H4b, and blocks due to the pattern list counted apart (S6.5). No data yet; owner approval and sealing are pending (§15.5). |
 | Status | OPEN |
 
 ### PRF-043 The paper uses BFCL v4 as its main evidence without citing it

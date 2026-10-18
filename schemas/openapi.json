@@ -142,6 +142,22 @@
             "title": "Envelope",
             "type": "object"
           },
+          "label_cap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Cap"
+          },
+          "label_source": {
+            "default": "none",
+            "title": "Label Source",
+            "type": "string"
+          },
           "oracle_calls": {
             "title": "Oracle Calls",
             "type": "integer"
@@ -731,6 +747,18 @@
         "properties": {
           "audit": {
             "$ref": "#/components/schemas/AuditRef"
+          },
+          "delegated_executor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The delegate the proposal named at assess time, approved with the call; absent when it named none.",
+            "title": "Delegated Executor"
           },
           "expires_at": {
             "title": "Expires At",
@@ -1348,6 +1376,40 @@
         "title": "PolicyDecision",
         "type": "object"
       },
+      "ReceiptSignatureModel": {
+        "additionalProperties": false,
+        "description": "A detached Ed25519 signature under ``REMORA/EFFECT-RECEIPT/v1``.",
+        "properties": {
+          "algorithm": {
+            "maxLength": 32,
+            "title": "Algorithm",
+            "type": "string"
+          },
+          "domain": {
+            "maxLength": 64,
+            "title": "Domain",
+            "type": "string"
+          },
+          "kid": {
+            "maxLength": 100,
+            "title": "Kid",
+            "type": "string"
+          },
+          "signature": {
+            "maxLength": 200,
+            "title": "Signature",
+            "type": "string"
+          }
+        },
+        "required": [
+          "algorithm",
+          "domain",
+          "kid",
+          "signature"
+        ],
+        "title": "ReceiptSignatureModel",
+        "type": "object"
+      },
       "RejectRequest": {
         "description": "Record a reviewer's refusal of a pending item.",
         "properties": {
@@ -1574,6 +1636,32 @@
         "title": "SemanticAssessment",
         "type": "object"
       },
+      "SignedEffectReceiptRequest": {
+        "additionalProperties": false,
+        "description": "A signed observation from a verifier domain (CAPR-06 to CAPR-08).\n\nUnlike :class:`EffectVerificationRequest` this carries no verdict to\nrecord. ``receipt`` holds what the verifier read, signed by a key the\ndeployment registered; ``arguments`` are the approved call's arguments,\naccepted only when they hash to the dispatched call. REMORA instantiates\nthe contract from the signed ToolSpec and computes the verdict itself.\nSee ``docs/design/compositional-authority-preservation-v1.md`` §4.",
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "receipt": {
+            "additionalProperties": true,
+            "title": "Receipt",
+            "type": "object"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/ReceiptSignatureModel"
+          }
+        },
+        "required": [
+          "receipt",
+          "signature",
+          "arguments"
+        ],
+        "title": "SignedEffectReceiptRequest",
+        "type": "object"
+      },
       "ToolCallRequest": {
         "description": "The PROPOSAL only (issue #34 trust boundary; full-args binding kept).\n\nThe request carries what the agent proposes: tool, exact arguments,\nrequested target. Every authoritative safety signal — risk tier,\ndomain, action type, trust, phase, evidence status, schema validity,\nrollback capability — is derived SERVER-SIDE from the tool registry;\nthe caller can never assert its way to an ACCEPT. The only inbound\nsafety influence permitted is a DOWNGRADE: schema_valid=false or\nrollback_available=false lowers trust; true/None never raises it.\nLegacy pre-#34 fields (trust_score, phase, evidence_action,\nevidence_confidence, risk_tier, domain, action_type) are ignored as\nunknown extras for wire compatibility.",
         "examples": [
@@ -1613,6 +1701,19 @@
               }
             ],
             "title": "Context Id"
+          },
+          "delegated_executor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegated Executor"
           },
           "derivations": {
             "anyOf": [
@@ -3153,6 +3254,111 @@
           }
         },
         "summary": "Record Effect",
+        "tags": [
+          "execution"
+        ]
+      }
+    },
+    "/v1/execution/proposals/{proposal_id}/effect-receipt": {
+      "post": {
+        "description": "Compute and record an effect verdict from a signed receipt (CAPR-07/08).\n\nThe digest endpoint above records an attestation. This one records a\nverdict REMORA computed: the contract comes from the signed ToolSpec v5\n``postcondition`` block and the approved arguments, the observation from\na receipt signed by a registered verifier key, and the vantage from that\nkey's registry record. A status the receipt claims is kept beside the\ncomputed one and never replaces it.",
+        "operationId": "record_signed_effect_receipt_v1_execution_proposals__proposal_id__effect_receipt_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedEffectReceiptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Signed Effect Receipt V1 Execution Proposals  Proposal Id  Effect Receipt Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "REMORA computed the verdict and appended it to the audit chain."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No such proposal for this tenant."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The receipt cannot be bound or evaluated."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No verifier keys are registered."
+          }
+        },
+        "summary": "Record Signed Effect Receipt",
         "tags": [
           "execution"
         ]

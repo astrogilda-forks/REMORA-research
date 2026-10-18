@@ -96,12 +96,23 @@ class DemoGateway:
         )
 
 
+#: Owned by the deployment, not the agent: the adapter takes risk tier and
+#: action type from here. Labels on a proposed call cannot reach ACCEPT on
+#: their own (RMR-AUD-011).
+DEPLOYMENT_REGISTRY = {
+    "search_docs": {"risk_tier": "low", "action_type": "read"},
+    "send_email": {"risk_tier": "medium", "action_type": "write"},
+    "delete_table": {"risk_tier": "critical", "action_type": "destructive_write"},
+}
+
+
 class GovernedToolNode:
     """Minimal LangGraph-style tool node with REMORA pre-execution gating."""
 
     def __init__(self, tools: dict[str, Callable[[dict[str, Any]], dict[str, Any]]]) -> None:
         self.tools = tools
-        self.adapter = LangGraphActionAdapter(gateway=DemoGateway())
+        self.adapter = LangGraphActionAdapter(gateway=DemoGateway(),
+                                              registry=DEPLOYMENT_REGISTRY)
         self.executed: list[str] = []
 
     def invoke(self, tool_calls: list[ToolCall]) -> list[dict[str, Any]]:

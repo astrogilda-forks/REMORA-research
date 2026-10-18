@@ -61,7 +61,11 @@ def from_dict(d, cls):
                 v['expires_at'] = datetime.fromisoformat(v['expires_at'])
                 v['issued_at'] = datetime.fromisoformat(v['issued_at'])
                 v['approved_action'] = DecisionAction(v['approved_action'])
+                if isinstance(v.get('approved_reasons'), list):
+                    v['approved_reasons'] = tuple(v['approved_reasons'])
                 kwargs[k] = Approval(**v)
+            elif k == 'requested_reasons' and isinstance(v, list):
+                kwargs[k] = tuple(v)
             else:
                 kwargs[k] = v
         return cls(**kwargs)

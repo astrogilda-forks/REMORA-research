@@ -43,8 +43,9 @@ def _suites() -> dict[str, Any]:
 
 
 def split() -> dict[str, dict[str, list[str]]]:
-    from experiments.control_eval.metrics import split_tasks
-    return split_tasks({name: list(s.user_tasks) for name, s in _suites().items()})
+    from experiments.control_eval.metrics import inspected_user_tasks, split_tasks
+    return split_tasks({name: list(s.user_tasks) for name, s in _suites().items()},
+                       forced_dev=inspected_user_tasks())
 
 
 def _scripted_agent(task: Any):

@@ -12,7 +12,7 @@ a handle. ``sink`` says who receives the call's arguments. The contract is
 nothing reads would be a constraint the author believes in and the runtime
 ignores. :func:`lint_flow` then checks the block against the rest of the
 spec (argument schema, action type, effect mode) and returns one finding per
-broken rule, FL-01 to FL-12. :func:`lint_toolspec` adds FL-13, the strict
+broken rule, FL-01 to FL-12 and FL-14. :func:`lint_toolspec` adds FL-13, the strict
 profile's refusal of a spec with no block.
 
 Defaults fail closed: an undeclared field is UNTRUSTED, rendered as a handle,
@@ -51,8 +51,9 @@ __all__ = [
     "parse_flow",
 ]
 
-#: Kinds an argument may declare. ``url`` makes a sink of ``recipients:
-#: none`` a lint failure (FL-01); ``resource`` makes a write name its
+#: Kinds an argument may declare. A ``url`` must be the ``url_host_of``
+#: argument, and an ``email`` or ``iban`` of a tool that writes must be named
+#: by the recipients rule (FL-01); ``resource`` makes a write name its
 #: resource (FL-05).
 ARGUMENT_KINDS: Final = ("url", "email", "iban", "resource", "principal", "text", "scalar")
 RETURN_MODES: Final = ("BY_VALUE", "BY_HANDLE")
@@ -64,7 +65,7 @@ FROM_ARGS_KINDS: Final = ("email", "principal")
 
 LINT_RULES: Final = (
     "FL-01", "FL-02", "FL-03", "FL-04", "FL-05", "FL-06", "FL-07",
-    "FL-08", "FL-09", "FL-10", "FL-11", "FL-12", "FL-13",
+    "FL-08", "FL-09", "FL-10", "FL-11", "FL-12", "FL-13", "FL-14",
 )
 
 _PATH = re.compile(r"\$(?:\.[A-Za-z_][A-Za-z0-9_]*|\[\*\])*")
@@ -400,10 +401,28 @@ def _schema_arguments(argument_schema: Mapping[str, Any]) -> set[str]:
     return set(props) if isinstance(props, Mapping) else set()
 
 
+def _renders_by_value(rule: FieldRule) -> bool:
+    """Whether a rule can show its node by value: BY_VALUE, or no return mode
+    and a ⊥ label (PUBLIC and TRUSTED), as the labeler decides."""
+    if rule.return_mode is not None:
+        return rule.return_mode == "BY_VALUE"
+    return rule.readers.kind == "public" and rule.integrity is Integrity.TRUSTED
+
+
+def _ancestor_paths(path: str) -> list[str]:
+    """'$[*].a.b' -> ['$', '$[*]', '$[*].a']: every container above a field."""
+    out, rest, prefix = [], path[1:], "$"
+    while rest:
+        out.append(prefix)
+        step = "[*]" if rest.startswith("[*]") else "." + rest[1:].split(".", 1)[0].split("[", 1)[0]
+        prefix, rest = prefix + step, rest[len(step):]
+    return out
+
+
 def lint_flow(flow: FlowSpec, *, argument_schema: Mapping[str, Any],
               action_type: str | None, effect_mode: str | None,
               tool_id: str = "?") -> tuple[LintFinding, ...]:
-    """Every broken rule FL-01 to FL-12, ordered by rule."""
+    """Every broken rule FL-01 to FL-12 and FL-14, ordered by rule."""
     found: list[LintFinding] = []
 
     def fail(rule: str, message: str) -> None:
@@ -415,10 +434,20 @@ def lint_flow(flow: FlowSpec, *, argument_schema: Mapping[str, Any],
     kinds = dict(flow.arguments)
     read_only = _read_only(action_type)
 
-    if recipients.kind == "none":
-        for name, kind in flow.arguments:
-            if kind == "url":
-                fail("FL-01", f"argument {name!r} is a url, so recipients cannot be none")
+    # A url is fetched, so it reaches its host whatever else the block says.
+    # An email or iban reaches its holder when the tool writes; a read-only
+    # lookup by address reaches no one (RMR-AUD-007).
+    covered = set(recipients.arguments())
+    for name, kind in flow.arguments:
+        if kind == "url" and recipients.kind == "none":
+            fail("FL-01", f"argument {name!r} is a url, so recipients cannot be none")
+        elif kind == "url" and not (recipients.kind == "url_host_of"
+                                    and recipients.argument == name):
+            fail("FL-01", f"argument {name!r} is a url, so recipients must be "
+                 f"url_host_of {name!r}")
+        elif kind in ("email", "iban") and not read_only and name not in covered:
+            fail("FL-01", f"argument {name!r} is an {kind} of a tool that writes, so the "
+                 "recipients rule must name it")
 
     named = [*sink.integrity_required, *(sink.payload_args or ()),
              *(a for a, _ in sink.roles_accepted), *recipients.arguments(),
@@ -468,6 +497,18 @@ def lint_flow(flow: FlowSpec, *, argument_schema: Mapping[str, Any],
     for name, kind in recipients.from_args:
         if name in kinds and kinds[name] != kind:
             fail("FL-12", f"from_args maps {name!r} to {kind}, but it is declared {kinds[name]}")
+
+    # A container without a rule that shows it by value is rendered as one
+    # handle (SDD §3.2.1, §3.3), so a BY_VALUE rule below it is never reached
+    # (RMR-AUD-008). Refuse the dead rule rather than traverse the container.
+    shown = {f.path for f in sources.fields if _renders_by_value(f)}
+    for f in sources.fields:
+        if f.return_mode != "BY_VALUE":
+            continue
+        hidden = [p for p in _ancestor_paths(f.path) if p not in shown]
+        if hidden:
+            fail("FL-14", f"field {f.path} is BY_VALUE, but its container {hidden[0]} has no "
+                 "BY_VALUE rule, so it is rendered as one handle and the field is never shown")
 
     order = {r: i for i, r in enumerate(LINT_RULES)}
     return tuple(sorted(found, key=lambda f: (order[f.rule], f.message)))

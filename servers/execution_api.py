@@ -52,6 +52,7 @@ from remora.enforcement.outbox import (
 )
 from remora.enforcement.token import PolicyDecisionToken
 from remora.governance import audit_outbox as _audit_outbox
+from remora.governance.delegation import delegated_executor_of, delegation_refusal
 from remora.governance.effect_receipt import (
     ReceiptRefused,
 )
@@ -130,6 +131,7 @@ from servers.execution_contracts import (  # noqa: F401
     RejectRequest,
     RevokePrincipalRequest,
     SemanticAssessment,
+    SignedEffectReceiptRequest,
     ToolCallRequest,
     ToolExecutionResult,
     ToolResultEnvelopeModel,
@@ -670,6 +672,7 @@ from remora.execution.dispatch import (
     record_dispatch_intent as _record_dispatch_intent_impl,
 )
 from remora.execution.review_service import (
+    ApprovalAuthority,
     ReviewConflict,
     ReviewNotFound,
     SeparationOfDutiesRefused,
@@ -681,6 +684,7 @@ from remora.execution.review_service import (
     reject_item as _reject_item,
 )
 from remora.execution.service import (
+    ApprovalContextRefused,
     TokenRefused,
     ToolSpecChanged,
 )
@@ -742,6 +746,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             rebuild_call=_rebuild_tool_call,
             assessed_record=_assessed_record,
             require_execution_context=context_required(),
+            approval_policy=_approval_policy_for(tenant),
         )
         if result is not None:
             results.append(result)
@@ -851,6 +856,7 @@ def _auth(request: Request) -> tuple[str, str, str]:
     return tenant, role, api_mod._authenticated_principal(request)
 
 
+import hashlib
 import json
 
 # Review-state persistence (issue #241 extraction slice 2): the transaction
@@ -881,6 +887,60 @@ def db_transaction_state(tenant: str) -> AbstractContextManager[Any]:
         dsn=_os.environ.get("REMORA_PG_DSN", "").strip(),
         db_path=_os.environ.get("REMORA_CHAIN_DB", "").strip(),
     )
+
+
+def _delegation_or_refuse(req: Any, tenant: str, principal: str) -> None:
+    """Refuse a proposal naming a delegate this deployment has not declared.
+
+    409 with the reason and nothing assessed. The declaration is read from
+    the tenant's own ``tenant_access`` block of the risk-profile config; see
+    remora/governance/delegation.py for why defaults never apply.
+    """
+    delegate = delegated_executor_of(req)
+    if not delegate:
+        return
+    from servers import api as api_mod
+
+    tenant_access = api_mod._RISK_PROFILE_CONFIG.get("tenant_access", {})
+    reason = delegation_refusal(
+        tenant_access if isinstance(tenant_access, dict) else {},
+        tenant=tenant, proposer=principal, delegate=delegate)
+    if reason is not None:
+        raise HTTPException(status_code=409, detail=reason)
+
+
+def _approval_requirement(tenant: str, risk_tier: Any) -> dict[str, Any]:
+    """Who may approve an item at ``risk_tier`` in ``tenant``, as resolved now.
+
+    The two inputs ``_enforce_review_approval_role`` decides with: the
+    profile's ``approval_role`` and the tenant's ``reviewer_roles``. Read from
+    the risk-profile config loaded at startup, so an edited file takes effect
+    at the next restart, and an approval granted before it is compared with
+    the requirement after it.
+    """
+    from servers import api as api_mod
+
+    _, profile_cfg = api_mod._resolve_tenant_policy_profile(
+        tenant, str(risk_tier) if risk_tier is not None else None)
+    required = api_mod._extract_review_requirements(profile_cfg).get("approval_role")
+    access = api_mod._tenant_access_policy(tenant)
+    reviewer_roles = access.get("reviewer_roles", []) if isinstance(access, dict) else []
+    return {
+        "approval_role": str(required).strip().lower() if required else None,
+        "reviewer_roles": sorted({str(r).strip().lower() for r in reviewer_roles
+                                  if isinstance(r, str)}),
+    }
+
+
+def _approval_requirement_hash(requirement: dict[str, Any]) -> str:
+    canonical = json.dumps(requirement, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _approval_policy_for(tenant: str) -> Any:
+    """The hook the execution re-gate uses: observation -> requirement hash."""
+    return lambda observation: _approval_requirement_hash(
+        _approval_requirement(tenant, getattr(observation, "risk_tier", None)))
 
 
 def _queue(tenant: str) -> ReviewQueue:
@@ -1938,6 +1998,7 @@ def assess(req: ToolCallRequest, request: Request) -> dict[str, Any]:
     # finding 4).
     api_mod._require_tenant_capability(role, tenant, "assess")
     _task_or_refuse(req)
+    _delegation_or_refuse(req, tenant, principal)
     claim = None
     if req.idempotency_key:
         claim = _idempotency_claim(tenant, principal, req.idempotency_key, req)
@@ -2061,7 +2122,7 @@ def approve(req: ApproveRequest, request: Request) -> dict[str, Any]:
 
     api_mod._require_tenant_capability(role, tenant, "review")
 
-    def _authorize_approval(item: Any) -> None:
+    def _authorize_approval(item: Any) -> ApprovalAuthority:
         # Profile-specific approval role (review-8 finding): a generic
         # reviewer must not approve what the tenant's risk profile reserves
         # for domain_expert/senior_authority. Raises the same HTTP errors it
@@ -2075,6 +2136,14 @@ def approve(req: ApproveRequest, request: Request) -> dict[str, Any]:
             tenant_id=tenant,
             decision="approved",
             review_requirements=api_mod._extract_review_requirements(profile_cfg),
+        )
+        # What admitted this approver, kept with the approval so execution
+        # can tell whether that requirement is still the one in force.
+        requirement = _approval_requirement(tenant, risk_tier)
+        return ApprovalAuthority(
+            approver_role=(role or "").strip().lower(),
+            required_role=requirement["approval_role"],
+            policy_hash=_approval_requirement_hash(requirement),
         )
 
     try:
@@ -2568,10 +2637,13 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             async_dispatch=async_mode,
             transactional_append=chain_append_transactional,
             require_execution_context=context_required(),
+            approval_policy=_approval_policy_for(tenant),
         )
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ToolSpecChanged as exc:
+        raise HTTPException(status_code=409, detail=exc.reason) from exc
+    except ApprovalContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ReviewNotFound as exc:
         raise HTTPException(status_code=404, detail="review item not found") from exc
@@ -2899,13 +2971,35 @@ def _effect_audit_is_durable() -> bool:
 def record_effect_verification(tenant: str, verification: Any, *,
                                submitted_by: str = "",
                                dispatch_id: str = "",
-                               settled_dispatch_id: str = "") -> dict[str, Any]:
+                               settled_dispatch_id: str = "",
+                               self_attested: bool = False) -> dict[str, Any]:
     """Append one effect verification to the tenant audit chain (see
     remora.execution.projections for the appending/never-editing contract)."""
     return _record_effect_verification_impl(
         _CHAIN, tenant, verification, submitted_by=submitted_by,
         dispatch_id=dispatch_id, settled_dispatch_id=settled_dispatch_id,
+        self_attested=self_attested,
     )
+
+
+def _effect_separation_required() -> bool:
+    """Whether an effect verifier must be independent of the call (RMR-AUD-004).
+
+    True in production and under the strict runtime profiles. There the
+    verifier holds the ``verify_effect`` capability, its identity comes from
+    ``REMORA_EFFECT_VERIFIER_BINDINGS``, and it is neither the proposer nor the
+    executor of the call. A development deployment outside the strict profiles
+    may still record a receipt from the executing principal, marked
+    ``self_attested`` so it is never read as an independent observation.
+    """
+    from remora.profiles import (
+        STRICT_PROFILES,
+        current_runtime_profile,
+        deployment_environment,
+    )
+
+    return (deployment_environment() == "production"
+            or current_runtime_profile() in STRICT_PROFILES)
 
 
 def _current_state(events: list[dict[str, Any]],
@@ -2945,6 +3039,9 @@ def get_proposal(proposal_id: str, request: Request) -> dict[str, Any]:
         "tool_name": assessed.get("tool_name"),
         "tool_call_hash": assessed.get("tool_call_hash"),
         "actor": assessed.get("actor"),
+        # Who may execute besides the actor, as admitted at assess. Shown so
+        # a reviewer approves the delegation along with the call.
+        "delegated_executor": assessed.get("delegated_executor"),
         "review_item_id": assessed.get("review_item_id"),
         "current_state": _current_state(events, dispatch),
         "event_count": len(events),
@@ -3013,12 +3110,32 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
     tenant, role, principal = _auth(request)
     from servers import api as api_mod
 
-    api_mod._require_tenant_capability(role, tenant, "execute")
+    separation = _effect_separation_required()
+    # RMR-AUD-004: recording an effect is its own capability. It used to be
+    # "execute", so the agent that ran a call could attest to its effect.
+    # Outside production and the strict profiles "execute" is still accepted,
+    # and the record is marked self-attested below when it is one.
+    try:
+        api_mod._require_tenant_capability(role, tenant, "verify_effect")
+    except HTTPException:
+        if separation:
+            raise
+        api_mod._require_tenant_capability(role, tenant, "execute")
     events = _proposal_events(tenant, proposal_id)
     if not events:
         raise HTTPException(status_code=404, detail="proposal not found")
 
-    from remora.profiles import deployment_environment
+    from remora.profiles import current_runtime_profile, deployment_environment
+
+    if current_runtime_profile() == "controlled_pilot":
+        # Owner decision 4 (CAPR-08): a pilot accepts only signed receipts,
+        # whose verdict REMORA computes. An unsigned digest attestation names
+        # its verifier by a string, which is not separation by trust domain.
+        raise HTTPException(
+            status_code=409,
+            detail=("effect receipt refused (unsigned_receipt_refused): the "
+                    "controlled_pilot profile records only signed receipts; "
+                    "submit to /proposals/{id}/effect-receipt"))
 
     if deployment_environment() == "production" and not _effect_audit_is_durable():
         raise HTTPException(
@@ -3028,6 +3145,16 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
                     "uniqueness and its audit evidence commit together; "
                     "REMORA_STATE_ENDPOINT does not yet store the tenant "
                     "audit chain"),
+        )
+    if separation and not _verifier_bindings():
+        # Unset bindings mean "the verifier is whoever submits", which in a
+        # deployment where the agent holds the receipt credential is the agent.
+        raise HTTPException(
+            status_code=503,
+            detail=("effect receipt refused (effect_verifier_bindings_required): "
+                    "production and the strict profiles require "
+                    "REMORA_EFFECT_VERIFIER_BINDINGS to name which principal "
+                    "observes effects under which verifier identity"),
         )
 
     # NOT defaulted to the server clock: substituting our time for a missing
@@ -3076,6 +3203,16 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
             detail=f"effect receipt refused ({exc.reason}): {exc.detail}",
         ) from exc
 
+    # A principal that proposed or executed the call is not an independent
+    # observer of its effect, whatever verifier identity it is bound to.
+    self_attested = principal in lineage.executors
+    if self_attested and separation:
+        raise HTTPException(
+            status_code=403,
+            detail=(f"effect receipt refused (verifier_is_executor): "
+                    f"{principal!r} proposed or executed this call and may not "
+                    "attest to its effect"))
+
     # The record names the governed tool and spec, so both come from the
     # assessment in the chain. Copying them from the request let a receipt
     # store evidence about a tool or spec the dispatch never ran under.
@@ -3117,6 +3254,7 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
             dispatch_id=lineage.dispatch_id,
             settled_dispatch_id=(lineage.dispatch_id
                                  if status.is_terminal else ""),
+            self_attested=self_attested,
         )
     except EffectVerificationReplay as exc:
         raise HTTPException(
@@ -3135,8 +3273,229 @@ def record_effect(proposal_id: str, req: EffectVerificationRequest,
         "dispatch_id": lineage.dispatch_id,
         "reason_code": req.reason_code,
         "verifier_identity": req.verifier_identity,
+        "self_attested": self_attested,
         # RMR-CR-008: an attestation by a verifier of this deployment, about
         # the declared delta only.
+        "vantage": verification.vantage,
+        "scope": verification.scope,
+        "audit": audit,
+    }
+
+
+def _receipt_refused(exc: ReceiptRefused) -> HTTPException:
+    return HTTPException(status_code=409,
+                         detail=f"effect receipt refused ({exc.reason}): {exc.detail}")
+
+
+def _receipt_vantage(record: Any, executors: frozenset[str]) -> Any:
+    """The observation vantage of a signed receipt, derived, never declared.
+
+    ``independent`` needs three facts, all from configuration rather than the
+    receipt: the executor's control domain is declared
+    (``REMORA_EXECUTOR_CONTROL_DOMAIN``), the verifier key is registered for a
+    different one, and its credential on the system of record is read-only. A
+    verifier that can write could have produced the state it reports.
+    """
+    from remora.evidence.admission.models import ObservationVantage
+
+    executor_domain = _os.environ.get("REMORA_EXECUTOR_CONTROL_DOMAIN", "").strip()
+    return ObservationVantage(
+        observer_id=record.kid,
+        observed_party=",".join(sorted(executors)) or "executor",
+        control_domain=record.control_domain,
+        # Undeclared: the executor's domain is not known to differ, so the
+        # vantage cannot be established and stays same_deployment.
+        observed_control_domain=executor_domain or record.control_domain,
+        can_observed_party_forge=not record.read_only,
+        can_observed_party_suppress=False,
+    )
+
+
+@router.post("/proposals/{proposal_id}/effect-receipt", responses={
+    200: {"description": "REMORA computed the verdict and appended it to the audit chain."},
+    **_AUTH_RESPONSES,
+    404: {"model": ErrorDetail, "description": "No such proposal for this tenant."},
+    409: {"model": ErrorDetail, "description": "The receipt cannot be bound or evaluated."},
+    503: {"model": ErrorDetail, "description": "No verifier keys are registered."},
+})
+def record_signed_effect_receipt(proposal_id: str, req: SignedEffectReceiptRequest,
+                                 request: Request) -> dict[str, Any]:
+    """Compute and record an effect verdict from a signed receipt (CAPR-07/08).
+
+    The digest endpoint above records an attestation. This one records a
+    verdict REMORA computed: the contract comes from the signed ToolSpec v5
+    ``postcondition`` block and the approved arguments, the observation from
+    a receipt signed by a registered verifier key, and the vantage from that
+    key's registry record. A status the receipt claims is kept beside the
+    computed one and never replaces it.
+    """
+    _note_proposal_id(proposal_id)
+    tenant, role, principal = _auth(request)
+    from servers import api as api_mod
+
+    # No "execute" fallback on this path: it exists for verifiers.
+    api_mod._require_tenant_capability(role, tenant, "verify_effect")
+    events = _proposal_events(tenant, proposal_id)
+    if not events:
+        raise HTTPException(status_code=404, detail="proposal not found")
+
+    from remora.profiles import deployment_environment
+
+    if deployment_environment() == "production" and not _effect_audit_is_durable():
+        raise HTTPException(
+            status_code=503,
+            detail=("effect receipt audit store unavailable: production "
+                    "requires REMORA_PG_DSN or REMORA_CHAIN_DB"))
+    from remora.crypto import Signature
+    from remora.governance.effect_receipt import resolve_lineage
+    from remora.governance.effect_receipt_signing import (
+        EffectReceipt,
+        VerifierKeyRegistry,
+        verify_signed_receipt,
+    )
+
+    try:
+        registry = VerifierKeyRegistry.from_env()
+    except (ValueError, OSError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"effect receipt refused (effect_verifier_keys_invalid): {exc}",
+        ) from exc
+    if not len(registry):
+        raise HTTPException(
+            status_code=503,
+            detail=("effect receipt refused (effect_verifier_keys_required): "
+                    "REMORA_EFFECT_VERIFIER_KEYS registers no verifier key"))
+    try:
+        receipt = EffectReceipt.from_dict(req.receipt)
+        record = verify_signed_receipt(
+            receipt, Signature.from_dict(req.signature.model_dump()), registry,
+            tenant=tenant)
+        lineage = resolve_lineage(events)
+    except ReceiptRefused as exc:
+        raise _receipt_refused(exc) from exc
+
+    # A principal that proposed or executed the call is not an observer of
+    # its effect, whichever key it holds.
+    if principal in lineage.executors:
+        raise HTTPException(
+            status_code=403,
+            detail=(f"effect receipt refused (verifier_is_executor): "
+                    f"{principal!r} proposed or executed this call"))
+
+    tool_id, toolspec_hash = _assessed_tool_identity(events)
+    bundle = _toolspec_bundle()
+    spec = bundle.get(tool_id) if bundle is not None and tool_id in bundle else None
+    if spec is None or spec.postcondition is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"effect receipt refused (postcondition_not_declared): "
+                    f"{tool_id!r} has no signed postcondition block, so REMORA "
+                    "has no contract to evaluate"))
+    if spec.toolspec_hash != toolspec_hash:
+        raise HTTPException(
+            status_code=409,
+            detail=("effect receipt refused (toolspec_changed_since_assessment): "
+                    "the dispatch was assessed under another spec"))
+
+    # The arguments are the approved call's only if they hash to it.
+    from remora.policy.observation import canonical_tool_call_hash
+
+    target = next((str((e.get("payload") or e).get("target_environment") or "")
+                   for e in events if e.get("event") == "assessed"), "")
+    try:
+        argument_hash = canonical_tool_call_hash(
+            name=tool_id, arguments=req.arguments, tenant=tenant,
+            target=target or None)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=(
+            f"effect receipt refused (arguments_not_the_dispatched_call): {exc}")) from exc
+    if argument_hash != lineage.tool_call_hash:
+        raise HTTPException(
+            status_code=409,
+            detail=("effect receipt refused (arguments_not_the_dispatched_call): "
+                    "the arguments do not hash to the dispatched call"))
+
+    from remora.governance.effect_verification import (
+        EffectStatus,
+        PostconditionContract,
+        verify_declared_delta,
+    )
+    from remora.toolcall.postcondition_spec import PostconditionSpecError
+
+    try:
+        contract: PostconditionContract = spec.postcondition.instantiate(
+            tool_id=tool_id, reader=str(spec.postcondition_reader),
+            arguments=req.arguments)
+    except PostconditionSpecError as exc:
+        raise HTTPException(status_code=409, detail=(
+            f"effect receipt refused (postcondition_not_instantiable): {exc}")) from exc
+
+    execution_id = lineage.execution_id or lineage.dispatch_id
+    computed = verify_declared_delta(
+        contract, receipt.observed, proposal_id=proposal_id,
+        execution_id=execution_id, toolspec_hash=toolspec_hash,
+        verifier_identity=record.kid)
+    if (receipt.pre_state_revision and receipt.source_revision
+            and receipt.pre_state_revision == receipt.source_revision
+            and computed.status in (EffectStatus.VERIFIED, EffectStatus.MISMATCH)):
+        # The object did not change across the dispatch, so whatever it holds
+        # is not attributable to this call (NEGATIVE_RESULTS §85, narrowed
+        # for systems that expose revisions).
+        computed = dataclasses.replace(computed, status=EffectStatus.UNOBSERVABLE,
+                           reason_code="postcondition_no_attributable_change",
+                           detail=("pre-state and observed revisions are equal "
+                                   f"({receipt.source_revision}); no change is "
+                                   "attributable to this dispatch"))
+
+    try:
+        lineage, status = verify_effect_receipt(
+            events=events, proposal_id=proposal_id,
+            claimed_status=computed.status,
+            tool_call_hash=receipt.tool_call_hash, grant_jti=receipt.grant_jti,
+            expected_sha256=computed.expected_sha256,
+            observed_sha256=computed.observed_sha256,
+            verified_at=receipt.observed_at, verifier_identity=record.kid,
+            trusted_verifiers=(record.kid,), reason_code=computed.reason_code,
+            already_recorded=[e.get("payload", {}) for e in events
+                              if e.get("event") == "effect_verified"],
+        )
+    except ReceiptRefused as exc:
+        raise _receipt_refused(exc) from exc
+
+    claim = receipt.claimed_status
+    refs = ["verdict:computed", f"receipt_kid:{record.kid}",
+            f"receipt_signature:{req.signature.signature}"]
+    if claim:
+        refs.append(f"claimed_status:{claim}")
+    verification = dataclasses.replace(
+        computed, status=status, verified_at=receipt.observed_at,
+        dispatch_id=lineage.dispatch_id, tool_call_hash=lineage.tool_call_hash,
+        observed_state_hash=receipt.source_revision, submitted_by=principal,
+        execution_context_hash=lineage.execution_context_hash,
+        evidence_refs=tuple(refs),
+    ).observed_from(_receipt_vantage(record, lineage.executors))
+    try:
+        audit = record_effect_verification(
+            tenant, verification, submitted_by=principal,
+            dispatch_id=lineage.dispatch_id,
+            settled_dispatch_id=lineage.dispatch_id if status.is_terminal else "")
+    except EffectVerificationReplay as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=("effect receipt refused (receipt_replayed): this dispatch "
+                    "already has a settled verdict")) from exc
+    except ExecutionContextRefused as exc:
+        raise HTTPException(status_code=409, detail=exc.reason) from exc
+    return {
+        "proposal_id": proposal_id,
+        "status": status.value,
+        "verdict_source": "computed",
+        "reason_code": computed.reason_code,
+        "claimed_status": claim or None,
+        "claim_disagrees": bool(claim) and claim != status.value,
+        "dispatch_id": lineage.dispatch_id,
+        "verifier_kid": record.kid,
         "vantage": verification.vantage,
         "scope": verification.scope,
         "audit": audit,

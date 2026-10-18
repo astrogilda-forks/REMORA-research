@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from remora.capabilities.ceiling import DownstreamCeiling
     from remora.crypto import SigningKey, VerificationKey
     from remora.flow.spec import FlowSpec
+    from remora.toolcall.postcondition_spec import PostconditionSpec
 
 __all__ = [
     "ToolSpec",
@@ -157,7 +158,7 @@ def _spec_hash(spec: Mapping[str, Any]) -> str:
 #: Bundle schema versions this loader understands. Version 2 adds the
 #: optional ``downstream_capabilities`` declaration; a version-1 bundle that
 #: carries one is refused rather than read with a field it never defined.
-SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3, 4)
+SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3, 4, 5)
 
 #: Schema version 3 (CR-005): how a tool reaches effects, as a signed claim.
 #: MEDIATED: every effect goes through the mediator, within the declared
@@ -218,6 +219,36 @@ def _flow(raw: Mapping[str, Any]) -> "FlowSpec | None":
     return flow
 
 
+def _postcondition(raw: Mapping[str, Any]) -> "PostconditionSpec | None":
+    """The spec's signed ``postcondition`` block (schema version 5, CAPR-07).
+
+    Parsed and linted at load, like the flow block: a signed template that
+    names an undeclared argument or an unknown rule cannot be enforced, so it
+    does not load. A block needs a declared ``postcondition_reader``; a
+    contract with no one to read it back cannot be observed.
+    """
+    if "postcondition" not in raw:
+        return None
+    from remora.toolcall.postcondition_spec import (
+        PostconditionSpecError,
+        parse_postcondition,
+    )
+
+    tool_id = str(raw.get("tool_id", "?"))
+    reader = raw.get("postcondition_reader")
+    if not isinstance(reader, str) or not reader.strip():
+        raise ToolSpecRefused(
+            "toolspec_postcondition_invalid",
+            f"tool spec {tool_id!r}: a postcondition block needs a "
+            "postcondition_reader")
+    try:
+        return parse_postcondition(raw["postcondition"],
+                                   argument_schema=raw.get("argument_schema", {}))
+    except PostconditionSpecError as exc:
+        raise ToolSpecRefused("toolspec_postcondition_invalid",
+                              f"tool spec {tool_id!r}: {exc}") from exc
+
+
 def _downstream(raw: Mapping[str, Any]) -> "DownstreamCeiling | None":
     """The spec's downstream ceiling, or None when it declares none."""
     if "downstream_capabilities" not in raw:
@@ -272,6 +303,9 @@ class ToolSpec:
     #: Schema version 4 (IFC-03): how results are labelled and where the
     #: arguments go. None when the spec has no block.
     flow: "FlowSpec | None" = None
+    #: Schema version 5 (CAPR-07): the signed postcondition template the
+    #: server instantiates from the approved arguments. None when absent.
+    postcondition: "PostconditionSpec | None" = None
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "ToolSpec":
@@ -335,6 +369,7 @@ class ToolSpec:
             effect_mode=_effect_policy(raw)[0],
             direct_effect_credentials=_effect_policy(raw)[1],
             flow=_flow(raw),
+            postcondition=_postcondition(raw),
         )
 
 
@@ -562,6 +597,12 @@ class ToolSpecBundle:
                     "toolspec_flow_requires_v4",
                     f"tool spec {raw.get('tool_id')!r} declares a flow block in a "
                     f"schema_version {schema_version} bundle",
+                )
+            if schema_version < 5 and "postcondition" in raw:
+                raise ToolSpecRefused(
+                    "toolspec_postcondition_requires_v5",
+                    f"tool spec {raw.get('tool_id')!r} declares a postcondition "
+                    f"block in a schema_version {schema_version} bundle",
                 )
             spec = ToolSpec.from_mapping(raw)
             if spec.tool_id in specs:

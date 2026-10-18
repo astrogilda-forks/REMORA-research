@@ -451,15 +451,40 @@ def test_approval_is_durable_in_db_mode_same_process(tmp_path, monkeypatch) -> N
     assert body["outcome"] == "execute", body
 
 
-def test_riskier_world_invalidates_approval_at_execution(client) -> None:
+def test_riskier_world_invalidates_approval_at_execution(client, monkeypatch) -> None:
+    import dataclasses
+
+    import servers.execution_api as exec_mod
+
     item_id = client.post("/v1/execution/assess", json=PROD_WRITE).json()["review_item_id"]
     client.post("/v1/execution/approve", json={"item_id": item_id})
-    # Same payload (same hash), riskier world: rollback no longer available
-    # -> the engine escalates, which is stricter than the approved VERIFY.
-    riskier = {**PROD_WRITE, "rollback_available": False}
+    # Same proposal, riskier world: the server-side observation now reports
+    # no rollback -> the engine escalates, stricter than the approved VERIFY.
+    # This used to be simulated by re-presenting the call with
+    # rollback_available=false. That is a different proposal and is now
+    # refused as binding_refused (RMR-AUD-001, the test below), so the world
+    # change is made where worlds change: on the server.
+    observe = exec_mod._observation_with_context
+
+    def riskier(tool_call, tenant):
+        obs, semantic = observe(tool_call, tenant)
+        return dataclasses.replace(obs, rollback_available=False), semantic
+
+    monkeypatch.setattr(exec_mod, "_observation_with_context", riskier)
     r = client.post("/v1/execution/execute",
-                    json={"item_id": item_id, "tool_call": riskier})
+                    json={"item_id": item_id, "tool_call": PROD_WRITE})
     assert r.json()["outcome"] == "approval_invalidated"
+
+
+def test_a_request_side_downgrade_added_at_execution_is_refused(client) -> None:
+    """RMR-AUD-001: fields outside the payload hash are bound to the assessment."""
+    item_id = client.post("/v1/execution/assess", json=PROD_WRITE).json()["review_item_id"]
+    client.post("/v1/execution/approve", json={"item_id": item_id})
+    r = client.post("/v1/execution/execute",
+                    json={"item_id": item_id,
+                          "tool_call": {**PROD_WRITE, "rollback_available": False}})
+    assert r.status_code == 409
+    assert r.json()["detail"] == "binding_refused"
 
 
 def test_changed_arguments_are_refused_by_binding(client) -> None:

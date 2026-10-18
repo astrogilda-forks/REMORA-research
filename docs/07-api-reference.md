@@ -293,6 +293,30 @@ Two server-side authorities cut into `/v1/assess`'s caller freedom:
   assessed as critical/unknown. `ToolCallAssessment.label_source` records
   the source, and `should_execute` is True only for ACCEPT with
   `label_source == "registry"`.
+- Registry labels only, on `/v1/assess`, `/v1/rerun` and the adapters
+  (RMR-AUD-011, 2026-10-18).
+  - `/v1/assess` with a `tool_call` takes `risk_tier` and `action_type`
+    from the server's registry, the same `resolve_tool_metadata` that
+    `/v1/execution/*` uses. A request `risk_tier` may only raise the
+    registered tier. An `action_type` that differs from the registry's caps
+    ACCEPT (`registry_label_conflict`). The environment is the riskier of
+    the declared and requested one. A tool nobody classified is
+    critical/unknown, and the request's labels are ignored.
+  - Without a `tool_call` there is no tool to look up, so the request's
+    labels are the caller's. An engine ACCEPT becomes VERIFY with
+    `caller_labels_untrusted`, in `policy_decision` and in the stored
+    envelope.
+  - The response carries `label_source` (`registry`, `unregistered`,
+    `caller` or `none`) and `label_cap`. The audit record keeps
+    `label_source`.
+  - `/v1/rerun` keeps an ACCEPT only when the original assessment's
+    labels came from the registry. A record without `label_source` is
+    treated as the caller's.
+  - The action-gate adapters in `remora/adapters/` take `registry=` in the
+    same shape as `assess_tool_call`. Without one, an ACCEPT becomes VERIFY
+    and `ActionGateResult.label_cap` says why. `HttpGateway` sends the
+    `tool_call`, and the adapter keeps the server's `label_source` and
+    verdict.
 
 ---
 
@@ -362,16 +386,22 @@ All gateways return an **`ActionGateResult`**:
 class ActionGateResult:
     envelope: DecisionEnvelope
     should_execute: bool   # True only when the gate outcome is ACCEPT
+    label_source: str = "caller"   # "registry", "unregistered" or "caller"
+    label_cap: str | None = None   # why an ACCEPT was lowered to VERIFY
 ```
 
 Adapters are constructed with `gateway=` (not `engine=`); the concrete
 in-process gateway is `LocalGateway` (`remora/adapters/gateway.py`, exposing
-`assess_sync()`), which wraps an `EngineLike` such as `Remora`:
+`assess_sync()`), which wraps an `EngineLike` such as `Remora`. Pass the
+deployment's `registry=` too: without it, the `risk_tier`/`action_type`
+given to `intercept` are the caller's and cannot produce
+`should_execute=True` (RMR-AUD-011):
 
 ```python
 gateway = LocalGateway(engine)                      # wraps the in-process engine
-adapter = LangGraphActionAdapter(gateway=gateway)   # or OpenAIToolCallingAdapter,
-                                                    # CrewAIActionAdapter, AutoGenActionAdapter
+registry = {"search_docs": {"risk_tier": "low", "action_type": "read"}}
+adapter = LangGraphActionAdapter(gateway=gateway,   # or OpenAIToolCallingAdapter,
+                                 registry=registry) # CrewAIActionAdapter, AutoGenActionAdapter
 result = adapter.intercept(
     action_name=..., action_args=..., proposed_by=..., domain=...,
     risk_tier=..., action_type=..., target_environment=..., context=...,
@@ -431,7 +461,13 @@ enqueues a review item), `POST /approve` (records the authenticated principal;
 mandatory bounded TTL; profile-specific approval role enforced), `POST
 /execute` (re-gates the fresh observation, binds the exact payload, consumes a
 one-time grant, then dispatches the tool through the app-lifecycle
-`GovernedToolDispatcher`), `GET /audit/verify` (recomputes the per-tenant
+`GovernedToolDispatcher`; the executing principal must be the proposer, or the
+delegate the proposal named, and the task must be the proposal's, or the call
+is refused with 409 `context_mismatch` before the approval is touched; a risk
+tier that differs from the one the approval was reviewed at voids the approval
+as `approval_invalidated`, so it is re-approved under the role the current tier
+requires, and so does an approval requirement that changed since the approval
+or was never recorded with it), `GET /audit/verify` (recomputes the per-tenant
 chain and reports `records_checked`; an `empty` chain is flagged because it is
 trivially valid). Its `hash_chain_status` (`INTACT` or `BROKEN`) and
 `signature_status` are separate: `CHECKED` when this process holds
@@ -467,6 +503,65 @@ context as `execution_context`. The authority of the deployment sources stays
 `NOT_ESTABLISHED` (`execution_context_authoritative_binding`). Setup is in the
 [execution quickstart](deployment/execution-quickstart.md#optional-authoritative-execution-context).
 
+**Delegated execution (opt-in):** by default only the proposer executes what
+it proposed, on the review path and with an ACCEPT token. A proposal may name
+`delegated_executor`, a service identity that executes on the proposer's
+behalf. `POST /assess` admits it only when the risk-profile config declares it
+for this agent in this tenant, under
+`tenant_access.<tenant>.delegated_executors` as
+`{service_identity: [agent, ...]}`; `access_defaults` does not apply. Otherwise
+the assessment is refused with 409 and nothing is assessed:
+`delegate_not_declared`, `delegate_cross_tenant` when the identity is declared
+only under another tenant, or `delegate_is_proposer`. The shipped config
+declares none. An admitted delegate is written to the `assessed` record and
+bound into the ACCEPT token's authorization context. `GET /proposals/{id}` and
+`POST /approve` return it and the `approved` event records it, so the reviewer
+approves it with the call. The delegate re-presents the same
+`delegated_executor` and is compared as the proposer it acts for. A delegate
+added, swapped or stripped after assessment is `context_mismatch`, and so is
+any other principal. The delegate cannot approve the item it will execute (403
+`approver_is_delegated_executor`). `execution_authorized` records the delegate
+as `actor` with `acting_for` naming the proposer, and the execution lease is
+minted with the delegate as `actor_identity`. The
+delegation is checked at assess only: withdrawing the declaration later does
+not void an item already assessed, while revoking the approver still does.
+
+**Proposal binding:** `POST /execute` re-presents the call, and the fields
+outside the payload hash must be the ones assessed. Those are `schema_valid`,
+`rollback_available`, `untrusted_context`, `intent_ref`, `derivations`, the
+task, `plan`, `task_type` and `delegated_executor`. The `assessed` record
+carries `proposal_envelope_hash` over them (the idempotency key excepted). A
+different proposal is refused with 409 `binding_refused` before the approval
+is touched (RMR-AUD-001). An item assessed before this binding has no hash and
+is refused the same way, so it must be proposed again. Arguments, tool and
+target stay bound by the queue's payload hash, as before. A riskier world
+still comes from the server side: ToolSpec, state, revocation and risk
+metadata re-gate as before. The intent authority the reviewer approved is
+also bound. An `intent_authority_hash` that differs from the `assessed`
+record's is `context_mismatch`, as at ACCEPT-token redemption. That holds when
+the reference changed and when the authority behind the same reference did
+(RMR-AUD-006).
+
+**Approved escalations:** an item records the decision reasons it was
+enqueued with, and its approval records them as `approved_reasons`. An
+approved ESCALATE survives the execution re-gate when the fresh decision is
+ACCEPT, VERIFY or ESCALATE and every fresh reason is among the approved ones.
+Re-deciding the observation the reviewer saw therefore no longer voids it
+(RMR-AUD-002). A new reason, or a fresh ABSTAIN, voids it as
+`approval_invalidated`. An approved VERIFY keeps the earlier rule.
+
+**Approval policy binding:** an approval records the approver's
+authenticated role and the role the item's tier required (`required_role`, null
+when the profile names none). It also records `approval_policy_hash`, a hash of
+that requirement and the tenant's `reviewer_roles`. All three are on the
+approval and on the `approved` event. `POST /execute` and the async worker
+recompute the hash for the fresh observation. A typical cause of a difference
+is an edited `schemas/risk-profiles.yaml` and a restart with the item in a
+durable queue. The approval is then void as `approval_invalidated`
+(`approval_policy_changed`), and the item returns for approval under the
+current rule. An approval stored without the record, such as one persisted before this
+binding, is voided the same way (`approval_policy_unbound`).
+
 **Task identity and loop safety (Q7.2):** a tool call may carry `context_id`
 and `task_id`, in A2A's vocabulary, both or neither (one alone is a 422).
 When present, the task is bound into the ACCEPT token's authorization
@@ -488,10 +583,12 @@ off by default because callers must first send the fields. The loop limits
 are defaults that no study has calibrated.
 
 **Meet composition (COMP-01):** every decision is the least executable of
-its components (`ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT`). The components are
-the cascade, the hard-guard floor, each conditional gate that fires, and any
-external cap. A stricter component that fires after the first match still
-binds, and its reason is appended. Library callers can pass `caps` to
+its components (`ABSTAIN < ESCALATE < VERIFY < ACCEPT`). ABSTAIN is lowest
+because it has no approval route; ESCALATE has one. The components are the
+cascade, every hard guard that fires, every conditional gate that fires, the
+rest of the policy as it would decide without them, and any external cap. A
+stricter component that fires after the first match still binds, and its
+reason is appended. Library callers can pass `caps` to
 `RemoraDecisionEngine.decide` and `explain`, with reason `monitor_cap` for a
 learned monitor or `protocol_cap` for a control protocol. A cap can only
 lower a decision ([ADR](architecture/ADR-flow-meet-composition.md)).
@@ -702,7 +799,8 @@ restart-proven by test.
   `append()` is atomic; `verify()` recomputes and checks the HMAC signature.
 - `remora/governance/review_queue.py`, `ReviewQueue`: enqueue (VERIFY/ESCALATE
   only), TTL→ABSTAIN, mandatory-expiry approvals, execution-time re-gate
-  (only ACCEPT/VERIFY execute), all transitions hash-chained.
+  (only ACCEPT/VERIFY execute; a changed risk tier or approval requirement
+  voids the approval), all transitions hash-chained.
 - `remora/governance/degradation.py`, `DegradationRecorder` (G0–G4 ladder with
   tamper-evident transitions) and `g4_refuses()`.
 - `remora/governance/a2a_envelope.py`, `A2AGovernanceEnvelope`, `RegisteredKey`

@@ -66,8 +66,14 @@ def dispatch_projection(outbox: Any, tenant: str, proposal_id: str) -> dict[str,
 def record_effect_verification(chain: Any, tenant: str, verification: Any, *,
                                submitted_by: str = "",
                                dispatch_id: str = "",
-                               settled_dispatch_id: str = "") -> dict[str, Any]:
+                               settled_dispatch_id: str = "",
+                               self_attested: bool = False) -> dict[str, Any]:
     """Append one effect verification to the tenant audit chain.
+
+    ``self_attested`` marks a record submitted by a principal that proposed
+    or executed the call (RMR-AUD-004). Only a development deployment outside
+    the strict profiles may record one, and the mark keeps it from being read
+    as an independent observation.
 
     Appends; never edits the execution record it verifies. A verifier that
     could rewrite what it verifies produces no evidence, only a claim —
@@ -109,6 +115,10 @@ def record_effect_verification(chain: Any, tenant: str, verification: Any, *,
         "dispatch_id": dispatch_id,
         **record,
     }
+    if self_attested:
+        # Present only when true, so records from independent verifiers keep
+        # their existing bytes.
+        payload["self_attested"] = True
     if settled_dispatch_id:
         # Receipt uniqueness and evidence recording must commit together.
         # Reserving a slot in a separate store first creates a crash window:
@@ -168,6 +178,7 @@ def effect_projection(events: list[dict[str, Any]]) -> dict[str, Any]:
         "reason_code": latest["reason_code"] if latest else None,
         "verified_at": latest["verified_at"] if latest else None,
         "verifier_identity": latest["verifier_identity"] if latest else None,
+        "self_attested": bool(latest.get("self_attested")) if latest else None,
         "expected_sha256": latest["expected_sha256"] if latest else None,
         "observed_sha256": latest["observed_sha256"] if latest else None,
         "history": history,
@@ -184,28 +195,87 @@ def current_state(events: list[dict[str, Any]],
     without raising" and "the approved change is present" are different
     claims, and only the second is about the world.
     """
-    effect = effect_projection(events)
-    if effect["status"] in EFFECT_STATE:
-        return EFFECT_STATE[str(effect["status"])]
+    # The latest INDEPENDENT verdict. A self-attested receipt, recorded only
+    # outside production and the strict profiles, stays in the history and
+    # the effect block but never settles the proposal (RMR-AUD-004).
+    independent = [e["payload"] for e in events
+                   if e.get("event") == "effect_verified"
+                   and not e["payload"].get("self_attested")]
+    status = str(independent[-1]["status"]) if independent else None
+    if status in EFFECT_STATE and _lineage_holds(events):
+        return EFFECT_STATE[str(status)]
     if dispatch is not None and dispatch["terminal"]:
         return str(dispatch["state"])
-    names = [str(e.get("event")) for e in events]
-    if any(n.startswith("execution_") and n != "execution_authorized"
-           for n in names):
-        return "REFUSED"
-    if "execution_authorized" in names:
-        return "DISPATCHING"
-    if "rejected" in names:
-        return "REFUSED"
-    if "approved" in names:
-        return "AUTHORIZED"
-    if "review_enqueued" in names or any(
-        e["payload"].get("review_item_id") for e in events
-    ):
-        return "REVIEW_PENDING"
-    if "assessed" in names:
-        return "ASSESSED"
-    return "PROPOSED"
+    return _fold_state(events)
+
+
+#: Refusals of one attempt that leave the approval or the unspent grant
+#: standing. The caller can present the approved call again.
+_ATTEMPT_REFUSALS = frozenset({
+    "execution_binding_refused", "execution_context_refused",
+})
+#: The approval was voided and the item went back to the review queue.
+_APPROVAL_VOIDED = frozenset({
+    "execution_approval_expired", "execution_approval_invalidated",
+})
+
+
+def _fold_state(events: list[dict[str, Any]]) -> str:
+    """The lifecycle state as a fold over the chain, in chain order.
+
+    RMR-AUD-005. This used to ask whether ANY refusal had ever been recorded,
+    so one refused attempt read REFUSED for good: after a binding refusal
+    that left the approval standing, and after a re-approval that followed an
+    expired or invalidated one. Folding in order makes the latest fact win, as
+    the docstring of ``current_state`` always said.
+    """
+    state = "PROPOSED"
+    for event in events:
+        name = str(event.get("event"))
+        payload = event.get("payload") or {}
+        if name == "assessed":
+            state = "REVIEW_PENDING" if payload.get("review_item_id") else "ASSESSED"
+        elif name == "review_enqueued":
+            state = "REVIEW_PENDING"
+        elif name == "approved":
+            state = "AUTHORIZED"
+        elif name == "rejected":
+            state = "REFUSED"
+        elif name == "execution_authorized":
+            state = "DISPATCHING"
+        elif name in _APPROVAL_VOIDED:
+            state = "REVIEW_PENDING"
+        elif name in _ATTEMPT_REFUSALS:
+            continue
+        elif name == "execution_result":
+            # The dispatch record exists but no outbox projection was passed:
+            # a chain that ends here must not read DISPATCHING for good.
+            if payload.get("tool_executed") is True:
+                state = "SUCCEEDED"
+            elif payload.get("state_unknown") is True:
+                state = "UNKNOWN"
+            else:
+                state = "REFUSED"
+        elif name.startswith("execution_"):
+            # Grant refused, ToolSpec changed, or a refusal this fold does not
+            # know: terminal unless a later record shows the lifecycle moving.
+            state = "REFUSED"
+    return state
+
+
+def _lineage_holds(events: list[dict[str, Any]]) -> bool:
+    """Whether a recorded effect follows an authorized dispatch (RMR-AUD-004).
+
+    An effect record on a proposal the policy abstained on, or a reviewer
+    rejected, stays in the history but does not move the state.
+    """
+    from remora.governance.effect_receipt import ReceiptRefused, resolve_lineage
+
+    try:
+        resolve_lineage(events)
+    except ReceiptRefused:
+        return False
+    return True
 
 
 def envelope_projection(

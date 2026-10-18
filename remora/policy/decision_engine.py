@@ -26,7 +26,7 @@ from remora.credal import (
     compute_from_obs,
 )
 from remora.observability.events import governance_event
-from remora.policy.composition import EXTERNAL_CAP_REASONS, Cap, executability, meet
+from remora.policy.composition import EXTERNAL_CAP_REASONS, Cap, meet, rank
 from remora.policy.invariants import InvariantResult, check_all_invariants
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
@@ -160,7 +160,15 @@ def _controls_sensitive_argument(names: tuple[str, ...] | None) -> bool:
 def hard_guard_floor(
     obs: PolicyObservation,
 ) -> tuple[DecisionAction, DecisionReason] | None:
-    """Evaluate the unconditional hard guards, in the engine's priority order.
+    """The hard-block floor: the least executable hard guard that fires.
+
+    Every guard in :func:`_hard_guards` is a cap, and the floor is their meet;
+    among equals the earliest guard wins, so the priority order still picks
+    the reason. A non-approvable refusal (``NON_APPROVABLE_REASONS``) ranks
+    below ESCALATE. Before RMR-AUD-003 the first guard decided, and an
+    ESCALATE guard (``schema_valid=False``, ``adversarial_detected``) hid a
+    cross-tenant or intent-provenance ABSTAIN, turning a refusal into a
+    review item.
 
     This is the single source of truth for the hard-block floor. It is used
     by ``RemoraDecisionEngine.decide()`` as the first evaluation stage, and by
@@ -175,24 +183,81 @@ def hard_guard_floor(
 
     Returns ``None`` when no hard guard fires.
     """
+    fired = _hard_guards(obs)
+    if not fired:
+        return None
+    chosen = meet(Cap("floor", action, reason) for action, reason in fired)
+    return chosen.action, chosen.reason
+
+
+def _hard_guards(
+    obs: PolicyObservation,
+) -> list[tuple[DecisionAction, DecisionReason]]:
+    """Every unconditional hard guard that fires, in the engine's priority order."""
+    fired: list[tuple[DecisionAction, DecisionReason]] = []
+    for guard in (_guard_admission, _guard_schema, _guard_forbidden, _guard_scope,
+                  _guard_intent_provenance, _guard_coercion, _guard_blackmail,
+                  _guard_counterfactual, _guard_contradiction, _guard_taint):
+        result = guard(obs)
+        if result is not None:
+            fired.append(result)
+    return fired
+
+
+_GuardResult = tuple[DecisionAction, DecisionReason] | None
+
+
+def _guard_admission(obs: PolicyObservation) -> _GuardResult:
     if obs.adversarial_detected:
         return DecisionAction.ESCALATE, DecisionReason.ADMISSION_FIREWALL_BLOCKED
+    return None
+
+
+def _guard_schema(obs: PolicyObservation) -> _GuardResult:
     if obs.schema_valid is False:
         return DecisionAction.ESCALATE, DecisionReason.MALFORMED_CALL_BLOCKED
+    return None
+
+
+def _guard_forbidden(obs: PolicyObservation) -> _GuardResult:
     if obs.tool_forbidden:
         return DecisionAction.ESCALATE, DecisionReason.FORBIDDEN_TOOL_BLOCKED
+    return None
+
+
+def _guard_scope(obs: PolicyObservation) -> _GuardResult:
     if obs.argument_scope_valid is False:
         return DecisionAction.ABSTAIN, DecisionReason.CROSS_TENANT_ARGUMENT_BLOCKED
+    return None
+
+
+def _guard_intent_provenance(obs: PolicyObservation) -> _GuardResult:
     if obs.intent_provenance_required and not obs.intent_provenance_resolved:
         # An intent the deployment did not authorise cannot reach review, let
         # alone ACCEPT: nothing downstream can add the authority it lacks.
         return DecisionAction.ABSTAIN, DecisionReason.INTENT_PROVENANCE_REQUIRED
+    return None
+
+
+def _guard_coercion(obs: PolicyObservation) -> _GuardResult:
     if obs.coercion_detected:
         return DecisionAction.ESCALATE, DecisionReason.COERCION_BLOCKED
+    return None
+
+
+def _guard_blackmail(obs: PolicyObservation) -> _GuardResult:
     if obs.blackmail_pattern_detected:
         return DecisionAction.ESCALATE, DecisionReason.BLACKMAIL_BLOCKED
+    return None
+
+
+def _guard_counterfactual(obs: PolicyObservation) -> _GuardResult:
     if obs.counterfactual_passed is False:
         return DecisionAction.ESCALATE, DecisionReason.COUNTERFACTUAL_FAILED
+    return None
+
+
+def _guard_contradiction(obs: PolicyObservation) -> _GuardResult:
     if obs.evidence_contradictions is not None and obs.evidence_contradictions > 0:
         action = (
             DecisionAction.ESCALATE
@@ -200,6 +265,10 @@ def hard_guard_floor(
             else DecisionAction.ABSTAIN
         )
         return action, DecisionReason.EVIDENCE_CONTRADICTED
+    return None
+
+
+def _guard_taint(obs: PolicyObservation) -> _GuardResult:
     if obs.argument_tainted:
         # Untrusted content that *controls* a sensitive argument is
         # authorising, not informing. Deciding where money goes, what command
@@ -682,6 +751,20 @@ _CONDITIONAL_GATES: tuple[_ConditionalGate, ...] = (
 )
 
 
+#: The explicit risk matrix: tier, action type and environment decide.
+_MATRIX_GATES: frozenset[str] = frozenset({
+    "production_write_high_or_critical",
+    "high_risk_no_evidence",
+    "critical_risk_hard_verify",
+})
+#: Estimators over facts the matrix already decides on; they yield to it.
+_ESTIMATOR_GATES: frozenset[str] = frozenset({"minimax_gate", "trap_escalate", "trap_verify"})
+if not {g.name for g in _CONDITIONAL_GATES} >= _MATRIX_GATES | _ESTIMATOR_GATES:
+    raise AssertionError(
+        "a matrix or estimator gate is missing from _CONDITIONAL_GATES: "
+        f"{sorted((_MATRIX_GATES | _ESTIMATOR_GATES) - {g.name for g in _CONDITIONAL_GATES})}")
+
+
 # ---------------------------------------------------------------------------
 # Engine
 # ---------------------------------------------------------------------------
@@ -906,13 +989,14 @@ class RemoraDecisionEngine:
     ) -> DecisionReport:
         """Gate a proposed action and return an authoritative DecisionReport.
 
-        Meet composition (SDD flow control §3.9, COMP-01). The priority
-        cascade below decides as before; then each component group that fired,
-        the hard-guard floor and the conditional-gate group (its first gate,
-        as in the cascade), and every external cap in *caps* (a learned
-        monitor, a control protocol) contributes its action,
-        and the final decision is the least executable of them
-        (``ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT``). A cascade decision that no
+        Meet composition (SDD flow control §3.9, COMP-01, RMR-AUD-001/003).
+        The priority cascade below decides as before; then every component
+        contributes its action: the hard-guard floor (the meet of every guard
+        that fires), the conditional gates (the first gate that fires and
+        every unmaskable gate that fires), and every external cap in *caps*
+        (a learned monitor, a control protocol). The final decision is the
+        least executable of them (``ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT``,
+        with a refusal no review can lift below all of them). A cascade decision that no
         component undercuts is returned unchanged, reasons included. When one
         does, its action wins and its reason is appended, so the audit record
         keeps the first-match reason too. External caps must carry
@@ -935,7 +1019,7 @@ class RemoraDecisionEngine:
             components.append(conditional)
         components.extend(caps)
         binding = meet(components)
-        if executability(binding.action) < executability(report.action):
+        if rank(binding) < rank(components[0]):
             report = self._build(binding.action, [*report.reasons, binding.reason], norm,
                                  credal=credal, raw_obs=obs)
         # Internal reports are candidates, not decisions. Emit only after
@@ -955,23 +1039,35 @@ class RemoraDecisionEngine:
     def _conditional_cap(
         self, obs: PolicyObservation, credal: CredalEnvelope, trap: float
     ) -> Cap | None:
-        """The conditional-gate group's cap: its first gate that fires (§3.9).
+        """The conditional gates' cap: the meet of every gate that fires (§3.9).
 
-        The SDD composes component groups, not the gates inside one: the order
-        of ``_CONDITIONAL_GATES`` is a deliberate priority (evidence gates
-        before minimax, for example), and the cascade's own gate stage keeps
-        it. The §23 rule applies as in the cascade: a VERIFY whose gap nobody
-        can close is an ABSTAIN.
+        COMP-01 took the group's first gate, so an early VERIFY gate
+        (``distribution_shift``, ``high_risk_no_evidence``,
+        ``oracle_quorum_gate``) hid a later ESCALATE gate (``rollback_unavailable``,
+        ``env_mismatch_escalate``, ``critical_alternative``...), and adding a
+        risk signal could lower the authority a call needed (RMR-AUD-003).
+        Every gate is a cap now, with one exception kept from COMP-01: the
+        estimator gates (``_ESTIMATOR_GATES``) yield to the explicit risk
+        matrix (``_MATRIX_GATES``). Trap reads only the action type, domain and
+        environment the matrix already decides on, and letting it overrule the
+        matrix turned every high-risk production write into ESCALATE and 13
+        benign AROMER arena calls with it (ADR-flow-meet-composition). Among
+        equal caps the earliest gate gives the reason. The §23 rule applies per
+        gate: a VERIFY whose gap nobody can close is an ABSTAIN.
         """
-        for gate in _CONDITIONAL_GATES:
-            action = gate.evaluate(self, obs, credal, trap)
-            if action is None:
-                continue
+        fired = [(gate, action) for gate in _CONDITIONAL_GATES
+                 if (action := gate.evaluate(self, obs, credal, trap)) is not None]
+        if any(gate.name in _MATRIX_GATES for gate, _ in fired):
+            fired = [(gate, action) for gate, action in fired
+                     if gate.name not in _ESTIMATOR_GATES]
+        caps: list[Cap] = []
+        for gate, action in fired:
             if action is DecisionAction.VERIFY and _unresolvable_gap(obs):
-                return Cap(f"gate:{gate.name}", DecisionAction.ABSTAIN,
-                           DecisionReason.NO_RESOLVER_AVAILABLE)
-            return Cap(f"gate:{gate.name}", action, gate.reason)
-        return None
+                caps.append(Cap(f"gate:{gate.name}", DecisionAction.ABSTAIN,
+                                DecisionReason.NO_RESOLVER_AVAILABLE))
+            else:
+                caps.append(Cap(f"gate:{gate.name}", action, gate.reason))
+        return meet(caps) if caps else None
 
     def _decide_cascade(
         self, obs: PolicyObservation, *, _skip_hard_floor: bool = False

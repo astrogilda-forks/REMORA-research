@@ -80,10 +80,47 @@ The frontier model of §7.3 is therefore a Claude model.
 
 ## Implementation findings (ADRs)
 
-No ADR has been filed. One deviation from the SDD is recorded in a merged
-commit and in the schema file:
+No ADR has been filed. Two deviations from the SDD are recorded in commits
+and in the schema file:
 
 - IFC-03a (`52cbcd35`, #913): `schemas/tool_spec_v4.yaml` adds three fields
   beyond the SDD's §5.1 excerpt (`provider`, argument kinds and
   `disclosure`), because lint rules the SDD assigns to the linter cannot be
   checked without them. The schema file states the reason for each.
+- RMR-AUD-007 and RMR-AUD-008, from an external audit of `b64e3cc1` on
+  2026-10-18.
+  - **Fixed, empty recipients.** Take a `from_args`, `url_host_of`,
+    `iban_of` or `resource_of` sink whose recipient argument is `[]`,
+    `null` or missing. The rule reached no one, so `flow_check` passed a
+    secret payload as clean. A derived rule that yields no value now names
+    each argument it reads as `unresolved:<argument>`. One absent argument
+    beside a resolved one (a `cc` beside a `to`) is still allowed.
+  - **Fixed, FL-01.** The rule caught a `url` argument only under
+    `recipients: none`. It now also refuses a `url` argument that is not
+    the `url_host_of` argument. On a tool that writes, it refuses an
+    `email` or `iban` argument the recipients rule does not name. The SDD (§3.5)
+    refuses only `url` under `none`. A read-only lookup by address reaches
+    no one, so email and iban count only for tools that write.
+  - **Fixed, handle references.** `HandleStore.resolve` treated the
+    `{"$handle", "$type"}` object the model is shown as literal text, so
+    the tool received the wrapper. The unchanged reference now resolves as
+    a whole handle (`L_value = L_h`). A reference with another tag, an
+    extra key or extra text stays literal and keeps `L_ctx`.
+  - **Not changed, rule-less containers.** The audit asks the labeler to
+    walk into a container that has no rule but has rules below it. Under
+    §3.2.1 a node is shown by value only if its label flows to the model,
+    and an undeclared container's label is `{user_principal}`. Under §3.3
+    key presence and list length are data. Walking the container would show
+    its structure to a model that may not read it, so the labeler still
+    renders it as one handle.
+  - **SDD inconsistency, new rule FL-14.** The SDD's own §5.1 `get_inbox`
+    excerpt declares `$[*].subject` BY_VALUE with no rule for `$` or
+    `$[*]`. Under §3.2.1 the subject is never shown. FL-14 now refuses a
+    BY_VALUE rule under a container with no BY_VALUE rule, so the author
+    learns this at lint time and not at run time. The excerpt as written
+    fails FL-14, and the test fixture adds the two container rules it
+    needs.
+  - **Not changed, argument labels.** The audit asks that a PUBLIC field
+    not take the label of the call's arguments. §3.3 requires that join
+    ("data that went in can come out"). A PUBLIC rule written by the
+    ToolSpec author cannot declassify data the call was given.

@@ -43,11 +43,14 @@ ASSESSED = _event(0, "assessed", {
     "policy_version": "v4",
     "tool_contract_bundle_hash": "bundle-1",
 })
+APPROVED = _event(1, "approved", {"proposal_id": "p-1", "actor": "approver-1"})
 AUTHORIZED = _event(2, "execution_authorized", {
     "proposal_id": "p-1", "grant_jti": "jti-1", "pep_allowed": True,
+    "tool_call_hash": "tch-1",
 })
 RESULT = _event(3, "execution_result", {
-    "proposal_id": "p-1", "executed": True, "tool_call_hash": "tch-1",
+    "proposal_id": "p-1", "executed": True, "tool_executed": True,
+    "tool_call_hash": "tch-1", "grant_jti": "jti-1",
 })
 DISPATCH = {
     "outbox_id": "ob-1", "state": "SUCCEEDED", "attempt_no": 1,
@@ -102,7 +105,8 @@ def test_a_verified_effect_outranks_the_dispatch_verdict() -> None:
         "verifier_identity": "cmms-reader",
         "expected_sha256": "e", "observed_sha256": "e",
     })
-    envelope = _project([ASSESSED, AUTHORIZED, RESULT, verified], DISPATCH)
+    envelope = _project([ASSESSED, APPROVED, AUTHORIZED, RESULT, verified],
+                        DISPATCH)
     assert envelope.effect.effect_outcome == "EFFECT_VERIFIED"
     assert envelope.effect.ledger_entry["effect_verifier_identity"] == "cmms-reader"
 
@@ -116,7 +120,8 @@ def test_a_mismatch_is_carried_not_smoothed() -> None:
         "verifier_identity": "cmms-reader",
         "expected_sha256": "e", "observed_sha256": "o",
     })
-    envelope = _project([ASSESSED, AUTHORIZED, RESULT, mismatch], DISPATCH)
+    envelope = _project([ASSESSED, APPROVED, AUTHORIZED, RESULT, mismatch],
+                        DISPATCH)
     assert envelope.effect.effect_outcome == "EFFECT_MISMATCH"
     assert envelope.effect.executed is True, (
         "a mismatch does not mean nothing was dispatched — the two facts are "

@@ -274,16 +274,25 @@ def test_parallel_fanout_preserves_order():
     assert names == ["oracle_0", "oracle_1", "oracle_2"]
 
 
-def test_parallel_fanout_faster_than_sequential():
-    """Parallel fan-out should complete faster than sum of individual latencies."""
-    import time
+def test_parallel_fanout_is_concurrent_not_sequential():
+    """Parallel fan-out must have all oracles in flight at once.
+
+    The previous form asserted a 2x wall-clock speedup over three 30 ms
+    sleeps, which fails on a loaded runner where thread-pool overhead can
+    exceed 45 ms. The property under test is concurrency, not speed: a
+    barrier of 3 opens only when all three asks are simultaneously in
+    flight, and a sequential fan-out instead produces an error response
+    (BrokenBarrierError or the oracle timeout).
+    """
+    import threading
+    barrier = threading.Barrier(3)
     oracles = []
     for i in range(3):
         o = MagicMock()
         o.name = f"o{i}"
-        def ask(prompt):
-            time.sleep(0.03)
-            return OracleResponse(provider=f"o{i}", raw_text='{}', extracted={}, cost_usd=0.0)
+        def ask(prompt, _i=i):
+            barrier.wait(timeout=5)
+            return OracleResponse(provider=f"o{_i}", raw_text='{}', extracted={}, cost_usd=0.0)
         o.ask = ask
         oracles.append(o)
 
@@ -291,17 +300,10 @@ def test_parallel_fanout_faster_than_sequential():
     genome.enable_parallel_fanout = True
     engine = Remora(oracles=oracles, genome=genome)
 
-    t0 = time.perf_counter()
-    engine._ask_parallel("test")
-    t_parallel = time.perf_counter() - t0
-
-    t0 = time.perf_counter()
-    for o in oracles:
-        o.ask("test")
-    t_seq = time.perf_counter() - t0
-
-    # Parallel should be significantly faster (at least 2x)
-    assert t_parallel < t_seq / 2
+    responses = engine._ask_parallel("test")
+    assert [r.provider for r in responses] == ["o0", "o1", "o2"]
+    assert all(r.error is None for r in responses), [
+        (r.provider, r.error) for r in responses]
 
 
 def test_router_gate_three_way_tie_returns_false():

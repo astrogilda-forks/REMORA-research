@@ -21,7 +21,9 @@ CRITICAL_NEVER_AUTONOMOUSLY_ACCEPTED
     A critical-risk action must never receive ``ACCEPT`` without human review.
 
 ADVERSARIAL_ALWAYS_ESCALATED
-    Any action with ``adversarial_detected=True`` must produce ``ESCALATE``.
+    Any action with ``adversarial_detected=True`` must produce ``ESCALATE``, or
+    ``ABSTAIN`` when a refusal no review can lift also applies
+    (``NON_APPROVABLE_REASONS``).
 
 ESCALATE_IMPLIES_HUMAN_REVIEW
     Every ``ESCALATE`` decision must set ``human_review_required=True``.
@@ -84,6 +86,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from remora.errors import RemoraError
+from remora.policy.composition import NON_APPROVABLE_REASONS
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction, DecisionReport
 
@@ -176,22 +179,30 @@ class _CriticalNeverAutonomouslyAccepted(PolicyInvariant):
 class _AdversarialAlwaysEscalated(PolicyInvariant):
     name = "ADVERSARIAL_ALWAYS_ESCALATED"
     description = (
-        "Any action with adversarial_detected=True must produce ESCALATE. "
-        "The admission firewall is a hard block with no bypass."
+        "Any action with adversarial_detected=True must produce ESCALATE, or "
+        "ABSTAIN when a refusal no review can lift also applies. The admission "
+        "firewall is a hard block with no bypass."
     )
 
     def check(self, obs: PolicyObservation, report: DecisionReport) -> InvariantResult:
-        if obs.adversarial_detected and report.action != DecisionAction.ESCALATE:
-            return InvariantResult(
-                invariant_name=self.name,
-                passed=False,
-                violated=True,
-                evidence=(
-                    f"adversarial_detected=True but action={report.action.value} "
-                    f"(expected ESCALATE)"
-                ),
-            )
-        return InvariantResult(invariant_name=self.name, passed=True, violated=False)
+        if not obs.adversarial_detected or report.action == DecisionAction.ESCALATE:
+            return InvariantResult(invariant_name=self.name, passed=True, violated=False)
+        # A cross-tenant argument or an unauthorised intent is refused with no
+        # approval route. Escalating it would open one, so the stricter
+        # refusal stands (RMR-AUD-003). The firewall still blocks.
+        if report.action == DecisionAction.ABSTAIN and (
+            set(report.reasons) & NON_APPROVABLE_REASONS
+        ):
+            return InvariantResult(invariant_name=self.name, passed=True, violated=False)
+        return InvariantResult(
+            invariant_name=self.name,
+            passed=False,
+            violated=True,
+            evidence=(
+                f"adversarial_detected=True but action={report.action.value} "
+                f"(expected ESCALATE)"
+            ),
+        )
 
 
 class _EscalateImpliesHumanReview(PolicyInvariant):

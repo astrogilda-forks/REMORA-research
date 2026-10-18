@@ -43,8 +43,11 @@ def http(monkeypatch, tmp_path):
     # equal the principal, which is fail-closed: before this binding existed
     # the verifier name arrived in the request body, so anyone authorised to
     # record receipts could type a permitted name.
+    # The reader is its own service (RMR-AUD-004): a receipt from the
+    # principal that executed the call is a self-attestation and never
+    # settles the proposal.
     monkeypatch.setenv("REMORA_EFFECT_VERIFIER_BINDINGS",
-                       "employee-1=acme.reader/v1")
+                       "reader-svc=acme.reader/v1")
     monkeypatch.setenv("REMORA_LEASE_SIGNING_KEY", "roundtrip-lease-key")
     monkeypatch.setenv("REMORA_ENV", "development")
     monkeypatch.setenv("REMORA_TOOL_REGISTRY_MODULE",
@@ -59,8 +62,10 @@ def http(monkeypatch, tmp_path):
     import servers.execution_api as exec_mod
 
     monkeypatch.setattr(api_mod, "_authenticate", lambda request: ("acme", "reviewer"))
-    monkeypatch.setattr(api_mod, "_authenticated_principal",
-                        lambda request: "employee-1")
+    monkeypatch.setattr(
+        api_mod, "_authenticated_principal",
+        lambda request: ("reader-svc" if request.url.path.endswith("/effect")
+                         else "employee-1"))
     monkeypatch.setattr(api_mod, "_require_tenant_capability",
                         lambda role, tenant, cap: None)
     monkeypatch.setattr(api_mod, "_enforce_review_approval_role",

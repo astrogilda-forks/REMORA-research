@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from remora.governance.effect_verification import EffectStatus
 
@@ -143,6 +143,9 @@ class ExecutionApproveResponse(BaseModel):
     item_id: str
     expires_at: str
     audit: AuditRef
+    delegated_executor: str | None = Field(
+        None, description="The delegate the proposal named at assess time, "
+                          "approved with the call; absent when it named none.")
 
 
 class ExecutionExecuteResponse(BaseModel):
@@ -327,6 +330,14 @@ class ToolCallRequest(BaseModel):
     # The request this call arrived in. When present it is bound into the
     # ACCEPT grant, so the grant redeems only with the same reference.
     request_ref: RequestRefModel | None = None
+    # Opt-in delegated execution: a service identity that may execute this
+    # proposal on the proposer's behalf. Admitted at assess only when the
+    # deployment declares it for this agent in this tenant
+    # (tenant_access.<tenant>.delegated_executors), then bound into the
+    # authorization context, so it is part of what the reviewer approves and
+    # cannot be added or changed afterwards. Absent, only the proposer
+    # executes. See remora/governance/delegation.py.
+    delegated_executor: str | None = Field(None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def _task_identity_is_whole(self) -> ToolCallRequest:
@@ -560,3 +571,32 @@ class EffectVerificationRequest(BaseModel):
         description="Lowercase hex SHA-256, or empty.")
     verified_at: str = Field("", max_length=64)
     detail: str = Field("", max_length=2000)
+
+
+class ReceiptSignatureModel(BaseModel):
+    """A detached Ed25519 signature under ``REMORA/EFFECT-RECEIPT/v1``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    algorithm: str = Field(..., max_length=32)
+    domain: str = Field(..., max_length=64)
+    kid: str = Field(..., max_length=100)
+    signature: str = Field(..., max_length=200)
+
+
+class SignedEffectReceiptRequest(BaseModel):
+    """A signed observation from a verifier domain (CAPR-06 to CAPR-08).
+
+    Unlike :class:`EffectVerificationRequest` this carries no verdict to
+    record. ``receipt`` holds what the verifier read, signed by a key the
+    deployment registered; ``arguments`` are the approved call's arguments,
+    accepted only when they hash to the dispatched call. REMORA instantiates
+    the contract from the signed ToolSpec and computes the verdict itself.
+    See ``docs/design/compositional-authority-preservation-v1.md`` §4.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    receipt: dict[str, Any]
+    signature: ReceiptSignatureModel
+    arguments: dict[str, Any]

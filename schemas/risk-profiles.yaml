@@ -36,7 +36,7 @@ defaults:
 access_defaults:
   default_role: viewer
   role_permissions:
-    admin: ["assess", "evidence", "execute", "follow_up", "read", "rerun", "review"]
+    admin: ["assess", "evidence", "execute", "follow_up", "read", "rerun", "review", "verify_effect"]
     operator: ["assess", "evidence", "execute", "rerun", "read"]
     reviewer: ["review", "follow_up", "read"]
     domain_expert: ["review", "read"]
@@ -44,8 +44,10 @@ access_defaults:
     soc_analyst: ["review", "read"]
     legal_counsel: ["review", "read"]
     viewer: ["read"]
+    # RMR-AUD-004: records observed effects (POST .../effect); never executes.
+    effect_verifier: ["verify_effect", "read"]
   tenant_defaults:
-    allowed_roles: ["admin", "operator", "reviewer", "domain_expert", "senior_authority", "soc_analyst", "legal_counsel", "viewer"]
+    allowed_roles: ["admin", "operator", "reviewer", "domain_expert", "senior_authority", "soc_analyst", "legal_counsel", "viewer", "effect_verifier"]
     reviewer_roles: ["admin", "reviewer", "domain_expert", "senior_authority", "soc_analyst", "legal_counsel"]
 
 # ── Risk profiles ──────────────────────────────────────────────────────────────

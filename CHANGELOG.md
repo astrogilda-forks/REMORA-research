@@ -4,6 +4,123 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Review path binds the intent authority (RMR-AUD-006, part 3)
+
+- An item approved under one intent authority executed under another, and the
+  new `intent_authority_hash` was signed into the grant, the lease and the
+  audit record. The review path now compares it with the `assessed` record,
+  as ACCEPT-token redemption does. A difference is 409 `context_mismatch`
+  with `intent_authority_hash` in `mismatched`, and the approval is not
+  consumed.
+
+### Review path binds the whole proposal (RMR-AUD-001, binding part)
+
+- The proposal fields outside `canonical_tool_call_hash` (`schema_valid`,
+  `rollback_available`, `untrusted_context`, `intent_ref`, `derivations`, task,
+  `plan`, `task_type`, `request_ref`, `delegated_executor`) could differ
+  between assess and execute. A call assessed as ESCALATE because of one downgrade could be
+  approved and then executed as a VERIFY by dropping it and adding another.
+  The `assessed` record now carries `proposal_envelope_hash`, and
+  `POST /v1/execution/execute` refuses a different proposal with 409
+  `binding_refused` before the approval is touched. Items assessed before this
+  change carry no hash and are refused, so they must be proposed again.
+  `tests/test_execution_api.py::test_riskier_world_invalidates_approval_at_execution`
+  simulated a riskier world by re-presenting `rollback_available=false`. That
+  is now a refused proposal, so the test makes the world change on the server
+  side, and a new test pins the refusal.
+
+### Approved escalations execute (RMR-AUD-002)
+
+- An approved ESCALATE re-decided on the observation the reviewer saw was
+  ESCALATE again, and the re-gate voided every fresh ESCALATE, so no approved
+  escalation could execute. The review queue now records each item's decision
+  reasons (`requested_reasons`), and the approval records them as
+  `approved_reasons` (also on the `approved` event). An approved ESCALATE
+  survives a fresh ACCEPT, VERIFY or ESCALATE whose reasons are all among the
+  approved ones. A new reason or a fresh ABSTAIN still voids it. Items
+  enqueued without reasons keep the earlier rule.
+
+### Delegated execution and approval policy binding
+
+Follow-ups to the review-path binding below. The default stays fail-closed.
+
+- Opt-in delegated execution. A proposal may name `delegated_executor`. It is
+  admitted at `POST /v1/execution/assess` only when
+  `tenant_access.<tenant>.delegated_executors` in the risk-profile config
+  declares that service identity for the proposing agent. Otherwise the
+  assessment is refused with 409 `delegate_not_declared`,
+  `delegate_cross_tenant` or `delegate_is_proposer`. The shipped config
+  declares none. The delegate is recorded in the `assessed` record, bound into
+  the `AuthorizationContext` hash, shown by `GET /proposals/{id}` and
+  `POST /approve` and recorded on the `approved` event. It may execute on the
+  review path and redeem the ACCEPT token. A delegate added, swapped or stripped
+  after assessment, or any other principal, is `context_mismatch`. The delegate
+  cannot approve the item (403 `approver_is_delegated_executor`).
+  `execution_authorized` records `acting_for`. Without a delegation, behaviour
+  is unchanged.
+- Approvals are bound to the requirement that admitted the approver. The
+  approval and the `approved` event record `approver_role`, `required_role`
+  and `approval_policy_hash`. At execution, and at the async worker's
+  dispatch re-gate, a requirement that changed (for example an edited
+  `schemas/risk-profiles.yaml` and a restart with the item in a durable queue)
+  voids the approval as `approval_invalidated` (`approval_policy_changed`) and
+  returns the item for approval under the current rule. An approval without
+  the record, including one persisted before this change, is voided the same
+  way (`approval_policy_unbound`). Durable approvals pending at upgrade
+  therefore need approving again.
+- `AuthorizationContext` gains `delegated_executor`, which enters the hash
+  only when set, so existing tokens and golden vectors are unchanged.
+
+### Review path binds actor, task and reviewed risk tier (behaviour change)
+
+Fixes the two review-path defects measured by the execution-chain attack
+evaluation (PR #932, `scripts/execution_chain_attack_eval.py`).
+
+- `POST /v1/execution/execute` refuses an approved item presented by a
+  principal other than the proposer, or under a task other than the
+  proposal's (including a task stripped or added), with 409
+  `context_mismatch` and an `execution_context_refused` chain record naming
+  the mismatched fields. The comparison is the ACCEPT token's
+  `AuthorizationContext` hash, with the approved side read from the
+  `assessed` record. It runs before the queue is touched, so the approval
+  stays usable by its proposer. A proposal whose assessment cannot be read
+  back is refused as `context_unbound`.
+- `ReviewQueue.execute` and `ReviewQueue.regate_authorized` void an approval
+  when the observation's risk tier differs from the one the approval was
+  reviewed at (`reviewed_risk_tier_changed`), even when the fresh decision is
+  still VERIFY. The item re-enters the queue with the fresh observation, so
+  re-approval is checked against the role the current tier requires
+  (`domain_expert` at high, `senior_authority` at critical).
+- Callers that executed another principal's approved item, or relied on an
+  approval surviving a relabel, now get a refusal. ACCEPT-token and lease
+  semantics are unchanged.
+
+### Breaking: `/v1/assess` and the adapters need registry labels to reach ACCEPT (RMR-AUD-011)
+
+- Before this change, with a confident oracle ensemble, `POST /v1/assess`
+  for `xfer` labelled `risk_tier=low`, `action_type=read` returned ACCEPT,
+  and so did an action-gate adapter given the same labels
+  (`should_execute=True`). Both now return VERIFY.
+- `/v1/assess` with a `tool_call` takes the labels from the server's
+  registry (`resolve_tool_metadata`, as `/v1/execution/*` does). The
+  request's `risk_tier` may only raise the tier, an `action_type` that
+  differs caps ACCEPT (`registry_label_conflict`), and an unclassified tool
+  is critical/unknown.
+- `/v1/assess` without a `tool_call`: the labels are the caller's, and an
+  engine ACCEPT becomes VERIFY with `caller_labels_untrusted`, in the
+  response and in the stored envelope. Clients that relied on ACCEPT from
+  `/v1/assess` must send a `tool_call` for a tool the server classifies.
+- The response and the audit record gain `label_source`; the response
+  also gains `label_cap`. `/v1/rerun` keeps ACCEPT only for a record whose
+  labels came from the registry.
+- `remora/adapters/`: every action-gate adapter takes `registry=`.
+  Without it an ACCEPT becomes VERIFY, and `ActionGateResult` gains
+  `label_source`/`label_cap`. `HttpGateway` sends the `tool_call`, and
+  `GatewayResult` gains `label_source`/`label_cap`. The four framework
+  examples declare a deployment registry. Their outcomes are unchanged.
+- No committed benchmark or published result runs through `/v1/assess`
+  or the adapters, so no published number changes.
+
 ### Breaking: library labels need a registry to reach ACCEPT (PRF-040)
 
 - `assess_tool_call` and `what_if_tool_call` take `registry=`, a mapping
@@ -75,6 +192,88 @@ This file lists externally relevant changes by release. Fine-grained development
   `EXECUTION_SERVICE` bound every retry assessed again, opened a new review
   item and answered 402. A request with `input.review_item_id` now redeems that
   item through `/v1/execution/execute`.
+
+### SAP v7 addenda: InjecAgent and external routing baselines (pre-registration only)
+
+- SAP v7 §12 to §15 pre-register two studies before any data exists (owner
+  decision 2026-10-18). Q6 runs InjecAgent (`f19c9f2c`, MIT) through
+  `/v1/execution/assess` against allow-all and a policy-only gateway, with
+  benign twin controls (PRF-042). Q7 compares REMORA with an LLM judge and
+  Invariant Guardrails on BFCL v4 multi-turn (gorilla `6ea57973`), with
+  model-generated wrong calls and no constructed producers (PRF-010, PRF-011,
+  PRF-013). Nothing has been run; the plan stays a draft until the owner
+  approves and seals it.
+
+### Routing: semantic bundle v3 keeps qualifiers (RMR-AUD-009)
+
+- Bundle v2's intent extractor grounded a mutation in a conditional or a
+  question: "Inspect booking B-104 before cancel.", "Tell me if I can cancel
+  booking B-104." and "Review the policy before we cancel booking B-104." each
+  supported `cancel_booking`. v2 checks negation only and passes goal
+  matching the bare keyword, so `goal_match`'s conditional check never sees
+  the qualifier.
+- `remora/toolcall/routing/bfcl_semantic_bundle_v3.py` changes intent
+  extraction only. A mutation keyword with a conditional word in the four
+  words before it, or framed as a question ("tell me if", "can I", "is it
+  possible to"), grounds nothing. Action spans quote up to three preceding
+  words of the clause. Contract authoring is v2's, re-exported.
+- v2, `goal_match.py` and `bfcl_arms.py` are unchanged: the C-ext4 manifest
+  pins their hashes. v3 is wired into no runner and supports no claim.
+- `scripts/bfcl_v3_extractor_dev_compare.py` routes the three spent
+  development sets under V2D with each extractor
+  (`artifacts/posthoc/bfcl_v3_extractor_dev_compare.json`, development only).
+  v3 accepts the same gold calls as v2 on all three sets and no wrong call.
+  Four routes change, all on one task where v2 read "if I set the capture
+  percentage" as an update request and refuted the correct read tool; v3
+  sends them to VERIFY instead.
+
+### Security (effect evidence follows an authorized dispatch; audit keeps every approval, RMR-AUD-004/005)
+
+An external audit on 2026-10-18 reproduced these on the Python runtime.
+
+- **Effect after a deny.** `resolve_lineage` read only the last
+  `execution_result`. A trail that also held an ABSTAIN assessment or a
+  rejection accepted an effect receipt, and the proposal read
+  `EFFECT_VERIFIED`. The lineage now requires an assessment that may
+  dispatch, no rejection, an approval for a VERIFY or ESCALATE decision, and
+  an `execution_authorized` record with `pep_allowed: true` for the same
+  grant and call. Refusals: `dispatched_after_deny`,
+  `assessment_decision_unknown`, `dispatched_without_approval`,
+  `dispatch_not_authorized`. The surface runtime, whose chain has no decision
+  records, opts out explicitly (`require_decision_path=False`).
+- **The executor as its own verifier.** Recording an effect needed the
+  `execute` capability, and with `REMORA_EFFECT_VERIFIER_BINDINGS` unset the
+  verifier identity only had to equal the principal, so the agent that ran a
+  call could attest to it. There is now a `verify_effect` capability and an
+  `effect_verifier` role. In production and under the strict profiles:
+  - `verify_effect` is required;
+  - the bindings must be set (503 `effect_verifier_bindings_required`);
+  - a principal that proposed or executed the call is refused (403
+    `verifier_is_executor`).
+
+  A development deployment outside the strict profiles still accepts
+  `execute` and the executor's own receipt. The record and the projection
+  then carry `self_attested: true`.
+- **Evidence about another object.** `verify_declared_delta` never read
+  `PostconditionContract.target_selector`. An observed selector field that
+  differs now returns `EFFECT_UNOBSERVABLE` with
+  `postcondition_target_mismatch`. A selector field the reader does not
+  return is still not compared. The surface runtime refuses a contract whose
+  selector names another object than the call's arguments
+  (`postcondition_target_not_call_argument`).
+- **Dropped audit events.** The outbox key for `approved` named only the
+  item, so an approval after an expired or invalidated one was dropped from
+  the chain. The same held for a second re-gate refusal on one item. The key
+  now carries the approval's issue time, or a per-attempt id for refusals.
+  The key of a first approval changes bytes; the event does not.
+- **State stuck at REFUSED.** `current_state` returned `REFUSED` once any
+  refusal had been recorded. It is now a fold in chain order. A binding or
+  context refusal leaves the approval standing (`AUTHORIZED`). An expired or
+  invalidated approval returns to `REVIEW_PENDING` until it is approved
+  again. An effect counts only when its lineage holds.
+- Not changed: the frozen `effect-evidence-v1` schema and its reference
+  verifier, the Worker gateway's effect submission, and the review-queue
+  re-gate.
 
 ### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §86)
 
@@ -158,6 +357,65 @@ This file lists externally relevant changes by release. Fine-grained development
   007, 013, 018 to 024) are re-audited and rebound to the code commit, with
   their evidence tests passing. Their mechanism, status, scope and caveats are
   unchanged. The boundary declaration and its summary are repinned.
+
+### SAP v7 addenda: InjecAgent and external routing baselines (pre-registration only)
+
+- SAP v7 §12 to §15 pre-register two studies before any data exists (owner
+  decision 2026-10-18). Q6 runs InjecAgent (`f19c9f2c`, MIT) through
+  `/v1/execution/assess` against allow-all and a policy-only gateway, with
+  benign twin controls (PRF-042). Q7 compares REMORA with an LLM judge and
+  Invariant Guardrails on BFCL v4 multi-turn (gorilla `6ea57973`), with
+  model-generated wrong calls and no constructed producers (PRF-010, PRF-011,
+  PRF-013). Nothing has been run; the plan stays a draft until the owner
+  approves and seals it.
+
+### Flow control (RMR-AUD-007, RMR-AUD-008: recipients, FL-01, FL-14, handle references)
+
+- `flow_check` passed a secret payload as clean when the recipient argument
+  of a derived sink (`from_args`, `url_host_of`, `iban_of`, `resource_of`)
+  was `[]`, `null` or missing. Such a rule now reports each argument it
+  reads as `unresolved:<argument>`. An absent `cc` beside a resolved `to`
+  is still allowed.
+- FL-01 refuses a `url` argument that is not the `url_host_of` argument, and,
+  on a tool that writes, an `email` or `iban` argument the recipients rule
+  does not name. Before, it caught only `url` under `recipients: none`.
+- New lint rule FL-14 refuses a BY_VALUE field rule under a container with
+  no BY_VALUE rule. The container is rendered as one handle (SDD §3.2.1), so
+  the field was never shown. The SDD's §5.1 `get_inbox` excerpt fails it as
+  written; the status document records the inconsistency.
+- `HandleStore.resolve` resolves the unchanged `{"$handle", "$type"}`
+  reference the model is shown as a whole handle. Before, the tool received
+  the wrapper object.
+- Not changed: a container without a rule is still one handle, and result
+  labels still join the call's argument labels. Both follow SDD §3.2.1 and
+  §3.3; the reasons are in
+  `docs/design/derived-information-flow-control-v1-status.md`.
+- No committed ToolSpec bundle carries a `flow` block, so no signed bundle
+  changes. `remora/flow/spec.py` is in the policy bundle hash, which
+  changes.
+### Policy (signal monotonicity, RMR-AUD-003)
+
+- A refusal no review can lift now outranks an ESCALATE. A cross-tenant
+  argument or an unresolved intent provenance stays ABSTAIN, with no review
+  item, when `schema_valid=False`, `adversarial_detected` or
+  `tool_forbidden` also fires. Before, those guards came first and turned
+  the refusal into a review item. `NON_APPROVABLE_REASONS` in
+  `remora/policy/composition.py` names the set, which the OPA adapter
+  already used.
+- The conditional gates compose by meet. An early VERIFY gate
+  (`distribution_shift`, `high_risk_no_evidence`, `oracle_quorum_gate`) no
+  longer hides a later ESCALATE gate such as `rollback_unavailable` or
+  `env_mismatch_escalate`. The trap and minimax gates still yield to the
+  explicit risk matrix, so high-risk production writes stay VERIFY.
+- `ADVERSARIAL_ALWAYS_ESCALATED` accepts ABSTAIN when a non-approvable
+  refusal also applies.
+- Decisions change only toward stricter: 17,166 of 60,000 generated
+  decisions, none looser. C-ext3 (0 of 8,397 episode-arm decisions) and
+  every published count are unchanged.
+- Still open: a risk signal on a call that abstains for lack of evidence
+  opens a review route, and raising a production write from medium to high
+  risk lowers ESCALATE to VERIFY. Both need an owner decision
+  ([ADR](docs/architecture/ADR-flow-meet-composition.md#amendment-2026-10-18-rmr-aud-003)).
 
 ### Security (MCP gateway readiness fails closed)
 
@@ -431,6 +689,20 @@ This file lists externally relevant changes by release. Fine-grained development
   Bundle v2 grounds no intent in AgentDojo's phrasing.
 - `local.env`, which holds the experiment API key, is now in the committed
   `.gitignore`.
+
+### Evidence (execution-chain attack evaluation, PRF-015 and PRF-041)
+
+- `scripts/execution_chain_attack_eval.py` writes
+  `artifacts/posthoc/execution_chain_attack_eval_v1.json` (status
+  `post_hoc_descriptive`): 52 attacks and 16 benign controls against
+  `/v1/execution`, a policy-only gateway with the same proposal-time
+  decision, the library flow check (library_only) and the advisory library
+  path at master before the PRF-040 fix. Scoring is by the tool body's side
+  effect, not the API verdict.
+- REMORA ran 4 of 37 chain attacks (replay, substitution, ToolSpec change,
+  cross-context reuse, forgery, expiry) and the gateway 31. The secret
+  reached the sink in all 11 exfiltration attacks on both. NEGATIVE_RESULTS
+  §87 has the table and the four chain attacks REMORA did not stop.
 
 ### Evidence (peer-review level 2: post-hoc re-analysis, no sealed number changed)
 

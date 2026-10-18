@@ -62,7 +62,11 @@ def build_effect_evidence(*, contract: PostconditionContract,
             tool_call_hash=tool_call_hash, grant_jti=grant_jti,
             expected_sha256=verification.expected_sha256,
             observed_sha256=verification.observed_sha256, verified_at=verified_at,
-            verifier_identity=verifier_identity, trusted_verifiers=tuple(trusted_verifiers))
+            verifier_identity=verifier_identity, trusted_verifiers=tuple(trusted_verifiers),
+            # The surface runtime's chain has no assessment decisions: its
+            # dispatch is gated in process by the one-use assessment handle
+            # and the lease, and a refused dispatch is recorded not executed.
+            require_decision_path=False)
     except ReceiptRefused as exc:
         raise ValueError(exc.reason) from exc
     attempted = datetime.fromisoformat(lineage.attempted_at.replace("Z", "+00:00"))

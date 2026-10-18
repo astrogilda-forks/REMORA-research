@@ -13,7 +13,9 @@ minted it, the proposal that created it and an expiry.
   turns into ABSTAIN.
 - :meth:`HandleStore.resolve` substitutes handle values into a call's
   arguments, anywhere they occur, and returns a value label per top-level
-  field: ``L_h`` for a field whose whole value is one handle, and
+  field: ``L_h`` for a field whose whole value is one handle (the bare
+  token, or the unchanged ``{"$handle", "$type"}`` reference the model was
+  shown), and
   ``L_ctx ⊔ ⨆ embedded handle labels`` for any other field, because literal
   text came from the model (:func:`remora.flow.label.field_value_label`).
 - A stored record never changes. Writing a different record under an
@@ -35,6 +37,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from remora.flow.label import Label, field_value_label
+from remora.flow.render import HANDLE_KEY, TYPE_KEY, is_handle_ref
 
 __all__ = [
     "HANDLE_TOKEN",
@@ -167,10 +170,22 @@ class HandleStore:
                 return [substitute(v, seen) for v in value]
             return value
 
+        def reference(value: Any) -> str | None:
+            # The {"$handle", "$type"} object the model was shown, passed back
+            # unchanged. Any other key, another tag or extra text is the
+            # model's own and keeps the literal path (RMR-AUD-008).
+            if not is_handle_ref(value) or not isinstance(value[HANDLE_KEY], str):
+                return None
+            token = HANDLE_TOKEN.fullmatch(value[HANDLE_KEY])
+            if token is None or lookup(token.group(1)).type_tag != value[TYPE_KEY]:
+                return None
+            return token.group(0)
+
         resolved: dict[str, Any] = {}
         labels: dict[str, Label] = {}
         for name, value in args.items():
             seen: list[Label] = []
+            value = reference(value) or value
             whole = isinstance(value, str) and HANDLE_TOKEN.fullmatch(value) is not None
             resolved[name] = substitute(value, seen)
             labels[name] = field_value_label(exactly_one_handle=whole, context=context_label,

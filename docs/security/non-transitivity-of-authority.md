@@ -254,7 +254,11 @@ the class, not how often the pattern occurs in real systems.
 3. Delegation is a library and dispatcher mechanism. No `/v1/execution/*`
    route derives a delegation on a wrapper's behalf. A wrapper that makes a
    nested call must call `delegate()` and dispatch the nested call under its
-   own lease bound to the child set.
+   own lease bound to the child set. The execution API's `delegated_executor`
+   is a different thing: it changes who may execute one assessed call, not
+   what may be done. The deployment declares it per tenant, the proposal names
+   it, and it is bound into the authorization the reviewer approves
+   (`docs/07-api-reference.md`).
 4. Transitive delegation exists by opt-in. It is bounded by depth,
    lifetime and subset rules, but a policy that opts in widens who may act,
    never what may be done.

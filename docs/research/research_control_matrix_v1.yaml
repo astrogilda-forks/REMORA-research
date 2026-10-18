@@ -1238,6 +1238,7 @@ entries:
       - remora/toolcall/routing/tool_contract.py
       - remora/toolcall/routing/bfcl_semantic_bundle.py
       - remora/toolcall/routing/bfcl_semantic_bundle_v2.py
+      - remora/toolcall/routing/bfcl_semantic_bundle_v3.py
       - remora/toolcall/routing/derivation.py
       - remora/toolcall/routing/derivation_search.py
       - remora/toolcall/routing/evaluate.py
@@ -1253,6 +1254,7 @@ entries:
       - tests/test_goal_match.py
       - tests/test_semantic_bundle.py
       - tests/test_bfcl_semantic_bundle_v2.py
+      - tests/test_bfcl_semantic_bundle_v3.py
       - tests/test_semantic_authority_floor.py
       - tests/test_intent_claim_boundaries.py
       - tests/test_derivation_receipt.py
@@ -1282,7 +1284,10 @@ entries:
       model made. Transfer to an unseen catalogue, model-made wrong calls and
       external baselines are untested. The BFCL bundles are benchmark
       bundles: no deployment bundle imports them, and the v1 intent extractor
-      ignores negation (§81). The governed path supplies its own contracts
+      ignores negation (§81), and v2 handles negation but still grounds a
+      mutation in a conditional or a question (RMR-AUD-009). Bundle v3
+      fixes extraction for those cases; it is a development artifact, run
+      on no sealed set. The governed path supplies its own contracts
       and intents.
     related_work_section: "docs/09-related-work.md §15"
     in_code_citation: false

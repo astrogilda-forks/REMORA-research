@@ -171,6 +171,9 @@ EXPECTED_REASON_CODES = {
     "toolspec_flow_requires_v4",
     "toolspec_flow_invalid",
     "toolspec_flow_lint_failed",
+    # Additive 2026-10-18 (CAPR-07): the postcondition block of schema version 5.
+    "toolspec_postcondition_requires_v5",
+    "toolspec_postcondition_invalid",
 }
 
 

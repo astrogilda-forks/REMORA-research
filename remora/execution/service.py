@@ -11,6 +11,7 @@ duck-typed proposal carrying tool_name/arguments/target_environment.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import hmac
 import json
 import logging
@@ -37,6 +38,7 @@ from remora.execution.ports import (
 )
 from remora.execution.request_ref import RequestRef, request_ref_of
 from remora.governance.audit_outbox import encode_key
+from remora.governance.delegation import delegated_executor_of
 from remora.governance.execution_identity import (
     ExecutionContextProvider,
     ExecutionContextRefused,
@@ -367,6 +369,14 @@ def assess_proposal(
     if request_ref is not None:
         record["request_ref"] = request_ref.to_dict()
         record["request_ref_hash"] = request_ref.digest()
+    # RMR-AUD-001: the whole proposal, so execution can be refused for
+    # presenting another one under this approval.
+    record["proposal_envelope_hash"] = proposal_envelope_hash(proposal)
+    delegate = delegated_executor_of(proposal)
+    if delegate:
+        # Admitted by the route before this function ran; recorded here so
+        # the reviewer, the approval record and execution read one value.
+        record["delegated_executor"] = delegate
     if context is not None:
         record["execution_context_hash"] = context.digest()
         record["execution_context_canonical"] = context.canonical_bytes().decode("utf-8")
@@ -424,6 +434,7 @@ def assess_proposal(
             toolspec_hash=str(toolspec_identity["hash"]),
             task=task,
             request_ref=request_ref,
+            delegated_executor=delegate,
         )
         token = PolicyDecisionToken.issue(
             action="accept",
@@ -444,7 +455,10 @@ def assess_proposal(
             # REM-032 lazy sweep: overdue PENDING items resolve to ABSTAIN
             # before new work is considered.
             q.expire_due()
-            item = q.enqueue(obs, report.action) if report.action in (
+            item = q.enqueue(
+                obs, report.action,
+                reasons=[r.value for r in report.reasons],
+            ) if report.action in (
                 DecisionAction.VERIFY, DecisionAction.ESCALATE
             ) else None
             if item is not None:
@@ -497,6 +511,185 @@ class ToolSpecChanged(RemoraError):
     reason = "toolspec_changed_between_assess_and_dispatch"
 
 
+class ApprovalContextRefused(RemoraError):
+    """The approved item is presented by another actor or under another task
+    than the proposal it was approved for (route maps to 409).
+
+    ``reason`` is the wire detail and uses the ACCEPT path's vocabulary:
+    ``context_mismatch`` when a bound field differs, ``context_unbound``
+    when the proposal's assessment cannot be read back to compare against.
+    """
+
+    code = "approval_context_refused"
+    category = "execution"
+
+    def __init__(self, message: str, *, reason: str,
+                 mismatched: tuple[str, ...] = ()) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.mismatched = mismatched
+
+
+#: The AuthorizationContext fields the review path binds to the proposal.
+#: The ACCEPT token binds all of its fields because nothing is decided again
+#: at redemption. The review path re-decides on a fresh observation, so the
+#: other fields are covered elsewhere: the target and arguments by the queue's
+#: payload binding (tool_call_hash), the ToolSpec hash by FT-03, the policy
+#: bundle by the fresh decision and the approval-policy hash, the reviewed risk
+#: tier by ReviewQueue step 4b', and the execution context by the queue's own
+#: binding. The intent authority is bound here (RMR-AUD-006): the fresh
+#: decision re-reads it but does not compare it with the one approved, so an
+#: item approved under one intent executed under another, and the new hash was
+#: signed into the grant, the lease and the audit record.
+_REVIEW_BOUND_FIELDS = ("principal", "context_id", "task_id", "delegated_executor",
+                        "intent_authority_hash")
+
+
+#: The proposal fields outside ``canonical_tool_call_hash``. The review path
+#: binds them to the assessment (RMR-AUD-001). The hash covers only the tool,
+#: arguments, tenant and target, which the queue's payload binding already
+#: refuses as ``binding_refused``. The rest still decide: ``schema_valid``,
+#: ``rollback_available`` and ``untrusted_context`` lower trust, ``intent_ref``
+#: selects the intent authority, and ``derivations`` grounds argument values.
+#: Unbound, a caller could get one decision approved and execute under another.
+#: ``idempotency_key`` is exempt because it names a request, not the call.
+#: tests/test_review_path_audit_r3.py pins this tuple to the wire model, so a
+#: new field is bound or exempted on purpose.
+PROPOSAL_ENVELOPE_FIELDS = (
+    "schema_valid", "rollback_available", "intent_ref", "untrusted_context",
+    "derivations", "context_id", "task_id", "plan", "task_type",
+    "delegated_executor", "request_ref",
+)
+
+
+def _plain(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if isinstance(value, dict):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    return value
+
+
+def proposal_envelope_hash(tool_call: Any) -> str:
+    """SHA-256 over the proposal fields outside the payload hash, as presented.
+
+    Read by attribute, so the wire model and a duck-typed call hash alike;
+    an absent field hashes as null.
+    """
+    envelope = {f: _plain(getattr(tool_call, f, None))
+                for f in PROPOSAL_ENVELOPE_FIELDS}
+    canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"),
+                           default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def proposal_envelope_refusal(
+    chain: AuditChainPort, tenant: str, proposal_id: str, tool_call: Any,
+) -> ApprovalContextRefused | None:
+    """The refusal for presenting ``tool_call`` against an approval of a
+    different proposal, or None.
+
+    The approved proposal is the hash the ``assessed`` record carries. A
+    record without one (assessed before this binding) cannot be compared and
+    is refused, so a pending item from before the upgrade must be proposed
+    again rather than executed unbound.
+    """
+    record = _assessed_payload(chain, tenant, proposal_id)
+    approved = str((record or {}).get("proposal_envelope_hash") or "")
+    if approved and approved == proposal_envelope_hash(tool_call):
+        return None
+    return ApprovalContextRefused(
+        "binding refused: the presented proposal differs from the one this "
+        "item was approved for",
+        reason="binding_refused",
+        mismatched=("proposal_envelope",))
+
+
+def _assessed_payload(
+    chain: AuditChainPort, tenant: str, proposal_id: str
+) -> dict[str, Any] | None:
+    """The proposal's single ``assessed`` record, or None when there is not
+    exactly one with an actor."""
+    assessed = [
+        e.payload for e in chain.entries(tenant)
+        if e.payload.get("event") == "assessed"
+        and e.payload.get("proposal_id") == proposal_id
+    ] if proposal_id else []
+    if len(assessed) != 1 or not str(assessed[0].get("actor") or ""):
+        return None
+    return dict(assessed[0])
+
+
+def _acting_for(record: dict[str, Any] | None, executor: str) -> str:
+    """The proposer ``executor`` acts for as its bound delegate, or "".
+
+    Only the delegate the ``assessed`` record names qualifies; the proposer
+    acting for itself is not a delegation.
+    """
+    if record is None:
+        return ""
+    delegate = str(record.get("delegated_executor") or "")
+    proposer = str(record.get("actor") or "")
+    if delegate and executor == delegate and executor != proposer:
+        return proposer
+    return ""
+
+
+def approved_context_refusal(
+    chain: AuditChainPort,
+    tenant: str,
+    proposal_id: str,
+    current: AuthorizationContext,
+) -> ApprovalContextRefused | None:
+    """The refusal for presenting an approved item under ``current``, or None.
+
+    The approved context is ``current`` with the bound fields replaced by
+    what the proposal's ``assessed`` record says: the authenticated proposer
+    and its task. Both sides are :class:`AuthorizationContext` values built by
+    :func:`authorization_context` and compared by hash, the comparison the
+    ACCEPT token makes at redemption.
+
+    Same actor means the proposer, or the delegate the proposal named when it
+    was assessed. The delegate is compared as the proposer it acts for, and
+    the ``delegated_executor`` field itself is compared like the task, so a
+    delegate added, swapped or stripped after approval is a mismatch. The
+    agent is the attacker in the threat model, so another agent in the tenant
+    is not this one's delegate unless the deployment declared it and the
+    proposal named it. A proposal whose assessment is missing, or recorded
+    more than once, is refused rather than compared with nothing.
+
+    Read-only, and it reads the chain, so it runs before the execute
+    transaction opens (see ``assessed_record``).
+    """
+    record = _assessed_payload(chain, tenant, proposal_id)
+    if record is None:
+        return ApprovalContextRefused(
+            "the proposal this item was approved for cannot be read back",
+            reason="context_unbound")
+    proposer = str(record.get("actor") or "")
+    approved = dataclasses.replace(
+        current,
+        principal=proposer,
+        context_id=str(record.get("context_id") or ""),
+        task_id=str(record.get("task_id") or ""),
+        delegated_executor=str(record.get("delegated_executor") or ""),
+        intent_authority_hash=str(record.get("intent_authority_hash") or ""),
+    )
+    acting_for = _acting_for(record, current.principal)
+    presented = (dataclasses.replace(current, principal=acting_for)
+                 if acting_for else current)
+    if approved.hash() == presented.hash():
+        return None
+    return ApprovalContextRefused(
+        "authorization context refused: this item was approved for a "
+        "different actor, task or delegate than the one presented here",
+        reason="context_mismatch",
+        mismatched=tuple(f for f in _REVIEW_BOUND_FIELDS
+                         if getattr(approved, f) != getattr(presented, f)))
+
+
 def execute_approved_item(
     *,
     tenant: str,
@@ -525,6 +718,7 @@ def execute_approved_item(
     async_dispatch: bool = False,
     transactional_append: TransactionalAppendPort | None = None,
     require_execution_context: bool = False,
+    approval_policy: Callable[[Any], str] | None = None,
 ) -> dict[str, Any]:
     """Execute a previously approved item under full re-gating.
 
@@ -540,6 +734,11 @@ def execute_approved_item(
     governed dispatcher; authorization and result are separate chain
     records (authorized-for-execution and actually-executed are distinct
     states - external review 2026-07-27).
+
+    ``approval_policy`` maps the fresh observation to the hash of the
+    approval requirement in force for it now (the role its tier requires).
+    The queue voids an approval granted under another requirement, or under
+    none recorded. None leaves the requirement unchecked (library use).
     """
     # RMR-CR-002: the review path mints and consumes in this process. A
     # redeemer holding only verify keys cannot do the first half, so it refuses
@@ -570,6 +769,29 @@ def execute_approved_item(
         )
 
     fresh_obs, fresh_semantic = build_observation(tool_call, tenant)
+    # The approval belongs to the proposal's actor and task, as an ACCEPT
+    # token does. Read from the chain here, outside any transaction, for the
+    # reason assessed_record gives; raised inside the transaction, after the
+    # tenant check and before the queue is touched, so an unknown item still
+    # answers not-found and a refused presentation neither consumes nor voids
+    # the approval for the actor and task it was granted to.
+    context_refusal = approved_context_refusal(
+        chain, tenant, assessed_proposal_id,
+        authorization_context(
+            tenant=tenant, principal=principal, semantic=fresh_semantic,
+            target_environment=tool_call.target_environment or "",
+            policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+            toolspec_hash=str(toolspec_identity["hash"]),
+            task=task_identity_of(tool_call),
+            delegated_executor=delegated_executor_of(tool_call),
+        ))
+    # Then the proposal itself (RMR-AUD-001): the fields outside the payload
+    # hash must be the ones assessed, or a call approved as one decision could
+    # be re-presented as another. Same placement, same non-consumption.
+    context_refusal = context_refusal or proposal_envelope_refusal(
+        chain, tenant, assessed_proposal_id, tool_call)
+    acting_for = _acting_for(
+        _assessed_payload(chain, tenant, assessed_proposal_id), principal)
     context = historical_context(
         chain, tenant, assessed_proposal_id, required=require_execution_context)
     fresh_obs = _bind_execution_context(
@@ -585,18 +807,31 @@ def execute_approved_item(
         with transaction(tenant) as q:
             if item_tenant.get(item_id) != tenant:
                 raise not_found(item_id)
+            if context_refusal is not None:
+                raise context_refusal
             q.expire_due()
             proposal_id = getattr(q.item(item_id).observation,
                                   "proposal_id", None)
             note_proposal_id(proposal_id)
-            outcome = q.execute(item_id, fresh_obs)
+            outcome = q.execute(
+                item_id, fresh_obs,
+                approval_policy_hash=(approval_policy(fresh_obs)
+                                      if approval_policy is not None else None))
             if outcome.decision is not ExecutionDecision.EXECUTE:
                 # REM-047: a re-gate refusal is a terminal state transition,
                 # and its audit event now commits with it. Appended after the
                 # commit, a crash in between left an item refused with no
                 # record of the refusal.
+                #
+                # One key per attempt (RMR-AUD-005). A binding refusal leaves
+                # the approval standing and an expiry returns the item to the
+                # queue, so the same item can be refused again; a key naming
+                # only the item dropped every refusal after the first. The
+                # append commits with this transaction, so a crash re-runs the
+                # attempt rather than replaying this key.
                 refusal_key = encode_key(
-                    tenant, f"execution_{outcome.decision.value}", item_id)
+                    tenant, f"execution_{outcome.decision.value}", item_id,
+                    uuid4().hex)
                 refusal_entry = append(tenant, {
                     "event": f"execution_{outcome.decision.value}",
                     "proposal_id": proposal_id,
@@ -644,6 +879,18 @@ def execute_approved_item(
                     # its own identity for theirs.
                     requested_by=principal,
                 )
+    except ApprovalContextRefused as exc:
+        # After the rollback, like the ACCEPT path's execution_context_refused
+        # record: nothing in the queue changed, so nothing commits with it.
+        chain.append(tenant, {
+            "event": "execution_context_refused",
+            "proposal_id": assessed_proposal_id or None,
+            "actor": principal,
+            "item_id": item_id,
+            "detail": exc.reason,
+            "mismatched": list(exc.mismatched),
+        })
+        raise
     except (KeyError, ValueError) as exc:
         raise conflict(str(exc)) from exc
 
@@ -728,6 +975,7 @@ def execute_approved_item(
         "event": "execution_authorized",
         "proposal_id": proposal_id,
         "actor": principal,
+        **({"acting_for": acting_for} if acting_for else {}),
         "item_id": item_id,
         "tool_call_hash": fresh_obs.tool_call_hash,
         "grant_jti": token.jti,
@@ -1040,6 +1288,7 @@ def dispatch_pending_intent(
     rebuild_call: Callable[[dict[str, Any]], Any] | None = None,
     assessed_record: Callable[[str, str], tuple[str, str]] | None = None,
     require_execution_context: bool = False,
+    approval_policy: Callable[[Any], str] | None = None,
 ) -> dict[str, Any] | None:
     """Dispatch one DISPATCH_PENDING intent from a separate worker (issue #82).
 
@@ -1135,6 +1384,10 @@ def dispatch_pending_intent(
             authorized_hash=authorized_hash)
     actor = (row.requested_by or "").strip()
     proposal_id = row.proposal_id
+    # Outside any transaction, like historical_context below: a delegate the
+    # proposal named is recorded with the proposer it acts for.
+    acting_for = _acting_for(
+        _assessed_payload(chain, tenant, str(proposal_id or "")), actor)
     if refusal is None:
         try:
             assert fresh_obs is not None and fresh_semantic is not None
@@ -1158,7 +1411,11 @@ def dispatch_pending_intent(
         regate: Any = None
         try:
             with transaction(tenant) as q:
-                regate = q.regate_authorized(row.item_id, fresh_obs)
+                regate = q.regate_authorized(
+                    row.item_id, fresh_obs,
+                    approval_policy_hash=(approval_policy(fresh_obs)
+                                          if approval_policy is not None
+                                          else None))
         except (KeyError, ValueError):
             # No AUTHORIZED item behind the row: nothing to honour.
             regate = None
@@ -1272,6 +1529,7 @@ def dispatch_pending_intent(
         "event": "execution_authorized",
         "proposal_id": proposal_id,
         "actor": actor,
+        **({"acting_for": acting_for} if acting_for else {}),
         "executed_by": worker_id,
         "item_id": row.item_id,
         "tool_call_hash": fresh_obs.tool_call_hash,
@@ -1381,6 +1639,7 @@ def authorization_context(
     toolspec_hash: str,
     task: TaskIdentity | None = None,
     request_ref: RequestRef | None = None,
+    delegated_executor: str = "",
 ) -> AuthorizationContext:
     """The conditions a decision is made under, in one place.
 
@@ -1406,6 +1665,11 @@ def authorization_context(
     (:mod:`remora.execution.request_ref`). It enters the hash only when
     present, by the same rule, so a grant issued for one request is refused,
     unspent, when its call is re-presented under another.
+
+    ``delegated_executor`` is the delegate the proposal named, admitted at
+    assess time (remora/governance/delegation.py). It enters the hash only
+    when present, for the same reason, so a delegate cannot be added to or
+    swapped in a grant or an approval after the fact.
     """
 
     return AuthorizationContext(
@@ -1419,6 +1683,7 @@ def authorization_context(
         task_id=task.task_id if task is not None else "",
         execution_context_hash=str(semantic.get("execution_context_hash", "")),
         request_ref_hash=request_ref.digest() if request_ref is not None else "",
+        delegated_executor=delegated_executor or "",
     )
 
 
@@ -1557,13 +1822,19 @@ def redeem_accept_token(
     # binding above: a token presented under different conditions must not burn
     # the grant for the conditions it actually authorizes.
     request_ref = request_ref_of(tool_call)
+    # A delegate the proposal named redeems as the proposer it acts for, and
+    # the delegate field it re-presents must be the one signed in; anyone
+    # else is compared as themselves and refused as context_mismatch.
+    acting_for = _acting_for(
+        _assessed_payload(chain, tenant, str(proposal_id or "")), principal)
     current_context = authorization_context(
-        tenant=tenant, principal=principal, semantic=semantic,
+        tenant=tenant, principal=acting_for or principal, semantic=semantic,
         target_environment=tool_call.target_environment or "",
         policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
         toolspec_hash=str((toolspec_identity or {}).get("hash", "")),
         task=task_identity_of(tool_call),
         request_ref=request_ref,
+        delegated_executor=delegated_executor_of(tool_call),
     )
     request_ref_fields = (
         {"request_ref_hash": request_ref.digest()} if request_ref is not None else {})
@@ -1626,6 +1897,7 @@ def redeem_accept_token(
         "event": "execution_authorized",
         "proposal_id": proposal_id,
         "actor": principal,
+        **({"acting_for": acting_for} if acting_for else {}),
         "item_id": f"accept:{token.jti}",
         "tool_call_hash": obs.tool_call_hash,
         "grant_jti": token.jti,

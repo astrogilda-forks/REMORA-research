@@ -1,0 +1,46 @@
+# ToolSpec schema version 5: additions to tool_spec_v4.yaml (CAPR-07).
+#
+# Version 5 is version 4 plus one optional, signed block, `postcondition`,
+# the contract template REMORA instantiates from the approved call's
+# arguments and evaluates itself when a signed effect receipt arrives.
+# Everything in tool_spec_v1.yaml to tool_spec_v4.yaml applies unchanged, and
+# a v4 bundle loads under this loader exactly as before. A spec that declares
+# `postcondition` in a bundle with schema_version below 5 is refused
+# (toolspec_postcondition_requires_v5).
+#
+# Design: docs/design/compositional-authority-preservation-v1.md §4.3 (L7).
+# Parser: remora/toolcall/postcondition_spec.py. Comparison vocabulary and
+# statuses: schemas/postcondition_contract_v1.yaml (unchanged).
+
+schema_version: 5
+extends: tool_spec_v4.yaml
+status: implemented
+implemented_at: "2026-10-18"
+
+optional_fields:
+  postcondition:
+    target_selector: >-
+      REQUIRED, non-empty. {field: value} naming the object the call changes.
+      A value is a literal or {"$arg": <argument>}; the argument must be a
+      property of the argument schema.
+    expected_fields: >-
+      REQUIRED, non-empty. {field: value}, the declared delta, with the same
+      template rule. Under a `hash` comparison rule an argument template is
+      filled with the canonical SHA-256 of the argument value.
+    comparison_rules: "{field: exact|hash|present|absent|version_increment}; a rule must name a declared expected field"
+    observation_deadline_seconds: "positive integer; absent means 30"
+    repeatable: "boolean; absent means true"
+    evidence_fields: "list of field names; absent means none"
+  requires:
+    postcondition_reader: "a non-empty name; a contract with no reader cannot be observed"
+
+instantiation:
+  source_of_arguments: >-
+    The approved call. The server accepts the arguments only when their
+    canonical tool-call hash equals the hash of the dispatch in the audit
+    chain; the receipt never supplies a contract value.
+  missing_argument: refused, the contract cannot be instantiated for this call
+
+reason_codes:
+  - toolspec_postcondition_requires_v5
+  - toolspec_postcondition_invalid

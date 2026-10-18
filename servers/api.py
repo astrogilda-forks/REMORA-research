@@ -44,6 +44,7 @@ Design notes
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import hmac
 import importlib.metadata
@@ -516,6 +517,9 @@ _LATENCY_BUCKETS_MS = [100.0, 250.0, 500.0, 1000.0, 2000.0]
 # _ALL_CAPABILITIES coverage test in tests/test_rbac_isolation.py.
 _ALL_CAPABILITIES: frozenset[str] = frozenset({
     "assess", "evidence", "execute", "follow_up", "read", "rerun", "review",
+    # RMR-AUD-004: recording an observed effect is separate from executing,
+    # so the agent that ran a call does not attest to its effect.
+    "verify_effect",
 })
 
 _BUILTIN_ROLE_PERMISSIONS: dict[str, set[str]] = {
@@ -527,6 +531,7 @@ _BUILTIN_ROLE_PERMISSIONS: dict[str, set[str]] = {
     "soc_analyst": {"review", "read"},
     "legal_counsel": {"review", "read"},
     "viewer": {"read"},
+    "effect_verifier": {"verify_effect", "read"},
 }
 
 
@@ -1867,6 +1872,13 @@ class AssessResponse(BaseModel):
     # "not run", never "checked and empty". RECORDED for audit; on this
     # question-based path the gate decision comes from the engine pipeline.
     semantic: dict[str, Any] | None = None
+    # RMR-AUD-011: where risk_tier/action_type came from. "registry" means
+    # the server's tool registry (the request named a classified tool_call);
+    # "unregistered" is the critical/unknown floor for an unclassified tool;
+    # "caller" and "none" mean no tool identity, so the labels are the
+    # caller's. label_cap names why an engine ACCEPT was lowered to VERIFY.
+    label_source: str = "none"
+    label_cap: str | None = None
 
 
 class HealthResponse(BaseModel):
@@ -2144,11 +2156,20 @@ def _record_artifacts(
     elapsed_ms: float,
     report: dict,
     envelope_payload: dict,
+    labels: _AssessLabels | None = None,
 ) -> None:
-    """Store envelope/audit artifacts in tenant-scoped control-plane persistence."""
+    """Store envelope/audit artifacts in tenant-scoped control-plane persistence.
+
+    ``labels`` are the ones the engine actually saw (RMR-AUD-011); the
+    record keeps their source so ``/v1/rerun`` knows whether they came from
+    the server's registry.
+    """
 
     pd = report["policy_decision"]
     env_audit = envelope_payload.get("audit", {}) if isinstance(envelope_payload, dict) else {}
+    if labels is None:
+        labels = _AssessLabels(req.risk_tier, req.action_type, req.target_environment,
+                               "caller", None)
     audit_record = {
         "request_id": request_id,
         "tenant_id": tenant_id,
@@ -2156,9 +2177,10 @@ def _record_artifacts(
         "question_hash": question_hash,
         "state_hash": report.get("state_hash"),
         "domain": req.domain,
-        "risk_tier": req.risk_tier,
-        "action_type": req.action_type,
-        "target_environment": req.target_environment,
+        "risk_tier": labels.risk_tier,
+        "action_type": labels.action_type,
+        "target_environment": labels.target_environment,
+        "label_source": labels.source,
         "policy_version": pd.get("policy_version"),
         "decision": pd.get("action"),
         "reasons": pd.get("reasons", []),
@@ -2389,6 +2411,81 @@ def health() -> HealthResponse:
     )
 
 
+@dataclasses.dataclass(frozen=True)
+class _AssessLabels:
+    risk_tier: str | None
+    action_type: str | None
+    target_environment: str | None
+    source: str
+    cap: str | None
+
+
+def _assess_labels(req: AssessRequest) -> _AssessLabels:
+    """Resolve the labels the engine sees on ``/v1/assess`` (RMR-AUD-011).
+
+    With a ``tool_call`` the server's registry decides, through the same
+    ``resolve_tool_metadata`` that ``/v1/execution`` uses: the caller's
+    ``risk_tier`` may only raise the registered tier, an ``action_type``
+    that differs from the registry's caps ACCEPT, and the environment is the
+    riskier of the declared and requested one. A tool nobody classified is
+    critical/unknown and the caller's labels are ignored. Without a
+    ``tool_call`` there is no tool identity to look up, so the labels are
+    the caller's own and cannot produce ACCEPT.
+    """
+    from remora.toolcall.deployment_registry import resolve_tool_metadata
+    from remora.toolcall.label_caps import RISK_ORDER as _RISK_ORDER
+    from remora.toolcall.label_caps import LabelCapReason
+    from servers.execution_api import _effective_target_environment
+
+    if req.tool_call is None:
+        given = req.risk_tier is not None or req.action_type is not None
+        return _AssessLabels(
+            req.risk_tier, req.action_type, req.target_environment,
+            "caller" if given else "none",
+            LabelCapReason.CALLER_LABELS_UNTRUSTED.value,
+        )
+    entry, declared = resolve_tool_metadata(req.tool_call.tool_name)
+    tier = str(entry.get("risk_tier", "critical"))
+    kind = str(entry.get("action_type", "unknown"))
+    env = _effective_target_environment(
+        entry.get("target_environment"), req.target_environment) or None
+    if not declared:
+        return _AssessLabels(tier, kind, env, "unregistered",
+                             LabelCapReason.TOOL_NOT_IN_REGISTRY.value)
+    if (req.risk_tier in _RISK_ORDER and tier in _RISK_ORDER
+            and _RISK_ORDER[req.risk_tier] > _RISK_ORDER[tier]):
+        tier = req.risk_tier
+    cap = None
+    if req.action_type is not None and req.action_type.strip().lower() != kind:
+        cap = LabelCapReason.REGISTRY_LABEL_CONFLICT.value
+    return _AssessLabels(tier, kind, env, "registry", cap)
+
+
+def _cap_assess_accept(pd: dict[str, Any], envelope_payload: dict[str, Any],
+                       cap: str, proposed_action: str | None) -> None:
+    """Lower an engine ACCEPT to VERIFY in the decision and its envelope."""
+    pd["action"] = "verify"
+    pd["reasons"] = [*pd.get("reasons", []), cap]
+    pd["human_review_required"] = True
+    pd["source_of_decision"] = "assess.label_cap"
+    pd["explanation"] = (
+        f"{cap}: the engine reached ACCEPT, but the risk tier and action type "
+        f"did not come from the server's tool registry, so a person decides. "
+        f"Engine: {pd.get('explanation', '')}"
+    )
+    gate = envelope_payload.get("gate")
+    if isinstance(gate, dict):
+        gate["outcome"] = "verify"
+        gate["blocked_action"] = gate.get("blocked_action") or proposed_action
+        steps = list(gate.get("allowed_next_steps") or [])
+        if "human_review" not in steps:
+            steps.append("human_review")
+        gate["allowed_next_steps"] = steps
+    assessment = envelope_payload.get("assessment")
+    if isinstance(assessment, dict):
+        assessment["policy_triggers"] = [*(assessment.get("policy_triggers") or []), cap]
+
+
 @app.post("/v1/assess", response_model=AssessResponse, tags=["research"])
 def assess(req: AssessRequest, request: Request) -> AssessResponse | JSONResponse:
     """Assess an agent action proposal through the research pipeline.
@@ -2460,7 +2557,8 @@ def _assess_decide(req: AssessRequest, request: Request, *, t0: float, tenant_id
         _actor_identity = f"{_principal} (on_behalf_of={_claimed_actor}, unverified)"
     else:
         _actor_identity = _principal
-    profile_name, profile_cfg = _resolve_tenant_policy_profile(tenant_id, req.risk_tier)
+    labels = _assess_labels(req)
+    profile_name, profile_cfg = _resolve_tenant_policy_profile(tenant_id, labels.risk_tier)
     review_requirements = _extract_review_requirements(profile_cfg)
 
     engine = _make_engine()
@@ -2472,16 +2570,16 @@ def _assess_decide(req: AssessRequest, request: Request, *, t0: float, tenant_id
     try:
         with _TRACER.query_span(req.question, remora_endpoint="/v1/assess", tenant_id=tenant_id) as span:
             span.set_attribute("remora.domain", req.domain)
-            span.set_attribute("remora.risk_tier", req.risk_tier)
+            span.set_attribute("remora.risk_tier", labels.risk_tier)
             span.set_governance_outcome(decision_envelope_id=proposal_id)
             with _TRACER.stage_span("api_gateway", tenant_id=tenant_id):
                 state = engine.run(
                     question=req.question,
                     context=req.context,
                     domain=req.domain,
-                    risk_tier=req.risk_tier,
-                    action_type=req.action_type,
-                    target_environment=req.target_environment,
+                    risk_tier=labels.risk_tier,
+                    action_type=labels.action_type,
+                    target_environment=labels.target_environment,
                 )
                 report = engine.report(state)
             policy = report.get("policy_decision", {})
@@ -2521,6 +2619,15 @@ def _assess_decide(req: AssessRequest, request: Request, *, t0: float, tenant_id
     if isinstance(req_block, dict):
         req_block["request_id"] = request_id
 
+    # RMR-AUD-011: applied before the audit block is finalised, so the
+    # recorded envelope carries the capped outcome, not the engine's.
+    label_cap: str | None = None
+    if labels.cap is not None and pd.get("action") == "accept":
+        _cap_assess_accept(
+            pd, envelope_payload, labels.cap,
+            req.tool_call.tool_name if req.tool_call is not None else None)
+        label_cap = labels.cap
+
     _finalize_envelope_audit(
         envelope_payload=envelope_payload,
         tenant_id=tenant_id,
@@ -2548,11 +2655,12 @@ def _assess_decide(req: AssessRequest, request: Request, *, t0: float, tenant_id
         elapsed_ms=elapsed_ms,
         report=report,
         envelope_payload=envelope_payload,
+        labels=labels,
     )
     _record_metrics(
         decision_action=pd["action"],
         elapsed_ms=elapsed_ms,
-        risk_tier=req.risk_tier,
+        risk_tier=labels.risk_tier,
         total_cost_usd=report.get("total_cost_usd"),
         oracle_calls=report.get("oracle_calls"),
     )
@@ -2610,6 +2718,8 @@ def _assess_decide(req: AssessRequest, request: Request, *, t0: float, tenant_id
         policy_profile=profile_name,
         review_requirements=review_requirements,
         semantic=semantic_context,
+        label_source=labels.source,
+        label_cap=label_cap,
     )
     return _assess_response
 
@@ -2956,6 +3066,27 @@ def rerun(req: RerunRequest, request: Request) -> dict | JSONResponse:
     if isinstance(req_payload, dict):
         req_payload["request_id"] = rerun_request_id
 
+    # RMR-AUD-011: the stored envelope keeps no tool identity, so the
+    # registry cannot be consulted again. The labels keep ACCEPT only when
+    # the original assessment took them from the registry; a record without
+    # a label_source predates this rule and is treated as the caller's.
+    from remora.toolcall.label_caps import LabelCapReason
+
+    prior_record = _CONTROL_PLANE_STORE.get_audit_record(
+        request_id=req.request_id, tenant_id=tenant_id)
+    prior_source = (prior_record or {}).get("label_source") or "caller"
+    rerun_labels = _AssessLabels(
+        replay_request.risk_tier, replay_request.action_type,
+        replay_request.target_environment, prior_source,
+        None if prior_source == "registry"
+        else LabelCapReason.CALLER_LABELS_UNTRUSTED.value,
+    )
+    rerun_pd = report["policy_decision"]
+    rerun_label_cap: str | None = None
+    if rerun_labels.cap is not None and rerun_pd.get("action") == "accept":
+        _cap_assess_accept(rerun_pd, envelope_payload, rerun_labels.cap, None)
+        rerun_label_cap = rerun_labels.cap
+
     _finalize_envelope_audit(
         envelope_payload=envelope_payload,
         tenant_id=tenant_id,
@@ -2971,6 +3102,7 @@ def rerun(req: RerunRequest, request: Request) -> dict | JSONResponse:
         elapsed_ms=elapsed_ms,
         report=report,
         envelope_payload=envelope_payload,
+        labels=rerun_labels,
     )
     pd = report["policy_decision"]
     _record_metrics(
@@ -3007,6 +3139,8 @@ def rerun(req: RerunRequest, request: Request) -> dict | JSONResponse:
         "tenant_id": tenant_id,
         "elapsed_ms": elapsed_ms,
         "policy_decision": pd,
+        "label_source": rerun_labels.source,
+        "label_cap": rerun_label_cap,
         "state_hash": report.get("state_hash"),
         "replay_mode": replay_mode,
         "evidence_records_used": len(evidence_rows),
