@@ -158,21 +158,25 @@ def test_both_arms_refuse_cross_tenant_reuse(evaluation):
             assert not rows[(f"cross_context_reuse/{variant}", arm)]["tool_body_ran"]
 
 
-def test_the_review_path_binds_neither_the_executing_actor_nor_the_task(evaluation):
+def test_the_review_path_binds_the_executing_actor_and_the_task(evaluation):
+    """Fixed by the review-path binding: both attacks read context_mismatch."""
     _ev, committed, _fresh = evaluation
     rows = _rows(committed)
-    assert rows[("cross_context_reuse/review_other_actor", "remora")]["tool_body_ran"]
-    assert rows[("cross_context_reuse/review_other_task", "remora")]["tool_body_ran"]
+    for variant in ("review_other_actor", "review_other_task"):
+        row = rows[(f"cross_context_reuse/{variant}", "remora")]
+        assert not row["tool_body_ran"] and row["reason"] == "context_mismatch"
     for variant in ("accept_other_task", "accept_task_stripped", "accept_other_actor",
                     "lease_other_task"):
         assert not rows[(f"cross_context_reuse/{variant}", "remora")]["tool_body_ran"]
 
 
-def test_a_risk_raise_after_approval_keeps_the_approval(evaluation):
+def test_a_risk_raise_after_approval_voids_the_approval(evaluation):
+    """Fixed by the reviewed-tier binding: a relabel is approval_invalidated."""
     _ev, committed, _fresh = evaluation
     rows = _rows(committed)
     for tier in ("high", "critical"):
-        assert rows[(f"toolspec_toctou/review_risk_relabelled_{tier}", "remora")]["tool_body_ran"]
+        row = rows[(f"toolspec_toctou/review_risk_relabelled_{tier}", "remora")]
+        assert not row["tool_body_ran"] and row["reason"] == "approval_invalidated"
     for variant in ("review_spec_redeployed", "accept_spec_redeployed",
                     "lease_spec_redeployed", "review_callable_swapped_unsigned"):
         assert not rows[(f"toolspec_toctou/{variant}", "remora")]["tool_body_ran"]
@@ -185,12 +189,12 @@ def test_server_labels_do_not_change_the_decision(evaluation):
     assert not any(r["tool_body_ran"] for r in rows if not r["control"])
 
 
-def test_library_path_accepts_r2_reproduction_before_the_prf040_fix(evaluation):
+def test_library_path_caps_caller_labels_after_the_prf040_fix(evaluation):
     _ev, committed, _fresh = evaluation
-    assert committed["arms"]["library_advisory"] == "library path at master (pre-PRF-040 fix)"
+    assert committed["arms"]["library_advisory"] == "library path after PRF-040 fix"
     row = _rows(committed)[("caller_labels_library/r2_xfer_labelled_low_read",
                             "library_advisory")]
-    assert row["proposal_decision"] == "accept" and row["tool_body_ran"]
+    assert row["proposal_decision"] == "verify" and not row["tool_body_ran"]
 
 
 @pytest.mark.parametrize("cls", ("read_exfiltration", "composed_exfiltration"))

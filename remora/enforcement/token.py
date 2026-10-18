@@ -283,7 +283,8 @@ class AuthorizationContext:
             "tenant": self.tenant or "",
             "toolspec_hash": self.toolspec_hash or "",
         }
-        for name in ("context_id", "task_id", "execution_context_hash", "request_ref_hash"):
+        for name in ("context_id", "task_id", "execution_context_hash",
+                     "request_ref_hash", "delegated_executor"):
             if getattr(self, name):
                 out[name] = getattr(self, name)
         return out

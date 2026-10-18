@@ -558,7 +558,7 @@ _REVIEW_BOUND_FIELDS = ("principal", "context_id", "task_id", "delegated_executo
 PROPOSAL_ENVELOPE_FIELDS = (
     "schema_valid", "rollback_available", "intent_ref", "untrusted_context",
     "derivations", "context_id", "task_id", "plan", "task_type",
-    "delegated_executor",
+    "delegated_executor", "request_ref",
 )
 
 
