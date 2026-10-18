@@ -1118,7 +1118,7 @@ REMORA is designed to *reduce* unsafe autonomous AI actions, not to enable them.
 
 **Over-reliance risk:** An operator who treats ACCEPT decisions as guarantees of correctness would introduce risk. ACCEPT means "assurance conditions for autonomous action are met," not "the action is correct." Decision envelopes should be interpreted by qualified domain personnel.
 
-**Alignment with existing standards:** REMORA's ESCALATE path is designed to enforce the human-review requirements of frameworks such as NORSOK D-010 (well barriers), IEC 61511 (SIL classification), and EU AI Act Art. 14 (human oversight for high-risk AI). No claim is made that REMORA satisfies any specific standard; alignment mapping requires domain authority verification.
+**Alignment with existing standards:** REMORA's ESCALATE path is designed to enforce human-review requirements. Relevant frameworks include NORSOK D-010 (well barriers), IEC 61511 (SIL classification), and EU AI Act Art. 14 (human oversight for high-risk AI). No claim is made that REMORA satisfies any specific standard; alignment mapping requires domain authority verification.
 
 **Misuse prevention:** The adversarial admission firewall detects prompt injection patterns. However, sophisticated adversarial inputs that do not match known patterns may pass the firewall. REMORA should not be deployed as the sole defense against adversarial inputs in critical systems.
 

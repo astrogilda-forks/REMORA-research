@@ -1,3 +1,7 @@
+> **Historical snapshot, not current evidence.** Moved from `results/` on
+> 2026-10-18 because nothing referenced it. Preserved as a record only; for
+> current results see `docs/assurance/claim_register_v1.yaml` and README.
+
 # REMORA Deep Calibration & Scale Benchmark Report (Architecture & Capacity)
 
 **Date:** 2026-06-02

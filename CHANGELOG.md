@@ -4,6 +4,21 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-03b (ToolSpec v4 at bundle load)
+
+- The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in
+  an older bundle is refused (`toolspec_flow_requires_v4`). Every block is
+  parsed and linted at load, so a correctly signed block that breaks a rule
+  does not load (`toolspec_flow_invalid`, `toolspec_flow_lint_failed`).
+  `ToolSpec.flow` carries the parsed block.
+- Under a strict runtime profile with `REMORA_FLOW_CONTROL=1`, startup
+  refuses a bundle in which any spec has no block (FL-13).
+- `remora/flow/label.py` and `remora/flow/spec.py` join the policy bundle
+  hash, which now covers nine files. Every envelope's `policy_bundle_hash`
+  changes value with this release.
+- Contracts touched: three additive reason codes in
+  `schemas/tool_spec_v1.yaml`; `schemas/tool_spec_v4.yaml` is now
+  implemented. Nothing reads `ToolSpec.flow` to decide yet (IFC-05).
 ### Flow control IFC-05a (recipients and the flow check)
 
 - `remora/flow/check.py`: `recipients` computes who receives a resolved
