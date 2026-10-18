@@ -3032,6 +3032,7 @@ def rerun(req: RerunRequest, request: Request) -> dict | JSONResponse:
 # REM-035: end-to-end execution state machine (assess -> review -> re-gate
 # -> one-time grant -> PEP consume), wired as a first-class API path.
 from servers import execution_api as _execution_api_mod
+from servers.execution_api import contexts_router as _contexts_router
 from servers.execution_api import router as _execution_router
 
 
@@ -3190,6 +3191,7 @@ app.add_middleware(StrictJsonIngressMiddleware)
 app.add_middleware(_BodySizeLimitMiddleware)
 
 app.include_router(_execution_router)
+app.include_router(_contexts_router)
 
 
 def _apply_surface_selection() -> None:
