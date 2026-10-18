@@ -1,0 +1,38 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "03-receipt-billed-twice-across-lines",
+  "title": "A receipt billed twice across lines",
+  "change": "bill.json bills receipt 36 (sha256:ea1bfe30766012f23da1c8f44d31814cacd0b1b687b544c3cc95519754c2d682) on line L2 as well as on line L1, with L2's quantity and amount raised to match.",
+  "why": "Uniqueness within the bill: each receipt is billed at most once. Every other claim holds, quantities included, since each line's quantity still equals the receipts it names.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "uniqueness"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "PASS",
+      "coverage_receipts_to_bill": "PASS",
+      "uniqueness": "FAIL",
+      "quantities": "PASS",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "uniqueness": [
+        "listed_twice_in_bill"
+      ]
+    },
+    "payment_ready": false
+  }
+}

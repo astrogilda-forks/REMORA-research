@@ -1,0 +1,898 @@
+{
+  "format": "remora-acta-e6-run-v1",
+  "edge": "E6 (aeoess/agent-governance-vocabulary docs/boundary-map.md)",
+  "fixture": {
+    "repository": "https://github.com/VeritasActa/e6-fixture",
+    "tag": "v1.1.0",
+    "commit": "8d8fc50ae2b4fdb498fcbb65b4f2268683a79a41",
+    "sha256sums_sha256": "08731bb75416e588a2a0269387731c6643dfbded76ef98b738e0097a99c2ebc3"
+  },
+  "fixture_files": {
+    "sha256sums_sha256": "08731bb75416e588a2a0269387731c6643dfbded76ef98b738e0097a99c2ebc3",
+    "checked": 89,
+    "absent": []
+  },
+  "implementation": {
+    "path": "remora/interop/acta_e6/consumer.py",
+    "sha256": "cec3ef49a42e686293a31fb7593bc17e67e4614ebad129dadb1c38feee0d038a",
+    "written_from": "the fixture README at v1.1.0 only; consumer/, producer/, test/ and draft-03 not read",
+    "signature_backend": "cryptography Ed25519 and remora.interop.jcs; @veritasacta/verify not called"
+  },
+  "runtime": {
+    "python": "3.13.7",
+    "cryptography": "50.0.1",
+    "os": "Darwin 23.6.0 arm64"
+  },
+  "summary": {
+    "cases": 12,
+    "agree": 12,
+    "signature_blind_control_agree": 9,
+    "signature_blind_control_disagrees_on": [
+      "07-altered-receipt",
+      "08-unexpected-signer",
+      "12-manifest-signature-altered"
+    ]
+  },
+  "cases": [
+    {
+      "case": "01-matching-bill",
+      "expected": {
+        "verdict": "PASS",
+        "decisive": [],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "PASS",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {},
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "PASS",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "PASS",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {},
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "PASS",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "PASS",
+            "coverage_receipts_to_bill": "PASS",
+            "uniqueness": "PASS",
+            "quantities": "PASS",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {},
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "02-missing-receipt",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "coverage_bill_to_receipts"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "FAIL",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "PASS",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "coverage_bill_to_receipts": [
+            "unknown_receipt"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "FAIL",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "PASS",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "coverage_bill_to_receipts": [
+            "unknown_receipt"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "FAIL",
+            "coverage_receipts_to_bill": "PASS",
+            "uniqueness": "PASS",
+            "quantities": "PASS",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "coverage_bill_to_receipts": [
+              "unknown_receipt"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "03-receipt-billed-twice-across-lines",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "uniqueness"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "FAIL",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "uniqueness": [
+            "listed_twice_in_bill"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "FAIL",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "uniqueness": [
+            "listed_twice_in_bill"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "PASS",
+            "coverage_receipts_to_bill": "PASS",
+            "uniqueness": "FAIL",
+            "quantities": "PASS",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "uniqueness": [
+              "listed_twice_in_bill"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "04-receipt-billed-again-on-later-bill",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "uniqueness"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "FAIL",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "uniqueness": [
+            "billed_on_earlier_bill"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "PASS",
+          "uniqueness": "FAIL",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "uniqueness": [
+            "billed_on_earlier_bill"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "PASS",
+            "coverage_receipts_to_bill": "PASS",
+            "uniqueness": "FAIL",
+            "quantities": "PASS",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "uniqueness": [
+              "billed_on_earlier_bill"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "05-receipt-neither-billed-nor-excluded",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "coverage_receipts_to_bill"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "FAIL",
+          "uniqueness": "PASS",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "coverage_receipts_to_bill": [
+            "unaccounted_receipt"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "PASS",
+          "coverage_receipts_to_bill": "FAIL",
+          "uniqueness": "PASS",
+          "quantities": "PASS",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "coverage_receipts_to_bill": [
+            "unaccounted_receipt"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "PASS",
+            "coverage_receipts_to_bill": "FAIL",
+            "uniqueness": "PASS",
+            "quantities": "PASS",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "coverage_receipts_to_bill": [
+              "unaccounted_receipt"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "06-bill-cut-from-different-manifest",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "scope"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "scope": [
+            "manifest_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "scope": [
+            "manifest_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "FAIL",
+            "coverage_bill_to_receipts": "NOT_EVALUATED",
+            "coverage_receipts_to_bill": "NOT_EVALUATED",
+            "uniqueness": "NOT_EVALUATED",
+            "quantities": "NOT_EVALUATED",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "scope": [
+              "manifest_mismatch"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "07-altered-receipt",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "signatures"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "FAIL",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "signatures": [
+            "invalid_signature",
+            "chain_break"
+          ],
+          "scope": [
+            "root_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "FAIL",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "signatures": [
+            "invalid_signature",
+            "chain_break"
+          ],
+          "scope": [
+            "root_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "FAIL",
+            "scope": "FAIL",
+            "coverage_bill_to_receipts": "NOT_EVALUATED",
+            "coverage_receipts_to_bill": "NOT_EVALUATED",
+            "uniqueness": "NOT_EVALUATED",
+            "quantities": "NOT_EVALUATED",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "signatures": [
+              "chain_break"
+            ],
+            "scope": [
+              "root_mismatch"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": false,
+        "differences": [
+          "codes"
+        ]
+      }
+    },
+    {
+      "case": "08-unexpected-signer",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "keys"
+        ],
+        "claims": {
+          "keys": "FAIL",
+          "signatures": "FAIL",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "keys": [
+            "unexpected_signer"
+          ],
+          "signatures": [
+            "invalid_signature",
+            "manifest_signature_invalid"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "FAIL",
+          "signatures": "FAIL",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "keys": [
+            "unexpected_signer"
+          ],
+          "signatures": [
+            "invalid_signature",
+            "manifest_signature_invalid"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "FAIL",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "NOT_EVALUATED",
+            "coverage_receipts_to_bill": "NOT_EVALUATED",
+            "uniqueness": "NOT_EVALUATED",
+            "quantities": "NOT_EVALUATED",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "keys": [
+              "unexpected_signer"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": false,
+        "differences": [
+          "claims.signatures",
+          "codes"
+        ]
+      }
+    },
+    {
+      "case": "09-period-mismatch",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "scope"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "scope": [
+            "period_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "scope": [
+            "period_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "FAIL",
+            "coverage_bill_to_receipts": "NOT_EVALUATED",
+            "coverage_receipts_to_bill": "NOT_EVALUATED",
+            "uniqueness": "NOT_EVALUATED",
+            "quantities": "NOT_EVALUATED",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "scope": [
+              "period_mismatch"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "10-verifier-unavailable",
+      "expected": {
+        "verdict": "ABSTAIN",
+        "decisive": [
+          "signatures"
+        ],
+        "claims": {
+          "keys": "ABSTAIN",
+          "signatures": "ABSTAIN",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "keys": [
+            "verifier_unavailable"
+          ],
+          "signatures": [
+            "verifier_unavailable"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "ABSTAIN",
+        "claims": {
+          "keys": "ABSTAIN",
+          "signatures": "ABSTAIN",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "keys": [
+            "verifier_unavailable"
+          ],
+          "signatures": [
+            "verifier_unavailable"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "ABSTAIN",
+          "claims": {
+            "keys": "ABSTAIN",
+            "signatures": "ABSTAIN",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "NOT_EVALUATED",
+            "coverage_receipts_to_bill": "NOT_EVALUATED",
+            "uniqueness": "NOT_EVALUATED",
+            "quantities": "NOT_EVALUATED",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "keys": [
+              "verifier_unavailable"
+            ],
+            "signatures": [
+              "verifier_unavailable"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "11-export-truncated",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "scope"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "scope": [
+            "count_mismatch",
+            "sequence_mismatch",
+            "head_mismatch",
+            "root_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "PASS",
+          "scope": "FAIL",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "scope": [
+            "count_mismatch",
+            "sequence_mismatch",
+            "head_mismatch",
+            "root_mismatch"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "FAIL",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "FAIL",
+            "coverage_bill_to_receipts": "NOT_EVALUATED",
+            "coverage_receipts_to_bill": "NOT_EVALUATED",
+            "uniqueness": "NOT_EVALUATED",
+            "quantities": "NOT_EVALUATED",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {
+            "scope": [
+              "count_mismatch",
+              "sequence_mismatch",
+              "head_mismatch",
+              "root_mismatch"
+            ]
+          },
+          "payment_ready": false
+        },
+        "agrees": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "12-manifest-signature-altered",
+      "expected": {
+        "verdict": "FAIL",
+        "decisive": [
+          "signatures"
+        ],
+        "claims": {
+          "keys": "PASS",
+          "signatures": "FAIL",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "signatures": [
+            "manifest_signature_invalid"
+          ]
+        },
+        "payment_ready": false
+      },
+      "result": {
+        "verdict": "FAIL",
+        "claims": {
+          "keys": "PASS",
+          "signatures": "FAIL",
+          "scope": "PASS",
+          "coverage_bill_to_receipts": "NOT_EVALUATED",
+          "coverage_receipts_to_bill": "NOT_EVALUATED",
+          "uniqueness": "NOT_EVALUATED",
+          "quantities": "NOT_EVALUATED",
+          "amount": "NOT_EVALUATED"
+        },
+        "codes": {
+          "signatures": [
+            "manifest_signature_invalid"
+          ]
+        },
+        "payment_ready": false
+      },
+      "agrees": true,
+      "differences": [],
+      "signature_blind_control": {
+        "result": {
+          "verdict": "PASS",
+          "claims": {
+            "keys": "PASS",
+            "signatures": "PASS",
+            "scope": "PASS",
+            "coverage_bill_to_receipts": "PASS",
+            "coverage_receipts_to_bill": "PASS",
+            "uniqueness": "PASS",
+            "quantities": "PASS",
+            "amount": "NOT_EVALUATED"
+          },
+          "codes": {},
+          "payment_ready": false
+        },
+        "agrees": false,
+        "differences": [
+          "verdict",
+          "claims.signatures",
+          "claims.coverage_bill_to_receipts",
+          "claims.coverage_receipts_to_bill",
+          "claims.uniqueness",
+          "claims.quantities",
+          "codes"
+        ]
+      }
+    }
+  ]
+}

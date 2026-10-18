@@ -1,0 +1,40 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "04-receipt-billed-again-on-later-bill",
+  "title": "A receipt billed again on a later bill",
+  "change": "bill.json here is a second bill for August (HARBOR-DEMO-2026-08-002), cut from the same manifest. It bills a single receipt, receipt 65 (sha256:21085be01df916f42b1d9b5c905ac7bffe27589834153c875890fca738624236), and excludes every other receipt, as billed on the first bill or as not billable. The first bill (../../bill.json) is given as an earlier bill, and it already billed receipt 65.",
+  "why": "Uniqueness against earlier bills: a receipt is billed at most once across the bills the paying side is given. Taken alone, this bill passes every other claim.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [
+      "../../bill.json"
+    ],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "uniqueness"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "PASS",
+      "coverage_receipts_to_bill": "PASS",
+      "uniqueness": "FAIL",
+      "quantities": "PASS",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "uniqueness": [
+        "billed_on_earlier_bill"
+      ]
+    },
+    "payment_ready": false
+  }
+}

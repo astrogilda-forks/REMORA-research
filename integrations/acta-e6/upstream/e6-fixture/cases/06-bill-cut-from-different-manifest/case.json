@@ -1,0 +1,38 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "06-bill-cut-from-different-manifest",
+  "title": "A bill cut from a different manifest",
+  "change": "bill.json names the July 2026 period statement (sha256:28260e54f2df89f55256fd9a4d3bdb449a3a7fd593b52e8d539d7102dac51a32, in other-manifest.json) as its manifest instead of the August one supplied. Its period and lines are unchanged.",
+  "why": "Scope binding: the consumer refuses a bill whose manifest is not the one supplied and does not compare across scopes, so the bill is never compared with the receipts.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "scope"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "FAIL",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "scope": [
+        "manifest_mismatch"
+      ]
+    },
+    "payment_ready": false
+  }
+}

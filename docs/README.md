@@ -189,6 +189,7 @@ Several topics have more than one document. This table says which to open.
 | [ADR: single execution path](architecture/ADR-single-authoritative-execution-path.md) | One authoritative execution path; agent-control is ingress, not an engine |
 | [ADR: tainted arguments](architecture/ADR-tainted-argument-approval.md) | Approval suffices; sanitisation not required, with the residual stated (issue #40) |
 | [ADR: tainted argument floor order](architecture/ADR-tainted-argument-floor-order.md) | Severity-monotone floor: tainted HIGH-risk calls with no rollback or uncertain state escalate instead of verifying (WP-1) |
+| [ADR: meet composition](architecture/ADR-flow-meet-composition.md) | The decision is the least executable of its components, so a later, stricter component is no longer masked by a first-match VERIFY (COMP-01) |
 | [Evidence admission v1 (design)](design/evidence-admission-v1.md) | CoSAI §7.4 premises as typed evidence: visibility, coverage, vantage, binding, prior commitment — evidence is not authority |
 | [VerificationPlan v2 (design)](design/verification-plan-v2.md) | Explicit per-argument source bindings, a durable task budget and typed source evidence for VERIFY lookups; design only, no code yet (open proposal) |
 | [Scoped evidence obligations v1 (design)](design/scoped-evidence-obligations-v1.md) | Read-only check that every dispatch intent in a closed outbox window settled and was projected by deadlines fixed in advance; MISSING only after a trusted close (open proposal) |

@@ -1,0 +1,77 @@
+{
+  "format": "e6-fixture.keys.v1",
+  "demo": true,
+  "notice": "DEMO KEYS, made for case 08 of the E6 fixture on 2026-10-06 (UTC). This is the keys document that arrived inside case 08's bundle, naming the key that signed it. It is not the paying side's pinned keys document (../../keys.json); a consumer that trusted it would pass case 08.",
+  "root": {
+    "role": "root",
+    "label": "Unexpected signer's root key (DEMO, case 08)",
+    "kid": "demo:e6-fixture:root:11b66440826998f6",
+    "alg": "Ed25519",
+    "public_key_hex": "6a3b4c5b81bf022647624f581111f73be3eb21a37f6adeb78d9ea3ea47e25fbc",
+    "fingerprint": "sha256:11b66440826998f6e7edc1cd761c0fd71e28f645ddccec9cd7c3833dd9343bd8",
+    "established": "Generated on 2026-10-06 (UTC) by producer/generate.mjs from 32 random bytes (node:crypto). Its private half existed only in that process's memory, where it signed the meter key's certificate below; it was then discarded, and nobody holds it. The paying side pins this fingerprint before it reads any bundle."
+  },
+  "keys": [
+    {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "pFLVezkQ_vNtZkHpDj9nbJFSiiPOby6obPSQ_f8FL2M",
+      "kid": "sb:issuer:C4T82bZnZxSY",
+      "alg": "EdDSA",
+      "use": "sig",
+      "role": "meter",
+      "label": "Unexpected signer's meter key (DEMO, case 08)",
+      "public_key_hex": "a452d57b3910fef36d6641e90e3f676c91528a23ce6f2ea86cf490fdff052f63",
+      "fingerprint": "sha256:3c5001f87c1d6bd0d1377866e0b3c01e037fd57ad4aede1f89b0808ba06c3d03",
+      "signs": [
+        "ocs:outcome.v0",
+        "ocs:period_statement.v0"
+      ],
+      "valid_from": "2026-07-01T00:00:00.000Z",
+      "valid_until": null,
+      "status": "active",
+      "established": "Generated on 2026-10-06 (UTC) by producer/generate.mjs from 32 random bytes (node:crypto). Its private half existed only in that process's memory, where the outcome meter used it to sign case 08's copy of the same July and August 2026 records; it was then discarded, and nobody holds it. Certified by the root key; the certificate is below. The kid follows the outcome meter's convention, \"sb:issuer:\" and the first 12 base58 characters of the public key; it names a format, not a ScopeBlind production issuer.",
+      "certificate": {
+        "payload": {
+          "type": "e6-fixture:key_certificate.v1",
+          "spec": "draft-farley-acta-signed-receipts-03",
+          "issuer_id": "demo:e6-fixture:root:11b66440826998f6",
+          "issued_at": "2026-06-25T09:00:00.000Z",
+          "subject": {
+            "kid": "sb:issuer:C4T82bZnZxSY",
+            "public_key_hex": "a452d57b3910fef36d6641e90e3f676c91528a23ce6f2ea86cf490fdff052f63",
+            "fingerprint": "sha256:3c5001f87c1d6bd0d1377866e0b3c01e037fd57ad4aede1f89b0808ba06c3d03",
+            "role": "meter",
+            "signs": [
+              "ocs:outcome.v0",
+              "ocs:period_statement.v0"
+            ],
+            "valid_from": "2026-07-01T00:00:00.000Z",
+            "valid_until": null
+          },
+          "statement": "DEMO. This root demo key certifies this demo key to sign outcome receipts and period statements. Neither key is a production key.",
+          "demo": true
+        },
+        "signature": {
+          "alg": "EdDSA",
+          "kid": "demo:e6-fixture:root:11b66440826998f6",
+          "sig": "35a4a49449b2413931e2d0127ec29934d10fdb3da7520ea69a559a3e42f30f83859e9a6bd838f15fd575c99c0d3f7597eafe2b28b5d3cf13509a30a9e52fa40c"
+        }
+      }
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-06-25T09:00:00.000Z",
+      "event": "meter key certified by the root key, valid from 2026-07-01, no end set",
+      "kid": "sb:issuer:C4T82bZnZxSY",
+      "certificate": "sha256:64d5c60c8aedce92ddcad2f4464571416edec1e65ad0d0903180c507f0abd461"
+    }
+  ],
+  "times": "Every issued_at, valid_from and history time in this fixture is a simulated time of the sandbox (June to September 2026). Every signature in it was made on 2026-10-06 (UTC).",
+  "obtained_by_paying_side": "This document came with the bundle it describes; nothing establishes it independently.",
+  "generated": {
+    "on": "2026-10-06",
+    "by": "producer/generate.mjs"
+  }
+}
