@@ -35,12 +35,24 @@ def test_no_infer_by_default_stays_fail_closed():
     assert a.should_execute is False          # unset risk never ACCEPTs
 
 
-def test_high_trust_low_risk_read_accepts():
-    a = assess_tool_call("read_file", {"path": "x"}, risk_tier="low",
-                         action_type="read", target_environment="staging",
+def test_high_trust_low_risk_registry_read_accepts():
+    a = assess_tool_call("read_file", {"path": "x"},
+                         registry={"read_file": {"risk_tier": "low",
+                                                 "action_type": "read"}},
+                         target_environment="staging",
                          trust_score=0.9, phase="ordered")
     assert a.action == "accept"
     assert a.should_execute is True
+
+
+def test_high_trust_low_risk_caller_labels_are_capped_to_verify():
+    """PRF-040: the same call labelled by the caller no longer ACCEPTs."""
+    a = assess_tool_call("read_file", {"path": "x"}, risk_tier="low",
+                         action_type="read", target_environment="staging",
+                         trust_score=0.9, phase="ordered")
+    assert a.action == "verify"
+    assert a.label_cap == "caller_labels_untrusted"
+    assert a.should_execute is False
 
 
 def test_prompt_injection_blocked_at_admission_firewall():
@@ -64,7 +76,9 @@ def test_to_dict_is_json_ready_and_complete():
     import json
     a = assess_tool_call("read_file", {}, infer=True)
     d = json.loads(json.dumps(a.to_dict(), default=str))
-    assert set(d) == {"decision", "trace", "inferred", "envelope"}
+    assert set(d) == {"decision", "trace", "inferred", "label_source",
+                      "label_cap", "envelope"}
+    assert d["label_source"] == "inferred"
     assert d["decision"]["action"] == a.action
     assert d["inferred"] == {"action_type": "read", "risk_tier": "low"}
 
