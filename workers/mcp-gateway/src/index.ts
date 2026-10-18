@@ -760,10 +760,12 @@ export default {
       });
     }
 
-    // Deployment prerequisites first: a production gateway missing its
-    // durable chain or custody split must not take calls at all.
+    // Deployment prerequisites first, fail closed: any problem refuses, in any
+    // profile. Checking only profile === "production" let an unset or
+    // misspelt profile ("prod") serve /mcp with every problem reported and
+    // none acted on.
     const readiness = productionReadiness(env);
-    if (readiness.profile === "production" && readiness.problems.length > 0) {
+    if (readiness.problems.length > 0) {
       return Response.json(
         {
           error: "deployment_not_ready",
