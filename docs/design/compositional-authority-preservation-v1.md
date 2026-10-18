@@ -422,19 +422,20 @@ design, it needs:
 
 ## 8. Owner decisions
 
-1. Whether ABER L3b's case B registry is a deployment adapter only, or
-   REMORA ships a reference obligation store for evaluation. Recommendation:
-   adapter interface plus a fixture store for tests and SAP v7.
-2. Whether case C caps at VERIFY or ESCALATE. Recommendation: VERIFY, with
-   the reviewer shown amount and reference. ESCALATE when the amount exceeds a
-   deployment threshold.
-3. ToolSpec v5 for the `postcondition` block, or a v4 extension.
-   Recommendation: v5, because existing v4 bundles must keep loading.
-4. Whether strict profiles refuse unsigned receipts outright, or record them
-   capped at `same_deployment`. Recommendation: refuse in `controlled_pilot`,
-   cap in `review`.
-5. Whether a receipt may carry data `D_A` must not read. Recommendation: not
-   in v1; such tools stay at `same_deployment`.
+Decided by the owner on 2026-10-18, who adopted each recommendation below.
+A later change to any of them is a new decision and is recorded here.
+
+1. **Case B registry.** REMORA ships the adapter interface plus a fixture
+   obligation store for tests and SAP v7. Deployments supply their own
+   adapter.
+2. **Case C cap.** VERIFY, with the reviewer shown the amount and the
+   reference. ESCALATE when the amount exceeds a deployment-set threshold.
+3. **Postcondition block.** ToolSpec v5, so that existing v4 bundles keep
+   loading unchanged.
+4. **Unsigned receipts in strict profiles.** Refused in `controlled_pilot`;
+   recorded but capped at `same_deployment` in `review`.
+5. **Receipt data the authority domain must not read.** Not allowed in v1.
+   Tools that would need it stay at `same_deployment`.
 
 ## 9. Prior art
 
