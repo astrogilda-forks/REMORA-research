@@ -162,6 +162,21 @@ def test_a_new_escalation_reason_invalidates_the_approval() -> None:
     assert outcome.decision is ExecutionDecision.APPROVAL_INVALIDATED
 
 
+def test_a_new_verify_reason_invalidates_an_approved_verify() -> None:
+    from remora.governance.review_queue import ExecutionDecision, ReviewQueue
+    from remora.policy.report import DecisionAction
+
+    engine = _Engine()
+    engine.action = DecisionAction.VERIFY
+    queue = ReviewQueue(engine=engine)  # type: ignore[arg-type]
+    item = queue.enqueue(_obs("high"), DecisionAction.VERIFY,
+                         reasons=("evidence_insufficient",))
+    queue.approve(item.item_id, "reviewer-1", timedelta(minutes=5))
+    engine.reasons = (_reason("evidence_insufficient"), _reason("distribution_shift"))
+    outcome = queue.execute(item.item_id, _obs("high"))
+    assert outcome.decision is ExecutionDecision.APPROVAL_INVALIDATED
+
+
 @pytest.mark.parametrize("action", ["verify", "accept"])
 def test_a_lower_action_with_a_new_reason_invalidates_an_approved_escalation(
         action: str) -> None:

@@ -100,6 +100,10 @@ def _approval_survives(fresh: Any, approval: Approval) -> bool:
             and approval.approved_reasons is not None):
         return (fresh_action in (*_EXECUTABLE, DecisionAction.ESCALATE)
                 and set(_reason_values(fresh)) <= set(approval.approved_reasons))
+    if (approved_action is DecisionAction.VERIFY
+            and approval.approved_reasons is not None
+            and fresh_action is DecisionAction.VERIFY):
+        return set(_reason_values(fresh)) <= set(approval.approved_reasons)
     return (fresh_action in _EXECUTABLE
             and _SEVERITY[fresh_action] <= _SEVERITY[approved_action])
 
