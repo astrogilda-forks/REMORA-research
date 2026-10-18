@@ -213,6 +213,13 @@ reason_codes:
   # Additive (2026-10-12; see remora/toolcall/argument_schema.py).
   - code: toolspec_argument_schema_unsupported
     meaning: the argument_schema uses a keyword or value outside the enforced profile, so part of it would be signed but never checked
+  # Additive (2026-10-18; schemas/tool_spec_v4.yaml, IFC-03).
+  - code: toolspec_flow_requires_v4
+    meaning: a spec declares a flow block in a bundle older than schema_version 4
+  - code: toolspec_flow_invalid
+    meaning: the flow block has a key the schema does not define, or a value with no single meaning
+  - code: toolspec_flow_lint_failed
+    meaning: the flow block parses but breaks a lint rule (FL-01 to FL-12), so the flow check could not be computed from it as signed
 
 # ── Binding chain (handoff gate §1.3/§1.5) ─────────────────────────────────
 # The same ToolSpec hash must appear at every stage. Any difference means
