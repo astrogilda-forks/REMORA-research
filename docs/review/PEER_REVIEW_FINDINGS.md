@@ -298,9 +298,9 @@ conditions?
 | Evidence | §2.11, §5.2, §17. |
 | Affected claims | none |
 | Action | Reframe as a systems artifact plus evaluation method (owner decision 2026-10-17). Move the ensemble, debate, conformal and calibration material to an appendix. |
-| Owning PR | level-1 PR (reframing sentences) |
-| Verification | Done: the abstract, contributions and §2.11 state the reframing in both files. Remaining: the consensus and conformal material is still in the body. |
-| Status | IN_PROGRESS |
+| Owning PR | level-1 PR (reframing sentences); appendix move in the level-1 remainder PR (stacked on #927) |
+| Verification | Done: the abstract, contributions and §2.11 state the reframing in both files. The ensemble, conformal and calibration material of the body is now in appendices. In the .md, Appendix G holds the oracle swarm, canonicalizer and weighting (§4.1 to §4.3), the observable definitions (§5.1), the PhaseAwareGuardrail, weighted conformal selector and PVD-inspired score (§7.1 to §7.3), the three-oracle ablation (§10.2), Mondrian coverage (§10.5) and the oracle-count and weighting ablations (§11.2, §11.3). Each body heading keeps its number with a short pointer, so section references from §2 and from other documents stay valid. In the .tex the same material moved to three new appendices (`app:consensus`, `app:selection`, `app:mondrian`) beside the existing `app:crc`; a label/ref scan finds no duplicate label and no undefined reference. Every removed line is present in the appendix except the edited cross-references and the old CRC stub, whose caveat the new combined stub keeps. The §2 related-work subsections on ensembles, debate, conformal prediction and calibration were not moved: §2 belongs to a concurrent PR. |
+| Status | RESOLVED |
 
 ### PRF-019 Clustering units for CLAIM-001 and CLAIM-002, and post-hoc utility test
 

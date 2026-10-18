@@ -95,7 +95,7 @@ The individual mechanisms are known: capabilities with caveats (Birgisson et al.
 
 The AgentHarm false-block floor (at most 40%) was pre-registered for the re-scoring of the same 208 benign scenarios. The run blocked all 208, and the floor is recorded as missed (`artifacts/verify_protocols/agentharm_rescore_v1.json`, `fbr_target` and `fbr_target_met`; NEGATIVE_RESULTS.md §19).
 
-Sections 2-8 describe the related work, execution architecture, research observables and decision record. Sections 9-12 give the evaluation and worked cases. Sections 13-16 address limitations, validity, safety and reproduction before the conclusion in §17.
+Sections 2-8 describe the related work, execution architecture, research observables and decision record. Sections 9-12 give the evaluation and worked cases. Sections 13-16 address limitations, validity, safety and reproduction before the conclusion in §17. The retired oracle-consensus, conformal and calibration material is in Appendix G.
 
 ---
 
@@ -276,19 +276,15 @@ REMORA processes each gate request through six decision stages, followed by Deci
 
 ### 4.1 Oracle Swarm
 
-The oracle set $\mathcal{O}$ contains $n \geq 3$ models from distinct model families. The 2026-07 clean benchmark round, the AgentHarm external validation, and the real-LLM baselines use a Cloudflare Workers AI cross-family trio (`@cf/meta/llama-3.3-70b-instruct-fp8-fast` (Meta LLaMA), `@cf/qwen/qwen3-30b-a3b-fp8` (Alibaba Qwen), and `@cf/mistralai/mistral-small-3.1-24b-instruct` (Mistral)), with the no-same-family rule enforced fail-closed by `remora/oracles/families.py`. Earlier QA and tool-call rounds ran on a Groq-hosted three-LLaMA swarm (Llama-3.1-8B-Instant, Llama-3.3-70B-Versatile, Llama-4-Scout-17B-16E-Instruct), which is one weight family: its within-family correlation gave an effective diversity closer to two oracles, the limitation §13.5 documents and the cross-family trio addresses. Fan-out is implemented with `concurrent.futures.ThreadPoolExecutor`; sequential fallback is invoked on runtime errors (e.g., nested event loops). Oracle responses are collected with per-oracle timeouts. Failed responses (network errors, timeouts, parse failures) are identified by a non-null `error` field and excluded from all downstream aggregation before consensus is computed.
+The oracle swarm feeds Stages 2 to 4 of Figure 1, which run on the research and benchmark path only (§5.2). Its composition, fan-out and failure handling are in Appendix G.1.
 
 ### 4.2 Canonicalizer
 
-The canonicalizer $\phi$ maps each oracle's raw text response to a structured `CanonicalVerdict` tuple (`polarity`, `claim_hash`, `magnitude`, `tags`). Polarity ($\{$True, False, None$\}$) is extracted from binary-answer signals. The claim hash is a 16-character truncated SHA-256 over NFKC-normalized, stopword-stripped, sorted token sequences, a semantics-preserving fingerprint that clusters semantically equivalent responses even when wording differs. This is a pragmatic heuristic, not a semantic equivalence proof.
+The canonicalizer maps each oracle response to a structured verdict on the same research path (Appendix G.1).
 
 ### 4.3 Correlation-Aware Weighting
 
-Oracles within the same base-model family tend to agree regardless of factual correctness, a form of correlation that inflates apparent consensus. REMORA maintains a rolling window (default: 200 samples) of pairwise agreement rates $\rho(a, b) \in [0, 1]$ between every oracle pair $(a, b)$. Diversity weights are:
-
-$$w(o) = \frac{\tfrac{1}{n}}{1 + \sum_{j \neq o} \rho(o, j)} \cdot Z^{-1}$$
-
-where $Z$ normalizes weights to sum to one. Oracles that frequently agree with others receive down-weighted votes; oracles that dissent from the majority receive up-weighted votes. This is an operational heuristic, not a proof of statistical independence.
+Oracle votes are down-weighted by their pairwise agreement on the same research path (Appendix G.1).
 
 ### 4.4 The Authority-Bound Execution Chain (PDP/PEP, ToolSpec, Lease, Custody)
 
@@ -358,25 +354,7 @@ The observables below describe oracle disagreement on the research and benchmark
 
 ### 5.1 Definitions
 
-Let $\hat{p}(v) = \sum_{o \in \mathcal{O}'} w(o) \cdot \mathbf{1}[\phi(o) = v]$ be the weighted support for verdict $v$ after removing failed oracles and applying diversity weights. Let $k = |\{\hat{p}(v) > 0\}|$ be the number of distinct active verdicts.
-
-**Entropy** (Shannon, bits):
-$$H = -\sum_v \hat{p}(v) \log_2 \hat{p}(v)$$
-
-**Dissensus:**
-$$D = 1 - \max_v \hat{p}(v)$$
-
-$D = 0$ when all valid oracles agree; $D \approx 1$ when support is spread uniformly. Note that $D$ and $H$ are correlated: high dissensus implies high entropy. This is a structural property of the observables, not a circular definition.
-
-**Consensus concentration:**
-$$\eta = \frac{\max_v \hat{p}(v) - \tfrac{1}{k}}{1 - \tfrac{1}{k}}$$
-
-$\eta = 1$ when consensus is unanimous; $\eta = 0$ when all verdicts are equally supported.
-
-**Trust score:**
-$$\tau = \eta \cdot (1 - h_{\text{bound}}) \cdot w_{\text{phase}} \cdot \left(1 + \frac{\chi}{\chi_0}\right)^{-1}$$
-
-Here $h_{\text{bound}}$ is a heuristic risk proxy, not a proven bound; $w_{\text{phase}}$ weights consensus regimes. This score describes research routing, not an execution authorization. The implementation details and the retired selection hypothesis are recorded in `NEGATIVE_RESULTS.md` (§18, §38).
+The weighted support distribution, entropy, dissensus, consensus concentration and trust score are defined in Appendix G.2. The trust score describes research routing, not an execution authorization.
 
 ### 5.2 What these observables do not do
 
@@ -465,48 +443,15 @@ Without enrichment, `DROP TABLE users` labelled `action_type=read, risk_tier=low
 
 In the critical phase, oracle consensus is near the phase boundary: the trust score is moderate but neither reliably high nor reliably low. A key empirical finding (§13.3) is that in this phase, *higher trust scores correlate with lower correctness* (Q4 high-trust: 50% correct vs Q1 low-trust: 75% correct on N=32 real-oracle critical-phase items; refined: τ ≥ 0.10 → 36.4% accuracy, τ < 0.10 → 76.2% accuracy, N=21). This is the opposite of what trust-based routing assumes. Conformal calibration at 5% risk target fails completely on critical-phase items (mean observed risk = 100%, coverage → 0%). Trust scoring alone cannot gate critical-phase decisions.
 
-**PhaseAwareGuardrail: Exploiting the Inversion.** The inversion is a *selection criterion reversal*: the guardrail should prefer low-τ items in the critical phase. `PhaseAwareGuardrail` (implemented in `remora.selective.guardrail`) applies an inverted score `τ̃ = 1 − τ` for critical-phase items, then calibrates a conformal threshold on `τ̃`. A hard gate rejects all items with τ ≥ 0.10 (the "groupthink boundary", a *provisional* operating point calibrated on a 32-item stratum split N=21 vs N=11; treat as exploratory until replicated on a larger critical-phase sample). The combined pool (99 ordered + 21 low-τ critical items) achieves:
-
-| Coverage | N   | Accuracy | Wilson CI       | Lift over baseline |
-|----------|-----|----------|-----------------|--------------------|
-| 18.2%    | 99  | 86.9%    | [78.8%, 92.2%]  | +45.7 pp           |
-| 20.0%    | 108 | 85.2%    | [77.3%, 90.7%]  | +44.0 pp           |
-| **22.1%**| **120** | **85.0%** | **[77.5%, 90.3%]** | **+43.8 pp** |
-
-A +3.9 pp coverage gain with 1.9 pp accuracy cost; still +43.8 pp above the 41.18% baseline. Numbers from `results/phase_aware_guardrail_n544_results.json` (empirical flat-phase policy). The guardrail is fully implemented and tested (25 unit tests in `tests/test_guardrail.py`).
+The `PhaseAwareGuardrail`, an offline selector that inverts the trust score for critical-phase items, and its operating points on the 544-item corpus are in Appendix G.3.
 
 ### 7.2 Conformal Risk Control Under Covariate Shift
 
-Standard Mondrian conformal calibration assumes exchangeability between calibration and test samples: a condition violated in the critical phase. Applying standard conformal to critical-phase items yields 100% observed risk and 0% coverage (negative result, §7.1 and §10.5).
-
-REMORA addresses this with a **CRC-inspired weighted empirical selective router**. Conformal Risk Control (Angelopoulos et al., 2022) generalises split-conformal coverage to a bound on the expected value of a loss that is monotone in the threshold. Weighting calibration points by a likelihood ratio to handle covariate shift comes from weighted conformal prediction (Tibshirani et al., 2019). The router borrows both ideas without satisfying either method's hypotheses. For the phase-shift setting, REMORA uses:
-
-$$w_i = \begin{cases} 1.0 & \text{if phase}(i) = p_{\text{test}} \\ \beta = 0.10 & \text{otherwise} \end{cases}$$
-
-The selector picks the smallest threshold $\hat{\lambda}$ (it **maximises** accepted items, coverage) subject to weighted empirical risk $\bar{L}(\hat{\lambda}) \leq \alpha$. **Theorem 1** (Angelopoulos et al., 2022) is stated for context only: the implemented selector does **not** instantiate the CRC procedure (external review R3-01), for two structural reasons that no weight specification can repair: (a) the threshold rule applies the raw constraint $\bar{L}(\lambda) \leq \alpha$ with no $B/(n+1)$ finite-sample term and no test-point weight $w_{n+1}$; (b) the controlled quantity, the conditional error rate among accepted items, is not monotone in $\lambda$, so the theorem does not attach even with correctly specified density-ratio weights. In addition, $\beta = 0.10$ is a hand-tuned constant, not a density ratio.
-
-Accordingly the component is named `WeightedEmpiricalSelectiveRouter` (formerly `CovariateShiftCRC`, retained as an alias): a deterministic, importance-weighted empirical operating-point selector whose quality evidence is exclusively empirical; for binary 0/1 loss, observed overshoot stayed within $1/(n+1)$ (5 pp for $n=19$, 1 pp for $n=99$) across 20 repeated splits on the synthetic session benchmark, an observation, not a bound.
-
-Implementation: `remora.selective.crc.WeightedEmpiricalSelectiveRouter.fit(scores, labels, phases, target_phase)` returns a `CRCReport` with `finite_sample_slack` ($= 1/(n_{\text{cal}}+1)$) and `nominal_risk_bound` ($= \alpha + \text{slack}$) as informational reference values (not applicable bounds), plus `holdout_risk` (plain unweighted holdout count). Tested: 45 unit tests. This module is an offline research component, not invoked by the reference API.
-
+A weighted empirical selective router inspired by Conformal Risk Control is implemented and tested as an offline research component. The reference API does not invoke it, and it does not instantiate the CRC theorem, so it gives no risk bound. The method and the reasons no reweighting repairs the gap are in Appendix G.3.
 
 ### 7.3 PVD-Inspired Offline Agreement Score for Critical-Phase Routing
 
-Kirchner et al. (2024) trained prover-verifier games that produce more legible and reliable LLM outputs. REMORA does **not** implement that training game: the component here is a PVD-*inspired* offline agreement score over already-produced oracle responses (default backend: token-fingerprint equality, not NLI), with no model training, live interaction, or additional API calls, and it is not invoked by the reference API.
-
-**Protocol:**
-1. **Cluster** oracle responses via Semantic Entropy clustering (Kuhn et al., 2023; Farquhar et al., 2024), producing semantic equivalence classes sorted by mass. *(In all reported benchmarks, the `TokenFingerprintBackend` heuristic is used rather than the `NLISemanticBackend`; the two may cluster differently for paraphrases with no shared tokens. The `NLISemanticBackend` is fully implemented as a drop-in alternative using cross-encoder entailment but has not been activated for any reported result, see NEGATIVE_RESULTS.md §3 for analysis and replication instructions.)*
-2. **Prover** = the oracle from the dominant cluster with highest confidence.
-3. **Verifier** = the highest-confidence oracle *outside* the dominant cluster.
-4. **Deliberation** (r = 1..., n_rounds): evaluate NLI entailment score prover→verifier with round-decay γ=0.85.
-5. Legibility score: L = mean_entailment × cluster_mass.
-6. Final confidence: geometric mean of dominant cluster mass and updated verifier confidence.
-
-**Routing signal:** PVD confidence blended with REMORA trust score:
-
-$$\tilde{\tau} = (1 - w_{\text{pvd}}) \cdot \tau + w_{\text{pvd}} \cdot \hat{c}, \quad w_{\text{pvd}} = 0.40$$
-
-Implementation: `remora.selective.pvd.deliberate(oracle_responses, oracle_confidences, n_rounds=2)` returns a `PVDResult`. `pvd_routing_score(trust_score, pvd_result)` implements the blending. Tested: 33 unit tests, no external model calls.
+A PVD-inspired agreement score over already-produced oracle responses is implemented as an offline research component. It trains no model, makes no model call and is not invoked by the reference API (Appendix G.3).
 
 ### 7.4 Evidence Router Design
 
@@ -622,20 +567,7 @@ The earlier selective-QA round is a historical artifact, not a current selection
 
 ### 10.2 Ablation on N=302 Subset
 
-**Table 1: Three-Oracle Ablation (N=302)**
-
-| Condition | Accuracy | 95% CI |
-|-----------|----------|--------|
-| A: Single oracle (Llama-3.3-70B) | 56.95% | [51.3, 62.4] |
-| B: Majority vote (3 oracles) | 82.78% | [78.1, 86.6] |
-| C: REMORA (correlation-weighted) | 69.54% | [64.1, 74.5] |
-| D: REMORA + policy gate (balanced) | 82.12%† | [77.4, 86.0] |
-
-†Policy gate primarily affects coverage (abstention rate) rather than per-accepted-item accuracy.
-
-**Note:** This is an exploratory ablation; not used as a headline claim. Per-item records are available in `ablation_v2_results.json` for independent verification. Headline claims are restricted to results fully verifiable from top-level artifact keys (see `docs/assurance/claim_register_v1.yaml`).
-
-Canonical benchmark headline snapshot (artifact-bound, one-decimal rendering): A single-oracle accuracy 57.0%, B majority-vote accuracy 82.8%, C REMORA accuracy 69.5%, D2 balanced accuracy 82.1%, D3 hybrid accuracy 76.2%, C ETR 12.9%, D2 ETR 43.4%, D3 ETR 40.7%.
+An exploratory three-oracle ablation on 302 QA items is in Appendix G.4. It is not a headline claim: majority vote beat correlation-weighted consensus on full-coverage accuracy.
 
 ### 10.3 Tool-Call Benchmark (N=700)
 
@@ -710,15 +642,7 @@ The trust-only baseline (all critical items escalated, no evidence routing) achi
 
 ### 10.5 Conformal Coverage (Mondrian: N=2,161 Augmented Dataset)
 
-**Table 5: Mondrian Phase-Stratified Conformal (20 seeds × N=2,161)**
-
-| Target | Phase | Mean Risk | Mean Coverage | Seeds Failing |
-|--------|-------|-----------|---------------|---------------|
-| 15% | Ordered | 12.0% | **99.9%** | **0/20** |
-| 15% | Critical | 64.5% | 0.9% | 4/20 |
-| 15% | Disordered | 78.6% | 0.2% | 2/20 |
-
-Ordered-phase conformal achieves 99.9% coverage with 0/20 seed failures at the 15% risk target; a stable internal benchmark operating point (the N=2,161 dataset is augmented and includes calibrated-simulation critical items; this is not evidence of deployability under production distribution shift). Critical and disordered phases cannot achieve meaningful coverage via conformal calibration alone; this is a documented limitation driving the evidence router design.
+Mondrian phase-stratified conformal calibration on the augmented 2,161-item dataset is in Appendix G.5. At the 15% risk target it reaches 99.9% mean coverage in the ordered phase, against 0.9% in the critical and 0.2% in the disordered phase, the limitation behind the evidence router.
 
 ### 10.6 External Validity: AgentHarm Benchmark (N=88)
 
@@ -933,11 +857,11 @@ headline safety result is unmeasured.
 
 ### 11.2 Oracle Count
 
-The ablation across N=302 (Table 1) shows a +25.8 pp accuracy gain from single oracle to three-oracle majority vote (56.95% vs. 82.78%). Correlation-aware weighting (69.54%) does not beat raw majority vote on full-coverage accuracy: its value lies in trust calibration and selective coverage, not full-coverage accuracy (see the §10.2 note and the selective trust curve). The primary benefit of the oracle swarm is disagreement detection (high H, high D) rather than full-coverage accuracy improvement per se.
+The oracle-count ablation (Appendix G.4, G.6) shows majority vote over three oracles ahead of a single oracle and ahead of correlation weighting on full-coverage accuracy. It is exploratory.
 
 ### 11.3 Correlation Weighting
 
-Without correlation weighting, consensus from a within-family oracle cluster (high $\bar{\rho}$) would receive inflated support. The diversity weights $w(o)$ reduce effective k in correlated settings, appropriately reducing trust scores and increasing escalation rates when oracles are likely agreeing due to shared training rather than factual correctness. Empirical validation of this effect requires a controlled study varying oracle family composition, which is identified as future work.
+The effect of correlation weighting on trust and escalation has not been tested in a controlled study (Appendix G.6).
 
 ---
 
@@ -1796,3 +1720,121 @@ This section documents resolution of the open caveats in §F.6 and the current s
 2. RBAC follow-through, REM-023: isolation test, admin wildcard and external confirmation (`docs/assurance/remediation_register.yaml`).
 
 *Gap 4 (NLI/SE DLL block on Windows) remains architecturally unresolved, see NEGATIVE\_RESULTS.md §3.*
+
+
+---
+
+## Appendix G: Retired Research Path: Oracle Consensus, Conformal Selection and Calibration
+
+This appendix holds the ensemble, conformal and calibration material that the body summarises in §4.1 to §4.3, §5.1, §7.1 to §7.3, §10.2, §10.5, §11.2 and §11.3. None of it is on the governed execution path (§5.2), and no headline result depends on it. It is kept because the numbers, the caveats and the negative results are part of the record (NEGATIVE_RESULTS.md §18, §38).
+
+### G.1 Oracle Swarm, Canonicalizer and Correlation-Aware Weighting
+
+The oracle set $\mathcal{O}$ contains $n \geq 3$ models from distinct model families. The 2026-07 clean benchmark round, the AgentHarm external validation, and the real-LLM baselines use a Cloudflare Workers AI cross-family trio (`@cf/meta/llama-3.3-70b-instruct-fp8-fast` (Meta LLaMA), `@cf/qwen/qwen3-30b-a3b-fp8` (Alibaba Qwen), and `@cf/mistralai/mistral-small-3.1-24b-instruct` (Mistral)), with the no-same-family rule enforced fail-closed by `remora/oracles/families.py`. Earlier QA and tool-call rounds ran on a Groq-hosted three-LLaMA swarm (Llama-3.1-8B-Instant, Llama-3.3-70B-Versatile, Llama-4-Scout-17B-16E-Instruct), which is one weight family: its within-family correlation gave an effective diversity closer to two oracles, the limitation §13.5 documents and the cross-family trio addresses. Fan-out is implemented with `concurrent.futures.ThreadPoolExecutor`; sequential fallback is invoked on runtime errors (e.g., nested event loops). Oracle responses are collected with per-oracle timeouts. Failed responses (network errors, timeouts, parse failures) are identified by a non-null `error` field and excluded from all downstream aggregation before consensus is computed.
+
+**Canonicalizer.** The canonicalizer $\phi$ maps each oracle's raw text response to a structured `CanonicalVerdict` tuple (`polarity`, `claim_hash`, `magnitude`, `tags`). Polarity ($\{$True, False, None$\}$) is extracted from binary-answer signals. The claim hash is a 16-character truncated SHA-256 over NFKC-normalized, stopword-stripped, sorted token sequences, a semantics-preserving fingerprint that clusters semantically equivalent responses even when wording differs. This is a pragmatic heuristic, not a semantic equivalence proof.
+
+**Correlation-aware weighting.** Oracles within the same base-model family tend to agree regardless of factual correctness, a form of correlation that inflates apparent consensus. REMORA maintains a rolling window (default: 200 samples) of pairwise agreement rates $\rho(a, b) \in [0, 1]$ between every oracle pair $(a, b)$. Diversity weights are:
+
+$$w(o) = \frac{\tfrac{1}{n}}{1 + \sum_{j \neq o} \rho(o, j)} \cdot Z^{-1}$$
+
+where $Z$ normalizes weights to sum to one. Oracles that frequently agree with others receive down-weighted votes; oracles that dissent from the majority receive up-weighted votes. This is an operational heuristic, not a proof of statistical independence.
+
+### G.2 Consensus Observables: Definitions
+
+Let $\hat{p}(v) = \sum_{o \in \mathcal{O}'} w(o) \cdot \mathbf{1}[\phi(o) = v]$ be the weighted support for verdict $v$ after removing failed oracles and applying diversity weights. Let $k = |\{\hat{p}(v) > 0\}|$ be the number of distinct active verdicts.
+
+**Entropy** (Shannon, bits):
+$$H = -\sum_v \hat{p}(v) \log_2 \hat{p}(v)$$
+
+**Dissensus:**
+$$D = 1 - \max_v \hat{p}(v)$$
+
+$D = 0$ when all valid oracles agree; $D \approx 1$ when support is spread uniformly. Note that $D$ and $H$ are correlated: high dissensus implies high entropy. This is a structural property of the observables, not a circular definition.
+
+**Consensus concentration:**
+$$\eta = \frac{\max_v \hat{p}(v) - \tfrac{1}{k}}{1 - \tfrac{1}{k}}$$
+
+$\eta = 1$ when consensus is unanimous; $\eta = 0$ when all verdicts are equally supported.
+
+**Trust score:**
+$$\tau = \eta \cdot (1 - h_{\text{bound}}) \cdot w_{\text{phase}} \cdot \left(1 + \frac{\chi}{\chi_0}\right)^{-1}$$
+
+Here $h_{\text{bound}}$ is a heuristic risk proxy, not a proven bound; $w_{\text{phase}}$ weights consensus regimes. This score describes research routing, not an execution authorization. The implementation details and the retired selection hypothesis are recorded in `NEGATIVE_RESULTS.md` (§18, §38).
+
+### G.3 Offline Critical-Phase Selection: PhaseAwareGuardrail, Weighted Conformal Selector and PVD-Inspired Score
+
+The critical-phase trust inversion that motivates these components is stated in §7.1 and §13.3.
+
+**PhaseAwareGuardrail: Exploiting the Inversion.** The inversion is a *selection criterion reversal*: the guardrail should prefer low-τ items in the critical phase. `PhaseAwareGuardrail` (implemented in `remora.selective.guardrail`) applies an inverted score `τ̃ = 1 − τ` for critical-phase items, then calibrates a conformal threshold on `τ̃`. A hard gate rejects all items with τ ≥ 0.10 (the "groupthink boundary", a *provisional* operating point calibrated on a 32-item stratum split N=21 vs N=11; treat as exploratory until replicated on a larger critical-phase sample). The combined pool (99 ordered + 21 low-τ critical items) achieves:
+
+| Coverage | N   | Accuracy | Wilson CI       | Lift over baseline |
+|----------|-----|----------|-----------------|--------------------|
+| 18.2%    | 99  | 86.9%    | [78.8%, 92.2%]  | +45.7 pp           |
+| 20.0%    | 108 | 85.2%    | [77.3%, 90.7%]  | +44.0 pp           |
+| **22.1%**| **120** | **85.0%** | **[77.5%, 90.3%]** | **+43.8 pp** |
+
+A +3.9 pp coverage gain with 1.9 pp accuracy cost; still +43.8 pp above the 41.18% baseline. Numbers from `results/phase_aware_guardrail_n544_results.json` (empirical flat-phase policy). The guardrail is fully implemented and tested (25 unit tests in `tests/test_guardrail.py`).
+
+**Weighted conformal selector.** Standard Mondrian conformal calibration assumes exchangeability between calibration and test samples: a condition violated in the critical phase. Applying standard conformal to critical-phase items yields 100% observed risk and 0% coverage (negative result, §7.1 and Appendix G.5).
+
+REMORA addresses this with a **CRC-inspired weighted empirical selective router**. Conformal Risk Control (Angelopoulos et al., 2022) generalises split-conformal coverage to a bound on the expected value of a loss that is monotone in the threshold. Weighting calibration points by a likelihood ratio to handle covariate shift comes from weighted conformal prediction (Tibshirani et al., 2019). The router borrows both ideas without satisfying either method's hypotheses. For the phase-shift setting, REMORA uses:
+
+$$w_i = \begin{cases} 1.0 & \text{if phase}(i) = p_{\text{test}} \\ \beta = 0.10 & \text{otherwise} \end{cases}$$
+
+The selector picks the smallest threshold $\hat{\lambda}$ (it **maximises** accepted items, coverage) subject to weighted empirical risk $\bar{L}(\hat{\lambda}) \leq \alpha$. **Theorem 1** (Angelopoulos et al., 2022) is stated for context only: the implemented selector does **not** instantiate the CRC procedure (external review R3-01), for two structural reasons that no weight specification can repair: (a) the threshold rule applies the raw constraint $\bar{L}(\lambda) \leq \alpha$ with no $B/(n+1)$ finite-sample term and no test-point weight $w_{n+1}$; (b) the controlled quantity, the conditional error rate among accepted items, is not monotone in $\lambda$, so the theorem does not attach even with correctly specified density-ratio weights. In addition, $\beta = 0.10$ is a hand-tuned constant, not a density ratio.
+
+Accordingly the component is named `WeightedEmpiricalSelectiveRouter` (formerly `CovariateShiftCRC`, retained as an alias): a deterministic, importance-weighted empirical operating-point selector whose quality evidence is exclusively empirical; for binary 0/1 loss, observed overshoot stayed within $1/(n+1)$ (5 pp for $n=19$, 1 pp for $n=99$) across 20 repeated splits on the synthetic session benchmark, an observation, not a bound.
+
+Implementation: `remora.selective.crc.WeightedEmpiricalSelectiveRouter.fit(scores, labels, phases, target_phase)` returns a `CRCReport` with `finite_sample_slack` ($= 1/(n_{\text{cal}}+1)$) and `nominal_risk_bound` ($= \alpha + \text{slack}$) as informational reference values (not applicable bounds), plus `holdout_risk` (plain unweighted holdout count). Tested: 45 unit tests. This module is an offline research component, not invoked by the reference API.
+
+**PVD-inspired offline agreement score.** Kirchner et al. (2024) trained prover-verifier games that produce more legible and reliable LLM outputs. REMORA does **not** implement that training game: the component here is a PVD-*inspired* offline agreement score over already-produced oracle responses (default backend: token-fingerprint equality, not NLI), with no model training, live interaction, or additional API calls, and it is not invoked by the reference API.
+
+**Protocol:**
+1. **Cluster** oracle responses via Semantic Entropy clustering (Kuhn et al., 2023; Farquhar et al., 2024), producing semantic equivalence classes sorted by mass. *(In all reported benchmarks, the `TokenFingerprintBackend` heuristic is used rather than the `NLISemanticBackend`; the two may cluster differently for paraphrases with no shared tokens. The `NLISemanticBackend` is fully implemented as a drop-in alternative using cross-encoder entailment but has not been activated for any reported result, see NEGATIVE_RESULTS.md §3 for analysis and replication instructions.)*
+2. **Prover** = the oracle from the dominant cluster with highest confidence.
+3. **Verifier** = the highest-confidence oracle *outside* the dominant cluster.
+4. **Deliberation** (r = 1..., n_rounds): evaluate NLI entailment score prover→verifier with round-decay γ=0.85.
+5. Legibility score: L = mean_entailment × cluster_mass.
+6. Final confidence: geometric mean of dominant cluster mass and updated verifier confidence.
+
+**Routing signal:** PVD confidence blended with REMORA trust score:
+
+$$\tilde{\tau} = (1 - w_{\text{pvd}}) \cdot \tau + w_{\text{pvd}} \cdot \hat{c}, \quad w_{\text{pvd}} = 0.40$$
+
+Implementation: `remora.selective.pvd.deliberate(oracle_responses, oracle_confidences, n_rounds=2)` returns a `PVDResult`. `pvd_routing_score(trust_score, pvd_result)` implements the blending. Tested: 33 unit tests, no external model calls.
+
+### G.4 Three-Oracle Ablation on 302 Items
+
+**Table 1: Three-Oracle Ablation (N=302)**
+
+| Condition | Accuracy | 95% CI |
+|-----------|----------|--------|
+| A: Single oracle (Llama-3.3-70B) | 56.95% | [51.3, 62.4] |
+| B: Majority vote (3 oracles) | 82.78% | [78.1, 86.6] |
+| C: REMORA (correlation-weighted) | 69.54% | [64.1, 74.5] |
+| D: REMORA + policy gate (balanced) | 82.12%† | [77.4, 86.0] |
+
+†Policy gate primarily affects coverage (abstention rate) rather than per-accepted-item accuracy.
+
+**Note:** This is an exploratory ablation; not used as a headline claim. Per-item records are available in `ablation_v2_results.json` for independent verification. Headline claims are restricted to results fully verifiable from top-level artifact keys (see `docs/assurance/claim_register_v1.yaml`).
+
+Canonical benchmark headline snapshot (artifact-bound, one-decimal rendering): A single-oracle accuracy 57.0%, B majority-vote accuracy 82.8%, C REMORA accuracy 69.5%, D2 balanced accuracy 82.1%, D3 hybrid accuracy 76.2%, C ETR 12.9%, D2 ETR 43.4%, D3 ETR 40.7%.
+
+### G.5 Mondrian Conformal Coverage on the Augmented 2,161-Item Dataset
+
+**Table 5: Mondrian Phase-Stratified Conformal (20 seeds × N=2,161)**
+
+| Target | Phase | Mean Risk | Mean Coverage | Seeds Failing |
+|--------|-------|-----------|---------------|---------------|
+| 15% | Ordered | 12.0% | **99.9%** | **0/20** |
+| 15% | Critical | 64.5% | 0.9% | 4/20 |
+| 15% | Disordered | 78.6% | 0.2% | 2/20 |
+
+Ordered-phase conformal achieves 99.9% coverage with 0/20 seed failures at the 15% risk target; a stable internal benchmark operating point (the N=2,161 dataset is augmented and includes calibrated-simulation critical items; this is not evidence of deployability under production distribution shift). Critical and disordered phases cannot achieve meaningful coverage via conformal calibration alone; this is a documented limitation driving the evidence router design.
+
+### G.6 Oracle Count and Correlation Weighting
+
+The ablation across N=302 (Table 1) shows a +25.8 pp accuracy gain from single oracle to three-oracle majority vote (56.95% vs. 82.78%). Correlation-aware weighting (69.54%) does not beat raw majority vote on full-coverage accuracy: its value lies in trust calibration and selective coverage, not full-coverage accuracy (see the note in Appendix G.4 and the selective trust curve). The primary benefit of the oracle swarm is disagreement detection (high H, high D) rather than full-coverage accuracy improvement per se.
+
+Without correlation weighting, consensus from a within-family oracle cluster (high $\bar{\rho}$) would receive inflated support. The diversity weights $w(o)$ reduce effective k in correlated settings, appropriately reducing trust scores and increasing escalation rates when oracles are likely agreeing due to shared training rather than factual correctness. Empirical validation of this effect requires a controlled study varying oracle family composition, which is identified as future work.
