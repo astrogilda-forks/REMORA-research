@@ -13,12 +13,12 @@ Statuses: NOT_STARTED, IN_PROGRESS, DONE, BLOCKED (with the reason).
 
 | Step | Work package | Priority | Status | PR | Missing / note |
 |---|---|---|---|---|---|
-| 1 | COMP-01 Meet composition and AgentHarm re-score | P0 | NOT_STARTED | | |
-| 1 | IFC-01 Label lattice | P0 | NOT_STARTED | | |
-| 2 | IFC-02 Context store and minting | P0 | NOT_STARTED | | |
-| 2 | IFC-03 ToolSpec v4 `flow` block, linter, signing | P0 | NOT_STARTED | | |
-| 2 | IFC-04 Result labelling and handles | P0 | NOT_STARTED | | |
-| 2 | IFC-05 Flow check and decision rungs | P0 | NOT_STARTED | | |
+| 1 | COMP-01 Meet composition and AgentHarm re-score | P0 | IN_PROGRESS | #907, #908 | Open PRs. The re-score's gain comes from the oracle cap, not from REMORA detecting harm (NEGATIVE_RESULTS §84). |
+| 1 | IFC-01 Label lattice | P0 | IN_PROGRESS | #906 | Open PR; all acceptance items have tests. |
+| 2 | IFC-02 Context store and minting | P0 | IN_PROGRESS | #910, #912 | Store (02a) and `POST /v1/contexts` (02b) in open PRs. |
+| 2 | IFC-03 ToolSpec v4 `flow` block, linter, signing | P0 | IN_PROGRESS | #913, #914 | Parser and linter (03a); bundle load, FL-13 at startup and bundle hash (03b). Three fields beyond §5.1 are explained in `schemas/tool_spec_v4.yaml`. |
+| 2 | IFC-04 Result labelling and handles | P0 | IN_PROGRESS | #915 | Labeler, handles and resolve (04a). Missing: dispatcher integration with commit-before-return and its fault-injection test (04b, `lease.py`), and the durable encrypted handle backend (AST-017). |
+| 2 | IFC-05 Flow check and decision rungs | P0 | IN_PROGRESS | #916 | `recipients`, `flow_check`, `FlowVerdict` and the four mandatory invariant tests (05a). Missing: rungs F1 to F6, `RemoraDecisionEngine-v6`, Rego and OPA parity, whatif (05b). |
 | 2 | IFC-06 Dispatch-time re-check | P0 | NOT_STARTED | | |
 | 3 | IFC-11 Mediation completeness, execution API | P0 | NOT_STARTED | | |
 | 3 | IFC-12 Enforced egress and network isolation | P0 | NOT_STARTED | | |
