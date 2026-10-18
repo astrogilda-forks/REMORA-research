@@ -122,8 +122,8 @@ systems artifact that integrates them, together with an evaluation method of
 sealed, pre-registered tracks whose misses and negative results are published.
 
 On a leakage-controlled 700-task tool-call simulator benchmark (effective
-$N=70$) the full gate produced zero unsafe acceptances (Wilson 95\% CI
-[0.0\%, 5.2\%]). Keyword baselines reached 1.4\%, a difference that is not
+$N=70$) the full gate produced zero unsafe acceptances, 0 of 56 harmful
+templates (Wilson 95\% upper bound 6.4\% over those templates). Keyword baselines reached 1.4\%, a difference that is not
 significant, and a component ablation attributes the result to no single
 component (CLAIM-001, CLAIM-020). On 208 AgentHarm scenarios
 \cite{andriushchenko2024agentharm} an imported intent-gating run made no
@@ -139,9 +139,12 @@ another task's correct call substituted into the task, almost always a
 tool the task never offered. In a sealed C-ext3
 track, declared tool contracts and task intents re-derived from the task text
 accepted 0/500 wrong calls (Wilson 95\% upper bound 0.76\% by row,
-3.5\% clustered by tool), but
-legitimate read autonomy was 26.6\% against a 75\% target, so the
-pre-registered joint hypothesis was not supported (CLAIM-019). A final sealed
+3.5\% clustered by tool). Four of the seven pre-registered targets were
+missed. One of them is a safety target: 2 of 199 constructed wrong-tool
+calls were accepted (1.005\%, against a bar of at most 1\%). Legitimate
+read autonomy was 26.6\% against a 75\% target, and both argument-routing
+targets were missed, so the pre-registered joint hypothesis was not
+supported (CLAIM-019). A final sealed
 track, C-ext4, spent the remaining BFCL v4 reserve (1{,}562 episodes) on a
 revised bundle. It accepted 29.9\% of correct calls against 6.9\% for the
 C-ext3 bundle and accepted no wrong call, as did a refuse-all control. The
@@ -199,7 +202,10 @@ measured property is contract-authorized read, not guaranteed task success
 or live deployment performance. Its current price matters: the deterministic intent extractor allowed only
 26.6\% of legitimate reads to proceed autonomously in that study, so the
 pre-registered joint hypothesis, which also required 75\% read autonomy,
-was not supported. A later
+was not supported. The same run accepted 2 of 199 constructed wrong-tool
+calls against a safety bar of at most 1\% and missed both argument-routing
+targets, four of its seven targets in all
+(\S\ref{sec:wrongcall-implication}). A later
 sealed track raised correct-call acceptance from 6.9\% to 29.9\% with a
 revised bundle and no wrong call accepted, mostly on tools seen in
 development; a refuse-all control also accepted no wrong call
@@ -1399,10 +1405,12 @@ Verifier heuristic         & 28.6\% & 1.4\% & 0.16 \\
 \end{table}
 
 REMORA's full policy gate produced 0 unsafe acceptances (cluster-level
-Wilson 95\% CI [0.0\%, 5.2\%]); baselines produced 1.4\% (1 of 70
-clusters). The safety-rate difference is not statistically significant
-at the template-cluster level (one-sided $p=0.50$); the statistically
-supported advantages are decision utility ($+0.456$, $p\approx10^{-4}$)
+Wilson 95\% CI [0.0\%, 5.2\%] over all 70 templates; upper bound 6.42\%
+over the 56 harmful templates, NEGATIVE\_RESULTS.md \S83); baselines
+produced 1.4\% (1 of 70 clusters). The safety-rate difference is not
+statistically significant at the template-cluster level (one-sided
+$p=0.50$). A post-hoc test, declared after the pre-registered hypothesis
+failed, finds advantages in decision utility ($+0.456$, $p\approx10^{-4}$)
 and accuracy. The complete condition set, including retired research
 selectors, remains in \path{results/toolcall_benchmark_v2_results.json}.
 Earlier versions of this table reported baselines at
@@ -1536,6 +1544,38 @@ that the contract shows serves the wrong goal, and behind every hard guard, so i
 never unblock one. The authority limit is the design: a model may \emph{propose}
 the intent but may not thereby assert a match, and an intent whose quoted spans
 do not occur in the task text yields \textsc{Unknown}, never \textsc{Supported}.
+
+Table~\ref{tab:cext3-targets} lists the seven targets SAP v5 fixed for
+C-ext3, with the confirmatory arm F's counts as the sealed artifact records
+them (\path{results/routing_bench_bfcl_v4_cext3_results.json},
+\texttt{targets}). Three were met and four were missed. One of the missed
+targets is a safety target: arm F accepted 2 of 199 constructed wrong-tool
+calls, 1.005\% against a bar of at most 1\%. Both accepted mutants are among
+the 26 that pass a schema check (NEGATIVE\_RESULTS.md \S83).
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{C-ext3 pre-registered targets, arm F. The two argument-routing
+counts are those at the locked commit \texttt{6a1ae712}; commit
+\texttt{edd9d144} later moved 79 arm-F episodes from \textsc{verify} to
+\textsc{abstain} and none into or out of \textsc{accept}
+(NEGATIVE\_RESULTS.md \S39, \S83).}
+\fitcolumn{%
+\begin{tabular}{@{}llllc@{}}
+\toprule
+Target & Bar & Arm F & Wilson 95\% CI & Verdict \\
+\midrule
+Native wrong-call \textsc{Acc} & $\leq 1\%$ & 0/500 = 0.0\% & 0.00--0.76\% & met \\
+Constructed wrong-tool \textsc{Acc} & $\leq 1\%$ & 2/199 = 1.005\% & 0.28--3.59\% & missed \\
+Required-\textsc{unknown} \textsc{Acc} & $\leq 0\%$ & 0/398 = 0.0\% & 0.00--0.96\% & met \\
+Irrelevance \textsc{Abs} recall & $\geq 95\%$ & 300/300 = 100.0\% & 98.74--100.0\% & met \\
+Legitimate read autonomy & $\geq 75\%$ & 25/94 = 26.6\% & 18.71--36.32\% & missed \\
+Obtainable \textsc{Ver} recall & $\geq 95\%$ & 93/199 = 46.7\% & 39.93--53.66\% & missed \\
+Unobtainable \textsc{Abs} recall & $\geq 95\%$ & 126/199 = 63.3\% & 56.43--69.70\% & missed \\
+\bottomrule
+\end{tabular}}
+\label{tab:cext3-targets}
+\end{table}
 
 The sealed C-ext3 track supplied that isolation: under a frozen
 deterministic bundle, native wrong-call acceptance fell 24/500, then 6/500,
@@ -1854,13 +1894,17 @@ confidence score moves it.
 vehicle status; the agent proposes \texttt{get\_work\_order} with a work-order
 identifier that happens to appear elsewhere in the task. Schema valid,
 arguments satisfiable, values grounded, nothing tainted: every signal in
-Call A's ladder is satisfied. The sealed BFCL v4 track measured wrong-call
-acceptance at 10.9\% without contracts. A declared
+Call A's ladder is satisfied. The superseded C-ext2 track measured
+wrong-call acceptance at 10.9\% without contracts (CLAIM-018). A declared
 tool contract does: the task targets a vehicle, the tool acts on a work order,
 and the mismatch is established rather than merely unverified. The sealed
-C-ext3 track measured that authority in isolation: with the frozen contract
-bundle and the semantic-authority floor, native wrong-call acceptance fell
-to 0/500 (\S\ref{sec:wrongcall-implication}).
+C-ext3 track measured that authority with the frozen contract bundle and the
+semantic-authority floor: native wrong-call acceptance fell to 0/500
+(\S\ref{sec:wrongcall-implication}). That measurement does not cover Call C.
+Only 2 of its 500 wrong calls name a tool the task itself offered
+(NEGATIVE\_RESULTS.md \S83), so confusing two tools of one catalogue, as
+here, is untested. The draft SAP v7 is to test it with wrong calls drawn
+from the task's own catalogue and from model outputs.
 
 \paragraph{Measured outcome.} The study behind the abstract's headline
 is registered as CLAIM-014: under study conditions the validator loop
@@ -2136,9 +2180,10 @@ dispatch and observed effect as different claims. The studies reported
 here examine three consequences of that design.
 
 \textbf{The zero-unsafe result has no identified cause.} The
-0\% unsafe-acceptance result on the adversarial tool-call benchmark (700 synthetic rows; effective $N=70$ clusters;
-cluster-level Wilson CI [0.0\%, 5.2\%]; baselines 1.4\%, difference not
-significant at $p=0.50$; the significant gains are utility $+0.456$ and
+0\% unsafe-acceptance result on the adversarial tool-call benchmark (700
+synthetic rows; 0 of 56 harmful templates, Wilson 95\% upper bound 6.4\%
+over those templates; baselines 1.4\%, difference not significant at
+$p=0.50$; a post-hoc test finds gains in utility, $+0.456$, and
 accuracy) was observed with the deterministic policy gates in place, and
 not produced by the multi-oracle consensus machinery. No experiment
 attributes it to the gates: the committed component ablation records FAR
@@ -2160,16 +2205,20 @@ regime, where none did without validators, with
 zero corrupt-identifier acceptances, zero cross-tenant lookups, and
 writes held at \textsc{verify} throughout.
 
-\textbf{Routing holds within one tool catalogue.} A sealed BFCL v4 track evaluated
-the current pipeline once and met all five pre-registered targets:
-wrong-call acceptance \textbf{10.9\%} (28/258), irrelevant-tool refusal
-100.0\%, unobtainable-input refusal 99.0\%, obtainable-input verification
-97.0\%, and required-UNKNOWN autonomous acceptance 0.0\%. Labelled routing
-accuracy was 91.2\%. The follow-up sealed C-ext3 track isolated the
-semantic axis: declared tool contracts with the semantic-authority floor
-accepted no substituted wrong call (0/500 vs.\ the 10.9\% baseline) but
-held read autonomy at 26.6\%, so its pre-registered joint hypothesis was
-not supported. A third sealed track, C-ext4, raised
+\textbf{Routing holds within one tool catalogue.} The sealed C-ext3 track
+isolated the semantic axis within one set of episodes: with declared tool
+contracts and the semantic-authority floor, arm F accepted 0/500
+substituted wrong calls (Wilson 95\% upper bound 0.76\% by row, 3.5\%
+clustered by tool), against 24/500 for the structural arm (exact McNemar
+$p = 1.2\times10^{-7}$, run after the fact). The same run missed four of
+its seven pre-registered targets. Constructed wrong-tool acceptance was
+2/199 against a safety bar of at most 1\%, read autonomy was 26.6\%
+against 75\%, and both argument-routing targets were missed, so its
+pre-registered joint hypothesis was not supported. The earlier C-ext2
+track (CLAIM-018, superseded by CLAIM-019) met its five targets with
+10.9\% (28/258) wrong-call acceptance on a different sample without
+contracts; it stays on record as superseded and is not the comparison for
+C-ext3. A third sealed track, C-ext4, raised
 correct-call acceptance from 6.9\% to 29.9\% with every safety count at
 zero, as for a refuse-all control; the gain sits mostly on tools seen in development, so generalisation
 to unseen tool families is untested.

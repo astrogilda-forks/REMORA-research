@@ -25,24 +25,29 @@ took over the compile.
   700-task adversarial tool-call benchmark (70 unique templates × 10 cosmetic
   variants; effective N = 70), versus 1.4% for the heuristic baselines under
   the same leakage-free input contract (2026-07-20 re-run).
-- Evidence: the safety floor comes from the hard-block policy layer over
-  surface-derived detectors and platform-fact context. The unsafe-rate delta
-  vs. baselines is **not statistically significant** at the template-cluster
-  level (one-sided p = 0.50); the significant advantage is decision utility
-  (+0.456, p ≈ 1×10⁻⁴).
+- Evidence: the zero was observed with the hard-block policy layer over
+  surface-derived detectors and platform-fact context in place, but the
+  ablation attributes the zero to no single component (CLAIM-020). The
+  unsafe-rate delta vs. baselines is **not statistically significant** at
+  the template-cluster level (one-sided p = 0.50). A post-hoc test, declared
+  after the pre-registered hypothesis failed, finds an advantage in decision
+  utility (+0.456, p ≈ 1×10⁻⁴).
 - Artifact: `results/toolcall_benchmark_v2_results.json` and
   `results/toolcall_benchmark_v2_significance.json`.
 - Caveat: 0% is a point estimate over 70 template clusters. The honest
   statement is a cluster-level 95% Wilson confidence interval of
-  **[0.0%, 5.2%]**, "at most ~1 in 19 templates," not "never." Earlier
+  **[0.0%, 5.2%]**, "at most ~1 in 19 templates," not "never." Only 56 of
+  the 70 templates are harmful; over those the upper bound is 6.42% (post
+  hoc, `artifacts/posthoc/peer_review_level2_v1.json`). Earlier
   versions quoted a task-level CI of [0.00%, 0.55%], which overstated
   precision by counting 10 near-duplicate variants as independent samples.
   The benchmark is a deterministic simulator (no real shell/network/db
   mutations) with synthetic adversarial patterns, and its environment facts
   (target environment, blast radius, authz/evidence status) are declared by
   the same generator that assigns labels.
-- Important architectural caveat: the hard-block policy rules alone produce
-  the 0% rate. The multi-oracle consensus machinery (thermodynamic routing,
+- Important architectural caveat: the ablation attributes the zero to no
+  single component (CLAIM-020); the condition without hard blocks also
+  records a false-accept rate of 0.0. The multi-oracle consensus machinery (thermodynamic routing,
   Lyapunov stability heuristic, entropy/dissensus) contributes to calibration
   and routing quality for VERIFY/ABSTAIN decisions but contributes **nothing** to
   the unsafe-execution safety claim. Do not cite REMORA's safety performance as
@@ -76,9 +81,9 @@ took over the compile.
   and CI are in the result JSON.
 
 ### 3. The critical-phase trust inversion
-- Claim: in the hardest ("critical") cases, the trust score anti-correlates
-  with correctness, low-trust items 76.2% correct (N=21), high-trust 36.4%
-  (N=11).
+- Claim (exploratory; Fisher exact p = 0.053): in the hardest ("critical")
+  cases, the trust score anti-correlates with correctness, low-trust items
+  76.2% correct (N=21), high-trust 36.4% (N=11).
 - Evidence: measured on real-oracle critical items; naive conformal at a 5%
   risk target collapses to 100% observed risk / 0 coverage in this regime. REMORA
   routes around it by inverting the selection score (`PhaseAwareGuardrail`).
@@ -159,8 +164,8 @@ with their artifacts:
 | CLAIM-016 | Superseded BFCL v3 negative record: 4 of 5 targets met; superseded by CLAIM-019 | externally_benchmarked | `results/routing_bench_bfcl_results.json` |
 | CLAIM-017 | Semantic binding gap in match_tool_to_intent (finding, fixed and regression-tested) | regression_tested | `remora/toolcall/routing/goal_match.py` |
 | CLAIM-018 | **Superseded by CLAIM-019.** Disjoint sealed BFCL v4 (C-ext2): all five pre-registered targets met, wrong-call ACCEPT 28/258 = 10.9%. Retained permanently as the degraded-authority baseline — that track ran with `contracts=None, intent=None`, so the semantic gates never fired | externally_benchmarked | `results/routing_bench_bfcl_v4_results.json` |
-| CLAIM-019 | Sealed BFCL v4 C-ext3 with declared semantic authority: native wrong-call ACCEPT **0/500 = 0.0%** (Wilson 95% upper 0.76%), irrelevance 300/300, required-unknown 0/398. **Four of seven targets MISSED** and published as measured — read autonomy 25/94 = 26.6% against a 75% bar, obtainable VERIFY 46.7%, unobtainable ABSTAIN 63.3%, constructed wrong-tool 2/199 = 1.005% (`NEGATIVE_RESULTS.md` §39) | externally_benchmarked | `results/routing_bench_bfcl_v4_cext3_results.json` |
-| CLAIM-021 | Sealed BFCL v4 C-ext4 utility track: bundle v2 with deterministic receipts accepts **87/291 = 29.9%** of gold calls against **20/291 = 6.9%** for the frozen v1 bundle on the same episodes; native wrong-call ACCEPT 0/295; all eight pre-registered targets met. The gain sits on tools also seen in development (`NEGATIVE_RESULTS.md` §82) | externally_benchmarked | `results/routing_bench_bfcl_v4_cext4_results.json` |
+| CLAIM-019 | Sealed BFCL v4 C-ext3 with declared semantic authority: native wrong-call ACCEPT **0/500 = 0.0%** (Wilson 95% upper 0.76% by row, 3.5% clustered over 106 tools), irrelevance 300/300, required-unknown 0/398. **Four of seven targets MISSED** and published as measured — read autonomy 25/94 = 26.6% against a 75% bar, obtainable VERIFY 46.7%, unobtainable ABSTAIN 63.3%, constructed wrong-tool 2/199 = 1.005% (`NEGATIVE_RESULTS.md` §39) | externally_benchmarked | `results/routing_bench_bfcl_v4_cext3_results.json` |
+| CLAIM-021 | Sealed BFCL v4 C-ext4 utility track: bundle v2 with deterministic receipts accepts **87/291 = 29.9%** of gold calls against **20/291 = 6.9%** for the frozen v1 bundle on the same episodes (19 tools against 2 when counted by tool, p = 1.1×10⁻⁴); native wrong-call ACCEPT 0/295 (Wilson 95% upper 1.29% by row, 5.42% clustered over 67 tools); all eight pre-registered targets met. The gain sits on tools also seen in development (`NEGATIVE_RESULTS.md` §82) | externally_benchmarked | `results/routing_bench_bfcl_v4_cext4_results.json` |
 
 ### Utility floors
 
