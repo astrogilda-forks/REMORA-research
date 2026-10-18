@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-17: **25 `open`**, **27 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-18: **26 `open`**, **27 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -138,6 +138,12 @@ cites only `open` sections and that no `open` section is missing a theme.
    CLAIM-002 score separates globally but not below 10 % false blocks. The
    harness's oracle arms never reached the engine. Measuring this needs a
    graded evidence channel and fresh paired data, not the spent artifacts.
+16. **Effect evidence attributes nothing to the dispatch** (§84):
+   `EFFECT_VERIFIED` says the declared delta was observed, not that this
+   dispatch produced it. Under every rule except `version_increment` a delta
+   that was already true, or that another writer made, verifies the same way.
+   Closing it needs a baseline or a target-side operation id in the contract,
+   which is a design decision.
 
 <!-- backlog-end -->
 
@@ -5034,3 +5040,50 @@ fact against the four arms.
   model outputs.
 - SAP v7 must pre-register clustered bounds, and score naive and external
   baselines on the same episodes.
+
+## §84 EFFECT_VERIFIED does not attribute the observed delta to the dispatch (2026-10-18)
+<!-- finding-status: open -->
+
+**Status:** a stated limit, found by reading the code against its design text
+and pinned by tests. No behaviour changed.
+
+`remora/governance/effect_verification.py` states its rule as comparing "the
+DECLARED DELTA against the version your own write produced", under the
+heading "did the approved thing happen?". `verify_declared_delta` takes the
+contract and the observed object, and nothing about the state before the
+dispatch or about who wrote. So under the `exact`, `hash`, `present` and
+`absent` rules, three cases return the same `EFFECT_VERIFIED` with the same
+reason code:
+
+- the dispatch made the change;
+- the change was already true before the dispatch, and the tool did nothing;
+- another writer made the change.
+
+Only `version_increment` compares against a baseline, so an unchanged version
+is `EFFECT_MISMATCH`. It still does not name the writer, so another writer's
+increment satisfies it.
+
+**What is and is not affected.** The verdict already carries
+`scope: declared_delta_only` and `vantage: same_deployment`, and the paper
+describes effect verification as a separate receipt, not as causation. No
+published claim rests on attribution. What overstates is the module's design
+text, and anyone who reads `EFFECT_VERIFIED` as "the approved action did it".
+An external review of PR #920 (2026-10-18, finding F-03) raised the same gap.
+It was then checked against the code here.
+
+**Related.** The `effect-evidence-v1` interop contract inherits the limit, and
+also has no field for the call binding, the observer or the captured
+decision. `docs/interop/FEDERATION.md` (invocation axes, #918) records that.
+The per-invocation export in `integrations/invocation-evidence/` keeps
+`effect_observed` at NOT_ESTABLISHED for the same reason.
+
+**Evidence.** `tests/test_effect_verification_attribution_limit.py`: the
+verifier has no input for prior state or writer; an already-true delta and
+one the dispatch made get the same verdict; `version_increment` refuses an
+unchanged version and accepts any advance.
+
+**What follows.** Leave the verdict as it is, and do not read attribution
+into it. A fix needs a contract decision first: a declared baseline per
+field, or a target-side operation id or revision that the dispatch returns
+and the reader confirms. Until then, causal attribution is NOT_ESTABLISHED
+for every effect REMORA verifies.
