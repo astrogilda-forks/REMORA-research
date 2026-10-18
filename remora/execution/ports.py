@@ -29,6 +29,7 @@ own with their own tests.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -292,6 +293,8 @@ class ReviewQueuePort(Protocol):
         observation: PolicyObservation,
         requested_action: DecisionAction,
         queue_ttl: timedelta | None = None,
+        *,
+        reasons: Iterable[str] | None = None,
     ) -> PendingReview: ...
 
     def expire_due(self, now: datetime | None = None) -> list[PendingReview]: ...

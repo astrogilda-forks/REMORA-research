@@ -441,7 +441,10 @@ def assess_proposal(
             # REM-032 lazy sweep: overdue PENDING items resolve to ABSTAIN
             # before new work is considered.
             q.expire_due()
-            item = q.enqueue(obs, report.action) if report.action in (
+            item = q.enqueue(
+                obs, report.action,
+                reasons=[r.value for r in report.reasons],
+            ) if report.action in (
                 DecisionAction.VERIFY, DecisionAction.ESCALATE
             ) else None
             if item is not None:

@@ -443,6 +443,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_remote_dispatch_boundary.py",
     "tests/test_resolved_effect_binding.py",
     "tests/test_review_fixes_gate_jti.py",
+    "tests/test_review_path_audit_r3.py",
     "tests/test_review_path_custody_split.py",
     "tests/test_runtime_trust_base_binding.py",
     "tests/test_signature_vectors.py",

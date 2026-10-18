@@ -226,6 +226,11 @@ def approve_item(
                 "approver_role": approval.approver_role,
                 "required_role": approval.required_role,
                 "approval_policy_hash": approval.approval_policy_hash,
+                # The reasons approved; an approved ESCALATE survives
+                # re-decision only within them.
+                "approved_reasons": (list(approval.approved_reasons)
+                                     if approval.approved_reasons is not None
+                                     else None),
                 # What the reviewer approved includes who may execute it.
                 **({"delegated_executor": delegate} if delegate else {}),
             }, key=key)

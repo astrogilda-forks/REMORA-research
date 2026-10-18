@@ -4,6 +4,17 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Approved escalations execute (RMR-AUD-002)
+
+- An approved ESCALATE re-decided on the observation the reviewer saw was
+  ESCALATE again, and the re-gate voided every fresh ESCALATE, so no approved
+  escalation could execute. The review queue now records each item's decision
+  reasons (`requested_reasons`), and the approval records them as
+  `approved_reasons` (also on the `approved` event). An approved ESCALATE
+  survives a fresh ACCEPT, VERIFY or ESCALATE whose reasons are all among the
+  approved ones. A new reason or a fresh ABSTAIN still voids it. Items
+  enqueued without reasons keep the earlier rule.
+
 ### Delegated execution and approval policy binding
 
 Follow-ups to the review-path binding below. The default stays fail-closed.

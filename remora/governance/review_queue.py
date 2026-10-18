@@ -51,10 +51,11 @@ above are storage-invariant.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from typing import Any
 
 from remora.execution.outcome import DispatchOutcome
 from remora.governance.degradation import ChainedEvent, ChainedEventLog
@@ -81,12 +82,32 @@ _SEVERITY: dict[DecisionAction, int] = {
 _EXECUTABLE = (DecisionAction.ACCEPT, DecisionAction.VERIFY)
 
 
-def _approval_survives(
-    fresh_action: DecisionAction, approved_action: DecisionAction
-) -> bool:
-    """Step 4c: an executable fresh action no stricter than the approval."""
+def _approval_survives(fresh: Any, approval: Approval) -> bool:
+    """Step 4c: whether ``fresh`` (a decision report) is within ``approval``.
+
+    An approved VERIFY covers an executable fresh action no stricter than
+    itself. An approved ESCALATE, when the reasons the reviewer saw were
+    recorded, covers a fresh ACCEPT, VERIFY or ESCALATE whose reasons are all
+    among them: the reviewer approved exactly that escalation, so re-deciding
+    the same observation must not void it (RMR-AUD-002), while a new reason is
+    something nobody approved. A fresh ABSTAIN never executes. Without recorded
+    reasons (an item enqueued by a caller that passed none) the earlier rule
+    holds and a fresh ESCALATE is void.
+    """
+    fresh_action = fresh.action
+    approved_action = approval.approved_action
+    if (approved_action is DecisionAction.ESCALATE
+            and approval.approved_reasons is not None):
+        return (fresh_action in (*_EXECUTABLE, DecisionAction.ESCALATE)
+                and set(_reason_values(fresh)) <= set(approval.approved_reasons))
     return (fresh_action in _EXECUTABLE
             and _SEVERITY[fresh_action] <= _SEVERITY[approved_action])
+
+
+def _reason_values(report: object) -> tuple[str, ...]:
+    """A decision's reasons as sorted, unique wire values."""
+    return tuple(sorted({str(getattr(r, "value", r))
+                         for r in getattr(report, "reasons", ()) or ()}))
 
 
 def _reviewed_tier(observation: PolicyObservation) -> str | None:
@@ -187,6 +208,10 @@ class Approval:
     approver_role: str | None = None
     required_role: str | None = None
     approval_policy_hash: str | None = None
+    #: The decision reasons the reviewer approved, sorted. Recorded when the
+    #: item was enqueued with its reasons; an approved ESCALATE then survives
+    #: re-decision only within them (step 4c). None when they were not given.
+    approved_reasons: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -198,6 +223,9 @@ class PendingReview:
     queue_deadline: datetime
     status: ItemStatus = ItemStatus.PENDING
     approval: Approval | None = None
+    #: The reasons behind ``requested_action``, sorted; None when the caller
+    #: enqueued without them.
+    requested_reasons: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -278,6 +306,8 @@ class ReviewQueue:
         observation: PolicyObservation,
         requested_action: DecisionAction,
         queue_ttl: timedelta | None = None,
+        *,
+        reasons: Iterable[str] | None = None,
     ) -> PendingReview:
         if requested_action not in (DecisionAction.VERIFY, DecisionAction.ESCALATE):
             raise ValueError(
@@ -291,6 +321,8 @@ class ReviewQueue:
             requested_action=requested_action,
             enqueued_at=now,
             queue_deadline=now + (queue_ttl or self._default_queue_ttl),
+            requested_reasons=(tuple(sorted({str(r) for r in reasons}))
+                               if reasons is not None else None),
         )
         self._items[item.item_id] = item
         self._log.append(
@@ -447,6 +479,7 @@ class ReviewQueue:
             approver_role=approver_role,
             required_role=required_role,
             approval_policy_hash=approval_policy_hash,
+            approved_reasons=item.requested_reasons,
         )
         item.status = ItemStatus.APPROVED
         item.approval = approval
@@ -604,6 +637,7 @@ class ReviewQueue:
             item.status = ItemStatus.PENDING
             item.approval = None
             item.requested_action = fresh.action
+            item.requested_reasons = _reason_values(fresh)
             item.observation = fresh_observation
             item.queue_deadline = now + self._default_queue_ttl
             self._log.append(
@@ -633,6 +667,7 @@ class ReviewQueue:
             item.status = ItemStatus.PENDING
             item.approval = None
             item.requested_action = fresh.action
+            item.requested_reasons = _reason_values(fresh)
             item.observation = fresh_observation
             item.queue_deadline = now + self._default_queue_ttl
             self._log.append(
@@ -656,7 +691,7 @@ class ReviewQueue:
                 "voided and item re-queued for review under the current rule",
             )
 
-        if _approval_survives(fresh.action, approval.approved_action):
+        if _approval_survives(fresh, approval):
             item.status = ItemStatus.AUTHORIZED
             self._log.append(
                 "authorized",
@@ -677,6 +712,7 @@ class ReviewQueue:
         item.status = ItemStatus.PENDING
         item.approval = None
         item.requested_action = fresh.action
+        item.requested_reasons = _reason_values(fresh)
         item.observation = fresh_observation
         item.queue_deadline = now + self._default_queue_ttl
         self._log.append(
@@ -684,6 +720,9 @@ class ReviewQueue:
             {
                 "item_id": item_id,
                 "approved_action": approval.approved_action.value,
+                "approved_reasons": (list(approval.approved_reasons)
+                                     if approval.approved_reasons is not None
+                                     else None),
                 "fresh_action": fresh.action.value,
                 "fresh_reasons": [r.value for r in fresh.reasons],
             },
@@ -756,7 +795,7 @@ class ReviewQueue:
                     "the approval was granted under",
                 )
             fresh = self._engine.decide(fresh_observation)
-            if _approval_survives(fresh.action, approval.approved_action):
+            if _approval_survives(fresh, approval):
                 return ExecutionOutcome(
                     ExecutionDecision.EXECUTE,
                     fresh.action,

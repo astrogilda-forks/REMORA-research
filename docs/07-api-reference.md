@@ -488,6 +488,14 @@ minted with the delegate as `actor_identity`. The
 delegation is checked at assess only: withdrawing the declaration later does
 not void an item already assessed, while revoking the approver still does.
 
+**Approved escalations:** an item records the decision reasons it was
+enqueued with, and its approval records them as `approved_reasons`. An
+approved ESCALATE survives the execution re-gate when the fresh decision is
+ACCEPT, VERIFY or ESCALATE and every fresh reason is among the approved ones.
+Re-deciding the observation the reviewer saw therefore no longer voids it
+(RMR-AUD-002). A new reason, or a fresh ABSTAIN, voids it as
+`approval_invalidated`. An approved VERIFY keeps the earlier rule.
+
 **Approval policy binding:** an approval records the approver's
 authenticated role and the role the item's tier required (`required_role`, null
 when the profile names none). It also records `approval_policy_hash`, a hash of
