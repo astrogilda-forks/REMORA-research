@@ -935,10 +935,22 @@ class RemoraDecisionEngine:
             components.append(conditional)
         components.extend(caps)
         binding = meet(components)
-        if executability(binding.action) >= executability(report.action):
-            return report
-        return self._build(binding.action, [*report.reasons, binding.reason], norm,
-                           credal=credal, raw_obs=obs)
+        if executability(binding.action) < executability(report.action):
+            report = self._build(binding.action, [*report.reasons, binding.reason], norm,
+                                 credal=credal, raw_obs=obs)
+        # Internal reports are candidates, not decisions. Emit only after
+        # composition and invariant enforcement have selected the final report.
+        governance_event(
+            "decision.made",
+            action=report.action.value,
+            reasons=[r.value for r in report.reasons],
+            source=report.source_of_decision,
+            risk_tier=norm.risk_tier,
+            action_type=norm.action_type,
+            target_environment=norm.target_environment,
+            human_review_required=report.human_review_required,
+        )
+        return report
 
     def _conditional_cap(
         self, obs: PolicyObservation, credal: CredalEnvelope, trap: float
@@ -1809,17 +1821,6 @@ class RemoraDecisionEngine:
                 return self._escalate_invariant_violation(
                     violations, obs, credal=credal, raw_obs=raw_obs
                 )
-        if not _invariant_recheck:
-            governance_event(
-                "decision.made",
-                action=report.action.value,
-                reasons=[r.value for r in report.reasons],
-                source=report.source_of_decision,
-                risk_tier=obs.risk_tier,
-                action_type=obs.action_type,
-                target_environment=obs.target_environment,
-                human_review_required=report.human_review_required,
-            )
         return report
 
     def _escalate_invariant_violation(

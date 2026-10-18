@@ -44,6 +44,39 @@ def test_the_escalation_replacement_does_not_double_log(
     assert len(made) == 1
 
 
+@pytest.mark.parametrize("path", ["monitor", "conditional", "explain"])
+def test_composition_logs_only_the_final_decision(
+    caplog: pytest.LogCaptureFixture, path: str,
+) -> None:
+    from remora.policy.composition import Cap
+    from remora.policy.report import DecisionAction, DecisionReason
+
+    engine = RemoraDecisionEngine()
+    obs = PolicyObservation(
+        question="read service metrics", risk_tier="low", action_type="read",
+        phase="ordered", trust_score=0.92,
+    )
+    caps = [Cap("monitor", DecisionAction.ESCALATE, DecisionReason.MONITOR_CAP)]
+    if path == "conditional":
+        obs = PolicyObservation(
+            question="update service", risk_tier="medium", action_type="write",
+            argument_tainted=True, environment_mismatch_detected=True,
+            rollback_available=True,
+        )
+        caps = []
+    with caplog.at_level(logging.INFO, logger="remora.governance"):
+        if path == "explain":
+            report = engine.explain(obs, caps=caps)
+            action = report.action
+        else:
+            report = engine.decide(obs, caps=caps)
+            action = report.action.value
+    events = [r for r in caplog.records if r.getMessage().startswith("decision.made")]
+    assert len(events) == 1
+    assert events[0].remora["action"] == action == "escalate"
+    assert events[0].remora["human_review_required"] is True
+
+
 @pytest.mark.parametrize(
     "field",
     ["api_key", "signing_key", "bearer_token", "password", "client_secret",

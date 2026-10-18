@@ -100,6 +100,8 @@ Several topics have more than one document. This table says which to open.
 | [security/pre-deployment-review.md](security/pre-deployment-review.md) | Pre-deployment security review |
 | [security/owasp_genai_mapping.md](security/owasp_genai_mapping.md) | OWASP GenAI mapping |
 | [security/non-transitivity-of-authority.md](security/non-transitivity-of-authority.md) | Non-Transitivity of Authority (NTA-1, NTA-2): principle, enforcement, conformance vectors, limits |
+| [design/derived-information-flow-control-v1.md](design/derived-information-flow-control-v1.md) | Derived information-flow control for untrusted agents (SDD v1.3, frozen): proposed, implementation in progress |
+| [design/derived-information-flow-control-v1-status.md](design/derived-information-flow-control-v1-status.md) | Work-package status for the flow-control SDD, in its release order |
 | [design/authority-preserving-capability-mediation-v1.md](design/authority-preserving-capability-mediation-v1.md) | Authority-Preserving Capability Mediation (NTA-2): proposed design, phase 1 implemented |
 | [design/evidence-sufficiency-v1.1.md](design/evidence-sufficiency-v1.1.md) | Evidence-sufficiency v1.1: closing the gaps found by external seeded-fault testing; decisions, requirements, rerun protocol |
 | [design/evidence-sufficiency-v1.3.md](design/evidence-sufficiency-v1.3.md) | Evidence-sufficiency v1.3: systematic mutation analysis, the rejection contract, metamorphic relations, the named-survivor gate and the blind external protocol |
@@ -175,6 +177,7 @@ Several topics have more than one document. This table says which to open.
 | [release_profiles_v1.yaml](assurance/release_profiles_v1.yaml) | Deployment maturity profiles |
 | [release_gates.md](assurance/release_gates.md) | Profile gate status |
 | [shipped_surfaces_v1.yaml](assurance/shipped_surfaces_v1.yaml) | Advertised surfaces bound to the CI jobs that guard them (issue #84) |
+| [skip_reason_allowlist_v1.yaml](assurance/skip_reason_allowlist_v1.yaml) | Every reason a test may skip with in the CI pytest job; a reason that matches no entry fails the job (`scripts/check_skip_reasons.py`) |
 | [product_truth_contract.yaml](product/product_truth_contract.yaml) | Capability classes (core/optional/experimental/legacy/demo) vs public copy |
 | [artifact_manifest_v1.md](assurance/artifact_manifest_v1.md) | Result artifact hashes |
 | [superseded_claims.md](assurance/superseded_claims.md) | Replaced claims and successors |
@@ -281,6 +284,7 @@ Design documents describe a proposal at the time it was written; whether it ship
 | [interop/REMORA-APS-PROFILE-v0.1.md](interop/REMORA-APS-PROFILE-v0.1.md) | APS interop profile v0.1: the term mapping for four conformance families, fixed before the run (open proposal) |
 | [interop/FEDERATION.md](interop/FEDERATION.md) | Federation interoperability: producer contract, foreign evidence as opaque reference, action lineage and attribution without transitive credit; entry point `artifacts/interop/index.json` |
 | [interop/INTEROP_MATRIX.md](interop/INTEROP_MATRIX.md) | Generated interop matrix: one row per Federation edge with status derived from run records (`scripts/build_interop_matrix.py`) |
+| [interop/E7_FIELD_CROSSWALK_CANDIDATE.md](interop/E7_FIELD_CROSSWALK_CANDIDATE.md) | Producer-side candidate mapping from the frozen `runtime-surface-e7-v0.1` fixture to Probity's reader; not bilateral confirmation |
 | [interop/CAPABILITY_DISCOVERY.md](interop/CAPABILITY_DISCOVERY.md) | Machine-readable workflow capabilities, fixture self-service procedures and runtime reproduction gaps |
 | [interop/FEDERATION_BRIDGE.md](interop/FEDERATION_BRIDGE.md) | Federation Bridge: loss-aware projection of REMORA's claims onto federation transports, and the federation-port/v0 adapter |
 | [interop/remora-boundaries-v1.yaml](interop/remora-boundaries-v1.yaml) | Canonical boundary types, role mappings, evidence freshness and claim ceilings |

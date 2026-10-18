@@ -488,6 +488,18 @@ binds, and its reason is appended. Library callers can pass `caps` to
 learned monitor or `protocol_cap` for a control protocol. A cap can only
 lower a decision ([ADR](architecture/ADR-flow-meet-composition.md)).
 
+**Flow contexts (RF-02, opt-in):** with `REMORA_FLOW_CONTROL=1`,
+`POST /v1/contexts` mints a flow context for derived information-flow
+control ([roadmap](13-research-frontier-roadmap.md)). The body
+names the `user_principal` (`user://<tenant>/...`), the `model_principal`,
+an optional `q_principal` and an optional `parent_context_id`. The response
+is the server-minted `context_id` and `label_epoch`. Every processor must be
+authorized by the processing policy in `REMORA_FLOW_PROCESSING_POLICY`;
+otherwise the mint is a 403 `processing_not_authorized`. The route needs
+`assess`. With the switch off it is a 409 `flow_control_disabled`. Labels
+are not yet raised by tool results, so a context does not change any
+decision in this release.
+
 **Capability sets (WS8 Q8.2, opt-in):** with
 `REMORA_CAPABILITY_POLICY_FILE` naming a YAML or JSON capability policy,
 the API resolves an `EffectiveCapabilitySet` for every call. It uses the

@@ -109,6 +109,8 @@ from servers.execution_contracts import (  # noqa: F401
     _AUTH_RESPONSES,
     ApproveRequest,
     AuditRef,
+    ContextMintRequest,
+    ContextMintResponse,
     DerivationProposal,
     DispatchLeasedRequest,
     EffectVerificationRequest,
@@ -971,6 +973,51 @@ def _loop_safety_monitor() -> LoopSafetyMonitor:
                 )
                 _LOOP_SAFETY = LoopSafetyMonitor(store)
     return _LOOP_SAFETY
+
+
+_FLOW_CONTEXTS: Any = None
+
+
+def _flow_control_enabled() -> bool:
+    """``REMORA_FLOW_CONTROL=1`` turns on derived flow control (SDD v1.3)."""
+    return _os.environ.get("REMORA_FLOW_CONTROL", "").strip() == "1"
+
+
+def _flow_contexts() -> Any:
+    """The flow context store, over the loop-safety store's durable backends.
+
+    Same three switches as ``_loop_safety_monitor``, for the same reason: a
+    switch the durability guard admits and this store ignored would keep a
+    deployment's labels per-process (AST-016). The processing policy comes
+    from ``REMORA_FLOW_PROCESSING_POLICY``, a JSON file
+    ``{tenant: {data_class: [principal patterns]}}``. Without it nothing is
+    authorized, so no context can be minted.
+    """
+    global _FLOW_CONTEXTS
+    if _FLOW_CONTEXTS is None:
+        with _LAZY_INIT_LOCK:
+            if _FLOW_CONTEXTS is None:
+                from remora.flow.context import (
+                    DurableFlowEventStore,
+                    FlowContextStore,
+                    InMemoryFlowEventStore,
+                    ProcessingPolicy,
+                )
+
+                dsn = _os.environ.get("REMORA_PG_DSN", "").strip()
+                db_path = _os.environ.get("REMORA_CHAIN_DB", "").strip()
+                endpoint = _os.environ.get("REMORA_STATE_ENDPOINT", "").strip()
+                store = (
+                    DurableFlowEventStore(dsn=dsn, db_path=db_path, state_endpoint=endpoint)
+                    if (dsn or db_path or endpoint) else InMemoryFlowEventStore()
+                )
+                policy_path = _os.environ.get("REMORA_FLOW_PROCESSING_POLICY", "").strip()
+                policy = ProcessingPolicy()
+                if policy_path:
+                    with open(policy_path, encoding="utf-8") as fh:
+                        policy = ProcessingPolicy.from_mapping(json.load(fh))
+                _FLOW_CONTEXTS = FlowContextStore(store, policy)
+    return _FLOW_CONTEXTS
 
 
 _EFFECT_RESOLVER: Any = None
@@ -2129,6 +2176,72 @@ def loop_safety_state(context_id: str, request: Request) -> dict[str, Any]:
         "tasks": list(state.tasks),
         "events_since_reset": state.events_since_reset,
     }
+
+
+contexts_router = APIRouter(
+    prefix="/v1/contexts",
+    tags=["flow"],
+    dependencies=[Depends(_enforce_execution_domain)],
+)
+
+
+@contexts_router.post("", response_model=ContextMintResponse, responses={
+    200: {"description": "A fresh context; pass its context_id on every later call."},
+    **_AUTH_RESPONSES,
+    403: {"model": ErrorDetail, "description": "The user principal belongs to another tenant, or a processor may not read this tenant's data (processing_not_authorized)."},
+    404: {"model": ErrorDetail, "description": "The parent context is unknown to this tenant and principal (flow_context_unknown)."},
+    409: {"model": ErrorDetail, "description": "Flow control is not enabled in this deployment (flow_control_disabled)."},
+    422: {"model": ErrorDetail, "description": "A principal is missing or not canonical."},
+    503: {"model": ErrorDetail, "description": "Flow store unavailable (flow_state_unavailable)."},
+})
+def mint_context(req: ContextMintRequest, request: Request) -> ContextMintResponse:
+    """Mint a flow context for the authenticated principal (SDD v1.3 §3.2, IFC-02).
+
+    The id is minted here, never chosen by the caller, and the context starts
+    at the bottom label (a child starts at its parent's label). Processors
+    must be authorized for the tenant's data. The mint is recorded on the
+    tenant chain. Requires the ``assess`` capability.
+    """
+    tenant, role, principal = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "assess")
+    if not _flow_control_enabled():
+        raise HTTPException(status_code=409, detail="flow_control_disabled")
+    from remora.capabilities.resource import ResourceRefused, canonical_resource
+    from remora.flow.context import (
+        FlowContextUnknown,
+        FlowStoreUnavailable,
+        ProcessingNotAuthorized,
+    )
+
+    try:
+        user = canonical_resource(req.user_principal)
+    except ResourceRefused as exc:
+        raise HTTPException(status_code=422, detail="user_principal is not canonical") from exc
+    if not user.startswith(f"user://{tenant.lower()}/"):
+        raise HTTPException(status_code=403, detail="principal_mismatch")
+    try:
+        state = _flow_contexts().mint(
+            tenant, principal, user_principal=user, model_principal=req.model_principal,
+            q_principal=req.q_principal, parent_context_id=req.parent_context_id)
+    except ProcessingNotAuthorized as exc:
+        raise HTTPException(status_code=403, detail="processing_not_authorized") from exc
+    except FlowContextUnknown as exc:
+        raise HTTPException(status_code=404, detail="flow_context_unknown") from exc
+    except FlowStoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail="flow_state_unavailable") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    _CHAIN.append(tenant, {
+        "event": "flow_context_minted",
+        "context_id": state.context_id,
+        "parent_context_id": state.parent_context_id,
+        "root_context_id": state.root_context_id,
+        "principal": principal,
+        "processors": sorted(state.processors),
+    })
+    return ContextMintResponse(context_id=state.context_id, label_epoch=state.epoch)
 
 
 @router.post("/loop-safety/reset", responses={

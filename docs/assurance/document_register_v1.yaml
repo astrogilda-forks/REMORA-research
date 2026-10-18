@@ -1,5 +1,5 @@
 schema_version: '1'
-updated: '2026-08-20'
+updated: '2026-10-18'
 documents:
 - id: DOC-001
   code_synced: verified
@@ -116,16 +116,6 @@ documents:
   path: paper/hf_dataset_card.md
   status: canonical
   topic: paper_hf_dataset_card_md
-  code_synced: verified
-  verdict: current
-  last_audited: '2026-07-26'
-  last_reviewed: '2026-07-26'
-  audience:
-  - researchers
-- id: DOC-022
-  path: paper/remora_paper_template.md
-  status: canonical
-  topic: paper_remora_paper_template_md
   code_synced: verified
   verdict: current
   last_audited: '2026-07-26'
@@ -2019,7 +2009,7 @@ documents:
   status: canonical
   topic: docs_assurance_fasttrack_register_v1_yaml
   code_synced: unreviewed
-  verdict: current
+  verdict: pending
   last_reviewed: '2026-08-05'
   audience:
   - maintainers
@@ -3057,7 +3047,102 @@ documents:
   last_reviewed: '2026-10-17'
   validates_against: []
   claims: []
+- id: DOC-391
+  path: docs/design/derived-information-flow-control-v1.md
+  status: canonical
+  topic: docs_design_derived-information-flow-control-v1_md
+  code_synced: verified
+  verdict: current
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - researchers
+  last_reviewed: '2026-10-17'
+  validates_against: []
+  claims: []
+- id: DOC-392
+  path: docs/design/derived-information-flow-control-v1-status.md
+  status: canonical
+  topic: docs_design_derived-information-flow-control-v1-status_md
+  code_synced: verified
+  verdict: current
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - researchers
+  last_reviewed: '2026-10-17'
+  validates_against: []
+  claims: []
 - id: DOC-393
+  path: docs/assurance/skip_reason_allowlist_v1.yaml
+  status: canonical
+  topic: docs_assurance_skip_reason_allowlist_v1_yaml
+  code_synced: unreviewed
+  verdict: pending
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  last_reviewed: '2026-10-18'
+  validates_against: []
+  claims: []
+- id: DOC-394
+  path: docs/interop/E7_FIELD_CROSSWALK_CANDIDATE.md
+  status: canonical
+  topic: docs_interop_E7_FIELD_CROSSWALK_CANDIDATE_md
+  code_synced: unreviewed
+  verdict: pending
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - researchers
+  last_reviewed: '2026-10-18'
+  validates_against: []
+  claims: []
+- id: DOC-395
+  path: docs/archive/omfattende_deep_report_legacy_2026-06-02.md
+  status: historical
+  topic: docs_archive_omfattende_deep_report_legacy_2026-06-02_md
+  code_synced: unreviewed
+  verdict: pending
+  audience:
+  - researchers
+  last_reviewed: '2026-10-18'
+  validates_against: []
+  claims: []
+- id: DOC-396
+  path: docs/archive/comprehensive_evaluation_report_legacy.md
+  status: historical
+  topic: docs_archive_comprehensive_evaluation_report_legacy_md
+  code_synced: unreviewed
+  verdict: pending
+  audience:
+  - researchers
+  last_reviewed: '2026-10-18'
+  validates_against: []
+  claims: []
+- id: DOC-397
+  path: docs/archive/comprehensive_deep_report_en_legacy_2026-06-02.md
+  status: historical
+  topic: docs_archive_comprehensive_deep_report_en_legacy_2026-06-02_md
+  code_synced: unreviewed
+  verdict: pending
+  audience:
+  - researchers
+  last_reviewed: '2026-10-18'
+  validates_against: []
+  claims: []
+- id: DOC-398
+  path: docs/archive/external_validation_extended_summary_legacy.md
+  status: historical
+  topic: docs_archive_external_validation_extended_summary_legacy_md
+  code_synced: unreviewed
+  verdict: pending
+  audience:
+  - researchers
+  last_reviewed: '2026-10-18'
+  validates_against: []
+  claims: []
+- id: DOC-399
   path: docs/architecture/ADR-flow-meet-composition.md
   status: canonical
   topic: docs_architecture_ADR-flow-meet-composition_md
@@ -3130,7 +3215,6 @@ topics:
 - CLAUDE_md
 - remora_README_md
 - paper_hf_dataset_card_md
-- paper_remora_paper_template_md
 - paper_figures_md
 - paper_future_state_md
 - paper_claim_ledger_md
@@ -3390,4 +3474,12 @@ topics:
 - docs_architecture_adr_sdd_as_v1_owner_decisions_md
 - docs_review_PEER_REVIEW_FINDINGS_md
 - docs_assurance_statistical_analysis_plan_v7_control_eval_md
+- docs_design_derived-information-flow-control-v1_md
+- docs_design_derived-information-flow-control-v1-status_md
+- docs_assurance_skip_reason_allowlist_v1_yaml
+- docs_interop_E7_FIELD_CROSSWALK_CANDIDATE_md
+- docs_archive_omfattende_deep_report_legacy_2026-06-02_md
+- docs_archive_comprehensive_evaluation_report_legacy_md
+- docs_archive_comprehensive_deep_report_en_legacy_2026-06-02_md
+- docs_archive_external_validation_extended_summary_legacy_md
 - docs_architecture_ADR-flow-meet-composition_md

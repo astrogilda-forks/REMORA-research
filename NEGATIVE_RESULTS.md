@@ -5085,4 +5085,3 @@ mapping from oracle verdict to observation is. A cap carries the signal
 through. The graded score that the worker computed does not support a
 useful threshold. Showing discrimination still needs fresh paired data
 (§80).
-
