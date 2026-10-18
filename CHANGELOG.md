@@ -4,6 +4,26 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-05a (recipients and the flow check)
+
+- `remora/flow/check.py`: `recipients` computes who receives a resolved
+  call's payload from the ToolSpec sink (email, principal, URL host, IBAN,
+  resource ACL, static), plus the provider of a tool outside the TCB. An
+  argument that cannot be mapped to one canonical principal (a display-name
+  address, a URL with user information or a non-http scheme) is unresolved,
+  and the check counts it as a confidentiality violation.
+- `flow_check` returns a `FlowVerdict` with the confidentiality, integrity
+  (including parameter role binding) and control violations of SDD §3.5,
+  and a digest over the violations and the payload label for the lease to
+  bind (§3.8).
+- The four invariant tests the SDD makes mandatory for IFC-05 pass at the
+  level of the check: a TRUSTED parameter handle satisfies
+  `integrity_required` after an untrusted read; the same value retyped does
+  not; a parameter in a field that does not accept its role is refused; and
+  the payload label includes the context label when only handles are passed.
+- Not yet wired: no decision reads the verdict. Rungs F1 to F6 in the
+  decision engine are IFC-05b (protected path).
+
 ### Flow control IFC-04a (result labelling and handles)
 
 - `remora/flow/labeler.py`: `FlowLabeler.label_result` gives every node of
