@@ -2014,10 +2014,9 @@ benchmark path. The authority-bound chain of \S\ref{sec:execution-chain}
 has unit, property and conformance tests, but no attack evaluation: replay,
 argument substitution after approval, ToolSpec swap, cross-task reuse of a
 grant, a forged lease without the key, and time-of-check/time-of-use races
-are not measured against a baseline gateway. The paper also lacks an
-explicit threat model that names the attacker's position, the trusted
-computing base (ToolSpec author, policy author, intent source, key custody)
-and the security goals. Per-call authorization does not stop an attack
+are not measured against a baseline gateway.
+Section~\ref{sec:threat-model} states the threat model; what is missing is
+an evaluation against it. Per-call authorization does not stop an attack
 composed of individually authorized calls, such as reading a secret and
 then sending it; REMORA does not claim trajectory-level or data-flow
 enforcement. Until that evaluation exists, contribution~1 is a design and
