@@ -124,7 +124,8 @@ roadmap section, a shelf or matrix row and a pre-registered target.
 Resolved against the arXiv export API (title, authors, latest version),
 Crossref, rfc-editor.org, docs.oasis-open.org, modelcontextprotocol.io and
 biscuitsec.org. All are `positioning_only` or `standard_or_regulation` in the
-matrix bibliography and cited in paper §2.11.
+matrix bibliography, on the research shelf as SHELF-042 to SHELF-059
+(`UNEVALUATED`), and cited in paper §2.11.
 
 | Work | Id / version read | Note |
 |---|---|---|
