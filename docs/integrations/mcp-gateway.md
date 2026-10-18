@@ -469,25 +469,52 @@ The queue REMORA refuses a re-execution from was read off D1 by a container
 whose disk was empty.
 
 **Effect verification.** The dispatcher returning cleanly says the request was
-accepted, not that the row is there. After a write executes, the Worker reads
-the fact back through its own binding and compares it against the delta the
-tool declared, then files the result on the proposal's trail as an attestation
-by a named verifier. REMORA records it as reported, mismatches included.
+accepted, not that the row is there. After a write executes, on the review
+path and the ACCEPT path alike, the Worker reads the fact back through its own
+binding and compares it against the arguments that were approved. The tool's
+result is used only to find the row it created. The row must also be created
+after the dispatch began and sit in the approved graph. Until RMR-AUD-004 the
+expected values came from the tool's own result, so a tool that wrote other
+values and reported them faithfully came out `EFFECT_VERIFIED`.
 
-Only the declared fields are compared: a field the delta does not name is out
+Only the approved fields are compared: a field the call does not name is out
 of scope by construction, because a concurrent legitimate write elsewhere in
 the row is not this action's problem.
 
-| Case | Reported |
+| Case | Read back as |
 | --- | --- |
-| write, read-back matches | `EFFECT_VERIFIED` / `delta_matches` |
-| write, a declared field differs | `EFFECT_MISMATCH`, naming every field |
-| write, fact not readable | `EFFECT_UNOBSERVABLE` — never mismatch |
+| write, row matches the approved call | `EFFECT_VERIFIED` / `delta_matches` |
+| write, an approved field differs | `EFFECT_MISMATCH`, naming every field |
+| write, row created before the dispatch | `EFFECT_MISMATCH` / `fact_predates_dispatch` |
+| write, fact not readable | `EFFECT_UNOBSERVABLE`, never mismatch |
 | reader itself broke | `EFFECT_VERIFIER_FAILED` |
 | a read | `EFFECT_UNSUPPORTED`, not a vacuous success |
 
 Not knowing and knowing it is wrong are different facts, and only one of them
 justifies compensating.
+
+The read-back is then filed on the proposal's trail as a receipt bound to the
+dispatch: the proposal id, `tool_call_hash`, `grant_jti` and `execution_id`
+come from REMORA's own assess and execute responses, and `verified_at` is
+when the Worker looked. The receipt goes out under a separate verifier
+credential, never the agent's token, because a receipt filed as the agent is
+the executor attesting to itself:
+
+```sh
+wrangler secret put REMORA_EFFECT_VERIFIER_TOKEN
+wrangler secret put REMORA_EFFECT_VERIFIER_IDENTITY
+```
+
+The identity has to be bound to that token's principal on the server through
+`REMORA_EFFECT_VERIFIER_BINDINGS`. The model is told `effect` only when REMORA
+recorded the receipt, and it is REMORA's adjudicated status. Otherwise it gets
+`effect_observation`, the Worker's own reading, with `effect_record` saying why
+nothing was recorded (no verifier configured, an incomplete binding, or
+REMORA's refusal and its reason). A mismatch the Worker saw is flagged either
+way. Before this change every receipt went to the review item id without its
+binding fields, REMORA refused it, the refusal was dropped in an empty
+`catch`, and the model was told `EFFECT_VERIFIED`. `/health` reports
+`effect_receipts`.
 
 The verifier is TypeScript and the writer is Python, so the canonical digest
 is implemented twice. A test pins the TypeScript output against hardcoded

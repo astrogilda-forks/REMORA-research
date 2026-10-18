@@ -544,3 +544,152 @@ describe("request reference id canonical form (shared vectors)", () => {
     });
   }
 });
+
+describe("an approval that lapsed is not an unknown dispatch (RMR-AUD-010)", () => {
+  async function poll(outcome: string) {
+    const { deps: d, rec } = deps(
+      { decision: "verify", review_item_id: "item-3" },
+      { executeBody: { outcome, detail: "x" } as Partial<ExecuteResult> });
+    await handleRpc(
+      call("gh_comment_issue", { repo: "o/r", number: 5, body: "x",
+                                 intent_ref: "o/r#5" }), d);
+    const first: any = await handleRpc(
+      call("remora_proposal_status", { proposal_id: "proposal-1" }, 2), d);
+    const again: any = await handleRpc(
+      call("remora_proposal_status", { proposal_id: "proposal-1" }, 3), d);
+    return { first, again, rec };
+  }
+
+  for (const outcome of ["approval_invalidated", "approval_expired"]) {
+    it(`${outcome} keeps the proposal and asks for a new approval`, async () => {
+      // REMORA put the item back in the queue. Calling this "unknown" told
+      // the model the call may have run, and deleting the proposal left the
+      // re-approved item with no way to be redeemed.
+      const { first, again, rec } = await poll(outcome);
+      expect(payload(first).status).toBe("pending_approval");
+      expect(payload(first).outcome).toBe(outcome);
+      expect(payload(first).explanation).toMatch(/nothing (has been|was) executed/i);
+      expect(payload(first).explanation).toMatch(/approve/i);
+      expect(first.result.isError).toBe(false);
+      expect(payload(again).status).not.toBe("unknown_proposal");
+      expect(rec.execute).toHaveLength(2);
+    });
+  }
+
+  it("binding_refused is a refusal, not an unknown", async () => {
+    const { first } = await poll("binding_refused");
+    expect(payload(first).status).toBe("refused");
+    expect(payload(first).explanation).toMatch(/did not happen/i);
+  });
+});
+
+describe("effect read-back (RMR-AUD-004)", () => {
+  const HASH = "d".repeat(64);
+  const KG_ARGS = { graph: "kg://acme", subject: "acme", predicate: "p",
+                    object: "active", source: "s", intent_ref: "task:t" };
+
+  function kgDeps(executeBody: Record<string, unknown>, report: unknown) {
+    const { deps: d, rec } = deps(
+      { decision: "verify", review_item_id: "item-5", proposal_id: "prop-5",
+        tool_call_hash: HASH },
+      { executeBody: executeBody as Partial<ExecuteResult> });
+    const seen: unknown[][] = [];
+    d.verifyEffect = async (...a: unknown[]) => {
+      seen.push(a);
+      return report as any;
+    };
+    return { d, rec, seen };
+  }
+
+  const EXECUTED = {
+    outcome: "execute",
+    proposal_id: "prop-5",
+    execution_grant: { jti: "jti-5" },
+    tool_execution: { executed: true, dispatch_began: true, state_unknown: false,
+                      proposal_id: "prop-5", execution_id: "exec-5",
+                      result: { id: "fact-1", object_json: '"inactive"' } },
+  };
+
+  async function redeem(d: Deps) {
+    await handleRpc(call("kg_assert_fact", KG_ARGS), d);
+    return handleRpc(
+      call("remora_proposal_status", { proposal_id: "proposal-1" }, 2), d);
+  }
+
+  it("verifies against the approved arguments and REMORA's own binding", async () => {
+    const { d, seen } = kgDeps(EXECUTED, {
+      observation: { status: "EFFECT_VERIFIED", reason_code: "delta_matches",
+                     expected_sha256: "", observed_sha256: "", detail: "" },
+      record: { recorded: true, http_status: 200, status: "EFFECT_VERIFIED" },
+    });
+    await redeem(d);
+    expect(seen).toHaveLength(1);
+    const [tool, approvedArgs, toolResult, binding] = seen[0];
+    expect(tool).toBe("kg_assert_fact");
+    // The approved call, without intent_ref, not the tool's result.
+    expect(approvedArgs).toEqual({ graph: "kg://acme", subject: "acme",
+      predicate: "p", object: "active", source: "s" });
+    expect(toolResult).toEqual({ id: "fact-1", object_json: '"inactive"' });
+    expect(binding).toEqual({ proposal_id: "prop-5", tool_call_hash: HASH,
+      grant_jti: "jti-5", execution_id: "exec-5", execution_context_hash: "" });
+  });
+
+  it("reports REMORA's recorded verdict as the effect", async () => {
+    const { d } = kgDeps(EXECUTED, {
+      observation: { status: "EFFECT_VERIFIED", reason_code: "delta_matches",
+                     expected_sha256: "", observed_sha256: "", detail: "" },
+      record: { recorded: true, http_status: 200, status: "EFFECT_VERIFIED" },
+    });
+    const p = payload(await redeem(d));
+    expect(p.effect).toBe("EFFECT_VERIFIED");
+    expect(p.effect_record.recorded).toBe(true);
+  });
+
+  it("does not present an unrecorded read-back as a verdict", async () => {
+    // The old gateway returned EFFECT_VERIFIED here while REMORA refused
+    // every receipt it sent.
+    const { d } = kgDeps(EXECUTED, {
+      observation: { status: "EFFECT_VERIFIED", reason_code: "delta_matches",
+                     expected_sha256: "", observed_sha256: "", detail: "" },
+      record: { recorded: false, http_status: 409,
+                reason: "effect receipt refused (verifier_not_bound): x" },
+    });
+    const r: any = await redeem(d);
+    const p = payload(r);
+    expect(p.effect).toBeUndefined();
+    expect(p.effect_observation.status).toBe("EFFECT_VERIFIED");
+    expect(p.effect_record).toMatchObject({ recorded: false, http_status: 409 });
+    expect(p.explanation).toMatch(/not recorded/i);
+  });
+
+  it("flags a mismatch the gateway saw even when it was not recorded", async () => {
+    const { d } = kgDeps(EXECUTED, {
+      observation: { status: "EFFECT_MISMATCH", reason_code: "delta_differs",
+                     expected_sha256: "", observed_sha256: "", detail: "object" },
+      record: { recorded: false, reason: "verifier_not_configured" },
+    });
+    const r: any = await redeem(d);
+    expect(r.result.isError).toBe(true);
+    expect(payload(r).explanation).toMatch(/does not match what was approved/i);
+  });
+
+  it("checks the effect on the ACCEPT path too", async () => {
+    const { deps: d } = deps({
+      decision: "accept", proposal_id: "prop-6", tool_call_hash: HASH,
+      execution_token: { jti: "jti-6" },
+    });
+    const seen: unknown[][] = [];
+    d.verifyEffect = async (...a: unknown[]) => {
+      seen.push(a);
+      return { observation: { status: "EFFECT_VERIFIED", reason_code: "delta_matches",
+                              expected_sha256: "", observed_sha256: "", detail: "" },
+               record: { recorded: true, http_status: 200,
+                         status: "EFFECT_VERIFIED" } } as any;
+    };
+    const p = payload(await handleRpc(call("kg_assert_fact", KG_ARGS), d));
+    expect(seen).toHaveLength(1);
+    expect((seen[0][3] as any).grant_jti).toBe("jti-6");
+    expect((seen[0][3] as any).proposal_id).toBe("prop-6");
+    expect(p.effect).toBe("EFFECT_VERIFIED");
+  });
+});

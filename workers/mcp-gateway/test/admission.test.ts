@@ -93,7 +93,8 @@ describe("verifyAccessJwt", () => {
     const { privateKey, config } = await fixture();
     const token = await sign(privateKey, { alg: "RS256", kid: "k1" }, goodClaims);
     const result = await verifyAccessJwt(token, config);
-    expect(result).toEqual({ ok: true, subject: "service-token-client-id" });
+    expect(result).toEqual({ ok: true, subject: "service-token-client-id",
+                             claims: goodClaims });
   });
 
   it("refuses a token for another Access application", async () => {
