@@ -632,7 +632,6 @@ overlay for agent actions**; the full history is in git.
 
 ---
 
-*Document scope: this document describes the current governance architecture. It
-is the canonical architecture reference for this repository.*
+*Document scope: this document describes the current governance architecture.*
 
 *Author: Stian Skogbrott, https://github.com/darklordVirtual/REMORA*
