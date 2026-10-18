@@ -50,6 +50,11 @@ _POLICY_SOURCE_FILES: tuple[str, ...] = (
     "remora/policy/observation.py",
     "remora/policy/trap_classifier.py",
     "remora/policy/report.py",
+    # Derived flow control (IFC-03): the label lattice and the ToolSpec flow
+    # rules decide which signed bundles load and, from IFC-05, which flows a
+    # decision admits.
+    "remora/flow/label.py",
+    "remora/flow/spec.py",
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
