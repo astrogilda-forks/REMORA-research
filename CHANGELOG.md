@@ -86,6 +86,29 @@ This file lists externally relevant changes by release. Fine-grained development
   model-generated wrong calls and no constructed producers (PRF-010, PRF-011,
   PRF-013). Nothing has been run; the plan stays a draft until the owner
   approves and seals it.
+
+### Routing: semantic bundle v3 keeps qualifiers (RMR-AUD-009)
+
+- Bundle v2's intent extractor grounded a mutation in a conditional or a
+  question: "Inspect booking B-104 before cancel.", "Tell me if I can cancel
+  booking B-104." and "Review the policy before we cancel booking B-104." each
+  supported `cancel_booking`. v2 checks negation only and passes goal
+  matching the bare keyword, so `goal_match`'s conditional check never sees
+  the qualifier.
+- `remora/toolcall/routing/bfcl_semantic_bundle_v3.py` changes intent
+  extraction only. A mutation keyword with a conditional word in the four
+  words before it, or framed as a question ("tell me if", "can I", "is it
+  possible to"), grounds nothing. Action spans quote up to three preceding
+  words of the clause. Contract authoring is v2's, re-exported.
+- v2, `goal_match.py` and `bfcl_arms.py` are unchanged: the C-ext4 manifest
+  pins their hashes. v3 is wired into no runner and supports no claim.
+- `scripts/bfcl_v3_extractor_dev_compare.py` routes the three spent
+  development sets under V2D with each extractor
+  (`artifacts/posthoc/bfcl_v3_extractor_dev_compare.json`, development only).
+  v3 accepts the same gold calls as v2 on all three sets and no wrong call.
+  Four routes change, all on one task where v2 read "if I set the capture
+  percentage" as an update request and refuted the correct read tool; v3
+  sends them to VERIFY instead.
 ### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §86)
 
 - Both Workers parsed request bodies with `JSON.parse`, which keeps the last
