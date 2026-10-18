@@ -142,6 +142,22 @@
             "title": "Envelope",
             "type": "object"
           },
+          "label_cap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Cap"
+          },
+          "label_source": {
+            "default": "none",
+            "title": "Label Source",
+            "type": "string"
+          },
           "oracle_calls": {
             "title": "Oracle Calls",
             "type": "integer"

@@ -19,7 +19,11 @@ Real-world wiring
     from autogen import ConversableAgent, register_function
     from remora.adapters.action_gate import AutoGenActionAdapter
 
-    adapter = AutoGenActionAdapter(gateway=DirectPolicyGateway())
+    # The registry, not the agent, says what each function is.
+    adapter = AutoGenActionAdapter(
+        gateway=DirectPolicyGateway(),
+        registry={"run_bash": {"risk_tier": "critical", "action_type": "execute"}},
+    )
 
     def governed_run_bash(command: str) -> str:
         result = adapter.intercept_function_call(
@@ -127,7 +131,8 @@ class GovernedFunction:
 
     def __post_init__(self):
         self._adapter = AutoGenActionAdapter(
-            gateway=DirectPolicyGateway(risk_tier=self.risk_tier)
+            gateway=DirectPolicyGateway(risk_tier=self.risk_tier),
+            registry=DEPLOYMENT_REGISTRY,
         )
 
     def call(self, **kwargs) -> str:
@@ -162,6 +167,14 @@ SCENARIOS: list[dict[str, Any]] = [
     dict(func_name="deploy_to_prod",   agent_name="DeployAgent",    domain="infrastructure",
          risk_tier="critical", action_type="deploy",           kwargs={"service": "payment-api", "version": "2.1.0"}),
 ]
+
+#: Owned by the deployment, not the agents: the adapter takes risk tier and
+#: action type from here. Labels an agent attaches to a call cannot reach
+#: ACCEPT on their own (RMR-AUD-011).
+DEPLOYMENT_REGISTRY = {
+    s["func_name"]: {"risk_tier": s["risk_tier"], "action_type": s["action_type"]}
+    for s in SCENARIOS
+}
 
 _EXPECTED: dict[str, set] = {
     "low":      {"accept"},

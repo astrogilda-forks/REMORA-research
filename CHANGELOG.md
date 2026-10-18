@@ -95,6 +95,32 @@ evaluation (PR #932, `scripts/execution_chain_attack_eval.py`).
   approval surviving a relabel, now get a refusal. ACCEPT-token and lease
   semantics are unchanged.
 
+### Breaking: `/v1/assess` and the adapters need registry labels to reach ACCEPT (RMR-AUD-011)
+
+- Before this change, with a confident oracle ensemble, `POST /v1/assess`
+  for `xfer` labelled `risk_tier=low`, `action_type=read` returned ACCEPT,
+  and so did an action-gate adapter given the same labels
+  (`should_execute=True`). Both now return VERIFY.
+- `/v1/assess` with a `tool_call` takes the labels from the server's
+  registry (`resolve_tool_metadata`, as `/v1/execution/*` does). The
+  request's `risk_tier` may only raise the tier, an `action_type` that
+  differs caps ACCEPT (`registry_label_conflict`), and an unclassified tool
+  is critical/unknown.
+- `/v1/assess` without a `tool_call`: the labels are the caller's, and an
+  engine ACCEPT becomes VERIFY with `caller_labels_untrusted`, in the
+  response and in the stored envelope. Clients that relied on ACCEPT from
+  `/v1/assess` must send a `tool_call` for a tool the server classifies.
+- The response and the audit record gain `label_source`; the response
+  also gains `label_cap`. `/v1/rerun` keeps ACCEPT only for a record whose
+  labels came from the registry.
+- `remora/adapters/`: every action-gate adapter takes `registry=`.
+  Without it an ACCEPT becomes VERIFY, and `ActionGateResult` gains
+  `label_source`/`label_cap`. `HttpGateway` sends the `tool_call`, and
+  `GatewayResult` gains `label_source`/`label_cap`. The four framework
+  examples declare a deployment registry. Their outcomes are unchanged.
+- No committed benchmark or published result runs through `/v1/assess`
+  or the adapters, so no published number changes.
+
 ### Breaking: library labels need a registry to reach ACCEPT (PRF-040)
 
 - `assess_tool_call` and `what_if_tool_call` take `registry=`, a mapping
