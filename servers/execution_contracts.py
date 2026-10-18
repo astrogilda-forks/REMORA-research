@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from remora.governance.effect_verification import EffectStatus
 
@@ -571,3 +571,32 @@ class EffectVerificationRequest(BaseModel):
         description="Lowercase hex SHA-256, or empty.")
     verified_at: str = Field("", max_length=64)
     detail: str = Field("", max_length=2000)
+
+
+class ReceiptSignatureModel(BaseModel):
+    """A detached Ed25519 signature under ``REMORA/EFFECT-RECEIPT/v1``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    algorithm: str = Field(..., max_length=32)
+    domain: str = Field(..., max_length=64)
+    kid: str = Field(..., max_length=100)
+    signature: str = Field(..., max_length=200)
+
+
+class SignedEffectReceiptRequest(BaseModel):
+    """A signed observation from a verifier domain (CAPR-06 to CAPR-08).
+
+    Unlike :class:`EffectVerificationRequest` this carries no verdict to
+    record. ``receipt`` holds what the verifier read, signed by a key the
+    deployment registered; ``arguments`` are the approved call's arguments,
+    accepted only when they hash to the dispatched call. REMORA instantiates
+    the contract from the signed ToolSpec and computes the verdict itself.
+    See ``docs/design/compositional-authority-preservation-v1.md`` §4.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    receipt: dict[str, Any]
+    signature: ReceiptSignatureModel
+    arguments: dict[str, Any]

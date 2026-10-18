@@ -257,7 +257,11 @@ def test_an_unknown_dispatch_can_still_be_verified_later():
     from remora.governance.effect_verification import EffectStatus
 
     now = datetime.now(UTC)
-    events = [{
+    events = [{"event": "assessed", "payload": {"decision": "accept"}},
+              {"event": "execution_authorized", "payload": {
+                  "grant_jti": "jti-1", "tool_call_hash": "c" * 64,
+                  "pep_allowed": True}},
+              {
         "event": "execution_result",
         "timestamp": (now - timedelta(seconds=10)).isoformat(),
         "payload": {"event": "execution_result", "proposal_id": "prop-1",

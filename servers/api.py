@@ -517,6 +517,9 @@ _LATENCY_BUCKETS_MS = [100.0, 250.0, 500.0, 1000.0, 2000.0]
 # _ALL_CAPABILITIES coverage test in tests/test_rbac_isolation.py.
 _ALL_CAPABILITIES: frozenset[str] = frozenset({
     "assess", "evidence", "execute", "follow_up", "read", "rerun", "review",
+    # RMR-AUD-004: recording an observed effect is separate from executing,
+    # so the agent that ran a call does not attest to its effect.
+    "verify_effect",
 })
 
 _BUILTIN_ROLE_PERMISSIONS: dict[str, set[str]] = {
@@ -528,6 +531,7 @@ _BUILTIN_ROLE_PERMISSIONS: dict[str, set[str]] = {
     "soc_analyst": {"review", "read"},
     "legal_counsel": {"review", "read"},
     "viewer": {"read"},
+    "effect_verifier": {"verify_effect", "read"},
 }
 
 

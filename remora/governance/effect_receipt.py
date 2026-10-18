@@ -96,6 +96,7 @@ _REASON_STATUS: Mapping[str, EffectStatus] = {
     "postcondition_field_mismatch": EffectStatus.MISMATCH,
     "postcondition_version_not_advanced": EffectStatus.MISMATCH,
     "postcondition_object_absent": EffectStatus.UNOBSERVABLE,
+    "postcondition_target_mismatch": EffectStatus.UNOBSERVABLE,
     "empty_postcondition": EffectStatus.UNSUPPORTED,
 }
 
@@ -134,6 +135,10 @@ class DispatchLineage:
     attempted_at: str
     execution_context_hash: str = ""
     execution_id: str = ""
+    #: The principals that proposed or executed the call. Where separation is
+    #: required an effect verifier must be none of them (RMR-AUD-004): the
+    #: agent that ran a call does not independently observe its effect.
+    executors: frozenset[str] = frozenset()
 
     @property
     def effect_possible(self) -> bool:
@@ -158,12 +163,95 @@ def _parse(ts: str) -> datetime | None:
     return parsed if parsed.tzinfo is not None else None
 
 
-def resolve_lineage(events: Sequence[Mapping[str, Any]]) -> DispatchLineage:
+def _payload(event: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if event is None:
+        return {}
+    return event.get("payload") or event
+
+
+def _assessment(events: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    for event in events:
+        if event.get("event") == "assessed":
+            return event
+    return None
+
+
+#: Decisions that may lead to a dispatch, and whether a human approval must
+#: stand between the assessment and the dispatch.
+_DISPATCHABLE = {"accept": False, "verify": True, "escalate": True}
+
+
+def _authorization_of(events: Sequence[Mapping[str, Any]],
+                      result: Mapping[str, Any]) -> Mapping[str, Any]:
+    """The decision path that allowed this dispatch, or a refusal (RMR-AUD-004).
+
+    An ``execution_result`` says a tool ran. It does not say the policy let it.
+    Before this check a result in a trail that also held an ABSTAIN or a
+    rejection carried an effect to EFFECT_VERIFIED. The chain must now show the
+    whole path: an assessment that could dispatch, no rejection, an approval
+    where the decision needed one, and an allowed authorization for exactly
+    this grant and call.
+    """
+    decision = str(_payload(_assessment(events)).get("decision") or "").lower()
+    if decision in ("abstain", "deny", "reject", "rejected"):
+        raise ReceiptRefused(
+            "dispatched_after_deny",
+            f"the proposal was assessed {decision}: no dispatch was allowed, so "
+            "no effect can be attested to")
+    if decision not in _DISPATCHABLE:
+        raise ReceiptRefused(
+            "assessment_decision_unknown",
+            "the audit trail has no assessment decision that allows a dispatch")
+    if any(e.get("event") == "rejected" for e in events):
+        raise ReceiptRefused(
+            "dispatched_after_deny",
+            "a reviewer rejected this proposal: no dispatch was allowed")
+    jti = str(result.get("grant_jti", ""))
+    call_hash = str(result.get("tool_call_hash", ""))
+    approved_live = False
+    for event in events:
+        ev_name = event.get("event")
+        if ev_name == "approved":
+            approved_live = True
+        elif ev_name in ("execution_approval_expired", "execution_approval_invalidated"):
+            approved_live = False
+        if ev_name != "execution_authorized":
+            continue
+        auth = _payload(event)
+        # ``is True``: the string "true" is not an allowed PEP check.
+        if (auth.get("pep_allowed") is True and jti
+                and str(auth.get("grant_jti", "")) == jti
+                and str(auth.get("tool_call_hash", "")) == call_hash):
+            if _DISPATCHABLE[decision] and not approved_live:
+                raise ReceiptRefused(
+                    "dispatched_without_approval",
+                    f"a {decision} decision needs an unvoided approval before "
+                    "dispatch, and the audit trail has none")
+            return auth
+    if _DISPATCHABLE[decision] and not approved_live:
+        raise ReceiptRefused(
+            "dispatched_without_approval",
+            f"a {decision} decision needs an approval before dispatch, and the "
+            "audit trail has none")
+    raise ReceiptRefused(
+        "dispatch_not_authorized",
+        "no allowed execution_authorized record names this dispatch's grant "
+        "and call")
+
+
+def resolve_lineage(events: Sequence[Mapping[str, Any]], *,
+                    require_decision_path: bool = True) -> DispatchLineage:
     """The dispatch this proposal actually attempted, or a refusal.
 
     Reads the audit chain rather than trusting the caller. An assessed
     proposal with no dispatch event has no lineage, which is the case that
     produced the original false VERIFIED.
+
+    ``require_decision_path`` (default on) also requires the chain to show the
+    policy allowed the dispatch (see ``_authorization_of``). Only a runtime
+    whose chain has no decision records turns it off: the surface runtime
+    gates its dispatch in process on a one-use assessment handle and a lease,
+    and records a refused dispatch as not executed.
     """
     result = None
     for event in events:
@@ -179,6 +267,8 @@ def resolve_lineage(events: Sequence[Mapping[str, Any]]) -> DispatchLineage:
     # chain's own timestamp beside it. Both are read from the chain; nothing
     # here comes from the receipt.
     payload = result.get("payload") or result
+    authorized = (_authorization_of(events, payload) if require_decision_path
+                  else {})
     # A string such as "false" is truthy in Python. Audit metadata must not
     # become positive execution evidence through a bool() coercion. Absent
     # fields default to False; an unknown can only be established explicitly.
@@ -203,6 +293,12 @@ def resolve_lineage(events: Sequence[Mapping[str, Any]]) -> DispatchLineage:
         attempted_at=str(result.get("timestamp") or ""),
         execution_context_hash=str(payload.get("execution_context_hash", "")),
         execution_id=str(payload.get("execution_id", "")),
+        executors=frozenset(
+            str(who) for who in (
+                _payload(_assessment(events)).get("actor"),
+                authorized.get("actor"), authorized.get("executed_by"),
+                payload.get("actor"), payload.get("executed_by"))
+            if who),
     )
     if not lineage.effect_possible:
         raise ReceiptRefused(
@@ -288,6 +384,7 @@ def verify_receipt(
     trusted_verifiers: Sequence[str],
     already_recorded: Sequence[Mapping[str, Any]] = (),
     reason_code: str = "",
+    require_decision_path: bool = True,
 ) -> tuple[DispatchLineage, EffectStatus]:
     """Bind a receipt to its dispatch and adjudicate the claimed status.
 
@@ -299,7 +396,7 @@ def verify_receipt(
     has already bound the identity to an authenticated principal passes that
     one identity.
     """
-    lineage = resolve_lineage(events)
+    lineage = resolve_lineage(events, require_decision_path=require_decision_path)
 
     owner = _REASON_STATUS.get(reason_code)
     if owner is not None and owner is not claimed_status:

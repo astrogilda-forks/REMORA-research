@@ -348,6 +348,25 @@ def verify_declared_delta(
             "is unknown, not failed",
         )
 
+    # RMR-AUD-004: the selector names the object this action changed, and was
+    # never read. A reader that returned another object with the expected
+    # values verified. An observed selector field that differs means the
+    # evidence is about a different object: the target was not observed, so
+    # the status is UNOBSERVABLE, not MISMATCH, and nothing is compensated.
+    # A selector field the reader does not return cannot be compared; the
+    # binding is only as strong as the reader's projection. A selector field
+    # that is also a declared expected field is left to the field comparison
+    # below, which reports it as a MISMATCH as it always has.
+    for name, selected in contract.target_selector.items():
+        if name in contract.expected_fields:
+            continue
+        if name in observed and not frozen_json.strict_equal(selected, observed[name]):
+            return _build(
+                EffectStatus.UNOBSERVABLE, "postcondition_target_mismatch",
+                f"the observed object has {name}={observed[name]!r}, not the "
+                f"declared target {selected!r}; the target was not observed",
+            )
+
     problems: list[str] = []
     for name, expected_value in contract.expected_fields.items():
         rule = contract.comparison_rules.get(name, "exact")

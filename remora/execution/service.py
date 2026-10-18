@@ -822,8 +822,16 @@ def execute_approved_item(
                 # and its audit event now commits with it. Appended after the
                 # commit, a crash in between left an item refused with no
                 # record of the refusal.
+                #
+                # One key per attempt (RMR-AUD-005). A binding refusal leaves
+                # the approval standing and an expiry returns the item to the
+                # queue, so the same item can be refused again; a key naming
+                # only the item dropped every refusal after the first. The
+                # append commits with this transaction, so a crash re-runs the
+                # attempt rather than replaying this key.
                 refusal_key = encode_key(
-                    tenant, f"execution_{outcome.decision.value}", item_id)
+                    tenant, f"execution_{outcome.decision.value}", item_id,
+                    uuid4().hex)
                 refusal_entry = append(tenant, {
                     "event": f"execution_{outcome.decision.value}",
                     "proposal_id": proposal_id,

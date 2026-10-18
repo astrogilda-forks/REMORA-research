@@ -85,6 +85,9 @@ class SignatureDomain(str, Enum):
     #: attempt or effect observation), with how it was selected.
     FEDERATION_RESULT = "REMORA/FEDERATION-RESULT/v1"
     OPERATOR_STATEMENT = "REMORA/OPERATOR-STATEMENT/v1"
+    #: An effect receipt from a verifier domain (CAPR-06): what a read-only
+    #: observer saw after a dispatch. REMORA computes the verdict from it.
+    EFFECT_RECEIPT = "REMORA/EFFECT-RECEIPT/v1"
 
 
 class SigningUnavailable(RemoraError, RuntimeError):

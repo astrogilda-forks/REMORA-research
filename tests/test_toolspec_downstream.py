@@ -67,7 +67,7 @@ def test_a_malformed_declaration_refuses_the_bundle(declaration):
     assert exc.value.reason_code == "toolspec_downstream_declaration_invalid"
 
 
-@pytest.mark.parametrize("version", [0, 5, "3", None])  # 3: CR-005, 4: IFC-03 flow
+@pytest.mark.parametrize("version", [0, 6, "3", None])  # 3: CR-005, 4: IFC-03 flow, 5: CAPR-07
 def test_an_unknown_schema_version_is_refused(version):
     with pytest.raises(ToolSpecRefused) as exc:
         _load([_spec()], version)

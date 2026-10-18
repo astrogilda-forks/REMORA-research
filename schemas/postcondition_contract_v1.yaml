@@ -87,6 +87,8 @@ reason_codes:
     meaning: a declared field holds a different value than approved
   - code: postcondition_object_absent
     meaning: the target object does not exist after execution
+  - code: postcondition_target_mismatch
+    meaning: the reader returned an object whose target_selector field differs, so the declared target was not observed
   - code: postcondition_version_not_advanced
     meaning: the object exists but its version did not advance as declared
   - code: postcondition_read_timeout
