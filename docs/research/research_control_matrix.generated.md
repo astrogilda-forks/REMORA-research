@@ -6,7 +6,7 @@
 
 The machine-checked chain from research source to tested code, one row per research line. Every code and test path below is verified to exist on disk by CI; the literature narrative lives in [docs/09-related-work.md](../09-related-work.md).
 
-Source of truth: `docs/research/research_control_matrix_v1.yaml` (schema 1, updated 2026-10-17).
+Source of truth: `docs/research/research_control_matrix_v1.yaml` (schema 1, updated 2026-10-18).
 
 ## Summary
 
@@ -660,8 +660,8 @@ Every reference in [`paper/remora_paper.md`](../../paper/remora_paper.md) with t
 | Implemented research line | 8 | present in the codebase |
 | Grounds a module (no dedicated line) | 11 | present in the codebase |
 | Evaluation source | 6 | present in the codebase |
-| Standard, regulation or tool | 4 | no code claim |
-| Related-work positioning only | 44 | no code claim |
+| Standard, regulation or tool | 10 | no code claim |
+| Related-work positioning only | 56 | no code claim |
 
 ### Implemented research line (8)
 
@@ -709,18 +709,24 @@ A dataset or benchmark REMORA is evaluated **on**. Not a method REMORA implement
 | `patil-2025-bfcl` | none | none | [`scripts/build_bfcl_v4_cext4.py`](../../scripts/build_bfcl_v4_cext4.py) | Berkeley Function Calling Leaderboard; the BFCL v4 rows behind the sealed routing tracks (CLAIM-018, CLAIM-019, CLAIM-021). |
 | `williams-2018-broad` | none | none | [`experiments/rag_critical_router_v1.py`](../../experiments/rag_critical_router_v1.py) | MultiNLI as the evidence-router proxy benchmark. |
 
-### Standard, regulation or tool (4)
+### Standard, regulation or tool (10)
 
 Aligned with or integrated, not a research result. Alignment is a mapping claim, never a conformity claim.
 
 | Source id | Identifier | Line | Code | Note |
 |-----------|------------|------|------|------|
+| `biscuit-2026-eclipse` | url:https://www.biscuitsec.org/ | none | none | Eclipse Biscuit authorization tokens (public-key signed, offline attenuation, Datalog checks); website accessed 2026-10-18, year is the access year. Token-level precedent for the lease; REMORA does not use Biscuit. Verified against the primary source 2026-10-18 (PRF-017). |
 | `european-2024-regulation` | none | none | [`remora/evidence/domains/ai_governance.py`](../../remora/evidence/domains/ai_governance.py) | EU AI Act Art. 12/14 mapped at runtime; no conformity assessment claimed. |
 | `international-2016-iec` | none | none | none | IEC 61511 SIL framing in the case study. |
+| `laurie-2013-ct` | none | none | none | Certificate Transparency, RFC 6962 (Experimental). Append-only audited Merkle logs; REMORA's audit chain is not anchored in such a log. Verified against the primary source 2026-10-18 (PRF-017). |
+| `laurie-2021-ct` | none | none | none | Certificate Transparency 2.0, RFC 9162 (Experimental), obsoletes RFC 6962. Same role as laurie-2013-ct. Verified against the primary source 2026-10-18 (PRF-017). |
+| `lodderstedt-2023-rar` | none | none | none | OAuth 2.0 Rich Authorization Requests, RFC 9396 (Standards Track). Structured authorization_details; compared with the exact-call lease. REMORA does not implement RAR. Verified against the primary source 2026-10-18 (PRF-017). |
+| `model-2025-mcp` | url:https://modelcontextprotocol.io/specification/2025-11-25 | none | none | MCP specification revision 2025-11-25. The paper quotes its statements that MCP cannot enforce security at the protocol level and that tool annotations are untrusted; REMORA binds approvals to a signed ToolSpec instead. No MCP conformance is claimed. Verified against the primary source 2026-10-18 (PRF-017). |
+| `oasis-2013-xacml` | none | none | none | XACML 3.0 OASIS Standard (22 January 2013, ed. E. Rissanen). Source of the PDP/PEP vocabulary in paper 4.4; REMORA does not use XACML policies. Verified against the primary source 2026-10-18 (PRF-017). |
 | `open-2024-open` | url:https://www.openpolicyagent.org/ | none | [`remora/policy/opa_adapter.py`](../../remora/policy/opa_adapter.py) | OPA/Rego adapter, failing closed to the Python engine. |
 | `standards-2021-norsok` | none | none | none | NORSOK D-010 well-barrier framing in the case study. |
 
-### Related-work positioning only (44)
+### Related-work positioning only (56)
 
 Compared against or used as framing in the paper. No code, no evaluation - and that is the honest status, not an oversight.
 
@@ -728,15 +734,20 @@ Compared against or used as framing in the paper. No code, no evaluation - and t
 |-----------|------------|------|------|------|
 | `anderson-1972-computer` | none | none | none | Reference monitor; named as a known mechanism REMORA integrates. |
 | `angelopoulos-2021-gentle` | arxiv:2107.07511 | none | none | Conformal tutorial; framing only. |
+| `beurerkellner-2025-patterns` | arxiv:2506.08837 | none | none | Design patterns for securing LLM agents against prompt injections, arXiv v3. Framing only. Verified against the primary source 2026-10-18 (PRF-017). |
 | `birgisson-2014-macaroons` | none | none | none | Macaroons - capabilities with caveats; named as a known mechanism REMORA integrates. |
 | `bloomfield-2010-safety` | none | none | none | none |
+| `chen-2025a-struq` | arxiv:2402.06363 | none | none | StruQ (USENIX Security 2025), arXiv v2: structured prompt/data channels plus fine-tuning. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017). |
+| `chen-2025b-secalign` | arxiv:2410.05451 | none | none | SecAlign (ACM CCS 2025), arXiv v3: preference optimization against prompt injection. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017). |
 | `chennabasappa-2025-llamafirewall` | arxiv:2505.03574 | none | none | LlamaFirewall - closest industrial system in scope. |
 | `choi-2026-membrane` | arxiv:2606.05743 | none | none | Membrane; contrasted with AROMER's never-weaken constraint. |
 | `chow-1970-optimum` | none | none | none | Origin of the error-reject tradeoff. |
 | `corsi-2021-formal` | none | none | none | none |
+| `costa-2025-fides` | arxiv:2505.23643 | none | none | FIDES, arXiv v2: planner with confidentiality/integrity labels and deterministic policy enforcement. REMORA propagates no labels across calls. Verified against the primary source 2026-10-18 (PRF-017). |
 | `crosby-2009-efficient` | none | none | none | Tamper-evident logging; named as a known mechanism REMORA integrates. |
+| `cutler-2024-cedar` | arxiv:2403.04651 | none | none | Cedar (PACMPL 8 OOPSLA1, 670-697): analyzable authorization language with Lean proofs. REMORA does not use Cedar. Verified against the primary source 2026-10-18 (PRF-017). |
 | `debenedetti-2024-agentdojo` | none | none | none | AgentDojo - named as a required replication target, not run. |
-| `debenedetti-2025-defeating` | arxiv:2503.18813 | none | none | CaMeL; shelf SHELF-008. |
+| `debenedetti-2025-defeating` | arxiv:2503.18813 | none | none | CaMeL; shelf SHELF-008. Pinned to arXiv v2 (2025-06-24): 77% of AgentDojo tasks with provable security vs 84% undefended; v1 reported 67%. Checked 2026-10-18 (PRF-038). |
 | `dong-2025-evaluating` | arxiv:2502.11347 | none | none | TEE attestation sketch; hardware integration pending. |
 | `du-2024-improving` | none | none | none | Multi-agent debate; REMORA's dissensus is a one-shot analogue. |
 | `endsley-1995-toward` | none | none | none | Situation awareness; supervision framing only. |
@@ -744,7 +755,9 @@ Compared against or used as framing in the paper. No code, no evaluation - and t
 | `guldimann-2024-compl` | arxiv:2410.07959 | none | none | COMPL-AI. |
 | `guo-2017-calibration` | none | none | none | Calibration; REMORA deliberately does not calibrate per-oracle. |
 | `hardy-1988-confused` | none | none | none | Confused deputy; frames AIRGuard's authority confusion. |
+| `hines-2024-spotlighting` | arxiv:2403.14720 | none | none | Spotlighting, arXiv v1: input transformation to mark provenance. Upstream model-side defense; not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017). |
 | `inan-2023-llama` | arxiv:2312.06674 | none | none | Llama Guard - content guardrail, contrasted with action gating. |
+| `jia-2025-taskshield` | arxiv:2412.16682 | none | none | Task Shield (ACL 2025 long, pp. 29680-29697), arXiv v1: test-time task-alignment check per tool call. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017). |
 | `kadavath-2022-language` | arxiv:2207.05221 | none | none | Self-knowledge; motivates structural over self-reported uncertainty. |
 | `kelly-1998-arguing` | none | none | none | Assurance cases; DecisionEnvelope populates one node. |
 | `kuncheva-2003-measures` | none | none | none | Ensemble diversity measures. |
@@ -757,12 +770,16 @@ Compared against or used as framing in the paper. No code, no evaluation - and t
 | `rebedea-2023-nemo` | none | none | none | NeMo Guardrails. |
 | `rhodes-2026-poe` | arxiv:2607.05397 | none | none | Proof of Execution - certificate-first execution evidence; REMORA differs by growing evidence out of a deployed enforcement path. |
 | `ruan-2024-identifying` | none | none | none | ToolEmu anticipates the Shadow Mode counterfactual idea. |
+| `schneier-1999-secure` | doi:10.1145/317087.317089 | none | none | Secure audit logs (ACM TISSEC 2(2):159-176; volume/issue per Crossref). REMORA's chain has no forward-secure keying. Verified against the primary source 2026-10-18 (PRF-017). |
 | `shamsujjoha-2024-taxonomy` | arxiv:2408.02205 | none | none | Swiss-cheese guardrail taxonomy. |
 | `sharma-2025-constitutional` | arxiv:2501.18837 | none | none | Constitutional classifiers. |
-| `shi-2025-progent` | arxiv:2504.11703 | none | none | Progent; shelf SHELF-009. Defines the (safety, friction) frontier. |
+| `shi-2025-progent` | arxiv:2504.11703 | none | none | Progent; shelf SHELF-009. Defines the (safety, friction) frontier. Pinned to arXiv v2 (2025-08-30): LLM-generated policies, gpt-4o, AgentDojo ASR 39.9% to 1.0%, utility 76.3% vs 79.4%; v3 (2026-05-14) repeats 39.9% to 1.0%; v1 reported 41.2% to 2.2%. Checked 2026-10-18 (PRF-038). |
+| `tsai-2025-conseca` | arxiv:2501.17070 | none | none | Conseca (HotOS 2025), arXiv v3: just-in-time contextual policies; contrasted with REMORA's fixed, versioned hard-block floor. Verified against the primary source 2026-10-18 (PRF-017). |
 | `wang-2023b-lora` | arxiv:2310.00035 | none | none | LoRA ensembles; motivates but does not validate heterogeneous aggregation. |
 | `wang-2025-agentspec` | arxiv:2503.18666 | none | none | AgentSpec - DSL near-isomorphic to REMORA's policy invariants. |
 | `wang-2026-pcaa` | arxiv:2606.04104 | none | none | Proof-Carrying Agent Actions - runtime-portable action certificate; REMORA trades portability for exact-call binding to one kernel. |
+| `wu-2024-fsecure` | arxiv:2409.19091 | none | none | f-secure LLM system (Wu, Cecchetti, Xiao), arXiv v2: information-flow control with a security monitor over the planner. The 'Wu et al. 2024' of PRF-017. Baseline for a data-flow extension; REMORA claims no trajectory-level or data-flow property. Verified against the primary source 2026-10-18 (PRF-017). |
+| `wu-2025-isolategpt` | arxiv:2403.04960 | none | none | IsolateGPT (NDSS 2025; arXiv v1 titled SecGPT): execution isolation between LLM apps. Not implemented or measured. Verified against the primary source 2026-10-18 (PRF-017). |
 | `xiang-2025-guardagent` | none | none | none | GuardAgent. |
 | `yadkori-2024-mitigating` | arxiv:2405.01563 | none | none | Conformal abstention for hallucination mitigation. |
 | `yang-2026-agenttrust` | arxiv:2606.08539 | none | none | AgentTrust; opposite corner of the safety/friction trade-off. |
@@ -770,6 +787,7 @@ Compared against or used as framing in the paper. No code, no evaluation - and t
 | `yuan-2024-judge` | none | none | none | R-Judge. |
 | `zhan-2024-injecagent` | none | none | none | InjecAgent. |
 | `zhang-2024-calibrating` | arxiv:2404.02655 | none | none | Confidence elicitation by fidelity. |
+| `zhu-2025-melon` | arxiv:2502.05174 | none | none | MELON (ICML 2025), arXiv v4: masked re-execution to detect indirect prompt injection. REMORA does not re-execute trajectories. Verified against the primary source 2026-10-18 (PRF-017). |
 
 ### Cited in code but not in the paper (20)
 

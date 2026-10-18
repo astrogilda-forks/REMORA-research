@@ -132,7 +132,11 @@ This is the field REMORA operates in, and the positioning boundaries matter.
 
 **Agent-level guardrail systems.** LlamaFirewall (Chennabasappa et al., 2025) is the closest industrial system in scope: a layered agent guardrail (prompt-injection detection, alignment checking, code screening). GuardAgent (Xiang et al., 2025) generates guardrail code with a guard LLM; AgentSpec (Wang et al., 2025) defines a DSL of runtime triggers/predicates/enforcement near-isomorphic to REMORA's policy invariants. Two 2026 systems share REMORA's learning ambition: AgentTrust (Yang, 2026) splits threats into lexical (deterministic rules) and semantic (LLM judge with a guarded verdict cache), and *self-distills judge decisions into its rule layer*; Membrane (Choi et al., 2026) evolves a contrastive safety memory against jailbreaks. REMORA's differences are deliberate: (1) the hard-block floor is fixed, versioned, and hash-provenanced policy-as-code, learned outputs never become enforcement rules, and the learning layer (AROMER) is monotonicity-tested to *never weaken* policy (`tests/policy/test_governance_intelligence_never_weakens_policy.py`), whereas AgentTrust's distillation pipeline makes learned judgments load-bearing for enforcement; (2) on the research path uncertainty is structural (multi-oracle disagreement with conformal abstention), not a single judge's confidence, while on the governed path these signals are left unset and decisions rest on deterministic policy (§5.2); (3) every decision emits a DecisionEnvelope, which the API path finalizes into a tenant-scoped hash chain and HMAC-signs when a signing key is configured. Conversely, AgentTrust reports zero benign hard-blocks across 45,000 actions, the opposite end of the safety/friction trade-off from REMORA's FBR=100% AgentHarm corner point (§10.6), and an explicit target for REMORA's calibration roadmap.
 
-**Permissioning and security by design.** Progent (Shi et al., 2025) enforces programmable least-privilege on agent tool calls, reducing attack success from 39.9% to 1.0% on AgentDojo *while maintaining utility*; CaMeL (Debenedetti et al., 2025) defeats prompt injection by construction via control/data-flow separation, retaining 77% task completion with provable security. These results define the current (safety, friction) frontier and pre-empt any reading of REMORA's zero-FAR corner point as sufficient: REMORA's own execution chain (§4.4) is capability-based enforcement of the same family, applied per call. Unlike CaMeL it does not track data flow, so it does not stop an exfiltration composed of individually authorized calls (§13.13). Its contribution is not the corner but the integrated chain and the claim-governed evaluation around it.
+**Permissioning and security by design.** Progent (Shi et al., 2025) enforces programmable least-privilege on agent tool calls. With LLM-generated policies and gpt-4o it reduces attack success on AgentDojo from 39.9% to 1.0%, at 76.3% utility against 79.4% undefended (arXiv:2504.11703v2; v3 repeats the 39.9% to 1.0% figure, v1 reported 41.2% to 2.2%). CaMeL (Debenedetti et al., 2025) defeats prompt injection by construction via control/data-flow separation and solves 77% of AgentDojo tasks, against 84% undefended, with what the authors call provable security (arXiv:2503.18813v2; v1 reported 67%). These results define the current (safety, friction) frontier and pre-empt any reading of REMORA's zero-FAR corner point as sufficient: REMORA's own execution chain (§4.4) is capability-based enforcement of the same family, applied per call. Unlike CaMeL it does not track data flow, so it does not stop an exfiltration composed of individually authorized calls (§13.13). Its contribution is not the corner but the integrated chain and the claim-governed evaluation around it.
+
+**Information-flow control and isolation.** Information-flow control addresses the case per-call authorization leaves open: an exfiltration built from individually authorized calls. Wu et al. (2024) build an f-secure LLM system in which a security monitor keeps untrusted input out of the planning process, with formal models of the guarantee. FIDES (Costa et al., 2025) is a planner that tracks confidentiality and integrity labels and enforces policies deterministically; the authors characterize which properties dynamic taint-tracking can enforce. IsolateGPT (Wu et al., 2025; first posted as SecGPT) isolates the execution of third-party LLM apps from each other and from the system. REMORA borrows the premise that untrusted data must not decide what runs. It does not propagate confidentiality or integrity labels across calls, has no separate planner, and claims no trajectory-level or data-flow property (§13.13). These systems are the baselines a data-flow extension of REMORA would have to be measured against.
+
+**Prompt-injection defenses.** A second family hardens the model or the agent loop. Spotlighting (Hines et al., 2024) transforms untrusted input so that its provenance stays visible to the model. StruQ (Chen et al., 2025a) separates prompt and data into two channels and fine-tunes the model to follow instructions only in the prompt channel. SecAlign (Chen et al., 2025b) pursues the same goal with preference optimization. Task Shield (Jia et al., 2025) checks at test time whether each instruction and tool call serves the user's goal. MELON (Zhu et al., 2025) re-executes the trajectory with a masked user prompt and flags an attack when the original and masked runs propose similar actions. Conseca (Tsai & Bagdasarian, 2025) generates just-in-time, contextual and human-verifiable security policies, where REMORA's hard-block floor is fixed and versioned (§6.2). Beurer-Kellner et al. (2025) propose design patterns for agents with provable resistance to prompt injection and analyze their utility and security trade-offs. REMORA does not train models, transform prompts or re-execute trajectories. It acts at the tool-call boundary after the model has proposed an action, so these defenses sit upstream of it, and REMORA reports no measurement against any of them.
 
 **Benchmarks and environments.** Beyond AgentHarm (Andriushchenko et al., 2024), the field evaluates on AgentDojo (Debenedetti et al., 2024), ToolEmu (Ruan et al., 2024), InjecAgent (Zhan et al., 2024), R-Judge (Yuan et al., 2024), and τ-bench (Yao et al., 2024). ToolEmu's LM-emulated sandbox anticipates the counterfactual-execution idea behind REMORA's Shadow Mode; REMORA's replay engine is therefore *not* conceptually unique: its distinction is the governance framing (committed replay artifacts under claim governance). Replication of REMORA's results on these independently constructed environments is required future work and the honest boundary of every internal benchmark claim in this paper.
 
@@ -142,7 +146,11 @@ This is the field REMORA operates in, and the positioning boundaries matter.
 
 **Multi-layer guardrail taxonomies.** A systematic literature review of runtime guardrails (Shamsujjoha et al., 2024) frames multi-layer defense as a Swiss-cheese model; a layered governance architecture with OS-level enforcement is developed in Ge (2026); confidence elicitation by fidelity is treated in Zhang et al. (2024); and formal verification of behavioral safety properties for neural policies in Corsi et al. (2021). REMORA's position relative to these four is that it composes recognized layers (policy floor, ensemble uncertainty, conformal abstention, audit chain) with a claim-governance methodology, rather than introducing a new layer type.
 
-**Authority-bound execution and execution evidence.** A 2026 line of work moves the control point from pre-action screening to the authorization and evidence of execution itself. AIRGuard (Qin et al., 2026) names *authority confusion*, a form of the confused-deputy problem (Hardy, 1988); untrusted context may inform reasoning but must not authorize side effects; and enforces least privilege as action-time authorization. Proof-Carrying Agent Actions (Wang, 2026) organizes runtime-neutral governance around a portable action certificate with pre-action admissibility, approval and outcome-closure checkpoints. Proof of Execution (Rhodes & Kang, 2026) formalizes execution evidence as a contract, a causal event stream and a replay context with validator-checkable invariants and a soundness argument under cryptographic assumptions. A survey of agent permission systems (Michael & Roesner, 2026) reviews 21 proposals and finds that no existing system simultaneously achieves low user burden, formally grounded specification and deterministic enforcement. REMORA's position in this line rests on explicit **non-claims**: it is not first with runtime policy enforcement, pre-action authorization checks, or agent governance in general; AgentSpec, Progent and AIRGuard each predate or parallel individual mechanisms here. What REMORA combines in one reproducible artifact is authority provenance (signed ToolSpec), exact-call binding between the approved and the executed action, key-custody separation between decision and execution domains, re-policying at the execution boundary, per-component trust-base coverage declared on the decision record, explicit effect-evidence states in which transport success is never execution, machine-readable capability and boundary declarations whose claim ceilings state what is not established, and a machine-enforced register of claims and negative results governing every number this paper reports. Unlike PoE's certificate-first formalization, REMORA's evidence model grew out of a deployed enforcement path and carries its falsification history with it; unlike PCAA's runtime-portable envelope, REMORA binds to one concrete execution kernel and buys exactness at the price of portability. A mechanism-level crosswalk against these systems is maintained in the repository (`docs/research/adjacent-systems-crosswalk-v2.md`), alongside a draft vendor-neutral conformance model (Agent Authority Conformance, A–G) intended to make such comparisons testable rather than narrative.
+**Authority-bound execution and execution evidence.** A 2026 line of work moves the control point from pre-action screening to the authorization and evidence of execution itself. AIRGuard (Qin et al., 2026) names *authority confusion*, a form of the confused-deputy problem (Hardy, 1988); untrusted context may inform reasoning but must not authorize side effects; and enforces least privilege as action-time authorization. Proof-Carrying Agent Actions (Wang, 2026) organizes runtime-neutral governance around a portable action certificate with five checkpoints, from pre-action admissibility through approval to outcome closure. Proof of Execution (Rhodes & Kang, 2026) formalizes execution evidence as a contract, a causal event stream and a replay context with validator-checkable invariants and a soundness argument under explicit cryptographic and deployment assumptions. A survey of agent permission systems (Michael & Roesner, 2026) reviews 21 proposals and finds that none of them achieves all three of low user burden, formally grounded specification and deterministic enforcement. REMORA's position in this line rests on explicit **non-claims**: it is not first with runtime policy enforcement, pre-action authorization checks, or agent governance in general; AgentSpec, Progent and AIRGuard each predate or parallel individual mechanisms here. What REMORA combines in one reproducible artifact is authority provenance (signed ToolSpec), exact-call binding between the approved and the executed action, key-custody separation between decision and execution domains, re-policying at the execution boundary, per-component trust-base coverage declared on the decision record, explicit effect-evidence states in which transport success is never execution, machine-readable capability and boundary declarations whose claim ceilings state what is not established, and a machine-enforced register of claims and negative results governing every number this paper reports. Unlike PoE's certificate-first formalization, REMORA's evidence model grew out of a deployed enforcement path and carries its falsification history with it; unlike PCAA's runtime-portable envelope, REMORA binds to one concrete execution kernel and buys exactness at the price of portability. A mechanism-level crosswalk against these systems is maintained in the repository (`docs/research/adjacent-systems-crosswalk-v2.md`), alongside a draft vendor-neutral conformance model (Agent Authority Conformance, A–G) intended to make such comparisons testable rather than narrative.
+
+**Protocols, authorization tokens and policy languages.** The Model Context Protocol specification (Model Context Protocol contributors, 2025) standardizes how hosts expose tools to models. It states that MCP "cannot enforce these security principles at the protocol level" and that tool annotations "should be considered untrusted, unless obtained from a trusted server". REMORA takes the same position on tool metadata: an approval binds to a signed ToolSpec (§4.4), not to what a server declares. Capability tokens with caveats (Birgisson et al., 2014) and Biscuit (Biscuit contributors, 2026), whose holders attenuate tokens offline and whose checks are written in Datalog, are the token-level precedents for REMORA's exact-call lease. OAuth Rich Authorization Requests (Lodderstedt et al., 2023) carry structured `authorization_details` that a scope string cannot express, close in intent to binding a lease to one call. XACML 3.0 (OASIS, 2013) defines the policy decision point and policy enforcement point vocabulary that §4.4 uses. Cedar (Cutler et al., 2024) is an authorization language whose design properties are proved in Lean. REMORA uses none of these formats or languages on the wire; its policies are Python with an OPA/Rego adapter (§6.3). Binding grants to the task and the exact call is aimed at the confused-deputy problem (Hardy, 1988).
+
+**Tamper-evident logs.** Schneier and Kelsey (1999) make log entries written before a logging machine's compromise unreadable to the attacker and impossible to change or delete undetectably. Crosby and Wallach (2009) give tamper-evident history trees with efficient membership and consistency proofs, and Certificate Transparency (Laurie et al., 2013; Laurie et al., 2021) publishes append-only Merkle-tree logs that third parties audit. REMORA's audit chain is a per-tenant SHA-256 hash chain (§8.2). It detects modification of a historical entry but not replacement of the whole chain. It has no forward-secure keying and is not anchored in an external log; these works are what a hardened chain would borrow from.
 
 ---
 
@@ -1078,7 +1086,7 @@ The status of these findings, later mitigations and superseded results is mainta
 
 ### 13.13 The Execution Chain Is Not Evaluated Against Attacks (Active)
 
-Everything in §10 is measured on the research and benchmark path. The authority-bound chain of §4.4 (signed ToolSpec, exact-call lease, single-use grant, re-check at dispatch) has unit, property and conformance tests, but no attack evaluation. Replay, argument substitution after approval, ToolSpec swap, cross-task reuse of a grant, a forged lease and time-of-check/time-of-use races are not measured against a baseline gateway. The threat model (§3.1) has no evaluation against it yet. Per-call authorization does not stop an attack composed of individually authorized calls, such as reading a secret and then sending it; REMORA does not claim trajectory-level or data-flow enforcement. Until that evaluation exists, contribution 1 is a design and artifact contribution, not a measured security result.
+Everything in §10 is measured on the research and benchmark path. The authority-bound chain of §4.4 (signed ToolSpec, exact-call lease, single-use grant, re-check at dispatch) has unit, property and conformance tests, but no attack evaluation. Replay, argument substitution after approval, ToolSpec swap, cross-task reuse of a grant, a forged lease and time-of-check/time-of-use races are not measured against a baseline gateway. The threat model (§3.1) has no evaluation against it yet. Per-call authorization does not stop an attack composed of individually authorized calls, such as reading a secret and then sending it; REMORA does not claim trajectory-level or data-flow enforcement. The information-flow systems in §2.11 (Wu et al., 2024; Costa et al., 2025) target that case. Until that evaluation exists, contribution 1 is a design and artifact contribution, not a measured security result.
 
 ## 14. Threats to Validity
 
@@ -1253,11 +1261,19 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Angelopoulos, A. N., Bates, S., Fisch, A., Lei, L., & Schuster, T. (2022). Conformal risk control. arXiv:2208.02814.
 
+- Beurer-Kellner, L., Buesser, B., Creţu, A.-M., Debenedetti, E., Dobos, D., Fabian, D., Fischer, M., Froelicher, D., Grosse, K., Naeff, D., Ozoani, E., Paverd, A., Tramèr, F., & Volhejn, V. (2025). Design patterns for securing LLM agents against prompt injections. arXiv:2506.08837v3.
+
 - Birgisson, A., Politz, J. G., Erlingsson, Ú., Taly, A., Vrable, M., & Lentczner, M. (2014). Macaroons: Cookies with contextual caveats for decentralized authorization in the cloud. *NDSS 2014*.
+
+- Biscuit contributors. (2026). Eclipse Biscuit: An authorization token with decentralized verification. https://www.biscuitsec.org/ (accessed 2026-10-18).
 
 - Bjøru, A. R. (2026). Causal Post-hoc Explainable AI (PhD thesis). Norwegian University of Science and Technology (NTNU). ISBN 978-82-353-0022-5. Paper IV §4.2.1–§4.2.3
 
 - Bloomfield, R. & Bishop, P. (2010). Safety and assurance cases: Practice, trends and challenges. *SAFECOMP 2010*.
+
+- Chen, S., Piet, J., Sitawarin, C., & Wagner, D. (2025a). StruQ: Defending against prompt injection with structured queries. *USENIX Security Symposium 2025*. arXiv:2402.06363v2.
+
+- Chen, S., Zharmagambetov, A., Mahloujifar, S., Chaudhuri, K., Wagner, D., & Guo, C. (2025b). SecAlign: Defending against prompt injection with preference optimization. *ACM CCS 2025*. arXiv:2410.05451v3.
 
 - Chennabasappa, S., et al. (2025). LlamaFirewall: An open source guardrail system for building secure AI agents. arXiv:2505.03574.
 
@@ -1271,13 +1287,17 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Corsi, D., Marchesini, E., & Farinelli, A. (2021). Formal verification of neural networks for safety-critical tasks in deep reinforcement learning. *UAI 2021*, PMLR 161:333–343.
 
+- Costa, M., Köpf, B., Kolluri, A., Paverd, A., Russinovich, M., Salem, A., Tople, S., Wutschitz, L., & Zanella-Béguelin, S. (2025). Securing AI agents with information-flow control (FIDES). arXiv:2505.23643v2.
+
 - Crosby, S. A. & Wallach, D. S. (2009). Efficient data structures for tamper-evident logging. *USENIX Security Symposium 2009*.
+
+- Cutler, J. W., Disselkoen, C., Eline, A., He, S., Headley, K., Hicks, M., Hietala, K., Ioannidis, E., Kastner, J., Mamat, A., McAdams, D., McCutchen, M., Rungta, N., Torlak, E., & Wells, A. M. (2024). Cedar: A new language for expressive, fast, safe, and analyzable authorization. *Proceedings of the ACM on Programming Languages, 8*(OOPSLA1), 670–697. doi:10.1145/3649835. arXiv:2403.04651v2.
 
 - Darling, D. A. & Robbins, H. (1967). Confidence sequences for mean, variance, and median. *Proceedings of the National Academy of Sciences, 58*(1), 66–68.
 
 - Debenedetti, E., et al. (2024). AgentDojo: A dynamic environment to evaluate prompt injection attacks and defenses for LLM agents. *NeurIPS 2024 Datasets & Benchmarks*.
 
-- Debenedetti, E., et al. (2025). Defeating prompt injections by design (CaMeL). arXiv:2503.18813.
+- Debenedetti, E., et al. (2025). Defeating prompt injections by design (CaMeL). arXiv:2503.18813v2.
 
 - Dong, B. & Wang, Q. (2025). Evaluating the performance of the DeepSeek model in confidential computing environment. arXiv:2502.11347.
 
@@ -1303,11 +1323,15 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Hardy, N. (1988). The confused deputy (or why capabilities might have been invented). *ACM SIGOPS Operating Systems Review*, 22(4), 36–38.
 
+- Hines, K., Lopez, G., Hall, M., Zarfati, F., Zunger, Y., & Kiciman, E. (2024). Defending against indirect prompt injection attacks with spotlighting. arXiv:2403.14720v1.
+
 - Howard, S. R., Ramdas, A., McAuliffe, J., & Sekhon, J. (2021). Time-uniform, nonparametric, nonasymptotic confidence sequences. *Annals of Statistics, 49*(2), 1055–1080.
 
 - Inan, H., et al. (2023). Llama Guard: LLM-based input-output safeguard for human-AI conversations. arXiv:2312.06674.
 
 - International Electrotechnical Commission. (2016). IEC 61511-1:2016, Functional safety: Safety instrumented systems for the process industry sector. IEC.
+
+- Jia, F., Wu, T., Qin, X., & Squicciarini, A. (2025). The Task Shield: Enforcing task alignment to defend against indirect prompt injection in LLM agents. *ACL 2025 (Long Papers)*, 29680–29697. arXiv:2412.16682v1.
 
 - Kadavath, S., Conerly, T., Askell, A., Henighan, T., Drain, D., Perez, E., Schiefer, N., Hatfield-Dodds, Z., DasSarma, N., Tran-Johnson, E., Johnston, S., El-Showk, S., Jones, A., Elhage, N., Hume, T., Chen, A., Bai, Y., Bowman, S., Fort, S., Ganguli, D., Hernandez, D., Jacobson, J., Kernion, J., Kravec, S., Lovitt, L., Ndousse, K., Olsson, C., Ringer, S., Amodei, D., Brown, T., Clark, J., McCandlish, S., Olah, C., Mann, B., & Kaplan, J. (2022). Language models (mostly) know what they know. *arXiv:2207.05221*.
 
@@ -1321,13 +1345,23 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017). Simple and scalable predictive uncertainty estimation using deep ensembles. *NeurIPS 2017*.
 
+- Laurie, B., Langley, A., & Kasper, E. (2013). Certificate Transparency. RFC 6962 (Experimental), IETF.
+
+- Laurie, B., Messeri, E., & Stradling, R. (2021). Certificate Transparency version 2.0. RFC 9162 (Experimental; obsoletes RFC 6962), IETF.
+
 - Lin, S., Hilton, J., & Evans, O. (2022). TruthfulQA: Measuring how models mimic human falsehoods. *ACL 2022*.
+
+- Lodderstedt, T., Richer, J., & Campbell, B. (2023). OAuth 2.0 Rich Authorization Requests. RFC 9396 (Standards Track), IETF.
+
+- Model Context Protocol contributors. (2025). Model Context Protocol specification, revision 2025-11-25. https://modelcontextprotocol.io/specification/2025-11-25
 
 - Mohri, C. & Hashimoto, T. (2024). Language models with conformal factuality guarantees. *ICML 2024*.
 
-- Michael, A. E., & Roesner, F. (2026). How agents ask for permission: User permissions for AI agents, from interfaces to enforcement. arXiv:2607.13718.
+- Michael, A. E., & Roesner, F. (2026). How agents ask for permission: User permissions for AI agents, from interfaces to enforcement. arXiv:2607.13718v2.
 
 - Mu, T., Helyar, A., et al. (2024). Rule based rewards for language model safety. *NeurIPS 2024*.
+
+- OASIS. (2013). eXtensible Access Control Markup Language (XACML) version 3.0. OASIS Standard, 22 January 2013. E. Rissanen (ed.).
 
 - Open Policy Agent contributors. (2024). Open Policy Agent. https://www.openpolicyagent.org/
 
@@ -1341,13 +1375,15 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Ramdas, A., Grünwald, P., Vovk, V., & Shafer, G. (2023). Game-theoretic statistics and safe anytime-valid inference. *Statistical Science, 38*(4), 576–601.
 
-- Qin, S., Zhuang, H., Zhou, Y., Han, Y., & Zhang, X. (2026). AIRGuard: Guarding agent actions with runtime authority control. arXiv:2605.28914.
+- Qin, S., Zhuang, H., Zhou, Y., Han, Y., & Zhang, X. (2026). AIRGuard: Guarding agent actions with runtime authority control. arXiv:2605.28914v1.
 
 - Rebedea, T., et al. (2023). NeMo Guardrails: A toolkit for controllable and safe LLM applications with programmable rails. *EMNLP 2023 System Demonstrations*.
 
-- Rhodes, J., & Kang, G. (2026). Proof of execution: Runtime verification for governed AI agent actions. arXiv:2607.05397.
+- Rhodes, J., & Kang, G. (2026). Proof of execution: Runtime verification for governed AI agent actions. arXiv:2607.05397v1.
 
 - Ruan, Y., et al. (2024). Identifying the risks of LM agents with an LM-emulated sandbox (ToolEmu). *ICLR 2024*.
+
+- Schneier, B. & Kelsey, J. (1999). Secure audit logs to support computer forensics. *ACM Transactions on Information and System Security, 2*(2), 159–176. doi:10.1145/317087.317089.
 
 - Shafer, G. & Vovk, V. (2008). A tutorial on conformal prediction. *Journal of Machine Learning Research, 9*, 371–421.
 
@@ -1355,11 +1391,13 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Sharma, M., et al. (2025). Constitutional classifiers: Defending against universal jailbreaks across thousands of hours of red teaming. arXiv:2501.18837.
 
-- Shi, T., He, J., Wang, Z., Li, H., Wu, L., Guo, W., & Song, D. (2025). Progent: Securing AI agents with privilege control. arXiv:2504.11703.
+- Shi, T., He, J., Wang, Z., Li, H., Wu, L., Guo, W., & Song, D. (2025). Progent: Securing AI agents with privilege control. arXiv:2504.11703v2.
 
 - Standards Norway. (2021). NORSOK D-010:2021, Well integrity in drilling and well operations. Standards Norway.
 
 - Tibshirani, R. J., Barber, R. F., Candès, E. J., & Ramdas, A. (2019). Conformal prediction under covariate shift. *NeurIPS 2019*.
+
+- Tsai, L. & Bagdasarian, E. (2025). Contextual agent security: A policy for every purpose (Conseca). *HotOS 2025*. arXiv:2501.17070v3.
 
 - Ville, J. (1939). *Étude critique de la notion de collectif.* Gauthier-Villars.
 
@@ -1367,13 +1405,17 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 
 - Wang, H., Poskitt, C. M., et al. (2025). AgentSpec: Customizable runtime enforcement for safe and reliable LLM agents. arXiv:2503.18666.
 
-- Wang, Z. (2026). Proof-carrying agent actions: Model-agnostic runtime governance for heterogeneous agent systems. arXiv:2606.04104.
+- Wang, Z. (2026). Proof-carrying agent actions: Model-agnostic runtime governance for heterogeneous agent systems. arXiv:2606.04104v1.
 
 - Wang, X., Aitchison, L., & Rudolph, M. (2023b). LoRA ensembles for large language model fine-tuning. *arXiv:2310.00035*. https://arxiv.org/abs/2310.00035. doi:10.48550/arXiv.2310.00035
 
 - Wang, X., Wei, J., Schuurmans, D., Le, Q., Chi, E., Narang, S., Chowdhery, A., & Zhou, D. (2023a). Self-consistency improves chain of thought reasoning in language models. *ICLR 2023*.
 
 - Williams, A., Nangia, N., & Bowman, S. (2018). A broad-coverage challenge corpus for sentence understanding through inference. *NAACL 2018*.
+
+- Wu, F., Cecchetti, E., & Xiao, C. (2024). System-level defense against indirect prompt injection attacks: An information flow control perspective. arXiv:2409.19091v2.
+
+- Wu, Y., Roesner, F., Kohno, T., Zhang, N., & Iqbal, U. (2025). IsolateGPT: An execution isolation architecture for LLM-based agentic systems. *NDSS 2025*. arXiv:2403.04960v2 (v1 titled SecGPT).
 
 - Xiang, Z., et al. (2025). GuardAgent: Safeguard LLM agents by a guard agent via knowledge-enabled reasoning. *ICML 2025*.
 
@@ -1390,6 +1432,8 @@ Where AI-assisted output informed implementation or prose, the final responsibil
 - Zhang, M., Huang, M., Shi, R., Guo, L., Peng, C., Yan, P., Zhou, Y., & Qiu, X. (2024). Calibrating the confidence of large language models by eliciting fidelity. arXiv:2404.02655.
 
 - Zheng, L., Chiang, W.-L., Sheng, Y., Zhuang, S., Wu, Z., Zhuang, Y., Lin, Z., Li, Z., Li, D., Xing, E. P., Zhang, H., Gonzalez, J. E., & Stoica, I. (2023). Judging LLM-as-a-judge with MT-Bench and Chatbot Arena. *NeurIPS 2023*.
+
+- Zhu, K., Yang, X., Wang, J., Guo, W., & Wang, W. Y. (2025). MELON: Provable defense against indirect prompt injection attacks in AI agents. *ICML 2025*. arXiv:2502.05174v4.
 
 ## Appendix A: Mathematical Definitions
 
