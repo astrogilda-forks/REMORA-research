@@ -16,6 +16,14 @@ This file lists externally relevant changes by release. Fine-grained development
 - `NEGATIVE_RESULTS.md` §84 (open) records that `EFFECT_VERIFIED` does not
   attribute the observed delta to the dispatch; §85 (accepted) records this
   finding and its fix.
+- Three adversarial probes hold, each pinned by a test:
+  - P1: a batch member's grant does not redeem for its sibling, although
+    both share a body digest.
+  - P2: a grant issued before a policy revision is refused unspent, and
+    redeems once the policy is back.
+  - P3: an advisory `assess_tool_call()` ACCEPT carries no grant, nothing on
+    the enforcing path imports it, and the strict gate refuses it.
+    PRF-040 stays OPEN, because the advisory result is still called ACCEPT.
 
 ### Interop (effect-evidence-v1 limits found by the invocation axes corpus, #918)
 
