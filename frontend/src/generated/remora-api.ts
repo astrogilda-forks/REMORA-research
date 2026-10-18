@@ -1278,6 +1278,11 @@ export interface components {
         /** ExecutionApproveResponse */
         ExecutionApproveResponse: {
             audit: components["schemas"]["AuditRef"];
+            /**
+             * Delegated Executor
+             * @description The delegate the proposal named at assess time, approved with the call; absent when it named none.
+             */
+            delegated_executor?: string | null;
             /** Expires At */
             expires_at: string;
             /** Item Id */
@@ -1726,6 +1731,8 @@ export interface components {
             };
             /** Context Id */
             context_id?: string | null;
+            /** Delegated Executor */
+            delegated_executor?: string | null;
             /** Derivations */
             derivations?: components["schemas"]["DerivationProposal"][] | null;
             /** Idempotency Key */
