@@ -8,7 +8,9 @@ import type { Verification } from "./effect";
 import { dispatchStatus, statusExplanation } from "./outcome";
 import { governedNames, toolsFor } from "./tools";
 import type { GovernedTool } from "./tools";
-import type { AssessResult, ExecuteResult, RemoraClient, ToolCall } from "./remora";
+import type {
+  AssessResult, ExecuteResult, RemoraClient, RequestRef, ToolCall,
+} from "./remora";
 
 export const PROTOCOL_VERSION = "2025-06-18";
 
@@ -48,6 +50,20 @@ export interface Deps {
   newId: () => string;
   /** Deployment configuration, which decides which tool sets are live. */
   env: Record<string, unknown>;
+  /** SHA-256 (lowercase hex) of the HTTP body bytes this message arrived in.
+   *  When set, every tools/call carries a request_ref built from it. */
+  bodySha256?: string;
+}
+
+/** The reference REMORA binds into the grant, or undefined when the message
+ *  has no request id or the transport supplied no body digest. */
+export function requestRefFor(req: JsonRpcRequest, deps: Deps): RequestRef | undefined {
+  if (!deps.bodySha256 || req.id === undefined || req.id === null) return undefined;
+  return {
+    transport: "mcp-streamable-http",
+    jsonrpc_id: JSON.stringify(req.id),
+    body_sha256: deps.bodySha256,
+  };
 }
 
 const ok = (id: unknown, result: unknown) => ({ jsonrpc: "2.0", id, result });
@@ -122,6 +138,7 @@ async function callTool(
   name: string,
   args: Record<string, unknown>,
   deps: Deps,
+  requestRef?: RequestRef,
 ): Promise<unknown> {
   if (name === "remora_proposal_status") {
     return statusTool(String(args.proposal_id ?? ""), deps);
@@ -166,6 +183,7 @@ async function callTool(
     // and gets that exclusion back.
     target_environment: String(deps.env.REMORA_TARGET_ENVIRONMENT ?? "prod"),
     ...(intent_ref ? { intent_ref } : {}),
+    ...(requestRef ? { request_ref: requestRef } : {}),
   };
 
   const { status, body } = await deps.remora.assess(call);
@@ -328,7 +346,8 @@ export async function handleRpc(
       };
       if (!params.name) return err(req.id, -32602, "missing tool name");
       try {
-        return ok(req.id, await callTool(params.name, params.arguments ?? {}, deps));
+        return ok(req.id, await callTool(
+          params.name, params.arguments ?? {}, deps, requestRefFor(req, deps)));
       } catch (e) {
         return ok(
           req.id,

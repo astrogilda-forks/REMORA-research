@@ -2305,6 +2305,7 @@ def _dispatch_under_lease(
     task_identity: TaskIdentity | None = None,
     plan: Any = None,
     capability_set: Any = None,
+    report_lease: bool = False,
 ) -> dict[str, Any]:
     """Governed dispatch (see remora.execution.dispatch); binds this module's
     dispatcher and current policy bundle hash. Shared by /execute,
@@ -2384,6 +2385,7 @@ def _dispatch_under_lease(
             plan=plan,
             surface_digest=surface,
             capability_set=capability_set,
+            report_lease=report_lease,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):
@@ -3158,6 +3160,45 @@ def export_evidence(proposal_id: str, request: Request) -> dict[str, Any]:
         "section_sha256": {name: _digest(v) for name, v in sections.items()},
     }
     return bundle
+
+
+@router.get("/proposals/{proposal_id}/invocation-evidence", responses={
+    200: {"description": "One executed direct-ACCEPT invocation, signed under "
+                         "REMORA/EVIDENCE/v1 for offline verification."},
+    **_AUTH_RESPONSES,
+    404: {"model": ErrorDetail, "description": "No such proposal for this tenant."},
+    409: {"model": ErrorDetail,
+          "description": "The proposal is not one executed direct ACCEPT with its "
+                         "grant recorded."},
+    503: {"model": ErrorDetail, "description": "No evidence signing key is configured."},
+})
+def export_invocation_evidence(proposal_id: str, request: Request) -> dict[str, Any]:
+    """The signed per-invocation export (remora/execution/invocation_evidence.py).
+
+    Unlike ``/evidence`` it carries the signed grant and lease with the exact
+    bytes their signatures cover, the chain entries with the strings their
+    hashes cover, and a signature over the whole, so a verifier holding only
+    public keys can check it without this service.
+    """
+    _note_proposal_id(proposal_id)
+    from remora.execution.invocation_evidence import (
+        InvocationEvidenceUnavailable,
+        build_invocation_evidence,
+        evidence_signing_key,
+    )
+
+    tenant, role, _principal = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "read")
+    try:
+        return build_invocation_evidence(
+            _CHAIN.entries(tenant), tenant=tenant, proposal_id=proposal_id,
+            signing_key=evidence_signing_key())
+    except InvocationEvidenceUnavailable as exc:
+        status = {"proposal_not_found": 404,
+                  "evidence_key_unavailable": 503}.get(exc.reason, 409)
+        raise HTTPException(status_code=status, detail=exc.reason) from exc
 
 
 def _evidence_coverage(events: list[dict[str, Any]],

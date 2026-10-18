@@ -4,6 +4,35 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Interop (per-invocation evidence export and request binding)
+
+- New `remora/execution/request_ref.py`: a call may carry the request it
+  arrived in, as the transport, the JSON-RPC id's JSON text and the SHA-256 of
+  the body bytes as received. At ACCEPT its digest enters the
+  `AuthorizationContext` and so the signed grant. Redemption under another
+  reference, or with it stripped, is refused as `context_mismatch` before the
+  grant is spent. A context without one hashes exactly as before.
+- The MCP gateway digests the body bytes before decoding and sends the
+  reference on every `tools/call`.
+- On the direct-ACCEPT path the chain now keeps the grant, in
+  `execution_authorized` after the gate has consumed it, and the lease, in
+  `execution_result` after dispatch. The assessed record keeps the
+  authorization context fields the grant's `context_hash` covers.
+- New `GET /v1/execution/proposals/{id}/invocation-evidence`
+  (`remora/execution/invocation_evidence.py`). It returns the three chain
+  entries with the strings their hashes cover, the grant and lease with the
+  bytes their signatures cover, and one Ed25519 signature over the whole under
+  `REMORA/EVIDENCE/v1`. The new key `REMORA_EVIDENCE_SIGNING_KEY_ED25519_PRIVATE`
+  is declared in the credential topology register.
+- New `integrations/invocation-evidence/`: a verifier that imports no REMORA
+  code and needs public keys only, seven fixture cases made through the server
+  path, and a README. Two requests with the same call are told apart:
+  `request_corresponds` is CONTRADICTED for the other request while
+  `call_corresponds` stays ESTABLISHED.
+- `tests/test_invocation_evidence_export.py` (20 tests) and three gateway
+  tests. The verifier, the export and the cases are REMORA's own, so nothing
+  here is an independent result.
+
 ### Flow control IFC-01 (label lattice)
 
 - New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).

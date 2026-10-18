@@ -425,6 +425,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_hostile_review_2026_10_08.py",
     "tests/test_independent_recorder.py",
     "tests/test_interop_boundary_fixtures.py",
+    "tests/test_invocation_evidence_export.py",
     "tests/test_lease_authority_custody.py",
     "tests/test_lease_nonce_durability.py",
     "tests/test_lease_refusal_hooks_contract.py",

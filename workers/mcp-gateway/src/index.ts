@@ -785,10 +785,17 @@ export default {
     }
 
     let body: JsonRpcRequest | JsonRpcRequest[];
+    // Digested as bytes, before any decoding: a capture on the wire hashes
+    // these bytes, and text re-encoded after a BOM or a replacement
+    // character would not hash the same.
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    const bodySha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
     try {
       // RMR-CR-013: refuse a number this Worker would change before REMORA
       // binds the call, rather than binding the changed value.
-      body = parseJsonStrict(await request.text()) as JsonRpcRequest | JsonRpcRequest[];
+      body = parseJsonStrict(new TextDecoder().decode(bytes)) as
+        JsonRpcRequest | JsonRpcRequest[];
     } catch (e) {
       if (e instanceof UnsafeNumberError) {
         return Response.json(
@@ -820,6 +827,7 @@ export default {
       store: storeFor(env, session),
       newId: () => crypto.randomUUID(),
       env: env as unknown as Record<string, unknown>,
+      bodySha256,
       // The verifier reads the system of record through the Worker's own
       // binding — the same store the write landed in, reached without the
       // container's involvement. It answers "did it happen", not "was the

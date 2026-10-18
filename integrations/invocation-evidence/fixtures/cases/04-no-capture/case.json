@@ -1,0 +1,36 @@
+{
+  "case": "04-no-capture",
+  "why": "The export alone: authority and chain can be checked, the request cannot.",
+  "bundle": "bundle.json",
+  "capture": null,
+  "expected": {
+    "export_authentic": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "chain_consistent": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "authority_bound": {
+      "result": "ESTABLISHED",
+      "codes": []
+    },
+    "call_corresponds": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "no_captured_call"
+      ]
+    },
+    "request_corresponds": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "no_captured_request"
+      ]
+    },
+    "dispatch_recorded": {
+      "result": "ESTABLISHED",
+      "codes": []
+    }
+  }
+}

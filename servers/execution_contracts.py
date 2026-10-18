@@ -255,6 +255,26 @@ class PlanProposal(BaseModel):
         return self
 
 
+class RequestRefModel(BaseModel):
+    """The request a call arrived in (remora/execution/request_ref.py).
+
+    Set by the front end that received the request, never derived here: the
+    transport, the JSON-RPC id's JSON text, and the SHA-256 of the body bytes
+    as received. Bound into the ACCEPT grant's authorization context.
+    """
+
+    transport: str = Field(..., max_length=40)
+    jsonrpc_id: str = Field(..., min_length=1, max_length=200)
+    body_sha256: str = Field(..., min_length=64, max_length=64)
+
+    @model_validator(mode="after")
+    def _well_formed(self) -> RequestRefModel:
+        from remora.execution.request_ref import RequestRef
+
+        RequestRef(self.transport, self.jsonrpc_id, self.body_sha256)
+        return self
+
+
 class ToolCallRequest(BaseModel):
     """The PROPOSAL only (issue #34 trust boundary; full-args binding kept).
 
@@ -304,6 +324,9 @@ class ToolCallRequest(BaseModel):
     # the caller, and only ever intersected with the authenticated
     # principal's own tools, so choosing a task type cannot widen them.
     task_type: str | None = Field(None, min_length=1, max_length=200)
+    # The request this call arrived in. When present it is bound into the
+    # ACCEPT grant, so the grant redeems only with the same reference.
+    request_ref: RequestRefModel | None = None
 
     @model_validator(mode="after")
     def _task_identity_is_whole(self) -> ToolCallRequest:

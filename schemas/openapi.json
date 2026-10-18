@@ -1300,6 +1300,35 @@
         "title": "RejectRequest",
         "type": "object"
       },
+      "RequestRefModel": {
+        "description": "The request a call arrived in (remora/execution/request_ref.py).\n\nSet by the front end that received the request, never derived here: the\ntransport, the JSON-RPC id's JSON text, and the SHA-256 of the body bytes\nas received. Bound into the ACCEPT grant's authorization context.",
+        "properties": {
+          "body_sha256": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Body Sha256",
+            "type": "string"
+          },
+          "jsonrpc_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Jsonrpc Id",
+            "type": "string"
+          },
+          "transport": {
+            "maxLength": 40,
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "jsonrpc_id",
+          "body_sha256"
+        ],
+        "title": "RequestRefModel",
+        "type": "object"
+      },
       "RerunRequest": {
         "properties": {
           "request_id": {
@@ -1558,6 +1587,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PlanProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestRefModel"
               },
               {
                 "type": "null"
@@ -3103,6 +3142,101 @@
           }
         },
         "summary": "Export Evidence",
+        "tags": [
+          "execution"
+        ]
+      }
+    },
+    "/v1/execution/proposals/{proposal_id}/invocation-evidence": {
+      "get": {
+        "description": "The signed per-invocation export (remora/execution/invocation_evidence.py).\n\nUnlike ``/evidence`` it carries the signed grant and lease with the exact\nbytes their signatures cover, the chain entries with the strings their\nhashes cover, and a signature over the whole, so a verifier holding only\npublic keys can check it without this service.",
+        "operationId": "export_invocation_evidence_v1_execution_proposals__proposal_id__invocation_evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Invocation Evidence V1 Execution Proposals  Proposal Id  Invocation Evidence Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "One executed direct-ACCEPT invocation, signed under REMORA/EVIDENCE/v1 for offline verification."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No such proposal for this tenant."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The proposal is not one executed direct ACCEPT with its grant recorded."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No evidence signing key is configured."
+          }
+        },
+        "summary": "Export Invocation Evidence",
         "tags": [
           "execution"
         ]

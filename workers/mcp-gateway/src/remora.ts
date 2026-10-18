@@ -10,11 +10,24 @@
 
 export type Decision = "accept" | "verify" | "abstain" | "escalate";
 
+/** The request a call arrived in (remora/execution/request_ref.py). REMORA
+ *  binds its digest into the ACCEPT grant, so the grant redeems only with the
+ *  same reference, and an outside capture of the request can be matched to
+ *  the exported record by id and body digest rather than by call content. */
+export interface RequestRef {
+  transport: "mcp-streamable-http";
+  /** The JSON-RPC id's JSON text, so 7 and "7" stay distinct. */
+  jsonrpc_id: string;
+  /** Lowercase hex SHA-256 of the HTTP body bytes as received. */
+  body_sha256: string;
+}
+
 export interface ToolCall {
   tool_name: string;
   arguments: Record<string, unknown>;
   target_environment: string;
   intent_ref?: string;
+  request_ref?: RequestRef;
 }
 
 export interface AssessResult {
