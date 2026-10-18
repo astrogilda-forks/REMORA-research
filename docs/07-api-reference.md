@@ -293,6 +293,30 @@ Two server-side authorities cut into `/v1/assess`'s caller freedom:
   assessed as critical/unknown. `ToolCallAssessment.label_source` records
   the source, and `should_execute` is True only for ACCEPT with
   `label_source == "registry"`.
+- Registry labels only, on `/v1/assess`, `/v1/rerun` and the adapters
+  (RMR-AUD-011, 2026-10-18).
+  - `/v1/assess` with a `tool_call` takes `risk_tier` and `action_type`
+    from the server's registry, the same `resolve_tool_metadata` that
+    `/v1/execution/*` uses. A request `risk_tier` may only raise the
+    registered tier. An `action_type` that differs from the registry's caps
+    ACCEPT (`registry_label_conflict`). The environment is the riskier of
+    the declared and requested one. A tool nobody classified is
+    critical/unknown, and the request's labels are ignored.
+  - Without a `tool_call` there is no tool to look up, so the request's
+    labels are the caller's. An engine ACCEPT becomes VERIFY with
+    `caller_labels_untrusted`, in `policy_decision` and in the stored
+    envelope.
+  - The response carries `label_source` (`registry`, `unregistered`,
+    `caller` or `none`) and `label_cap`. The audit record keeps
+    `label_source`.
+  - `/v1/rerun` keeps an ACCEPT only when the original assessment's
+    labels came from the registry. A record without `label_source` is
+    treated as the caller's.
+  - The action-gate adapters in `remora/adapters/` take `registry=` in the
+    same shape as `assess_tool_call`. Without one, an ACCEPT becomes VERIFY
+    and `ActionGateResult.label_cap` says why. `HttpGateway` sends the
+    `tool_call`, and the adapter keeps the server's `label_source` and
+    verdict.
 
 ---
 
@@ -362,16 +386,22 @@ All gateways return an **`ActionGateResult`**:
 class ActionGateResult:
     envelope: DecisionEnvelope
     should_execute: bool   # True only when the gate outcome is ACCEPT
+    label_source: str = "caller"   # "registry", "unregistered" or "caller"
+    label_cap: str | None = None   # why an ACCEPT was lowered to VERIFY
 ```
 
 Adapters are constructed with `gateway=` (not `engine=`); the concrete
 in-process gateway is `LocalGateway` (`remora/adapters/gateway.py`, exposing
-`assess_sync()`), which wraps an `EngineLike` such as `Remora`:
+`assess_sync()`), which wraps an `EngineLike` such as `Remora`. Pass the
+deployment's `registry=` too: without it, the `risk_tier`/`action_type`
+given to `intercept` are the caller's and cannot produce
+`should_execute=True` (RMR-AUD-011):
 
 ```python
 gateway = LocalGateway(engine)                      # wraps the in-process engine
-adapter = LangGraphActionAdapter(gateway=gateway)   # or OpenAIToolCallingAdapter,
-                                                    # CrewAIActionAdapter, AutoGenActionAdapter
+registry = {"search_docs": {"risk_tier": "low", "action_type": "read"}}
+adapter = LangGraphActionAdapter(gateway=gateway,   # or OpenAIToolCallingAdapter,
+                                 registry=registry) # CrewAIActionAdapter, AutoGenActionAdapter
 result = adapter.intercept(
     action_name=..., action_args=..., proposed_by=..., domain=...,
     risk_tier=..., action_type=..., target_environment=..., context=...,

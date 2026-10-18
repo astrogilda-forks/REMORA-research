@@ -857,6 +857,13 @@ export interface components {
             envelope: {
                 [key: string]: unknown;
             };
+            /** Label Cap */
+            label_cap?: string | null;
+            /**
+             * Label Source
+             * @default none
+             */
+            label_source: string;
             /** Oracle Calls */
             oracle_calls: number;
             policy_decision: components["schemas"]["PolicyDecision"];

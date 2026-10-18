@@ -184,8 +184,18 @@ TOOL_CALLS = [
 ]
 
 
+#: Owned by the deployment, not the model: the adapter takes risk tier and
+#: action type from here. Labels the model attaches to a call cannot reach
+#: ACCEPT on their own (RMR-AUD-011).
+DEPLOYMENT_REGISTRY = {
+    "search_knowledge_base": {"risk_tier": "low", "action_type": "read"},
+    "create_support_ticket": {"risk_tier": "medium", "action_type": "write"},
+    "delete_account": {"risk_tier": "critical", "action_type": "destructive_write"},
+}
+
+
 def govern_and_dispatch() -> tuple[list[dict[str, Any]], list[str]]:
-    adapter = OpenAIToolCallingAdapter(gateway=DemoGateway())
+    adapter = OpenAIToolCallingAdapter(gateway=DemoGateway(), registry=DEPLOYMENT_REGISTRY)
     dispatcher = ToolDispatcher()
     outputs: list[dict[str, Any]] = []
 

@@ -146,8 +146,9 @@ def test_action_gate_result_fields() -> None:
     from remora.adapters.action_gate import ActionGateResult
 
     actual = {f.name for f in dataclasses.fields(ActionGateResult)}
-    assert actual == {"envelope", "should_execute"}
+    assert actual == {"envelope", "should_execute", "label_source", "label_cap"}
     assert "should_execute" in DOC_TEXT
+    assert "label_source" in DOC_TEXT and "label_cap" in DOC_TEXT
     # Phantom fields from the old doc must not reappear
     adapters_section = DOC_TEXT.split("## Adapters", 1)[1].split("## Enforcement", 1)[0]
     assert "allowed:" not in adapters_section

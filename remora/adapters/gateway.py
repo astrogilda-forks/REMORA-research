@@ -63,6 +63,11 @@ class GatewayResult:
     source_of_decision: str
     state_hash: str
     fallback_used: bool = False
+    # RMR-AUD-011: set only by a gateway that resolved risk_tier/action_type
+    # itself (HttpGateway given a tool_call); None means the labels are
+    # whatever the caller passed in.
+    label_source: Optional[str] = None
+    label_cap: Optional[str] = None
 
     @property
     def is_safe_to_proceed(self) -> bool:
@@ -250,7 +255,16 @@ class HttpGateway:
 
     Use when the agent framework runs in a different process or container
     from the REMORA engine.
+
+    With a ``tool_call`` the server takes the risk tier and action type from
+    its own tool registry, and the result carries ``label_source``. Without
+    one the server treats the labels as the caller's, and they cannot reach
+    ACCEPT (RMR-AUD-011).
     """
+
+    #: The action-gate adapters send a ``tool_call`` only to gateways that
+    #: declare this.
+    accepts_tool_call = True
 
     def __init__(
         self,
@@ -277,15 +291,19 @@ class HttpGateway:
         action_type: Optional[str] = None,
         target_environment: Optional[str] = None,
         tenant_id: Optional[str] = None,
+        tool_call: Optional[dict] = None,
     ) -> GatewayResult:
-        payload = json.dumps({
+        body_out: dict = {
             "question": question,
             "context": context,
             "domain": domain,
             "risk_tier": risk_tier,
             "action_type": action_type,
             "target_environment": target_environment,
-        }).encode("utf-8")
+        }
+        if tool_call is not None:
+            body_out["tool_call"] = tool_call
+        payload = json.dumps(body_out).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self._bearer_token:
             headers["Authorization"] = f"Bearer {self._bearer_token}"
@@ -319,6 +337,8 @@ class HttpGateway:
             source_of_decision=pd["source_of_decision"],
             state_hash=body["state_hash"],
             fallback_used=pd.get("fallback_used", False),
+            label_source=body.get("label_source"),
+            label_cap=body.get("label_cap"),
         )
 
 

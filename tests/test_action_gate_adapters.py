@@ -104,7 +104,10 @@ def test_verify_outcome_sets_blocked_action_and_refuses_execution() -> None:
 
 
 def test_accept_outcome_has_no_blocked_action() -> None:
-    out = _intercept(LangGraphActionAdapter(gateway=_AcceptGateway()))
+    # Registry-sourced labels: caller labels alone cannot reach ACCEPT
+    # (RMR-AUD-011, tests/test_action_gate_registry.py).
+    registry = {"restart_service": {"risk_tier": "high", "action_type": "write"}}
+    out = _intercept(LangGraphActionAdapter(gateway=_AcceptGateway(), registry=registry))
     assert out.envelope.gate.outcome == "accept"
     assert out.should_execute is True
     assert out.envelope.gate.blocked_action is None

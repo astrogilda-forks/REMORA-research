@@ -426,9 +426,18 @@ class TestExplain:
 # New framework adapters
 # ===========================================================================
 
+#: Caller labels alone cannot reach ACCEPT (RMR-AUD-011); the accept cases
+#: below name their tool in a deployment registry.
+_LOW_READ_REGISTRY = {
+    name: {"risk_tier": "low", "action_type": "read"}
+    for name in ("web_search", "read_file", "read_doc")
+}
+
+
 class TestCrewAIAdapter:
     def test_intercept_tool_low_risk_accepted(self):
-        adapter = CrewAIActionAdapter(gateway=_MockGateway("low"))
+        adapter = CrewAIActionAdapter(gateway=_MockGateway("low"),
+                                      registry=_LOW_READ_REGISTRY)
         result = adapter.intercept_tool(
             "web_search", {"query": "test"},
             domain="research", risk_tier="low", action_type="read",
@@ -461,7 +470,8 @@ class TestCrewAIAdapter:
 
 class TestAutoGenAdapter:
     def test_intercept_function_low_risk(self):
-        adapter = AutoGenActionAdapter(gateway=_MockGateway("low"))
+        adapter = AutoGenActionAdapter(gateway=_MockGateway("low"),
+                                       registry=_LOW_READ_REGISTRY)
         result = adapter.intercept_function_call(
             "read_file", {"path": "/docs/readme.md"},
             domain="filesystem", risk_tier="low", action_type="read",
@@ -506,7 +516,7 @@ class TestAsyncGateway:
     def test_async_action_gate_intercept(self):
         sync_gw = _MockGateway("low")
         async_gw = AsyncLocalGateway(sync_gateway=sync_gw)
-        gate = AsyncActionGate(gateway=async_gw)
+        gate = AsyncActionGate(gateway=async_gw, registry=_LOW_READ_REGISTRY)
 
         async def _run():
             return await gate.intercept(

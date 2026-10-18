@@ -98,6 +98,17 @@ class DirectPolicyGateway:
 # Simulated CrewAI BaseTool
 # ---------------------------------------------------------------------------
 
+#: Owned by the deployment, not the crew: the adapter takes risk tier and
+#: action type from here. Labels an agent attaches to a call cannot reach
+#: ACCEPT on their own (RMR-AUD-011).
+DEPLOYMENT_REGISTRY = {
+    "web_search": {"risk_tier": "low", "action_type": "read"},
+    "send_report_email": {"risk_tier": "medium", "action_type": "write"},
+    "update_customer_record": {"risk_tier": "high", "action_type": "write"},
+    "delete_all_inactive_users": {"risk_tier": "critical", "action_type": "destructive_write"},
+}
+
+
 @dataclass
 class GovernedTool:
     """Simulates a CrewAI BaseTool with REMORA governance wired in."""
@@ -110,7 +121,8 @@ class GovernedTool:
 
     def __post_init__(self):
         self._adapter = CrewAIActionAdapter(
-            gateway=DirectPolicyGateway(risk_tier=self.risk_tier)
+            gateway=DirectPolicyGateway(risk_tier=self.risk_tier),
+            registry=DEPLOYMENT_REGISTRY,
         )
         self.calls: list[ActionGateResult] = []
 
