@@ -27,6 +27,72 @@ This file lists externally relevant changes by release. Fine-grained development
   property in `tests/policy/test_meet_composition.py`, and the never-weakens
   tests cover monitor and protocol caps. The version label stays
   `RemoraDecisionEngine-v5`; the SDD reserves v6 for the flow rungs.
+### Flow control IFC-05a (recipients and the flow check)
+
+- `remora/flow/check.py`: `recipients` computes who receives a resolved
+  call's payload from the ToolSpec sink (email, principal, URL host, IBAN,
+  resource ACL, static), plus the provider of a tool outside the TCB. An
+  argument that cannot be mapped to one canonical principal (a display-name
+  address, a URL with user information or a non-http scheme) is unresolved,
+  and the check counts it as a confidentiality violation.
+- `flow_check` returns a `FlowVerdict` with the confidentiality, integrity
+  (including parameter role binding) and control violations of SDD §3.5,
+  and a digest over the violations and the payload label for the lease to
+  bind (§3.8).
+- The four invariant tests the SDD makes mandatory for IFC-05 pass at the
+  level of the check: a TRUSTED parameter handle satisfies
+  `integrity_required` after an untrusted read; the same value retyped does
+  not; a parameter in a field that does not accept its role is refused; and
+  the payload label includes the context label when only handles are passed.
+- Not yet wired: no decision reads the verdict. Rungs F1 to F6 in the
+  decision engine are IFC-05b (protected path).
+
+### Flow control IFC-04a (result labelling and handles)
+
+- `remora/flow/labeler.py`: `FlowLabeler.label_result` gives every node of
+  a JSON tool result a label from the ToolSpec `flow.sources` rules and
+  decides what the model sees. A node is shown by value only when its rule
+  says BY_VALUE and its label flows to the model principal; otherwise it and
+  everything under it becomes one handle labelled with the join of the
+  subtree. Every label is joined with the call's argument labels. The
+  labeler is pure: it returns the rendered result, the label to raise the
+  context by and the handle records to store.
+- `remora/flow/handles.py`: fixed-width `⟦h:…⟧` tokens (80 random bits),
+  records valid only in the minting context and its descendants, and
+  `HandleStore.resolve`, which substitutes handles anywhere in a call's
+  arguments and returns a value label per field (`L_h` for a whole-handle
+  field, `L_ctx ⊔ …` otherwise). A foreign, unknown or expired handle is
+  refused with `flow_handle_invalid`.
+- `remora/flow/render.py`: the agent-facing handle reference, with a type
+  tag taken only from a declared field `type` (new optional key in the
+  ToolSpec v4 block).
+- Two readings of the SDD are stated in the module docstrings. Rules match
+  exact paths and are not inherited. A container's structure carries the
+  container's own label.
+- Not yet wired: no dispatcher calls the labeler (IFC-04b), and handles are
+  held in process only; the durable, encrypted backend follows separately.
+
+### Flow control IFC-03a (ToolSpec v4 `flow` block, parser and linter)
+
+- `schemas/tool_spec_v4.yaml` defines the signed `flow` block: `sources`
+  (how each result field is labelled and whether the model sees it by value
+  or as a handle) and `sink` (who receives the arguments).
+- `remora/flow/spec.py` parses a block into frozen data and refuses any key
+  it does not define (`toolspec_flow_invalid`). Defaults fail closed: an
+  undeclared field is UNTRUSTED, a handle, and readable by the user alone.
+- Thirteen lint rules, FL-01 to FL-13, each with a test. They include the
+  four the SDD names for IFC-03 (a url argument under `recipients: none`, an
+  unknown argument in `integrity_required`, BY_VALUE on undeclared fields, a
+  missing block under the strict profile) and the ones §3.3 and §3.5 assign
+  to the linter.
+- Three fields go beyond the SDD's §5.1 excerpt, because a rule could not be
+  checked without them: `provider` (where the tool runs), `arguments` (the
+  kind of every argument, since the argument schema refuses `format`) and a
+  `disclosure` per source metadata entry. The schema file states why.
+- `scripts/check_toolspec_flow.py [--strict] BUNDLE...` lints a bundle
+  before signing.
+- Not yet wired: the bundle loader does not accept schema version 4 until
+  IFC-03b, so no deployment can carry a block yet.
 ### Flow control IFC-02b (`POST /v1/contexts`)
 
 - `POST /v1/contexts` mints a flow context for the authenticated principal
