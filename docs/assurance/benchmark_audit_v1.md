@@ -73,7 +73,7 @@ The primary leakage risk is documented as M1 in `remediation_register.yaml`. Pri
 ### Selective Prediction Benchmark (N=544)
 
 - Split: 80/20 stratified by source, seed=42. Training split: N=436; held-out split: N=108.
-- Threshold lock: τ* = 0.2032 selected on training split, locked before holdout was touched (documented in `docs/assurance/statistical_analysis_plan.md` §1). No re-optimisation on holdout.
+- Threshold lock: τ* = 0.2032 selected on training split, locked before holdout was touched (documented in `docs/assurance/statistical_analysis_plan.md` §1). No re-optimisation on holdout. This is the SAP v1 round, superseded by the SAP v2 round, whose locked threshold is τ* = 0.4991 (`results/selective_n500_holdout_results.json`).
 - Held-out result (re-issued 2026-07-27, SAP v2 clean round): N_accepted=18 on the held-out split, accuracy=100.0% at 16.7% coverage. Wilson CI [82.4%, 100.0%]; exact one-sided binomial vs the training-split null p0=84.86% gives p=0.052. This is a **directional observation only**: the SAP requires N_accepted >= 100 for generalization claims. The figures this audit originally recorded (N_accepted=25, accuracy 88%, CI [70.0%, 95.8%]) predate that re-issue and are stale.
 - Split label: `CLAIM-004` in `claim_register_v1.yaml` correctly describes this as a held-out split result with the CI and sample-size caveat. It is now **superseded by CLAIM-012**: the temperature signal it ranks on failed its pre-registered fresh-data confirmation. Archive: `superseded_claims.md`.
 
@@ -169,7 +169,7 @@ The primary leakage risk is documented as M1 in `remediation_register.yaml`. Pri
 | Toolcall benchmark v2 | v2 (current) | `artifacts/toolcall_benchmark_v2.json` | Yes (AST leakage detector) | v1 superseded; M1 fix documented |
 | Toolcall blind v3 | v3 (stricter label separation) | `benchmarks/toolcall_blind_v3/` | Yes (blinded files) | Supersedes v2 for citation; v2 retained for history |
 | Learning ablation arena | v1 (85-case, 13 categories) | `remora/aromer/evals/replay_arena/` | Yes (regression test) | adversarial_hard (8 cases) evaluated separately |
-| N500 selective benchmark | locked | `artifacts/benchmark_n500_locked.json` | Yes (checksum in manifest) | Held-out split frozen at τ*=0.2032, seed=42 |
+| N500 selective benchmark | locked | `artifacts/benchmark_n500_locked.json` | Yes (checksum in manifest) | Held-out split frozen at τ*=0.2032, seed=42 (SAP v1 round; superseded, SAP v2 τ*=0.4991) |
 | AgentHarm external | v1 (2026-06-29) | `results/external_benchmark_agentharm_v1.json` | Yes (REM-014 gate checksum) | Third-party dataset; sha256 in artifact_manifest_v1.md |
 | False-accept regression | v1 (167 episodes) | `results/false_accept_regression_v1.json` | Yes (REM-019 gate checksum) | Internal corpus; 2 exclusions documented |
 
