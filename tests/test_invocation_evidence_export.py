@@ -512,3 +512,27 @@ def test_a_batch_member_grant_does_not_redeem_for_its_sibling(world, verifier):
     outcome = _check(verifier, _export(client, proposal_id).json(),
                      capture_ref={"jsonrpc_id": "8", "body_sha256": second["body_sha256"]})
     assert outcome["claims"]["request_corresponds"]["result"] == "CONTRADICTED"
+
+
+# Etappe 1, probe P2 (design review INV-12): a grant outlives a policy revision.
+
+def test_a_grant_issued_before_a_policy_revision_is_refused_unspent(world, monkeypatch):
+    """The policy bundle hash is in the signed context. After a revision the
+    recomputed context differs, so the grant is refused before consumption,
+    and it redeems again once the original policy is back."""
+    from servers import execution_api as execution
+
+    client, calls = world
+    ref = _ref(BODY, "7")
+    token = client.post("/v1/execution/assess", json=_proposal(ref),
+                        headers=HEADERS).json()["execution_token"]
+    original = execution._current_policy_bundle_hash
+    monkeypatch.setattr(execution, "_current_policy_bundle_hash", lambda: "f" * 64)
+    revised = client.post("/v1/execution/execute-accepted", headers=HEADERS,
+                          json={"execution_token": token, "tool_call": _proposal(ref)})
+    assert revised.status_code == 409 and "context_mismatch" in revised.text, revised.text
+    assert calls == []
+    monkeypatch.setattr(execution, "_current_policy_bundle_hash", original)
+    restored = client.post("/v1/execution/execute-accepted", headers=HEADERS,
+                           json={"execution_token": token, "tool_call": _proposal(ref)})
+    assert restored.status_code == 200 and len(calls) == 1
