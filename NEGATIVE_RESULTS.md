@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-18: **26 `open`**, **27 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-18: **26 `open`**, **28 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -5087,3 +5087,42 @@ into it. A fix needs a contract decision first: a declared baseline per
 field, or a target-side operation id or revision that the dispatch returns
 and the reader confirms. Until then, causal attribution is NOT_ESTABLISHED
 for every effect REMORA verifies.
+
+## §85 The Worker edge collapsed repeated JSON members before the API could refuse them (2026-10-18)
+<!-- finding-status: accepted -->
+
+**Status:** found and fixed in the same change. The fix is the edge refusing,
+as it already did for numbers (RMR-CR-013).
+
+The execution API's strict ingress refuses a body with a repeated object
+member (`json_duplicate_member`, `servers/strict_json_ingress.py`). Both
+Workers (`mcp-gateway`, `agent-control`) parsed with `JSON.parse`, which
+keeps the last value. They then re-serialised the call to the API without the
+duplicate, so the API's check never saw it. A body such as
+`"arguments":{"repo":"o/r","repo":"evil/x"}` reached REMORA as `evil/x`. A
+reader that keeps the first value would read `o/r` over the same bytes: a
+proxy capturing the request, a reviewer reading the raw body, or a parser in
+another language. The request reference added in PR #920 makes this sharper.
+Two parties can hold the same `body_sha256` and still read different calls.
+`call_corresponds` would expose the divergence on the capture side, but only
+for a party that recomputes the call hash.
+
+Found while probing JSON ambiguity for the external design review of #920
+(finding F-11 asked for one strict JSON domain on both sides). No exploit in
+a deployment is known or claimed. The gateway is a test deployment, and the
+call that ran is the one REMORA bound and recorded.
+
+**Fix.** `parseJsonStrict` (byte-identical in both Workers) now refuses a
+repeated member name, compared after decoding as the Python ingress compares
+it, with `DuplicateMemberError` (`duplicate_member`). Both edges answer it as
+they answer an unsafe number.
+
+**Evidence.** `workers/mcp-gateway/test/json_numbers.test.ts` (refused and
+accepted bodies, including an escaped duplicate `"\u0061"`).
+`tests/test_worker_unsafe_numbers.py::test_the_worker_refuses_exactly_the_members_the_api_ingress_refuses`
+checks the Worker against `admit_strict_json` body by body.
+
+**What it does not cover.** Other ambiguities between parsers, such as
+Unicode normalisation of member names or byte-order marks, are not tested
+here. The edge and the API agree on the cases above, not on every JSON
+document.

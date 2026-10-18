@@ -4,6 +4,19 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §85)
+
+- Both Workers parsed request bodies with `JSON.parse`, which keeps the last
+  value of a repeated member, and re-serialised the call without the
+  duplicate. The API's strict ingress (`json_duplicate_member`) therefore
+  never saw it, and a first-value reader of the same bytes would read another
+  call. `parseJsonStrict` (byte-identical in `mcp-gateway` and
+  `agent-control`) now refuses a repeated member name after decoding, and
+  both edges answer it as they answer an unsafe number.
+- `NEGATIVE_RESULTS.md` §84 (open) records that `EFFECT_VERIFIED` does not
+  attribute the observed delta to the dispatch; §85 (accepted) records this
+  finding and its fix.
+
 ### Interop (effect-evidence-v1 limits found by the invocation axes corpus, #918)
 
 - Probity's `invocation_axes` corpus at `d2bdacc7` (23 cases, 22 bundles)

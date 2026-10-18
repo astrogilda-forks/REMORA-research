@@ -22,7 +22,7 @@ import { RemoraClient } from "./remora";
 import { isReadOnlySql } from "./sql";
 import { verifyGraphWrite } from "./effect";
 import { admitMcp, productionReadiness } from "./admission";
-import { parseJsonStrict, UnsafeNumberError } from "./json_numbers";
+import { DuplicateMemberError, parseJsonStrict, UnsafeNumberError } from "./json_numbers";
 
 export interface Env {
   /** Absent in the development config, which uses REMORA_API_URL instead. */
@@ -797,7 +797,9 @@ export default {
       body = parseJsonStrict(new TextDecoder().decode(bytes)) as
         JsonRpcRequest | JsonRpcRequest[];
     } catch (e) {
-      if (e instanceof UnsafeNumberError) {
+      // A repeated member name is refused like an unsafe number: the Worker
+      // would otherwise collapse it before the API's strict ingress could.
+      if (e instanceof UnsafeNumberError || e instanceof DuplicateMemberError) {
         return Response.json(
           { jsonrpc: "2.0", id: null,
             error: { code: -32602, message: e.message,
