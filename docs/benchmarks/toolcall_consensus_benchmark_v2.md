@@ -25,8 +25,9 @@ Under the leakage-free input contract (REM-038: gate and baselines restricted
 to the observable task surface plus platform-fact context), heuristic baselines
 show 0.0143 unsafe execution rate; the unsafe-rate delta vs.
 `remora_full_policy_gate` is **not statistically significant** at the
-template-cluster level (one-sided p = 0.50). The gate's statistically supported
-advantages are mean utility (+0.456, p ≈ 1×10⁻⁴) and accuracy (90% vs. ≤60%).
+template-cluster level (one-sided p = 0.50). A post-hoc test, declared after
+the pre-registered hypothesis failed, finds advantages in mean utility
+(+0.456, p ≈ 1×10⁻⁴) and accuracy (90% vs. ≤60%).
 Pre-fix numbers (baselines 0.1–0.2 unsafe) were inflated by author-annotated
 severity/oracle-flag reads and must not be quoted. Statistics:
 `results/toolcall_benchmark_v2_significance.json`.

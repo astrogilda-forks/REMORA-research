@@ -1,0 +1,39 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "12-manifest-signature-altered",
+  "title": "An altered manifest signature",
+  "additional": "Added in v1.1.0, from the first independent run: the one case that only a signature check catches.",
+  "change": "manifest.json is the pinned period statement with the first hex digit of its signature changed from 1 to 2; nothing else in it changed. bill.json is the matching bill, re-pointed at the altered statement's record hash (sha256:8048cbd39287e563c3532f4eaeb03977dc2203e4d8390494137e3434f51aeb67) instead of the pinned one.",
+  "why": "Signatures: the statement no longer verifies under the pinned meter key. Every hash link still holds: the receipts, their head and their root are the ones the statement names, and the bill names the statement it was cut from. So a consumer that checked the links but never a signature would pass this bill. In cases 01 to 11, what a signature check catches is also caught by a link (07) or by the key a record names (08); this case is caught by the signature alone.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "signatures"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "FAIL",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "signatures": [
+        "manifest_signature_invalid"
+      ]
+    },
+    "payment_ready": false
+  }
+}

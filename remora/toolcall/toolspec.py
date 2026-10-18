@@ -40,6 +40,7 @@ from remora.toolcall.argument_schema import check_schema, validate
 if TYPE_CHECKING:
     from remora.capabilities.ceiling import DownstreamCeiling
     from remora.crypto import SigningKey, VerificationKey
+    from remora.flow.spec import FlowSpec
 
 __all__ = [
     "ToolSpec",
@@ -156,7 +157,7 @@ def _spec_hash(spec: Mapping[str, Any]) -> str:
 #: Bundle schema versions this loader understands. Version 2 adds the
 #: optional ``downstream_capabilities`` declaration; a version-1 bundle that
 #: carries one is refused rather than read with a field it never defined.
-SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3)
+SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3, 4)
 
 #: Schema version 3 (CR-005): how a tool reaches effects, as a signed claim.
 #: MEDIATED: every effect goes through the mediator, within the declared
@@ -189,6 +190,32 @@ def _effect_policy(raw: Mapping[str, Any]) -> tuple[str | None, str | None]:
                 f"tool spec {raw.get('tool_id')!r}: direct_effect_credentials {direct!r} "
                 f"is not one of {list(DIRECT_EFFECT_CREDENTIAL_POLICIES)}")
     return mode, direct
+
+
+def _flow(raw: Mapping[str, Any]) -> "FlowSpec | None":
+    """The spec's ``flow`` block (schema version 4, IFC-03), parsed and linted.
+
+    A block that does not parse, or breaks a lint rule, refuses the bundle
+    even though it is signed: a signature says who wrote the block, not that
+    it can be enforced. A spec without a block gets None here; whether that is
+    allowed is the strict profile's question (FL-13), asked at startup.
+    """
+    if "flow" not in raw:
+        return None
+    from remora.flow.spec import FlowSpecRefused, lint_flow, parse_flow
+
+    tool_id = str(raw.get("tool_id", "?"))
+    try:
+        flow = parse_flow(raw["flow"])
+    except FlowSpecRefused as exc:
+        raise ToolSpecRefused(exc.reason_code, f"tool spec {tool_id!r}: {exc}") from exc
+    findings = lint_flow(flow, argument_schema=raw.get("argument_schema", {}),
+                         action_type=raw.get("action_type"),
+                         effect_mode=raw.get("effect_mode"), tool_id=tool_id)
+    if findings:
+        raise ToolSpecRefused("toolspec_flow_lint_failed",
+                              "; ".join(str(f) for f in findings))
+    return flow
 
 
 def _downstream(raw: Mapping[str, Any]) -> "DownstreamCeiling | None":
@@ -242,6 +269,9 @@ class ToolSpec:
     #: strict v2 contract refuses: an unstated effect mode is unknown, not none.
     effect_mode: str | None = None
     direct_effect_credentials: str | None = None
+    #: Schema version 4 (IFC-03): how results are labelled and where the
+    #: arguments go. None when the spec has no block.
+    flow: "FlowSpec | None" = None
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "ToolSpec":
@@ -304,6 +334,7 @@ class ToolSpec:
             downstream_capabilities=_downstream(raw),
             effect_mode=_effect_policy(raw)[0],
             direct_effect_credentials=_effect_policy(raw)[1],
+            flow=_flow(raw),
         )
 
 
@@ -524,6 +555,12 @@ class ToolSpecBundle:
                 raise ToolSpecRefused(
                     "toolspec_effect_policy_requires_v3",
                     f"tool spec {raw.get('tool_id')!r} declares an effect policy in a "
+                    f"schema_version {schema_version} bundle",
+                )
+            if schema_version < 4 and "flow" in raw:
+                raise ToolSpecRefused(
+                    "toolspec_flow_requires_v4",
+                    f"tool spec {raw.get('tool_id')!r} declares a flow block in a "
                     f"schema_version {schema_version} bundle",
                 )
             spec = ToolSpec.from_mapping(raw)

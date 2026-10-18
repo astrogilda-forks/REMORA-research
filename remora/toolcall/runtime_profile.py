@@ -157,6 +157,8 @@ def validate_runtime_profile_prerequisites() -> str:
             "every call would hard-abstain as INTENT_PROVENANCE_REQUIRED."
         )
 
+    _check_flow_control(profile)
+
     # Custody last, so its message is never the one hiding a plainer problem.
     assert_custody_split(strict=True)
 
@@ -171,6 +173,43 @@ def validate_runtime_profile_prerequisites() -> str:
 
     _check_contract(profile)
     return profile
+
+
+#: Derived information-flow control (SDD v1.3). ``1`` turns it on; any other
+#: value leaves it off.
+ENV_FLOW_CONTROL = "REMORA_FLOW_CONTROL"
+
+
+def _check_flow_control(profile: str) -> None:
+    """FL-13: under a strict profile with flow control on, every signed spec
+    says how its results are labelled and where its arguments go.
+
+    A spec without a ``flow`` block would leave the flow check with nothing to
+    compute recipients from, so the process refuses to start rather than
+    decide such a tool on defaults. The blocks that are present were already
+    parsed and linted when the bundle loaded.
+    """
+    if os.getenv(ENV_FLOW_CONTROL, "").strip() != "1":
+        return
+    from remora.execution.authorization import load_toolspec_bundle
+    from remora.toolcall.toolspec import ToolSpecRefused
+
+    try:
+        bundle = load_toolspec_bundle(os.environ)
+    except (ToolSpecRefused, OSError, ValueError) as exc:
+        raise RuntimeProfileError(
+            f"REMORA runtime profile {profile!r} with {ENV_FLOW_CONTROL}=1: the signed "
+            f"ToolSpec bundle did not load: {exc}") from exc
+    if bundle is None:
+        raise RuntimeProfileError(
+            f"REMORA runtime profile {profile!r} with {ENV_FLOW_CONTROL}=1 requires a "
+            "signed ToolSpec bundle")
+    missing = [spec.tool_id for spec in bundle.tool_specs() if spec.flow is None]
+    if missing:
+        raise RuntimeProfileError(
+            f"REMORA runtime profile {profile!r} with {ENV_FLOW_CONTROL}=1 refuses to "
+            f"start: FL-13, no flow block for {', '.join(missing)} "
+            "(schemas/tool_spec_v4.yaml)")
 
 
 #: Where the BindingPolicy is read from (CR-006, A2).

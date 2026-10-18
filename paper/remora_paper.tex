@@ -122,8 +122,8 @@ systems artifact that integrates them, together with an evaluation method of
 sealed, pre-registered tracks whose misses and negative results are published.
 
 On a leakage-controlled 700-task tool-call simulator benchmark (effective
-$N=70$) the full gate produced zero unsafe acceptances (Wilson 95\% CI
-[0.0\%, 5.2\%]). Keyword baselines reached 1.4\%, a difference that is not
+$N=70$) the full gate produced zero unsafe acceptances, 0 of 56 harmful
+templates (Wilson 95\% upper bound 6.4\% over those templates). Keyword baselines reached 1.4\%, a difference that is not
 significant, and a component ablation attributes the result to no single
 component (CLAIM-001, CLAIM-020). On 208 AgentHarm scenarios
 \cite{andriushchenko2024agentharm} an imported intent-gating run made no
@@ -139,9 +139,12 @@ another task's correct call substituted into the task, almost always a
 tool the task never offered. In a sealed C-ext3
 track, declared tool contracts and task intents re-derived from the task text
 accepted 0/500 wrong calls (Wilson 95\% upper bound 0.76\% by row,
-3.5\% clustered by tool), but
-legitimate read autonomy was 26.6\% against a 75\% target, so the
-pre-registered joint hypothesis was not supported (CLAIM-019). A final sealed
+3.5\% clustered by tool). Four of the seven pre-registered targets were
+missed. One of them is a safety target: 2 of 199 constructed wrong-tool
+calls were accepted (1.005\%, against a bar of at most 1\%). Legitimate
+read autonomy was 26.6\% against a 75\% target, and both argument-routing
+targets were missed, so the pre-registered joint hypothesis was not
+supported (CLAIM-019). A final sealed
 track, C-ext4, spent the remaining BFCL v4 reserve (1{,}562 episodes) on a
 revised bundle. It accepted 29.9\% of correct calls against 6.9\% for the
 C-ext3 bundle and accepted no wrong call, as did a refuse-all control. The
@@ -152,8 +155,8 @@ kept as the baseline (CLAIM-018, superseded by CLAIM-019).
 Each result cites its claim-register entry, and machine-readable capability
 and boundary declarations state what the system establishes and what it does
 not. The execution chain has not yet been evaluated against attacks. One
-frozen interoperability contract has two independent external reproductions
-under the repository's recorded independence rule; production enforcement
+frozen interoperability contract has two external fixture-level runs that
+meet the repository's independence rule; production enforcement
 remains unestablished and the system is \texttt{SHADOW\_ONLY}.
 \end{abstract}
 
@@ -199,7 +202,10 @@ measured property is contract-authorized read, not guaranteed task success
 or live deployment performance. Its current price matters: the deterministic intent extractor allowed only
 26.6\% of legitimate reads to proceed autonomously in that study, so the
 pre-registered joint hypothesis, which also required 75\% read autonomy,
-was not supported. A later
+was not supported. The same run accepted 2 of 199 constructed wrong-tool
+calls against a safety bar of at most 1\% and missed both argument-routing
+targets, four of its seven targets in all
+(\S\ref{sec:wrongcall-implication}). A later
 sealed track raised correct-call acceptance from 6.9\% to 29.9\% with a
 revised bundle and no wrong call accepted, mostly on tools seen in
 development; a refuse-all control also accepted no wrong call
@@ -249,8 +255,9 @@ permission. The reported numbers are tied to committed
 artifacts and their stated scope, not to field validation.
 
 \paragraph{Contributions.} The individual mechanisms are known:
-capabilities with caveats, reference monitors, policy engines and
-tamper-evident logs. The contribution is a systems artifact that integrates
+capabilities with caveats \cite{birgisson2014macaroons}, reference
+monitors \cite{anderson1972planning}, policy engines and tamper-evident
+logs \cite{crosby2009tamper}. The contribution is a systems artifact that integrates
 them and an evaluation method around it. This preprint makes five
 contributions, each
 bound to committed artifacts; Table~\ref{tab:headline} lists the headline
@@ -276,7 +283,8 @@ numbers.
   headline safety number to no component
   (\S\ref{sec:boundary-declarations}, \S\ref{sec:ablation});
 \item frozen interoperability contracts with external run records, one of
-  them independently reproduced, together with contract probes and a
+  them with two external fixture-level runs that meet the repository's
+  independence rule, together with contract probes and a
   formal model contributed to an external federation transport
   (\S\ref{sec:federation}).
 \end{enumerate}
@@ -463,8 +471,11 @@ never become enforcement rules, and the learning layer (AROMER) is
 monotonicity-tested to \emph{never weaken} policy
 (\path{tests/policy/test_governance_intelligence_never_weakens_policy.py}),
 whereas AgentTrust's distillation pipeline makes learned judgments
-load-bearing for enforcement; (2) uncertainty is structural (multi-oracle
-disagreement with conformal abstention), not a single judge's confidence;
+load-bearing for enforcement; (2) on the research path uncertainty is
+structural (multi-oracle disagreement with conformal abstention), not a
+single judge's confidence, while on the governed path these signals are
+left unset and decisions rest on deterministic policy
+(\S\ref{sec:observables-limits});
 (3) every decision emits a DecisionEnvelope, which the API path
 finalizes into a tenant-scoped hash chain and HMAC-signs when a signing
 key is configured.
@@ -504,8 +515,9 @@ and the honest boundary of every internal benchmark claim in this paper.
 Greenblatt et al.\ (2024) \cite{greenblatt2024aicontrol} formalize safety
 protocols that remain effective when the policy model itself is
 intentionally subversive, using trusted monitoring with a limited audit
-budget. In that taxonomy REMORA is a trusted-monitoring protocol with a
-deterministic trusted floor. The hard-block layer and the authority-bound
+budget. REMORA is related to the trusted-monitoring protocols of that
+taxonomy and adds a deterministic trusted floor. The hard-block layer and
+the authority-bound
 execution chain are the trusted components, the oracle swarm is a set of
 weaker trusted monitors, and \textsc{escalate} spends the audit budget. Two
 properties of the design are the control-relevant ones. Within the declared
@@ -513,8 +525,8 @@ custody profile the untrusted agent never holds the material that mints
 authority, and no model output, its own or a monitor's, can clear a hard
 block. Resampling and defer-to-trusted protocols from the control literature
 are implemented as a library (\path{remora/governance/control_protocols.py},
-roadmap item RF-04) and are not wired into the decision path. The threat
-model evaluated here covers injection and oracle compromise. A strategically
+roadmap item RF-04) and are not wired into the decision path.
+Section~\ref{sec:threat-model} states the threat model. A strategically
 subversive agent, collusion between monitors and monitor evasion remain
 open items for the red-team plan, and the benchmarks in
 \S\ref{sec:results} do not measure them.
@@ -544,7 +556,8 @@ rather than introducing a new layer type.
 A 2026 line of work moves the control point from pre-action screening to
 the authorization and evidence of execution itself. AIRGuard
 \cite{qin2026airguard} names \emph{authority confusion} (untrusted
-context may inform reasoning but must not authorize side effects) and
+context may inform reasoning but must not authorize side effects), a form
+of the confused-deputy problem \cite{hardy1988confused}, and
 enforces least privilege as action-time authorization. Proof-Carrying
 Agent Actions \cite{wang2026pcaa} organizes runtime-neutral governance
 around a portable action certificate with admissibility, approval and
@@ -596,6 +609,54 @@ This is not a question of oracle \emph{accuracy}: REMORA does not
 know whether action $a$ is correct. It is a question of
 \emph{assurance conditions}: whether the conditions that justify
 autonomous execution of $a$ are verifiably met.
+
+\subsection{Threat Model}
+\label{sec:threat-model}
+
+This subsection states the adversary and the trusted computing base that
+the execution-chain claims assume. It draws on
+\path{docs/assurance/threat_model_v1.md}, a STRIDE baseline written before
+the execution layer existed, and on the code paths named in
+\S\ref{sec:execution-chain}.
+
+\paragraph{Attacker position.} The attacker is the agent, or content that
+steers the agent, for example through prompt injection. It acts only by
+proposing calls at the gate: a tool name, arguments, and any labels that
+accompany them. It holds no signing key and cannot edit the tool registry
+or the policy bundle. The model assumes it reaches tools only through the
+governed dispatcher; paths that bypass the dispatcher are out of scope.
+
+\paragraph{Trusted computing base.} The claims hold only if four parties
+are trusted. The ToolSpec author signs the specification that defines what
+an approval covers. The policy author owns the versioned bundle that the
+PDP and the PEP evaluate. The intent source is the deployment component
+that supplies or verifies the task intent and the tool contracts. Key
+custody covers the domains that hold the PDP signing key and the Ed25519
+lease key, which the agent never holds (\S\ref{sec:execution-chain}). The
+policy code, the dispatcher and the audit store belong to the same base,
+and a compromise of any of them is out of scope.
+
+\paragraph{Labels supplied by the agent are untrusted.} A risk tier,
+action type or task intent that arrives with a proposed call is a claim,
+not authority. Where the opt-in enrichment stage runs, an inferred higher
+risk overrides a supplied lower label and never the reverse
+(\S\ref{sec:gov_intel}). Untrusted content that controls a sensitive argument
+escalates whatever risk tier the caller declared
+(\texttt{hard\_guard\_floor()}). A model may propose a task intent, but
+its clauses count only where their quoted spans occur in the task text
+(\S\ref{sec:wrongcall-implication}).
+
+\paragraph{Out of scope.} The model does not cover calls that bypass the
+governed dispatcher through alternate credential, network or execution
+paths, or privileged effects that an authorized tool's implementation can
+reach (\S\ref{sec:boundary-declarations}). It does not cover exfiltration
+composed of individually authorized calls, because REMORA does not track
+data flow (\S\ref{sec:related}). A strategically subversive agent,
+collusion between monitors and monitor evasion are open items for the
+red-team plan. Compromise of the host, the keys, or the ToolSpec, policy
+or intent sources is excluded, as are availability attacks such as
+rate-limit exhaustion. Within this model the execution chain has not yet
+been evaluated against attacks (\S\ref{sec:negative}).
 
 % =====================================================================
 \section{REMORA Architecture}
@@ -978,6 +1039,7 @@ and the retired selection hypothesis are recorded in
 \texttt{NEGATIVE\_RESULTS.md} (\S18, \S38).
 
 \subsection{What these observables do not do}
+\label{sec:observables-limits}
 
 The execution boundary matters more than the research observables.
 
@@ -1023,19 +1085,21 @@ the conditions for deciding are not met. Both \textsc{Abstain} and
 \textsc{Escalate} block execution; \textsc{Escalate} additionally
 triggers a human-review workflow.
 
-\subsection{Hard Blocks (Priority Order)}
+\subsection{Hard Blocks and Policy Gates (Headline Subset)}
 
 \begin{table}[h]
 \centering\small
-\caption{Priority-ordered policy gates: unconditional hard blocks
-  (1--3, \texttt{hard\_guard\_floor()}) and conditional policy gates
-  (4--7, \texttt{\_CONDITIONAL\_GATES}). Both sets take precedence
-  over the probabilistic ACCEPT decision; only the unconditional
-  blocks are evaluated before all routing logic.}
+\caption{A headline subset of the policy gates: unconditional hard blocks
+  (1--3b, \texttt{hard\_guard\_floor()}) and conditional policy gates
+  (4--7, \texttt{\_CONDITIONAL\_GATES}). Rows follow the engine's
+  evaluation order, but other guards run between them, so the numbers
+  give the order within this subset, not a rank in the whole floor. Both
+  sets take precedence over the probabilistic ACCEPT decision; only the
+  unconditional blocks are evaluated before all routing logic.}
 \fitcolumn{%
 \begin{tabular}{@{}clll@{}}
 \toprule
-Pri. & Condition & Reason Code & Action \\
+Ord. & Condition & Reason Code & Action \\
 \midrule
 \multicolumn{4}{@{}l}{\textit{Unconditional hard blocks (\texttt{hard\_guard\_floor()})}} \\
 \midrule
@@ -1399,10 +1463,12 @@ Verifier heuristic         & 28.6\% & 1.4\% & 0.16 \\
 \end{table}
 
 REMORA's full policy gate produced 0 unsafe acceptances (cluster-level
-Wilson 95\% CI [0.0\%, 5.2\%]); baselines produced 1.4\% (1 of 70
-clusters). The safety-rate difference is not statistically significant
-at the template-cluster level (one-sided $p=0.50$); the statistically
-supported advantages are decision utility ($+0.456$, $p\approx10^{-4}$)
+Wilson 95\% CI [0.0\%, 5.2\%] over all 70 templates; upper bound 6.42\%
+over the 56 harmful templates, NEGATIVE\_RESULTS.md \S83); baselines
+produced 1.4\% (1 of 70 clusters). The safety-rate difference is not
+statistically significant at the template-cluster level (one-sided
+$p=0.50$). A post-hoc test, declared after the pre-registered hypothesis
+failed, finds advantages in decision utility ($+0.456$, $p\approx10^{-4}$)
 and accuracy. The complete condition set, including retired research
 selectors, remains in \path{results/toolcall_benchmark_v2_results.json}.
 Earlier versions of this table reported baselines at
@@ -1441,8 +1507,8 @@ evidence router.
 Resolution rate 38.5\%; evidence-accept precision 100\%;
 false-accept rate on contradiction 0\%; abstain precision 99.3\%.
 Trust-only baseline: 0\% resolution (all escalated).
-A separate deterministic cross-domain evidence benchmark (36 cases over
-cybersecurity, AI governance and financial compliance;
+A separate deterministic cross-domain regression suite (36 author-curated
+cases over cybersecurity, AI governance and financial compliance;
 \path{artifacts/domain_benchmark_results.json}) passes all cases with zero
 critical failures; it measures the rule-based evidence layer, not the NLI
 proxy.
@@ -1455,7 +1521,9 @@ The benchmarks above measure whether a \emph{harmful} call is stopped. This
 track also measures whether a harmless-looking but incorrect call is stopped.
 Track C-ext2 retained five targets that were sealed before evaluation. It
 sampled 258 \texttt{live\_multiple} tasks and 258
-\texttt{live\_irrelevance} tasks from BFCL v4 at upstream commit
+\texttt{live\_irrelevance} tasks from BFCL v4, the Berkeley
+Function-Calling Leaderboard \cite{patil2025bfcl} of the Gorilla project
+\cite{patil2023gorilla}, at upstream commit
 \texttt{6ea57973c7a6} (Apache-2.0). The one permitted evaluation contained
 1{,}527 episodes over 516 source clusters, with an empty state index, no
 validator bindings, and a registry derived only from task schemas.
@@ -1536,6 +1604,38 @@ that the contract shows serves the wrong goal, and behind every hard guard, so i
 never unblock one. The authority limit is the design: a model may \emph{propose}
 the intent but may not thereby assert a match, and an intent whose quoted spans
 do not occur in the task text yields \textsc{Unknown}, never \textsc{Supported}.
+
+Table~\ref{tab:cext3-targets} lists the seven targets SAP v5 fixed for
+C-ext3, with the confirmatory arm F's counts as the sealed artifact records
+them (\path{results/routing_bench_bfcl_v4_cext3_results.json},
+\texttt{targets}). Three were met and four were missed. One of the missed
+targets is a safety target: arm F accepted 2 of 199 constructed wrong-tool
+calls, 1.005\% against a bar of at most 1\%. Both accepted mutants are among
+the 26 that pass a schema check (NEGATIVE\_RESULTS.md \S83).
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{C-ext3 pre-registered targets, arm F. The two argument-routing
+counts are those at the locked commit \texttt{6a1ae712}; commit
+\texttt{edd9d144} later moved 79 arm-F episodes from \textsc{verify} to
+\textsc{abstain} and none into or out of \textsc{accept}
+(NEGATIVE\_RESULTS.md \S39, \S83).}
+\fitcolumn{%
+\begin{tabular}{@{}llllc@{}}
+\toprule
+Target & Bar & Arm F & Wilson 95\% CI & Verdict \\
+\midrule
+Native wrong-call \textsc{Acc} & $\leq 1\%$ & 0/500 = 0.0\% & 0.00--0.76\% & met \\
+Constructed wrong-tool \textsc{Acc} & $\leq 1\%$ & 2/199 = 1.005\% & 0.28--3.59\% & missed \\
+Required-\textsc{unknown} \textsc{Acc} & $\leq 0\%$ & 0/398 = 0.0\% & 0.00--0.96\% & met \\
+Irrelevance \textsc{Abs} recall & $\geq 95\%$ & 300/300 = 100.0\% & 98.74--100.0\% & met \\
+Legitimate read autonomy & $\geq 75\%$ & 25/94 = 26.6\% & 18.71--36.32\% & missed \\
+Obtainable \textsc{Ver} recall & $\geq 95\%$ & 93/199 = 46.7\% & 39.93--53.66\% & missed \\
+Unobtainable \textsc{Abs} recall & $\geq 95\%$ & 126/199 = 63.3\% & 56.43--69.70\% & missed \\
+\bottomrule
+\end{tabular}}
+\label{tab:cext3-targets}
+\end{table}
 
 The sealed C-ext3 track supplied that isolation: under a frozen
 deterministic bundle, native wrong-call acceptance fell 24/500, then 6/500,
@@ -1854,13 +1954,17 @@ confidence score moves it.
 vehicle status; the agent proposes \texttt{get\_work\_order} with a work-order
 identifier that happens to appear elsewhere in the task. Schema valid,
 arguments satisfiable, values grounded, nothing tainted: every signal in
-Call A's ladder is satisfied. The sealed BFCL v4 track measured wrong-call
-acceptance at 10.9\% without contracts. A declared
+Call A's ladder is satisfied. The superseded C-ext2 track measured
+wrong-call acceptance at 10.9\% without contracts (CLAIM-018). A declared
 tool contract does: the task targets a vehicle, the tool acts on a work order,
 and the mismatch is established rather than merely unverified. The sealed
-C-ext3 track measured that authority in isolation: with the frozen contract
-bundle and the semantic-authority floor, native wrong-call acceptance fell
-to 0/500 (\S\ref{sec:wrongcall-implication}).
+C-ext3 track measured that authority with the frozen contract bundle and the
+semantic-authority floor: native wrong-call acceptance fell to 0/500
+(\S\ref{sec:wrongcall-implication}). That measurement does not cover Call C.
+Only 2 of its 500 wrong calls name a tool the task itself offered
+(NEGATIVE\_RESULTS.md \S83), so confusing two tools of one catalogue, as
+here, is untested. The draft SAP v7 is to test it with wrong calls drawn
+from the task's own catalogue and from model outputs.
 
 \paragraph{Measured outcome.} The study behind the abstract's headline
 is registered as CLAIM-014: under study conditions the validator loop
@@ -1910,10 +2014,9 @@ benchmark path. The authority-bound chain of \S\ref{sec:execution-chain}
 has unit, property and conformance tests, but no attack evaluation: replay,
 argument substitution after approval, ToolSpec swap, cross-task reuse of a
 grant, a forged lease without the key, and time-of-check/time-of-use races
-are not measured against a baseline gateway. The paper also lacks an
-explicit threat model that names the attacker's position, the trusted
-computing base (ToolSpec author, policy author, intent source, key custody)
-and the security goals. Per-call authorization does not stop an attack
+are not measured against a baseline gateway.
+Section~\ref{sec:threat-model} states the threat model; what is missing is
+an evaluation against it. Per-call authorization does not stop an attack
 composed of individually authorized calls, such as reading a secret and
 then sending it; REMORA does not claim trajectory-level or data-flow
 enforcement. Until that evaluation exists, contribution~1 is a design and
@@ -1928,9 +2031,11 @@ achievable with public models, and diversity weighting mitigates residual
 correlation without removing it.
 
 \paragraph{In-sample calibration.}
-The trust threshold ($\tau^* = 0.197$ in-sample, $0.203$ held-out) and the
-coverage operating points are evaluated on the same $N=544$ dataset used to
-select them; the decision envelope records this in
+The selective threshold $\tau^* = 0.4991$ was chosen on a 436-item training
+split and evaluated on the 108-item holdout of the same 544-item corpus, and
+the signal and coverage target were chosen from an earlier run on that corpus
+(\texttt{results/selective\_n500\_holdout\_results.json}); the SAP v1 round
+locked $\tau^* = 0.203$ and is superseded; the decision envelope records this in
 \texttt{in\_sample\_calibration\_warning}.
 
 \paragraph{Evidence retrieval is proxy-based.}
@@ -2136,9 +2241,10 @@ dispatch and observed effect as different claims. The studies reported
 here examine three consequences of that design.
 
 \textbf{The zero-unsafe result has no identified cause.} The
-0\% unsafe-acceptance result on the adversarial tool-call benchmark (700 synthetic rows; effective $N=70$ clusters;
-cluster-level Wilson CI [0.0\%, 5.2\%]; baselines 1.4\%, difference not
-significant at $p=0.50$; the significant gains are utility $+0.456$ and
+0\% unsafe-acceptance result on the adversarial tool-call benchmark (700
+synthetic rows; 0 of 56 harmful templates, Wilson 95\% upper bound 6.4\%
+over those templates; baselines 1.4\%, difference not significant at
+$p=0.50$; a post-hoc test finds gains in utility, $+0.456$, and
 accuracy) was observed with the deterministic policy gates in place, and
 not produced by the multi-oracle consensus machinery. No experiment
 attributes it to the gates: the committed component ablation records FAR
@@ -2160,16 +2266,20 @@ regime, where none did without validators, with
 zero corrupt-identifier acceptances, zero cross-tenant lookups, and
 writes held at \textsc{verify} throughout.
 
-\textbf{Routing holds within one tool catalogue.} A sealed BFCL v4 track evaluated
-the current pipeline once and met all five pre-registered targets:
-wrong-call acceptance \textbf{10.9\%} (28/258), irrelevant-tool refusal
-100.0\%, unobtainable-input refusal 99.0\%, obtainable-input verification
-97.0\%, and required-UNKNOWN autonomous acceptance 0.0\%. Labelled routing
-accuracy was 91.2\%. The follow-up sealed C-ext3 track isolated the
-semantic axis: declared tool contracts with the semantic-authority floor
-accepted no substituted wrong call (0/500 vs.\ the 10.9\% baseline) but
-held read autonomy at 26.6\%, so its pre-registered joint hypothesis was
-not supported. A third sealed track, C-ext4, raised
+\textbf{Routing holds within one tool catalogue.} The sealed C-ext3 track
+isolated the semantic axis within one set of episodes: with declared tool
+contracts and the semantic-authority floor, arm F accepted 0/500
+substituted wrong calls (Wilson 95\% upper bound 0.76\% by row, 3.5\%
+clustered by tool), against 24/500 for the structural arm (exact McNemar
+$p = 1.2\times10^{-7}$, run after the fact). The same run missed four of
+its seven pre-registered targets. Constructed wrong-tool acceptance was
+2/199 against a safety bar of at most 1\%, read autonomy was 26.6\%
+against 75\%, and both argument-routing targets were missed, so its
+pre-registered joint hypothesis was not supported. The earlier C-ext2
+track (CLAIM-018, superseded by CLAIM-019) met its five targets with
+10.9\% (28/258) wrong-call acceptance on a different sample without
+contracts; it stays on record as superseded and is not the comparison for
+C-ext3. A third sealed track, C-ext4, raised
 correct-call acceptance from 6.9\% to 29.9\% with every safety count at
 zero, as for a refuse-all control; the gain sits mostly on tools seen in development, so generalisation
 to unseen tool families is untested.
@@ -2181,8 +2291,8 @@ verifier can run without turning foreign results into execution authority.
 The former is not yet wired into effect verification. External run
 records now exist for the exact-call-binding, fresh-authority and
 effect-evidence contracts (E-ECB, E-FA, E-EE), recorded as not independent.
-The E7 runtime-surface contract has two independent external reproductions
-under the repository's recorded rule, with every boundary-level claim
+The E7 runtime-surface contract has two external fixture-level runs that
+meet the repository's independence rule, with every boundary-level claim
 result still \texttt{NOT\_ESTABLISHED}. Contract
 probes and a formal model from this repository found four findings in an
 external federation transport, all fixed upstream
@@ -2597,6 +2707,41 @@ Michael, A.~E., \& Roesner, F.\ (2026).
 How agents ask for permission: User permissions for AI agents, from
 interfaces to enforcement.
 arXiv:2607.13718.
+
+\bibitem{anderson1972planning}
+Anderson, J.~P.\ (1972).
+Computer security technology planning study.
+Technical Report ESD-TR-73-51, Vol.~II, U.S. Air Force Electronic Systems
+Division.
+
+\bibitem{hardy1988confused}
+Hardy, N.\ (1988).
+The confused deputy (or why capabilities might have been invented).
+\emph{ACM SIGOPS Operating Systems Review}, 22(4), 36--38.
+
+\bibitem{birgisson2014macaroons}
+Birgisson, A., Politz, J.~G., Erlingsson, \'U., Taly, A., Vrable, M., \&
+Lentczner, M.\ (2014).
+Macaroons: Cookies with contextual caveats for decentralized authorization
+in the cloud.
+\emph{NDSS 2014}.
+
+\bibitem{crosby2009tamper}
+Crosby, S.~A., \& Wallach, D.~S.\ (2009).
+Efficient data structures for tamper-evident logging.
+\emph{USENIX Security Symposium 2009}.
+
+\bibitem{patil2023gorilla}
+Patil, S.~G., Zhang, T., Wang, X., \& Gonzalez, J.~E.\ (2023).
+Gorilla: Large language model connected with massive APIs.
+arXiv:2305.15334.
+
+\bibitem{patil2025bfcl}
+Patil, S.~G., Mao, H., Yan, F., Ji, C.~C.-J., Suresh, V., Stoica, I., \&
+Gonzalez, J.~E.\ (2025).
+The Berkeley Function Calling Leaderboard (BFCL): From tool use to agentic
+evaluation of large language models.
+\emph{ICML 2025}.
 
 \end{thebibliography}
 

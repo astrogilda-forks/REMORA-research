@@ -1,0 +1,38 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "09-period-mismatch",
+  "title": "A period mismatch",
+  "change": "bill.json states period 2026-09 while naming the August 2026 manifest.",
+  "why": "Scope binding: the bill's period must equal the manifest's; the consumer refuses a mismatch and does not compare the bill with the receipts.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "scope"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "FAIL",
+      "coverage_bill_to_receipts": "NOT_EVALUATED",
+      "coverage_receipts_to_bill": "NOT_EVALUATED",
+      "uniqueness": "NOT_EVALUATED",
+      "quantities": "NOT_EVALUATED",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "scope": [
+        "period_mismatch"
+      ]
+    },
+    "payment_ready": false
+  }
+}

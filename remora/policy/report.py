@@ -138,6 +138,10 @@ class DecisionReason(str, Enum):
     # Capability minimization (quality program Q8.2): the proposed tool is not
     # in the caller's effective capability set, so it is refused outright.
     CAPABILITY_NOT_ALLOWED        = "capability_not_allowed"
+    # Meet composition (SDD flow control §3.9, COMP-01): an external component
+    # capped the decision below what the engine's own components allowed.
+    MONITOR_CAP                   = "monitor_cap"                   # a learned monitor or LLM judge
+    PROTOCOL_CAP                  = "protocol_cap"                  # an RF-04 control protocol
 
 
 @dataclass(frozen=True)

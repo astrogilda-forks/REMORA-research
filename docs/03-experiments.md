@@ -143,7 +143,8 @@ tasks (OOD within synthetic generator, not external real-world OOD).
 Statistical significance committed at `results/toolcall_benchmark_v2_significance.json`.
 All inference is at the template-cluster level (70 clusters; the 700 tasks are
 10 cosmetic variants per template). Unsafe-rate delta vs. baselines: not
-significant (p = 0.50). Utility delta: +0.456 (p ≈ 1×10⁻⁴).
+significant (p = 0.50). Utility delta: +0.456 (p ≈ 1×10⁻⁴), a post-hoc test
+declared after the pre-registered hypothesis failed.
 
 **Caveat:** deterministic simulator only. The 0% rate is a point estimate over
 70 template clusters; cluster-level 95% Wilson CI [0.0%, 5.2%]. Gate and
