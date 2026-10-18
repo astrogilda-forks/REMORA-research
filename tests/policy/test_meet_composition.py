@@ -8,7 +8,8 @@ from an early gate therefore masked a later gate that demanded ESCALATE, and
 an approver could redeem a call a stricter component had sent to a higher
 authority. Under meet composition every component returns a cap and the
 final decision is the least executable one:
-``ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT``.
+``ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT``, with a refusal no review can lift
+(``NON_APPROVABLE_REASONS``) below all of them (RMR-AUD-003).
 
 Searched validation over a declared generated domain (``_observations``):
 no counterexample found is not a proof.
@@ -30,6 +31,8 @@ from remora.policy.composition import (
 )
 from remora.policy.decision_engine import (
     _CONDITIONAL_GATES,
+    _ESTIMATOR_GATES,
+    _MATRIX_GATES,
     RemoraDecisionEngine,
     _normalize_observation,
     hard_guard_floor,
@@ -47,6 +50,16 @@ A, V, AB, E = (DecisionAction.ACCEPT, DecisionAction.VERIFY,
 
 def test_executability_order():
     assert executability(E) == executability(AB) < executability(V) < executability(A)
+
+
+def test_a_non_approvable_refusal_ranks_below_escalate():
+    refusal = Cap("floor", AB, DecisionReason.CROSS_TENANT_ARGUMENT_BLOCKED)
+    escalate = Cap("floor", E, DecisionReason.MALFORMED_CALL_BLOCKED)
+    epistemic = Cap("rest", AB, DecisionReason.DEFAULT_SAFE_ABSTAIN)
+    assert meet([escalate, refusal]) is refusal
+    assert meet([escalate, epistemic]) is escalate  # the tie keeps the earliest
+    assert meet([escalate, Cap("rest", AB, DecisionReason.DEFAULT_SAFE_ABSTAIN,
+                               approvable=False)]).source == "rest"
     assert set(EXECUTABILITY) == set(DecisionAction)
 
 
@@ -75,15 +88,15 @@ _MASKED = {
 }
 
 
-def test_priority_inside_the_conditional_group_is_kept():
-    """§3.9 composes groups. Inside _CONDITIONAL_GATES the first gate decides,
-    as in the cascade: an oracle-quorum VERIFY still precedes a later
-    environment-mismatch ESCALATE, because both belong to one group."""
+def test_an_earlier_gate_in_the_conditional_group_no_longer_masks_a_later_one():
+    """RMR-AUD-003 part 2. COMP-01 took the group's first gate, so an
+    oracle-quorum VERIFY hid a later environment-mismatch ESCALATE. Every gate
+    that fires is now a cap."""
     report = RemoraDecisionEngine().decide(PolicyObservation(
         question="q", risk_tier="medium", action_type="read", valid_oracle_count=1,
-        environment_mismatch_detected=True))
-    assert report.action is V
-    assert report.reasons == (DecisionReason.INSUFFICIENT_ORACLE_VOTES,)
+        phase="ordered", trust_score=0.92, environment_mismatch_detected=True))
+    assert report.action is E
+    assert DecisionReason.ENV_MISMATCH_ESCALATE in report.reasons
 
 
 @pytest.mark.parametrize("name", sorted(_MASKED))
@@ -106,7 +119,7 @@ def test_explain_reports_the_composed_decision():
 
 
 def test_ties_keep_the_first_match_decision():
-    # The schema floor's ABSTAIN and a later ESCALATE are equally blocking;
+    # The schema floor's ESCALATE and a later ABSTAIN are equally blocking;
     # meet keeps the earlier component, so the reason set does not change.
     engine = RemoraDecisionEngine()
     obs = PolicyObservation(question="q", risk_tier="low", schema_valid=False)
@@ -184,14 +197,16 @@ _ENGINES = (RemoraDecisionEngine(),
 
 
 def _component_actions(engine, obs):
-    """Each group's cap: the floor, and the first conditional gate that fires."""
+    """Every component cap: the floor and every conditional gate that fires,
+    except an estimator gate when the explicit risk matrix fired."""
     n = _normalize_observation(obs)
     credal, trap = compute_from_obs(n), trap_score(n)
     floor = hard_guard_floor(n)
     out = [floor[0]] if floor else []
-    first = next((a for g in _CONDITIONAL_GATES if (a := g.evaluate(engine, n, credal, trap))), None)
-    if first is not None:
-        out.append(first)
+    fired = [(g.name, a) for g in _CONDITIONAL_GATES if (a := g.evaluate(engine, n, credal, trap))]
+    if any(name in _MATRIX_GATES for name, _ in fired):
+        fired = [(name, a) for name, a in fired if name not in _ESTIMATOR_GATES]
+    out.extend(a for _, a in fired)
     return out
 
 
