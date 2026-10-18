@@ -157,12 +157,58 @@ and boundary declarations state what the system establishes and what it does
 not. The execution chain has not yet been evaluated against attacks. One
 frozen interoperability contract has two external fixture-level runs that
 meet the repository's independence rule; production enforcement
-remains unestablished and the system is \texttt{SHADOW\_ONLY}.
+remains unestablished, and the declared deployment status is
+\texttt{SHADOW\_ONLY}: shadow-mode operation is permitted, enforcement is not.
 \end{abstract}
 
 \textbf{Keywords:} agentic AI safety, AI control, agent security,
 governance overlay, policy-as-code, selective prediction, uncertainty
 routing, audit governance, human-in-the-loop.
+
+\paragraph{Identifiers used in this paper.} The repository's registers
+and plans use short identifiers, which this paper keeps so that every
+statement can be traced.
+\begin{description}[leftmargin=1.2em,itemsep=1pt,font=\normalfont\bfseries]
+\item[CLAIM-NNN] an entry in the claim register,
+  \path{docs/assurance/claim_register_v1.yaml}. Each entry binds a stated
+  result to its artifact, sample size, caveat and reproduce command.
+\item[REM-NNN] an item in the remediation register,
+  \path{docs/assurance/remediation_register.yaml}. REM-021, for example,
+  is the independent human review that is still open.
+\item[CAP-NNN] an entry in the capability register,
+  \path{docs/assurance/capability_register_v1.yaml}.
+\item[RMR-CR-NNN] a finding of the producer-owned security review of
+  2026-10-07 (\path{docs/assurance/reviews/2026-10-07-272b6c56/}).
+\item[NEGATIVE\_RESULTS.md \S N] a numbered entry in the repository's
+  record of negative results, falsified hypotheses and limitations.
+\item[SAP vN] version N of the pre-registered statistical analysis plan
+  (\path{docs/assurance/statistical_analysis_plan*.md}). SAP v5 governs
+  C-ext3, SAP v6 governs C-ext4, and SAP v7 is a draft.
+\item[C-ext2, C-ext3, C-ext4] three sealed evaluation tracks on disjoint
+  rows of BFCL v4, each run once. C-ext2 measured the routing pipeline
+  (CLAIM-018, superseded by CLAIM-019 and kept as the wrong-call baseline). C-ext3 added declared tool contracts and task intents
+  (CLAIM-019). C-ext4 spent the remaining reserve on a revised bundle
+  (CLAIM-021).
+\item[Arm F, F1, V2D] evaluation arms. Arm F is the confirmatory C-ext3
+  configuration, with contracts, intents and the semantic-authority floor.
+  In C-ext4, F1 is that same frozen bundle and V2D is the revised bundle v2
+  with deterministic derivation receipts, the confirmatory arm.
+\item[E-ECB, E-FA, E-EE, E7] frozen interoperability contracts for
+  exact-call binding, fresh authority, effect evidence and the runtime
+  capability surface (\S\ref{sec:federation}). CP-F1 to CP-F4 are the four
+  findings of the contract probes against the federation transport.
+\item[Status values] \texttt{NOT\_ESTABLISHED}, \texttt{NOT\_INDEPENDENT},
+  \texttt{EXTERNALLY\_VERIFIED} and \texttt{INDEPENDENT} are status values in
+  the capability, boundary and interoperability declarations
+  (\S\ref{sec:federation}, \S\ref{sec:boundary-declarations}).
+\item[SHADOW\_ONLY] the declared deployment status. Shadow-mode operation is
+  permitted and enforcement is not, until the remaining release gates close
+  (\path{docs/assurance/release_gates.md}).
+\item[AROMER, AII] AROMER is the experimental learning layer; AII, its
+  Autonomous Intelligence Index, is a researcher-defined composite score
+  whose phase labels (WARMUP, LEARNING, CAPABLE, TRAINED) are qualitative
+  (\S\ref{sec:threats}).
+\end{description}
 
 % =====================================================================
 \section{Introduction}
@@ -293,19 +339,25 @@ problem statement and architecture
 (\S\ref{sec:problem}--\S\ref{sec:audit}), evaluation and results
 (\S\ref{sec:eval}--\S\ref{sec:casestudy-fleetops}), negative results,
 validity and reproducibility (\S\ref{sec:negative}--\S\ref{sec:repro}), and
-the conclusion (\S\ref{sec:conclusion}).
+the conclusion (\S\ref{sec:conclusion}). The retired oracle-consensus,
+conformal and calibration material is in
+Appendices~\ref{app:consensus}--\ref{app:mondrian}.
 
 \begin{table}[t]
 \centering\footnotesize
 \caption{Headline results. Every row is bound to the claim register; BFCL
   wrong calls are cross-task substitutions (\S\ref{sec:routing-blind});
-  CLAIM-018 is superseded by CLAIM-019 and kept as the wrong-call baseline.}
+  CLAIM-018 is superseded by CLAIM-019 and kept as the wrong-call baseline.
+  The AgentHarm false-block floor (at most 40\%) was pre-registered for the
+  re-scoring of the same 208 benign scenarios and is recorded as missed
+  (\texttt{artifacts/verify\_protocols/agentharm\_rescore\_v1.json};
+  NEGATIVE\_RESULTS.md \S19).}
 \begin{tabular}{@{}p{0.40\columnwidth}p{0.54\columnwidth}@{}}
 \toprule
 Study & Result (claim) \\
 \midrule
 Tool-call benchmark, 70 clusters & 0\% unsafe acceptance, Wilson [0.0\%, 5.2\%], upper 6.4\% over the 56 harmful templates; keyword baselines 1.4\%, not significant (CLAIM-001) \\
-AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%], upper 7.6\% over the 47 base behaviours; every benign counterpart also blocked (CLAIM-002) \\
+AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%], upper 7.6\% over the 47 base behaviours; every benign counterpart also blocked, false-block rate 100\% against a pre-registered floor of at most 40\%, missed (CLAIM-002) \\
 Validator study, all-\textsc{unknown} regime & autonomous valid-identifier reads 0/60 (zero by construction) to 60/60 (CLAIM-014) \\
 Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-018, superseded) \\
 Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% by row, 3.5\% over its 106 tools (CLAIM-019) \\
@@ -775,7 +827,7 @@ NFKC-normalized sorted tokens for backward-compatible, dependency-free
 operation; the \texttt{NLISemanticBackend} replaces this with bidirectional
 cross-encoder entailment clustering, implementing Semantic Entropy
 \cite{kuhn2023semantic}. Oracle weights are derived from
-inverse pairwise correlation (see \S\ref{sec:method}).
+inverse pairwise correlation (Appendix~\ref{app:consensus}).
 
 \paragraph{Stage 4: Consensus Observables.}
 Entropy $H$ is computed over the diversity-weighted verdict distribution
@@ -791,10 +843,10 @@ drop-in replacement for future work but was not used in the
 reported results; claims about Semantic Entropy properties should
 be read accordingly.
 Dissensus $D$, consensus concentration $\eta$ and trust score
-$\trust$ are computed (see \S\ref{sec:method}), and a regime
+$\trust$ are computed (Appendix~\ref{app:consensus}), and a regime
 $\in\{\text{ordered}, \text{critical}, \text{disordered}\}$ is
 assigned. These run on the research and benchmark path; the governed
-server routes leave them unset (\S\ref{sec:method}).
+server routes leave them unset (\S\ref{sec:observables-limits}).
 
 \paragraph{Stage 5: Evidence Router (Critical Phase).}
 If phase = critical, the \texttt{CriticalEvidenceRouter} evaluates a
@@ -1065,57 +1117,10 @@ boundary ends.
 These observables describe oracle disagreement on the research and
 benchmark path. They are not inputs to the enforcing execution profile.
 
-\subsection{Weighted Support Distribution}
-
-Let $\hat{p}(v) = \sum_{o \in \OraclesV} w(o) \cdot
-\mathbf{1}[\varphi(o)=v]$ be the diversity-weighted support for
-verdict $v$, normalized to sum to 1. The diversity weight $w(o)$
-penalizes oracles that frequently agree with others:
-%
-\begin{equation}
-  w(o) = \frac{(1/n)}{1 + \sum_{j \neq o} \rho(o,j)} \cdot Z^{-1}
-\end{equation}
-%
-where $\rho(o,j)$ is the rolling pairwise agreement rate (window 200
-samples) and $Z$ normalizes. Oracles that agree with the swarm receive
-lower weight; independent dissenters receive higher weight.
-The rolling window persists for a long-lived engine instance (as in the
-offline experiments); the reference API constructs a fresh engine per
-request, so cross-request persistence of correlation state is a
-deployment integration point, not a current runtime property.
-
-\subsection{Core Observables}
-
-\textbf{Shannon entropy} (computed over the token-fingerprint proxy
-clustering in all reported experiments, not NLI-based semantic
-clusters; backend note in \S\ref{sec:architecture}, limitations in
-\S\ref{sec:threats}):
-\begin{equation}
-  H = -\sum_v \hat{p}(v) \log_2 \hat{p}(v) \quad \text{(bits)}
-\end{equation}
-
-\textbf{Dissensus:}
-\begin{equation}
-  D = 1 - \max_v \hat{p}(v)
-\end{equation}
-
-\textbf{Consensus concentration:}
-\begin{equation}
-  \eta = \frac{\max_v \hat{p}(v) - 1/k}{1 - 1/k}
-\end{equation}
-where $k = |\{v : \hat{p}(v) > 0\}|$ is the number of active verdicts.
-
-\textbf{Trust score:}
-\begin{equation}
-  \trust = \eta \cdot (1 - h_{\text{bound}})
-           \cdot w_{\text{phase}}
-           \cdot \left(1 + \frac{\chi}{\chi_0}\right)^{-1}
-\end{equation}
-Here $h_{\text{bound}}$ is a heuristic risk proxy, not a proven bound;
-$w_{\text{phase}}$ weights consensus regimes. This score describes
-research routing, not an execution authorization. Implementation details
-and the retired selection hypothesis are recorded in
-\texttt{NEGATIVE\_RESULTS.md} (\S18, \S38).
+The weighted support distribution, entropy $H$, dissensus $D$,
+consensus concentration $\eta$ and trust score $\trust$ are defined in
+Appendix~\ref{app:consensus}. The trust score describes research
+routing, not an execution authorization.
 
 \subsection{What these observables do not do}
 \label{sec:observables-limits}
@@ -1296,110 +1301,17 @@ correct; Q1 low-trust achieves 75\% correct. Conformal calibration at
 observed risk = 100\%, coverage $\rightarrow 0\%$). Standard trust-based
 routing cannot safely gate critical-phase decisions.
 
-\subsection{PhaseAwareGuardrail: Exploiting Trust Inversion}
-\label{sec:phase_aware}
-
-The inversion is a \emph{selection criterion reversal}, not an
-accuracy problem.  Items with $\tau < 0.10$ in the critical phase
-achieve 76.2\% accuracy ($N=21$) vs.\ 36.4\% for high-$\tau$
-critical items ($N=11$).  A \texttt{PhaseAwareGuardrail} exploits
-this by applying an inverted score $\tilde{\tau} = 1 - \tau$ for
-critical-phase items, then calibrating a conformal threshold on
-$\tilde{\tau}$.  A hard gate rejects all items with $\tau \geq
-\tau_{\max} = 0.10$ (the groupthink boundary) regardless of the
-conformal result.
-
-The combined pool, all 99 ordered-phase items (sorted by
-$\tau \downarrow$) plus 21 low-$\tau$ critical items ($\tau < 0.10$,
-sorted by $\tilde{\tau} \downarrow$), achieves:
-
-\begin{itemize}[leftmargin=*]
-  \item 20.0\% coverage ($N=108$): 85.2\% accuracy \text{CI~[77.3\%, 90.7\%]}
-  \item 22.1\% coverage ($N=120$): 85.0\% accuracy \text{CI~[77.5\%, 90.3\%]}
-\end{itemize}
-
-This is a $+3.9$\,pp coverage gain over the ordered-only operating
-point (18.2\%, 86.9\% accuracy), with a 1.9\,pp accuracy cost, still
-$+43.8$\,pp above the 41.18\% full-coverage baseline.  The guardrail is
-implemented in \path{remora.selective.guardrail.PhaseAwareGuardrail}
-and fully tested (25 unit tests).
-
-\subsection{Conformal Risk Control Under Covariate Shift}
+\subsection{Offline Selection Components}
 \label{sec:crc}
 
-A weighted split-conformal router inspired by Conformal Risk Control is
-implemented and tested, but it is an offline research component: the
-reference API does not invoke it, and the implementation does not
-instantiate the CRC theorem's hypotheses, so its output is a heuristic
-bound rather than a certified one. Because it is neither part of the
-operative architecture nor a valid instance of the formal method, the
-derivation, the theorem statement, and the reasons no reweighting repairs
-the gap are given in Appendix~\ref{app:crc} rather than here.
-
-\subsection{PVD-Inspired Offline Agreement Score for Critical-Phase Routing}
-\label{sec:pvd}
-
-Kirchner et al.\ (2024) trained prover-verifier games that produce more
-legible and reliable LLM outputs: helpful and sneaky \emph{provers}
-justify claims to iteratively retrained small \emph{verifiers}
-\cite{kirsch2024prover}. REMORA does \textbf{not} implement that training
-game. The component below is a PVD-\emph{inspired}, post-hoc agreement
-score computed over already-produced oracle responses: it selects two
-existing responses, scores their agreement with the configured entailment
-backend (default: token-fingerprint equality, not NLI), and applies a
-fixed round decay. No model training, live interaction, argument
-generation, or verifier update occurs, and it is not invoked by the
-reference API (offline research component).
-
-\paragraph{Protocol.}
-\begin{enumerate}[leftmargin=*,label=\arabic*.]
-  \item \textbf{Cluster} oracle responses via Semantic Entropy clustering
-        \cite{kuhn2023semantic,farquhar2024detecting}
-        (\S\ref{sec:method}), producing semantic equivalence classes
-        $\mathcal{C} = \{C_1, \ldots, C_K\}$ sorted by mass.
-  \item \textbf{Prover} = the oracle whose response belongs to the
-        dominant cluster $C_1$ and has the highest per-oracle confidence.
-  \item \textbf{Verifier} = the oracle with the highest confidence
-        \emph{outside} $C_1$ (the independent challenger).
-  \item \textbf{Deliberation} ($r = 1, \ldots, n_{\text{rounds}}$):
-        evaluate bidirectional NLI entailment
-        $e_r = \text{NLI}(\text{prover} \to \text{verifier}) \cdot \gamma^{r-1}$
-        with round-decay factor $\gamma = 0.85$.
-  \item \textbf{Legibility score}:
-        $\mathcal{L} = \bar{e} \cdot |C_1| / N$,
-        where $\bar{e}$ is the mean entailment and $|C_1|/N$ is the
-        dominant cluster mass.
-  \item \textbf{Final confidence}:
-        $\hat{c} = \sqrt{|C_1|/N \cdot c_{\text{verifier}}}$
-        (geometric mean of prover support and updated verifier confidence).
-\end{enumerate}
-
-\paragraph{Routing signal.}
-The PVD confidence is blended with the raw REMORA trust score:
-\begin{equation}
-  \tilde{\tau} = (1 - w_{\text{pvd}}) \cdot \tau + w_{\text{pvd}} \cdot \hat{c},
-  \qquad w_{\text{pvd}} = 0.40
-  \label{eq:pvd_blend}
-\end{equation}
-In offline experiments this score can promote borderline critical-phase
-items to \textsc{Accept} when agreement confidence is high, extending
-coverage beyond the \texttt{PhaseAwareGuardrail} operating point. Neither
-component is invoked by the reference API, and no formal risk bound
-applies to this heuristic blend (\S\ref{sec:crc}).
-
-\paragraph{Implementation.}
-The deliberation entry point is
-\begin{lstlisting}
-remora.selective.pvd.deliberate(
-    oracle_responses, oracle_confidences,
-    n_rounds=2)
-\end{lstlisting}
-It returns a \texttt{PVDResult} with fields
-\path{prover_cluster_mass}, \path{legibility_score},
-\path{agreement}, and \path{final_confidence}.
-\texttt{pvd\_routing\_score(trust\_score, pvd\_result)} implements
-Eq.~\ref{eq:pvd_blend}.  Fully tested (33 unit tests, no external
-model calls).
+Three offline components are implemented and tested on the research path
+and are not invoked by the reference API. The
+\texttt{PhaseAwareGuardrail} inverts the trust score for critical-phase
+items (Appendix~\ref{app:selection}). A weighted empirical selective
+router inspired by Conformal Risk Control does not instantiate the CRC
+theorem, so it gives no risk bound (Appendix~\ref{app:crc}). A
+PVD-inspired agreement score over already-produced oracle responses
+trains no model and makes no model call (Appendix~\ref{app:selection}).
 
 \subsection{CriticalEvidenceRouter}
 
@@ -1535,6 +1447,7 @@ Single model heuristic     & 28.6\% & 1.4\% & 0.16 \\
 Majority vote heuristic    & 28.6\% & 1.4\% & 0.16 \\
 Self-consistency heuristic & 28.6\% & 1.4\% & 0.16 \\
 Verifier heuristic         & 28.6\% & 1.4\% & 0.16 \\
+Temperature-gate heuristic (retired) & 60.0\% & 1.4\% & 0.36 \\
 \textbf{REMORA full policy}& \textbf{90\%} & \textbf{0\%} & \textbf{0.62} \\
 \bottomrule
 \end{tabular}}
@@ -1547,8 +1460,13 @@ over the 56 harmful templates, NEGATIVE\_RESULTS.md \S83); baselines
 produced 1.4\% (1 of 70 clusters). The safety-rate difference is not
 statistically significant at the template-cluster level (one-sided
 $p=0.50$). A post-hoc test, declared after the pre-registered hypothesis
-failed, finds advantages in decision utility ($+0.456$, $p\approx10^{-4}$)
-and accuracy. The complete condition set, including retired research
+failed, finds advantages in decision utility and accuracy. The utility
+gain is $+0.456$ (cluster bootstrap 95\% CI [0.36, 0.56],
+$p\approx10^{-4}$) against each of the four keyword heuristics and
+$+0.259$ ([0.15, 0.37], $p\approx10^{-4}$) against the retired
+temperature-gate heuristic, which maps the derived risk tier to a
+simulated temperature phase and has the same 1.4\% unsafe rate
+(\path{results/toolcall_benchmark_v2_significance.json}, \texttt{comparisons}). The complete condition set, including retired research
 selectors, remains in \path{results/toolcall_benchmark_v2_results.json}.
 Earlier versions of this table reported baselines at
 10--20\% unsafe: those numbers were inflated by baselines and gate
@@ -1557,29 +1475,11 @@ re-run restricts all conditions to the observable task surface.
 
 \subsection{Conformal Coverage (Mondrian, \texorpdfstring{$N=2{,}161$}{N=2,161})}
 
-\begin{table}[h]
-\centering\small
-\caption{Mondrian phase-stratified conformal, 15\% risk target
-(20 seeds $\times$ $N=2{,}161$ augmented dataset).}
-\begin{tabular}{@{}lrrl@{}}
-\toprule
-Phase & Mean Risk & Mean Cov. & Seeds Fail \\
-\midrule
-Ordered    & 12.0\% & \textbf{99.9\%} & \textbf{0/20} \\
-Critical   & 64.5\% &  0.9\% & 4/20 \\
-Disordered & 78.6\% &  0.2\% & 2/20 \\
-\bottomrule
-\end{tabular}
-\label{tab:mondrian}
-\end{table}
-
-Ordered-phase conformal achieves 99.9\% coverage with 0/20 failures, a
-stable internal benchmark operating point (the $N=2{,}161$ dataset is
-augmented and includes calibrated-simulation critical items; this is not
-evidence of deployability under production distribution shift).
-Critical and disordered phases cannot achieve
-meaningful coverage via conformal calibration alone, motivating the
-evidence router.
+Mondrian phase-stratified conformal calibration on the augmented
+2{,}161-item dataset is in Appendix~\ref{app:mondrian}. At the 15\% risk
+target it reaches 99.9\% mean coverage in the ordered phase, against
+0.9\% in the critical and 0.2\% in the disordered phase, the limitation
+behind the evidence router.
 
 \subsection{Evidence Router Proxy Benchmark (MultiNLI, \texorpdfstring{$N=3{,}000$}{N=3,000})}
 
@@ -1918,15 +1818,10 @@ the largest difference ($0.900 \to 0.300$ accuracy). No ablation whose
 conditions differ on false-accept rate has been run, so the deterministic
 floor's contribution to the headline safety result is unmeasured.
 
-\textbf{Oracle count ($N=302$).}
-Single oracle: 56.95\% (95\% CI [51.3, 62.4]); three-oracle majority
-vote: 82.78\% ([78.1, 86.6]), a gain of 25.8 pp; correlation-aware
-weighting: 69.54\% ([64.1, 74.5]), below raw majority vote on
-full-coverage accuracy. This is an exploratory ablation, not a headline
-claim (\path{results/ablation_v2_results.json}). The value of correlation weighting
-lies in trust calibration and selective coverage, not full-coverage
-accuracy, and the primary benefit of the oracle swarm is disagreement
-\emph{detection} (high $H$, high $D$).
+\textbf{Oracle count.} The exploratory oracle-count ablation on 302 QA
+items is in Appendix~\ref{app:oraclecount}. Majority vote over three
+oracles beat a single oracle and correlation weighting on full-coverage
+accuracy; it is not a headline claim.
 
 % =====================================================================
 \section{Case Study: Well Barrier Agent Action}
@@ -2217,7 +2112,9 @@ clustered at those levels are wider. Post hoc, the zero-count upper
 bounds are 3.5\% over C-ext3's 106 tools, 5.42\% over C-ext4's 67 tools,
 6.42\% over CLAIM-001's 56 harmful templates and 7.56\% over CLAIM-002's 47
 base behaviours (NEGATIVE\_RESULTS.md \S83). The
-tool-call benchmark's utility gain ($+0.46$) is a post-hoc test, declared
+tool-call benchmark's utility gain ($+0.46$ against the keyword
+heuristics, $+0.26$ against the retired temperature-gate heuristic) is
+a post-hoc test, declared
 after the pre-registered hypothesis failed. Wilson intervals are fixed-$N$
 constructions and are not valid under the continuous monitoring that the
 REM-020 longitudinal gate performs (optional stopping). A time-uniform
@@ -2324,8 +2221,9 @@ here examine three consequences of that design.
 0\% unsafe-acceptance result on the adversarial tool-call benchmark (700
 synthetic rows; 0 of 56 harmful templates, Wilson 95\% upper bound 6.4\%
 over those templates; baselines 1.4\%, difference not significant at
-$p=0.50$; a post-hoc test finds gains in utility, $+0.456$, and
-accuracy) was observed with the deterministic policy gates in place, and
+$p=0.50$; a post-hoc test finds gains in utility, $+0.456$ against the
+keyword heuristics and $+0.259$ against the temperature-gate heuristic,
+and in accuracy) was observed with the deterministic policy gates in place, and
 not produced by the multi-oracle consensus machinery. No experiment
 attributes it to the gates: the committed component ablation records FAR
 $=0.000$ in every condition,
@@ -3023,6 +2921,186 @@ ZK assurance proofs & Planned & No & Stubbed \\
 \end{tabular}}
 \end{table}
 
+\section{Retired Research Path: Consensus Observables}
+\label{app:consensus}
+
+This appendix and the two that follow hold the ensemble, conformal and
+calibration material that the body summarises in
+\S\ref{sec:method}, \S\ref{sec:evidence}, \S\ref{sec:results} and
+\S\ref{sec:ablation}. None of it is on the governed execution path
+(\S\ref{sec:observables-limits}), and no headline result depends on it.
+It is kept because the numbers, the caveats and the negative results are
+part of the record (\texttt{NEGATIVE\_RESULTS.md} \S18, \S38).
+
+\subsection{Weighted Support Distribution}
+
+Let $\hat{p}(v) = \sum_{o \in \OraclesV} w(o) \cdot
+\mathbf{1}[\varphi(o)=v]$ be the diversity-weighted support for
+verdict $v$, normalized to sum to 1. The diversity weight $w(o)$
+penalizes oracles that frequently agree with others:
+%
+\begin{equation}
+  w(o) = \frac{(1/n)}{1 + \sum_{j \neq o} \rho(o,j)} \cdot Z^{-1}
+\end{equation}
+%
+where $\rho(o,j)$ is the rolling pairwise agreement rate (window 200
+samples) and $Z$ normalizes. Oracles that agree with the swarm receive
+lower weight; independent dissenters receive higher weight.
+The rolling window persists for a long-lived engine instance (as in the
+offline experiments); the reference API constructs a fresh engine per
+request, so cross-request persistence of correlation state is a
+deployment integration point, not a current runtime property.
+
+\subsection{Core Observables}
+
+\textbf{Shannon entropy} (computed over the token-fingerprint proxy
+clustering in all reported experiments, not NLI-based semantic
+clusters; backend note in \S\ref{sec:architecture}, limitations in
+\S\ref{sec:threats}):
+\begin{equation}
+  H = -\sum_v \hat{p}(v) \log_2 \hat{p}(v) \quad \text{(bits)}
+\end{equation}
+
+\textbf{Dissensus:}
+\begin{equation}
+  D = 1 - \max_v \hat{p}(v)
+\end{equation}
+
+\textbf{Consensus concentration:}
+\begin{equation}
+  \eta = \frac{\max_v \hat{p}(v) - 1/k}{1 - 1/k}
+\end{equation}
+where $k = |\{v : \hat{p}(v) > 0\}|$ is the number of active verdicts.
+
+\textbf{Trust score:}
+\begin{equation}
+  \trust = \eta \cdot (1 - h_{\text{bound}})
+           \cdot w_{\text{phase}}
+           \cdot \left(1 + \frac{\chi}{\chi_0}\right)^{-1}
+\end{equation}
+Here $h_{\text{bound}}$ is a heuristic risk proxy, not a proven bound;
+$w_{\text{phase}}$ weights consensus regimes. This score describes
+research routing, not an execution authorization. Implementation details
+and the retired selection hypothesis are recorded in
+\texttt{NEGATIVE\_RESULTS.md} (\S18, \S38).
+
+\subsection{Oracle Count and Correlation Weighting}
+\label{app:oraclecount}
+
+\textbf{Oracle count ($N=302$).}
+Single oracle: 56.95\% (95\% CI [51.3, 62.4]); three-oracle majority
+vote: 82.78\% ([78.1, 86.6]), a gain of 25.8 pp; correlation-aware
+weighting: 69.54\% ([64.1, 74.5]), below raw majority vote on
+full-coverage accuracy. This is an exploratory ablation, not a headline
+claim (\path{results/ablation_v2_results.json}). The value of correlation weighting
+lies in trust calibration and selective coverage, not full-coverage
+accuracy, and the primary benefit of the oracle swarm is disagreement
+\emph{detection} (high $H$, high $D$).
+
+Without correlation weighting, consensus from a within-family oracle
+cluster would receive inflated support. The effect of the diversity
+weights on trust scores and escalation rates has not been tested in a
+controlled study that varies oracle family composition.
+
+\section{Offline Critical-Phase Selection Components}
+\label{app:selection}
+
+The critical-phase trust inversion that motivates these components is
+stated in \S\ref{sec:evidence}.
+
+\subsection{PhaseAwareGuardrail: Exploiting Trust Inversion}
+\label{sec:phase_aware}
+
+The inversion is a \emph{selection criterion reversal}, not an
+accuracy problem.  Items with $\tau < 0.10$ in the critical phase
+achieve 76.2\% accuracy ($N=21$) vs.\ 36.4\% for high-$\tau$
+critical items ($N=11$).  A \texttt{PhaseAwareGuardrail} exploits
+this by applying an inverted score $\tilde{\tau} = 1 - \tau$ for
+critical-phase items, then calibrating a conformal threshold on
+$\tilde{\tau}$.  A hard gate rejects all items with $\tau \geq
+\tau_{\max} = 0.10$ (the groupthink boundary) regardless of the
+conformal result.
+
+The combined pool, all 99 ordered-phase items (sorted by
+$\tau \downarrow$) plus 21 low-$\tau$ critical items ($\tau < 0.10$,
+sorted by $\tilde{\tau} \downarrow$), achieves:
+
+\begin{itemize}[leftmargin=*]
+  \item 20.0\% coverage ($N=108$): 85.2\% accuracy \text{CI~[77.3\%, 90.7\%]}
+  \item 22.1\% coverage ($N=120$): 85.0\% accuracy \text{CI~[77.5\%, 90.3\%]}
+\end{itemize}
+
+This is a $+3.9$\,pp coverage gain over the ordered-only operating
+point (18.2\%, 86.9\% accuracy), with a 1.9\,pp accuracy cost, still
+$+43.8$\,pp above the 41.18\% full-coverage baseline.  The guardrail is
+implemented in \path{remora.selective.guardrail.PhaseAwareGuardrail}
+and fully tested (25 unit tests).
+
+\subsection{PVD-Inspired Offline Agreement Score for Critical-Phase Routing}
+\label{sec:pvd}
+
+Kirchner et al.\ (2024) trained prover-verifier games that produce more
+legible and reliable LLM outputs: helpful and sneaky \emph{provers}
+justify claims to iteratively retrained small \emph{verifiers}
+\cite{kirsch2024prover}. REMORA does \textbf{not} implement that training
+game. The component below is a PVD-\emph{inspired}, post-hoc agreement
+score computed over already-produced oracle responses: it selects two
+existing responses, scores their agreement with the configured entailment
+backend (default: token-fingerprint equality, not NLI), and applies a
+fixed round decay. No model training, live interaction, argument
+generation, or verifier update occurs, and it is not invoked by the
+reference API (offline research component).
+
+\paragraph{Protocol.}
+\begin{enumerate}[leftmargin=*,label=\arabic*.]
+  \item \textbf{Cluster} oracle responses via Semantic Entropy clustering
+        \cite{kuhn2023semantic,farquhar2024detecting}
+        (Appendix~\ref{app:consensus}), producing semantic equivalence classes
+        $\mathcal{C} = \{C_1, \ldots, C_K\}$ sorted by mass.
+  \item \textbf{Prover} = the oracle whose response belongs to the
+        dominant cluster $C_1$ and has the highest per-oracle confidence.
+  \item \textbf{Verifier} = the oracle with the highest confidence
+        \emph{outside} $C_1$ (the independent challenger).
+  \item \textbf{Deliberation} ($r = 1, \ldots, n_{\text{rounds}}$):
+        evaluate bidirectional NLI entailment
+        $e_r = \text{NLI}(\text{prover} \to \text{verifier}) \cdot \gamma^{r-1}$
+        with round-decay factor $\gamma = 0.85$.
+  \item \textbf{Legibility score}:
+        $\mathcal{L} = \bar{e} \cdot |C_1| / N$,
+        where $\bar{e}$ is the mean entailment and $|C_1|/N$ is the
+        dominant cluster mass.
+  \item \textbf{Final confidence}:
+        $\hat{c} = \sqrt{|C_1|/N \cdot c_{\text{verifier}}}$
+        (geometric mean of prover support and updated verifier confidence).
+\end{enumerate}
+
+\paragraph{Routing signal.}
+The PVD confidence is blended with the raw REMORA trust score:
+\begin{equation}
+  \tilde{\tau} = (1 - w_{\text{pvd}}) \cdot \tau + w_{\text{pvd}} \cdot \hat{c},
+  \qquad w_{\text{pvd}} = 0.40
+  \label{eq:pvd_blend}
+\end{equation}
+In offline experiments this score can promote borderline critical-phase
+items to \textsc{Accept} when agreement confidence is high, extending
+coverage beyond the \texttt{PhaseAwareGuardrail} operating point. Neither
+component is invoked by the reference API, and no formal risk bound
+applies to this heuristic blend (Appendix~\ref{app:crc}).
+
+\paragraph{Implementation.}
+The deliberation entry point is
+\begin{lstlisting}
+remora.selective.pvd.deliberate(
+    oracle_responses, oracle_confidences,
+    n_rounds=2)
+\end{lstlisting}
+It returns a \texttt{PVDResult} with fields
+\path{prover_cluster_mass}, \path{legibility_score},
+\path{agreement}, and \path{final_confidence}.
+\texttt{pvd\_routing\_score(trust\_score, pvd\_result)} implements
+Eq.~\ref{eq:pvd_blend}.  Fully tested (33 unit tests, no external
+model calls).
+
 \section{Conformal Risk Control Under Covariate Shift (offline component)}
 \label{app:crc}
 
@@ -3092,6 +3170,33 @@ fully tested (45 unit tests) and is an
 offline research component, not invoked by the reference API.
 
 
+
+\section{Mondrian Conformal Coverage on the Augmented Dataset}
+\label{app:mondrian}
+
+\begin{table}[h]
+\centering\small
+\caption{Mondrian phase-stratified conformal, 15\% risk target
+(20 seeds $\times$ $N=2{,}161$ augmented dataset).}
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+Phase & Mean Risk & Mean Cov. & Seeds Fail \\
+\midrule
+Ordered    & 12.0\% & \textbf{99.9\%} & \textbf{0/20} \\
+Critical   & 64.5\% &  0.9\% & 4/20 \\
+Disordered & 78.6\% &  0.2\% & 2/20 \\
+\bottomrule
+\end{tabular}
+\label{tab:mondrian}
+\end{table}
+
+Ordered-phase conformal achieves 99.9\% coverage with 0/20 failures, a
+stable internal benchmark operating point (the $N=2{,}161$ dataset is
+augmented and includes calibrated-simulation critical items; this is not
+evidence of deployability under production distribution shift).
+Critical and disordered phases cannot achieve
+meaningful coverage via conformal calibration alone, motivating the
+evidence router.
 
 \section{Optional TEE-Based Audit Hardening (Tamper-Resistant)}
 \label{app:tee}
