@@ -1,0 +1,23 @@
+{
+  "rule": "A JSON-RPC id gets a request reference only when it is a string without lone surrogates or an integer within +/-(2^53 - 1). Its jsonrpc_id is the id's canonical JSON text: ECMAScript JSON.stringify of the parsed value, which for these ids equals Python json.dumps(value, ensure_ascii=False, separators=(',', ':')). canonical null means no reference.",
+  "vectors": [
+    {"wire": "7", "canonical": "7"},
+    {"wire": "\"7\"", "canonical": "\"7\""},
+    {"wire": "-0", "canonical": "0"},
+    {"wire": "0", "canonical": "0"},
+    {"wire": "9007199254740991", "canonical": "9007199254740991"},
+    {"wire": "-9007199254740991", "canonical": "-9007199254740991"},
+    {"wire": "1.5", "canonical": null},
+    {"wire": "\"\\u0037\"", "canonical": "\"7\""},
+    {"wire": "\"é\"", "canonical": "\"é\""},
+    {"wire": "\"\\u00e9\"", "canonical": "\"é\""},
+    {"wire": "\"a\\\"b\"", "canonical": "\"a\\\"b\""},
+    {"wire": "\"\\/\"", "canonical": "\"/\""},
+    {"wire": "\"\\u0001\\n\"", "canonical": "\"\\u0001\\n\""},
+    {"wire": "\"\\ud83d\\ude00\"", "canonical": "\"😀\""},
+    {"wire": "\"\\ud800\"", "canonical": null},
+    {"wire": "null", "canonical": null},
+    {"wire": "true", "canonical": null},
+    {"wire": "[1]", "canonical": null}
+  ]
+}

@@ -16,7 +16,8 @@ export type Decision = "accept" | "verify" | "abstain" | "escalate";
  *  the exported record by id and body digest rather than by call content. */
 export interface RequestRef {
   transport: "mcp-streamable-http";
-  /** The JSON-RPC id's JSON text, so 7 and "7" stay distinct. */
+  /** The JSON-RPC id's canonical JSON text (JSON.stringify of the parsed id),
+   *  so 7 and "7" stay distinct and "\u0037" is recorded as "7". */
   jsonrpc_id: string;
   /** Lowercase hex SHA-256 of the HTTP body bytes as received. */
   body_sha256: string;

@@ -6,9 +6,13 @@
  * that it never reaches a side effect without an authorisation.
  */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseJsonStrict } from "../src/json_numbers";
 import {
   handleRpc,
   PROTOCOL_VERSION,
+  requestRefFor,
   type Deps,
   type PendingProposal,
   type ProposalStore,
@@ -523,4 +527,20 @@ describe("request reference", () => {
       call("gh_read_issue", { repo: "o/r", number: 1, intent_ref: "o/r#1" }), d);
     expect(rec.assess[0].request_ref).toBeUndefined();
   });
+});
+
+describe("request reference id canonical form (shared vectors)", () => {
+  // The same file the Python request_ref and the standalone verifier test.
+  const vectors: { wire: string; canonical: string | null }[] = JSON.parse(
+    readFileSync(join(process.cwd(), "..", "..", "integrations", "invocation-evidence",
+                      "fixtures", "jsonrpc-id-vectors.json"), "utf8")).vectors;
+
+  for (const v of vectors) {
+    it(`id ${v.wire} -> ${v.canonical ?? "no reference"}`, async () => {
+      const body = `{"jsonrpc":"2.0","id":${v.wire},"method":"tools/call","params":{}}`;
+      const req = parseJsonStrict(body) as any;
+      const ref = requestRefFor(req, { bodySha256: "ab".repeat(32) } as Deps);
+      expect(ref?.jsonrpc_id ?? null).toBe(v.canonical);
+    });
+  }
 });

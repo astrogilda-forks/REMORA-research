@@ -24,7 +24,7 @@ This file lists externally relevant changes by release. Fine-grained development
 ### Interop (per-invocation evidence export and request binding)
 
 - New `remora/execution/request_ref.py`: a call may carry the request it
-  arrived in, as the transport, the JSON-RPC id's JSON text and the SHA-256 of
+  arrived in, as the transport, the JSON-RPC id's canonical JSON text and the SHA-256 of
   the body bytes as received. At ACCEPT its digest enters the
   `AuthorizationContext` and so the signed grant. Redemption under another
   reference, or with it stripped, is refused as `context_mismatch` before the
@@ -53,6 +53,14 @@ This file lists externally relevant changes by release. Fine-grained development
   tool's own result never becomes an observed effect (`effect_observed` is
   always NOT_ESTABLISHED). The verifier, the export and the cases are REMORA's own, so nothing
   here is an independent result.
+- Two findings of an external design review of this PR are fixed. F-10: the
+  JSON-RPC id is recorded in canonical form (a string without lone surrogates
+  or a safe integer, as `JSON.stringify` writes it), not as wire bytes, and the
+  docs no longer say otherwise. `fixtures/jsonrpc-id-vectors.json` (18
+  vectors) is checked by the gateway, the server and the verifier. F-11: the
+  verifier hashes the call over the same JSON domain enforcement accepts
+  (no `default=str`), and it refuses duplicate keys and NaN/Infinity in every
+  JSON it reads, signed or not.
 - The twelve capabilities whose sources this touched (CAP-003, 004, 005,
   007, 013, 018 to 024) are re-audited and rebound to the code commit, with
   their evidence tests passing. Their mechanism, status, scope and caveats are

@@ -15,8 +15,10 @@ depend on how this file or REMORA encodes JSON.
 
 Keys are 32-byte Ed25519 public keys, as hex or base64, pinned out of band.
 ``--jsonrpc-id`` and ``--body-sha256`` come from the verifier's own capture of
-the request: the id's JSON text as it appeared on the wire, and the SHA-256 of
-the HTTP body bytes. ``--call`` is ``{"name", "arguments", "target"}`` from the
+the request: the id as JSON text, and the SHA-256 of the HTTP body bytes. The
+id is compared in canonical form (see ``canonical_jsonrpc_id``), so ``"\u0037"``
+as captured on the wire matches ``"7"``; only the body digest covers the
+exact bytes. ``--call`` is ``{"name", "arguments", "target"}`` from the
 same capture, to recompute REMORA's call hash.
 
 Each claim is ESTABLISHED, CONTRADICTED or NOT_ESTABLISHED with reason codes.
@@ -59,6 +61,74 @@ CLAIMS = (
 
 class InputError(ValueError):
     pass
+
+
+class StrictJsonError(InputError):
+    """JSON that two readers could read differently: a duplicate key or a
+    non-finite number. Refused rather than read with last-key-wins."""
+
+
+def _no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in out:
+            raise StrictJsonError(f"duplicate key {key!r}")
+        out[key] = value
+    return out
+
+
+def _no_constant(name: str) -> Any:
+    raise StrictJsonError(f"{name} is not JSON")
+
+
+def strict_loads(data: str | bytes) -> Any:
+    try:
+        return json.loads(data, object_pairs_hook=_no_duplicates, parse_constant=_no_constant)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise StrictJsonError(str(exc)) from exc
+
+
+MAX_SAFE_INTEGER = 2**53 - 1
+MAX_DEPTH = 64
+
+
+def canonical_jsonrpc_id(text: str) -> str:
+    """A JSON-RPC id's canonical text: a string without lone surrogates or an
+    integer within +/-(2^53 - 1), written as ECMAScript JSON.stringify writes
+    it. Anything else has no request reference and raises InputError."""
+    value = strict_loads(text)
+    if isinstance(value, str):
+        if any(0xD800 <= ord(c) <= 0xDFFF for c in value):
+            raise InputError("jsonrpc id contains a lone surrogate")
+    elif type(value) is int:
+        if abs(value) > MAX_SAFE_INTEGER:
+            raise InputError("jsonrpc id is beyond +/-(2^53 - 1)")
+    else:
+        raise InputError("jsonrpc id must be a string or a safe integer")
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _require_json_domain(value: Any, depth: int = 0) -> None:
+    """The domain REMORA's enforcement accepts for call arguments."""
+    if depth > MAX_DEPTH:
+        raise InputError(f"call arguments nest deeper than {MAX_DEPTH} levels")
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            raise InputError("call arguments hold a non-finite number")
+        return
+    if isinstance(value, list):
+        for item in value:
+            _require_json_domain(item, depth + 1)
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise InputError("call arguments hold a non-string key")
+            _require_json_domain(item, depth + 1)
+        return
+    raise InputError(f"call arguments hold a {type(value).__name__}, outside JSON")
 
 
 def _public_key(text: str) -> bytes:
@@ -138,11 +208,15 @@ def _entry_hash(entry: dict[str, Any], tenant: str) -> str:
 
 
 def _canonical_call_hash(call: dict[str, Any], tenant: str) -> str:
-    """REMORA's canonical_tool_call_hash: sorted keys, no whitespace, ASCII escapes."""
+    """REMORA's canonical_tool_call_hash: sorted keys, no whitespace, ASCII
+    escapes, over the JSON domain enforcement accepts and nothing wider."""
+    if not isinstance(call.get("name"), str) or not isinstance(call.get("target") or "", str):
+        raise InputError("call name and target must be strings")
+    _require_json_domain(call["arguments"])
     preimage = json.dumps(
         {"name": call["name"], "arguments": call["arguments"], "tenant": tenant,
          "target": call.get("target") or ""},
-        sort_keys=True, separators=(",", ":"), default=str)
+        sort_keys=True, separators=(",", ":"))
     return _sha256_hex(preimage.encode("utf-8"))
 
 
@@ -197,7 +271,11 @@ def verify(
         export.contradict("evidence_signature_invalid")
     if export.result()["result"] != ESTABLISHED:
         return not_reached("export_not_authentic", CLAIMS[1:])
-    body = json.loads(body_bytes)
+    try:
+        body = strict_loads(body_bytes)
+    except StrictJsonError:
+        export.contradict("body_not_strict_json")
+        return not_reached("export_not_authentic", CLAIMS[1:])
     if body.get("format") != BODY_FORMAT:
         export.lack("body_format_unknown")
         return not_reached("export_not_authentic", CLAIMS[1:])
@@ -217,7 +295,11 @@ def verify(
     for entry in entries:
         if _entry_hash(entry, tenant) != entry["entry_hash"]:
             chain.contradict("entry_hash_mismatch")
-        payload = json.loads(entry["payload_canonical"])
+        try:
+            payload = strict_loads(entry["payload_canonical"])
+        except StrictJsonError:
+            chain.contradict("payload_not_strict_json")
+            payload = {}
         if payload.get("event") != entry["event"] or payload.get("proposal_id") != proposal_id:
             chain.contradict("entry_not_this_proposal")
         payloads.append(payload)
@@ -254,7 +336,11 @@ def verify(
         if not _domain_ok(grant_key, GRANT_DOMAIN, grant_bytes, token.get("signature", "")):
             authority.contradict("grant_signature_invalid")
         else:
-            signed = json.loads(grant_bytes)
+            try:
+                signed = strict_loads(grant_bytes)
+            except StrictJsonError:
+                authority.contradict("grant_payload_not_strict_json")
+                signed = {}
             if any(signed.get(k) != token.get(k) for k in signed):
                 authority.contradict("grant_fields_not_signed_ones")
             grant_verified = not authority.contradicted
@@ -291,7 +377,11 @@ def verify(
             if not _domain_ok(lease_key, domain, lease_bytes, lease.get("signature", "")):
                 authority.contradict("lease_signature_invalid")
             else:
-                signed = json.loads(lease_bytes)
+                try:
+                    signed = strict_loads(lease_bytes)
+                except StrictJsonError:
+                    authority.contradict("lease_payload_not_strict_json")
+                    signed = {}
                 if any(signed.get(k) != lease.get(k) for k in signed):
                     authority.contradict("lease_fields_not_signed_ones")
                 if (signed.get("grant_jti") != token.get("jti")
@@ -323,16 +413,28 @@ def verify(
     if ref is None:
         request.lack("request_ref_absent")
     else:
+        try:
+            if canonical_jsonrpc_id(ref.get("jsonrpc_id", "")) != ref.get("jsonrpc_id"):
+                request.contradict("request_ref_not_canonical")
+        except InputError:
+            request.contradict("request_ref_not_canonical")
         digest = _request_ref_digest(ref)
         recorded = {p.get("request_ref_hash") for p in payloads}
         if context.get("request_ref_hash") != digest or recorded != {digest}:
             request.contradict("request_ref_not_bound")
         if not grant_verified:
             request.lack("grant_not_verified")
+        captured_id = None
+        if capture_ref is not None:
+            try:
+                captured_id = canonical_jsonrpc_id(capture_ref["jsonrpc_id"])
+            except InputError:
+                request.lack("captured_id_not_referenceable")
         if capture_ref is None:
             request.lack("no_captured_request")
-        elif (capture_ref["jsonrpc_id"] != ref.get("jsonrpc_id")
-              or capture_ref["body_sha256"] != ref.get("body_sha256")):
+        elif captured_id is not None and (
+                captured_id != ref.get("jsonrpc_id")
+                or capture_ref["body_sha256"] != ref.get("body_sha256")):
             request.contradict("request_ref_mismatch")
         out["request_ref"] = ref
 
@@ -371,11 +473,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         with open(args.bundle, encoding="utf-8") as handle:
-            bundle = json.load(handle)
+            bundle = strict_loads(handle.read())
         call = None
         if args.call:
             with open(args.call, encoding="utf-8") as handle:
-                call = json.load(handle)
+                call = strict_loads(handle.read())
         result = verify(
             bundle,
             evidence_key=_public_key(args.evidence_key),

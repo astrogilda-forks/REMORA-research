@@ -426,3 +426,64 @@ def test_the_tools_own_result_is_not_an_observed_effect(world, verifier):
     assert outcome["result_sha256"]
     assert outcome["claims"]["effect_observed"] == {
         "result": "NOT_ESTABLISHED", "codes": ["no_observation_in_export"]}
+
+
+# F-10 and F-11 of the 2026-10-18 design review: the id's canonical form, and
+# one JSON domain on both sides.
+
+ID_VECTORS = json.loads((FIXTURES / "jsonrpc-id-vectors.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("vector", ID_VECTORS["vectors"], ids=lambda v: v["wire"])
+def test_server_and_verifier_agree_on_the_id_canonical_form(verifier, vector):
+    from remora.execution.request_ref import RequestRef, canonical_jsonrpc_id
+
+    for canon in (canonical_jsonrpc_id, verifier.canonical_jsonrpc_id):
+        if vector["canonical"] is None:
+            with pytest.raises(ValueError):
+                canon(vector["wire"])
+        else:
+            assert canon(vector["wire"]) == vector["canonical"]
+    if vector["canonical"] is not None:
+        RequestRef("mcp-streamable-http", vector["canonical"], "ab" * 32)
+        if vector["wire"] != vector["canonical"]:
+            with pytest.raises(ValueError, match="canonical"):
+                RequestRef("mcp-streamable-http", vector["wire"], "ab" * 32)
+
+
+def test_an_escaped_capture_id_matches_its_canonical_reference(world, verifier):
+    client, _ = world
+    proposal_id, _run_ = _run(client, _ref(BODY, '"7"'))
+    outcome = _check(verifier, _export(client, proposal_id).json(),
+                     capture_ref={"jsonrpc_id": '"\\u0037"',
+                                  "body_sha256": hashlib.sha256(BODY).hexdigest()})
+    assert outcome["claims"]["request_corresponds"]["result"] == "ESTABLISHED"
+
+
+@pytest.mark.parametrize("call, message", [
+    ('{"name":"read_telemetry","arguments":{"asset":"P-1","asset":"P-2"},"target":"staging"}',
+     "duplicate key"),
+    ('{"name":"read_telemetry","arguments":{"x":NaN},"target":"staging"}', "not JSON"),
+])
+def test_the_verifier_refuses_ambiguous_call_json(verifier, call, message):
+    with pytest.raises(verifier.InputError, match=message):
+        verifier.strict_loads(call)
+
+
+def test_a_signed_body_with_a_duplicate_key_is_contradicted(world, verifier):
+    """Bytes two readers would read differently are not an export, even signed."""
+    client, _ = world
+    proposal_id, _run_ = _run(client, _ref(BODY, "7"))
+    raw = base64.b64decode(_export(client, proposal_id).json()["payload_b64"])
+    ambiguous = raw[:-1] + b',"tenant":"someone-else"}'
+    from remora.crypto import SignatureDomain, SigningKey, sign
+
+    sig = sign(SignatureDomain.EVIDENCE, ambiguous,
+               SigningKey.from_text(SEEDS["evidence"], {SignatureDomain.EVIDENCE}))
+    bundle = {"format": "remora-invocation-evidence-envelope-v1",
+              "payload_b64": base64.b64encode(ambiguous).decode(),
+              "signature": {"alg": sig.algorithm, "domain": sig.domain, "kid": sig.kid,
+                            "value": sig.value}}
+    outcome = _check(verifier, bundle)
+    assert outcome["claims"]["export_authentic"] == {
+        "result": "CONTRADICTED", "codes": ["body_not_strict_json"]}

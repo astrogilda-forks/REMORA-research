@@ -1301,7 +1301,7 @@
         "type": "object"
       },
       "RequestRefModel": {
-        "description": "The request a call arrived in (remora/execution/request_ref.py).\n\nSet by the front end that received the request, never derived here: the\ntransport, the JSON-RPC id's JSON text, and the SHA-256 of the body bytes\nas received. Bound into the ACCEPT grant's authorization context.",
+        "description": "The request a call arrived in (remora/execution/request_ref.py).\n\nSet by the front end that received the request, never derived here: the\ntransport, the JSON-RPC id's canonical JSON text, and the SHA-256 of the body bytes\nas received. Bound into the ACCEPT grant's authorization context.",
         "properties": {
           "body_sha256": {
             "maxLength": 64,

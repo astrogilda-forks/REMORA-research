@@ -259,7 +259,7 @@ class RequestRefModel(BaseModel):
     """The request a call arrived in (remora/execution/request_ref.py).
 
     Set by the front end that received the request, never derived here: the
-    transport, the JSON-RPC id's JSON text, and the SHA-256 of the body bytes
+    transport, the JSON-RPC id's canonical JSON text, and the SHA-256 of the body bytes
     as received. Bound into the ACCEPT grant's authorization context.
     """
 

@@ -8,10 +8,18 @@ capture of one request can be joined to a REMORA record only by matching
 content, and matching content does not show that both describe one execution.
 
 ``RequestRef`` is the explicit reference. The front end that received the
-request (the MCP gateway) records the transport, the JSON-RPC ``id`` exactly as
-it appeared on the wire, and the SHA-256 of the request body bytes as
-received, before any parsing. Anyone holding a capture of the same request
-recomputes the last two without REMORA code.
+request (the MCP gateway) records the transport, the JSON-RPC ``id`` in a
+canonical form, and the SHA-256 of the request body bytes as received, before
+any parsing. Anyone holding a capture of the same request recomputes the last
+two without REMORA code.
+
+The id is canonical, not the bytes on the wire. An id gets a reference only
+when it is a string without lone surrogates or an integer within
++/-(2^53 - 1), and its text is what ECMAScript ``JSON.stringify`` writes for
+the parsed value, which for these ids equals Python
+``json.dumps(value, ensure_ascii=False)``. ``"\\u0037"`` on the wire is
+recorded as ``"7"``, while ``7`` and ``"7"`` stay distinct. Only the body
+digest covers the exact bytes.
 
 At ACCEPT its digest is bound into the ``AuthorizationContext`` and so into
 the signed grant, and redemption recomputes it from the re-presented call. A
@@ -43,7 +51,7 @@ _MAX_ID_TEXT = 200
 class RequestRef:
     """One received request: transport, JSON-RPC id text, body digest.
 
-    ``jsonrpc_id`` is the id's JSON text, so ``7`` and ``"7"`` stay distinct.
+    ``jsonrpc_id`` is the id's canonical JSON text (:func:`canonical_jsonrpc_id`).
     ``body_sha256`` is lowercase hex over the HTTP body bytes as received; for
     a batch it covers the whole batch, and ``jsonrpc_id`` names the member.
     """
@@ -59,14 +67,8 @@ class RequestRef:
             raise ValueError("request_ref jsonrpc_id must be the id's JSON text")
         if len(self.jsonrpc_id) > _MAX_ID_TEXT:
             raise ValueError("request_ref jsonrpc_id is too long")
-        try:
-            parsed = json.loads(self.jsonrpc_id)
-        except json.JSONDecodeError as exc:
-            raise ValueError("request_ref jsonrpc_id is not JSON text") from exc
-        # JSON-RPC 2.0: a request id is a string or a number. null marks a
-        # notification or an error response, never a request REMORA executes.
-        if isinstance(parsed, bool) or not isinstance(parsed, (str, int, float)):
-            raise ValueError("request_ref jsonrpc_id must be a JSON string or number")
+        if canonical_jsonrpc_id(self.jsonrpc_id) != self.jsonrpc_id:
+            raise ValueError("request_ref jsonrpc_id is not in canonical form")
         if not isinstance(self.body_sha256, str) or not _HEX64.match(self.body_sha256):
             raise ValueError("request_ref body_sha256 must be 64 lowercase hex characters")
 
@@ -98,6 +100,36 @@ class RequestRef:
         )
 
 
+_MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def _refuse_constant(name: str) -> Any:
+    raise ValueError(f"{name} is not JSON")
+
+
+def canonical_jsonrpc_id(text: str) -> str:
+    """The canonical text of a JSON-RPC id given as JSON text. Raises ValueError.
+
+    Accepted: a string without lone surrogates, or an integer within
+    +/-(2^53 - 1). JSON-RPC also allows a fractional id, but the gateway
+    cannot carry one unchanged, so it gets no reference; null marks a
+    notification, never a request REMORA executes.
+    """
+    try:
+        value = json.loads(text, parse_constant=_refuse_constant)
+    except json.JSONDecodeError as exc:
+        raise ValueError("request_ref jsonrpc_id is not JSON text") from exc
+    if isinstance(value, str):
+        if any(0xD800 <= ord(c) <= 0xDFFF for c in value):
+            raise ValueError("request_ref jsonrpc_id contains a lone surrogate")
+    elif type(value) is int:
+        if abs(value) > _MAX_SAFE_INTEGER:
+            raise ValueError("request_ref jsonrpc_id is beyond +/-(2^53 - 1)")
+    else:
+        raise ValueError("request_ref jsonrpc_id must be a string or a safe integer")
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
 def request_ref_of(tool_call: Any) -> RequestRef | None:
     """The reference a call carries, or None. Raises ValueError when malformed.
 
@@ -115,4 +147,4 @@ def request_ref_of(tool_call: Any) -> RequestRef | None:
     return RequestRef.from_dict(data)
 
 
-__all__ = ["FORMAT", "TRANSPORTS", "RequestRef", "request_ref_of"]
+__all__ = ["FORMAT", "TRANSPORTS", "RequestRef", "canonical_jsonrpc_id", "request_ref_of"]

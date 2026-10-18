@@ -55,13 +55,41 @@ export interface Deps {
   bodySha256?: string;
 }
 
+/** True when a string has no lone surrogate, which JSON.stringify would escape
+ *  and Python's json.dumps(ensure_ascii=False) would not. */
+function wellFormed(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const next = s.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+      i++;
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** The reference REMORA binds into the grant, or undefined when the message
- *  has no request id or the transport supplied no body digest. */
+ *  has no referenceable id or the transport supplied no body digest.
+ *
+ *  The id is recorded in canonical form, not as the bytes on the wire: only a
+ *  string without lone surrogates or a safe integer gets a reference, written
+ *  as JSON.stringify writes the parsed value ("7" becomes "7"; 7 and "7"
+ *  stay distinct). The body digest is what covers the exact bytes. The rule
+ *  is pinned by integrations/invocation-evidence/fixtures/jsonrpc-id-vectors.json,
+ *  which the Python side checks too. */
 export function requestRefFor(req: JsonRpcRequest, deps: Deps): RequestRef | undefined {
-  if (!deps.bodySha256 || req.id === undefined || req.id === null) return undefined;
+  if (!deps.bodySha256) return undefined;
+  const id = req.id;
+  const referenceable =
+    (typeof id === "string" && wellFormed(id)) ||
+    (typeof id === "number" && Number.isSafeInteger(id));
+  if (!referenceable) return undefined;
   return {
     transport: "mcp-streamable-http",
-    jsonrpc_id: JSON.stringify(req.id),
+    jsonrpc_id: JSON.stringify(id),
     body_sha256: deps.bodySha256,
   };
 }

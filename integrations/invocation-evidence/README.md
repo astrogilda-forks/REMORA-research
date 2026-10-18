@@ -20,8 +20,13 @@ any secret. The bundle carries:
 | the export as a whole | the evidence key, `REMORA/EVIDENCE/v1` | one signature over the exact body bytes |
 
 The request reference is set by the MCP gateway for every `tools/call`. It
-holds the transport, the JSON-RPC id's JSON text and the SHA-256 of the HTTP
-body bytes as received. REMORA binds its digest into the grant at ACCEPT, and
+holds the transport, the JSON-RPC id in canonical form and the SHA-256 of the
+HTTP body bytes as received. Only a string id without lone surrogates or a safe
+integer id gets a reference. Its text is what `JSON.stringify` writes for the
+parsed id, so `"\u0037"` on the wire is recorded as `"7"`. The body digest,
+not the id, covers the exact bytes. `fixtures/jsonrpc-id-vectors.json` pins
+the rule, and the gateway, the server and the verifier are all tested
+against it. REMORA binds its digest into the grant at ACCEPT, and
 redemption refuses the grant, unspent, under any other reference.
 
 ## Verify
