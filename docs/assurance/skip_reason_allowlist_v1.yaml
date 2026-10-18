@@ -11,8 +11,9 @@ schema_version: skip-reason-allowlist/v1
 # 'yaml', 'jsonschema', 'uvicorn', 'jwt' (identity extra), 'opentelemetry.sdk'
 # (otel extra). Not listed either: `BLOCKED: ...` from
 # tests/test_tla_models.py, which is a failure since #834, and that file's
-# `java not found: TLA+ models NOT checked`: the ubuntu runner image ships a
-# JDK, and a runner without one must fail the job, not skip the model checks.
+# `no Java runtime (...): TLA+ models NOT checked`, which fails instead of
+# skipping when CI is set: the ubuntu runner image ships a JDK, and a runner
+# without one must fail the job, not skip the model checks.
 
 classes:
   optional_dependency: "A package outside the job's install set (dev, causal, api, security). The tests run wherever it is installed."
@@ -117,9 +118,9 @@ entries:
   - pattern: "disclosure applies once E7 is recorded as independent"
     class: data_conditional
     note: "Guards the exposure disclosure only when the E7 contract is EXTERNALLY_VERIFIED."
-  - pattern: "single-valued enum|checked by test_session_dir_selects_the_session_state"
+  - pattern: "single-valued enum"
     class: data_conditional
-    note: "MCP tool-contract parametrisations that another test covers."
+    note: "MCP tool-contract parametrisations of an enum with one value: there is no second value to change to."
 
   # ── platform ───────────────────────────────────────────────────────────
   - pattern: "local zone is UTC and cannot be changed on this platform"

@@ -2130,7 +2130,11 @@ for a REMORA requirement.
 
 Each step below is ready to start. It is held for a decision an agent should
 not take: spending a sealed set, spending money on model calls, or speaking
-for the project in a public thread. None is started.
+for the project in a public thread. None was started on 2026-10-08. The
+C-ext4 sealed BFCL track has since run once under SAP v6 on 2026-10-17
+(CLAIM-021, `results/routing_bench_bfcl_v4_cext4_results.json`, commit
+`3ab28e8e`); its row is kept as the queue stood, and the outcome is in the
+QV2-06 sequence below.
 
 | Step | Waits on | Prepared so far | Done when |
 |---|---|---|---|

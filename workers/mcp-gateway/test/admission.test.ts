@@ -225,9 +225,21 @@ describe("admitMcp", () => {
   });
 
   it("skips the check only in the direct development transport", async () => {
-    const result = await admitMcp(req(), { REMORA_API_URL: "http://127.0.0.1:8000" });
+    const result = await admitMcp(req(), {
+      REMORA_API_URL: "http://127.0.0.1:8000", REMORA_DEPLOYMENT_PROFILE: "development",
+    });
     expect(result).toEqual({ ok: true, subject: "development" });
   });
+
+  it.each([undefined, "staging", "production", "prod"])(
+    "refuses the direct transport under profile %s", async (profile) => {
+      const result = await admitMcp(req(), {
+        REMORA_API_URL: "http://127.0.0.1:8000", REMORA_DEPLOYMENT_PROFILE: profile,
+      });
+      expect(result).toEqual({
+        ok: false, status: 503, reason: "direct_transport_outside_development",
+      });
+    });
 });
 
 describe("productionReadiness", () => {
@@ -261,6 +273,14 @@ describe("productionReadiness", () => {
     expect(productionReadiness(rest).problems).toEqual(["access_not_configured"]);
   });
 
+  it("names the direct transport as a problem outside development", () => {
+    expect(productionReadiness({ REMORA_DEPLOYMENT_PROFILE: "staging",
+                                 REMORA_API_URL: "http://x" }).problems)
+      .toEqual(["direct_transport_outside_development"]);
+    expect(productionReadiness({ REMORA_DEPLOYMENT_PROFILE: "development",
+                                 REMORA_API_URL: "http://x" }).problems).toEqual([]);
+  });
+
   it("does not enforce outside production, and rejects an unknown profile", () => {
     expect(productionReadiness({ REMORA_DEPLOYMENT_PROFILE: "staging" })).toEqual({
       profile: "staging",
@@ -283,6 +303,12 @@ describe("deployment configuration", () => {
   it("every wrangler config declares a known deployment profile", () => {
     expect(profileOf("wrangler.toml")).toBe("staging");
     expect(profileOf("wrangler.dev.toml")).toBe("development");
+  });
+
+  it("the /mcp route refuses on any readiness problem, not only in production", () => {
+    const source = readFileSync(join(process.cwd(), "src", "index.ts"), "utf8");
+    expect(source).toContain("if (readiness.problems.length > 0) {");
+    expect(source).not.toContain('readiness.profile === "production" && readiness.problems');
   });
 
   it("the /mcp route checks readiness and admission before parsing a call", () => {

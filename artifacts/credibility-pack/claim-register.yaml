@@ -60,9 +60,13 @@ claims:
       both restricted to the observable task surface plus platform-fact context),
       heuristic baselines show 1.4% unsafe execution; the unsafe-rate delta vs
       baselines is NOT statistically significant at the template-cluster level
-      (one-sided p=0.50). The utility delta (+0.46 vs heuristics) is significant
-      (p~=1e-4). The safety floor is produced by Stage 1 hard-block policy
-      invariants, not by the multi-oracle consensus machinery. Do not cite as
+      (one-sided p=0.50). A post-hoc test, declared after the pre-registered
+      hypothesis failed, gives a utility delta of +0.46 vs heuristics
+      (p~=1e-4). The ablation attributes the zero to no single component
+      (CLAIM-020): the condition without Stage 1 hard blocks also records a
+      false-accept rate of 0.0. The unsafe rate rests on the 56 harmful
+      templates; over them the cluster-level Wilson 95% upper bound is 6.42%
+      (post hoc, artifacts/posthoc/peer_review_level2_v1.json). Do not cite as
       evidence for the consensus layer, and do not cite the unsafe-rate delta
       vs baselines as significant.
     evidence_level: internal_benchmark
@@ -77,8 +81,11 @@ claims:
       560 harmful, 140 benign; deterministic synthetic benchmark;
       70 unique templates x 10 near-duplicate variants, so effective N=70
     # Q2.1: the independent harmful units the FAR rests on. 560 harmful tasks
-    # collapse to 70 template clusters, so the effective denominator is 70.
-    far_denominator: 70
+    # collapse to 56 harmful template clusters (14 of the 70 templates are
+    # benign-only); results/toolcall_benchmark_v2_results.json records
+    # effective_n 56 for remora_full_policy_gate. Corrected from 70 on
+    # 2026-10-18 (NEGATIVE_RESULTS.md section 83).
+    far_denominator: 56
     metrics:
       far_pct: 0.0
       far_ci_high_pct: 5.2
@@ -139,8 +146,11 @@ claims:
     statement: >
       REMORA blocked all 208 independently-sourced harmful scenarios from the
       AI Safety Institute's AgentHarm benchmark (arxiv:2410.09024). FAR=0.0%,
-      Wilson 95% CI [0.00%, 1.81%]. This dataset was not present in REMORA's
-      training corpus; external validity is supported by dataset independence.
+      Wilson 95% CI [0.00%, 1.81%]. The 208 scenarios come from 47 harmful
+      base behaviours; counted by behaviour, the Wilson 95% upper bound is
+      7.56% (post hoc, artifacts/posthoc/peer_review_level2_v1.json). This
+      dataset was not present in REMORA's training corpus; external validity
+      is supported by dataset independence.
     evidence_level: externally_benchmarked
     status: active
     artifact:
@@ -175,11 +185,13 @@ claims:
           208 benign scenarios (NEGATIVE_RESULTS.md section 19).
         status: missed
     caveat: >
-      Stage 1 hard-block policy invariants account for this result. The multi-oracle
-      consensus machinery contributes VERIFY/ABSTAIN routing quality only; it does not
-      drive the safety floor. Do not cite this result as evidence for the consensus layer.
+      No ablation was run on this benchmark and the artifact records no
+      per-component attribution, so the result is not attributed to the
+      hard-block layer; on the tool-call benchmark the ablation attributes the
+      zero to no single component (CLAIM-020). Do not cite this result as
+      evidence for the consensus layer.
       FBR=100% on benign variants is expected (same harm_category as harmful counterparts
-      triggers same risk_tier mapping). FAR=0.0% is the hard safety floor; FBR documents friction.
+      triggers same risk_tier mapping). FAR=0.0% comes with every benign scenario blocked; FBR documents friction.
       Gate: REM-014 PASS. Benchmark is intent-gating; tool-call interception is not verified.
     reproduce: >
       IMPORTED HISTORICAL RESULT. Produced in the REMORA main implementation repo
@@ -294,8 +306,10 @@ claims:
   - id: CLAIM-005
     title: "Critical-phase trust inversion (negative result)"
     statement: >
-      On N=32 critical-phase items, trust anti-correlates with correctness.
-      Low-trust items: 76.2% correct (N=21). High-trust items: 36.4% correct (N=11).
+      Exploratory: on N=32 critical-phase items, trust anti-correlates with
+      correctness. Low-trust items: 76.2% correct (N=21). High-trust items:
+      36.4% correct (N=11). Fisher exact p = 0.053, two-sided (post hoc,
+      artifacts/posthoc/peer_review_level2_v1.json).
     evidence_level: internal_benchmark
     status: active
     artifact:
@@ -840,7 +854,8 @@ claims:
       (500 live_multiple clusters + 300 live_irrelevance tasks, disjoint from
       both spent populations, 2,799 episodes) under the frozen deterministic
       semantic bundle with the semantic-authority floor. Met: native non-gold
-      call ACCEPT 0/500 = 0.0% (Wilson 95% upper bound 0.76%; C-ext2
+      call ACCEPT 0/500 = 0.0% (Wilson 95% upper bound 0.76% by row, 3.5%
+      clustered over the 106 proposed tools, post hoc; C-ext2
       degraded-authority baseline 28/258 = 10.9%); irrelevance ABSTAIN 300/300
       = 100.0%; required-unknown autonomous ACCEPT 0/398 = 0.0%. Missed and
       published as measured: constructed wrong-tool ACCEPT 2/199 = 1.005%
@@ -1000,9 +1015,11 @@ claims:
       29.9% of gold calls (Wilson 95% CI 24.9% to 35.4%). The frozen v1
       bundle (arm F1, the C-ext3 configuration) accepted 20/291 = 6.9%. V2D
       accepted 69 gold calls F1 did not, and F1 accepted 2 that V2D did not
-      (exact one-sided McNemar p about 1e-18). Obtainable VERIFY rose from
-      45/119 to 100/119 = 84.0%. Every safety count stayed at zero in every
-      arm: native wrong-call ACCEPT 0/295 (Wilson upper 1.29%), constructed
+      (exact one-sided McNemar p about 1e-18 by episode; counted by tool, 19
+      tools against 2, one-sided p = 1.1e-4, post hoc). Obtainable VERIFY
+      rose from 45/119 to 100/119 = 84.0%. Every safety count stayed at zero
+      in every arm: native wrong-call ACCEPT 0/295 (Wilson upper 1.29% by
+      row, 5.42% clustered over the 67 proposed tools, post hoc), constructed
       wrong-tool 0/119, required-unknown ACCEPT 0/238; irrelevance ABSTAIN
       was 68/68. All eight pre-registered targets were met.
     evidence_level: externally_benchmarked

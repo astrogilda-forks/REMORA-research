@@ -1,0 +1,14 @@
+{
+  "schema_version": "remora-acta-e6-upstream-lock-v1",
+  "fixture": {
+    "repository": "https://github.com/VeritasActa/e6-fixture",
+    "tag": "v1.1.0",
+    "commit": "8d8fc50ae2b4fdb498fcbb65b4f2268683a79a41",
+    "sha256sums_sha256": "08731bb75416e588a2a0269387731c6643dfbded76ef98b738e0097a99c2ebc3",
+    "announced": "https://github.com/aeoess/agent-governance-vocabulary/issues/177#issuecomment-6163809077",
+    "license": "Apache-2.0 (upstream LICENSE, vendored unchanged)"
+  },
+  "vendored_as": "upstream/e6-fixture",
+  "vendored_subset": "README.md, LICENSE, SHA256SUMS, bill.json, keys.json, manifest.json, receipts/chain.jsonl and cases/; consumer/, producer/, test/ and the per-sequence receipts/0036.json to 0086.json are not vendored",
+  "retrieved_at": "2026-10-18"
+}

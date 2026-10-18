@@ -29,9 +29,15 @@ silent:
   and exit 2 — for the CI job where NLI execution is the point.
 
 The artifact is deterministic given the pinned model: no timestamps, no
-environment-dependent fields beyond the backend name. It is CI-produced and
-MUST NOT be committed — the parity result enters the repo only via a later,
-provenance-bound round (claim hygiene: no numbers without artifacts).
+environment-dependent fields beyond the backend name. The copy the CI job
+produces is uploaded as a workflow artifact and is not committed. A parity
+result enters the repo only through a provenance-bound round (claim hygiene:
+no numbers without artifacts). One such round is committed:
+``results/se_backend_parity_smoke.json`` with its sidecar
+``results/se_backend_parity_smoke.provenance.json`` (2026-07-30, #109),
+registered in ``docs/assurance/results_manifest_v1.yaml`` and
+``docs/assurance/artifact_manifest_v1.md``. A later round replaces it the same
+way, with a new sidecar and manifest entry.
 
 Usage::
 

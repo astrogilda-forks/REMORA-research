@@ -1,0 +1,91 @@
+{
+  "format": "e6-fixture.keys.v1",
+  "demo": true,
+  "notice": "DEMO KEYS, made fresh for the E6 interoperability fixture on 2026-10-06 (UTC). None is a ScopeBlind production key or any other real key. A signature under them shows only that the signed bytes have not changed since they were signed; it shows nothing about any real party.",
+  "root": {
+    "role": "root",
+    "label": "E6 fixture root key (DEMO)",
+    "kid": "demo:e6-fixture:root:0a8d834701f54688",
+    "alg": "Ed25519",
+    "public_key_hex": "7de7de81eda8ecb29df03fa22fa03be36cb316346f90a71f7841dd4ad09c298d",
+    "fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "established": "Generated on 2026-10-06 (UTC) by producer/generate.mjs from 32 random bytes (node:crypto). Its private half existed only in that process's memory, where it signed the meter key's certificate below; it was then discarded, and nobody holds it. The paying side pins this fingerprint before it reads any bundle."
+  },
+  "keys": [
+    {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "z2i_dqqli8Ks0Blc_ZZDnCOh7Iv5od31uVZ5vsBet34",
+      "kid": "sb:issuer:Exe2v4V4bmeC",
+      "alg": "EdDSA",
+      "use": "sig",
+      "role": "meter",
+      "label": "E6 fixture meter key (DEMO)",
+      "public_key_hex": "cf68bf76aaa58bc2acd0195cfd96439c23a1ec8bf9a1ddf5b95679bec05eb77e",
+      "fingerprint": "sha256:04619a1b52728ef3a6155e1f54d4c6034d10b36a757411ae8e595d39b560c5c0",
+      "signs": [
+        "ocs:outcome.v0",
+        "ocs:period_statement.v0"
+      ],
+      "valid_from": "2026-07-01T00:00:00.000Z",
+      "valid_until": null,
+      "status": "active",
+      "established": "Generated on 2026-10-06 (UTC) by producer/generate.mjs from 32 random bytes (node:crypto). Its private half existed only in that process's memory, where the outcome meter used it to sign the simulated engagement's July and August 2026 records (outcome receipts and period statements); it was then discarded, and nobody holds it. Certified by the root key; the certificate is below. The kid follows the outcome meter's convention, \"sb:issuer:\" and the first 12 base58 characters of the public key; it names a format, not a ScopeBlind production issuer.",
+      "certificate": {
+        "payload": {
+          "type": "e6-fixture:key_certificate.v1",
+          "spec": "draft-farley-acta-signed-receipts-03",
+          "issuer_id": "demo:e6-fixture:root:0a8d834701f54688",
+          "issued_at": "2026-06-25T09:00:00.000Z",
+          "subject": {
+            "kid": "sb:issuer:Exe2v4V4bmeC",
+            "public_key_hex": "cf68bf76aaa58bc2acd0195cfd96439c23a1ec8bf9a1ddf5b95679bec05eb77e",
+            "fingerprint": "sha256:04619a1b52728ef3a6155e1f54d4c6034d10b36a757411ae8e595d39b560c5c0",
+            "role": "meter",
+            "signs": [
+              "ocs:outcome.v0",
+              "ocs:period_statement.v0"
+            ],
+            "valid_from": "2026-07-01T00:00:00.000Z",
+            "valid_until": null
+          },
+          "statement": "DEMO. The E6 fixture root demo key certifies this demo key to sign outcome receipts and period statements for the simulated Harbor Sandbox Co. engagement. Neither key is a production key.",
+          "demo": true
+        },
+        "signature": {
+          "alg": "EdDSA",
+          "kid": "demo:e6-fixture:root:0a8d834701f54688",
+          "sig": "4b41c95bf5b435b22aaf2b2a6fe8eb2abd91160d7727cda77cf0c3db3d78d0e52b5f09963282e56b4e519c0dafdefdc154ffdf9e960630ebf12856504c1cf808"
+        }
+      }
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-06-25T09:00:00.000Z",
+      "event": "meter key certified by the root key, valid from 2026-07-01, no end set",
+      "kid": "sb:issuer:Exe2v4V4bmeC",
+      "certificate": "sha256:dbfcab2cc09ab9438340ad95a232f214ac2a9c8e73b12c4c5eeb01b20b792245"
+    }
+  ],
+  "referenced_only": [
+    {
+      "role": "buyer (simulated)",
+      "fingerprint": "sha256:750cbb5ce55f5162937379bcc23ba5f79b4d5196a3d9b37128d6db9404ecd6b7",
+      "appears_in": "manifest.json, payload.engagement.buyer_key_fingerprint",
+      "established": "A demo key generated on 2026-10-06 (UTC) only so that the simulated engagement names a buyer, as the outcome meter requires. Its private half was discarded at once. It signs nothing in this fixture and no E6 check reads it."
+    },
+    {
+      "role": "certifier (simulated)",
+      "fingerprint": "sha256:c4c62c97584a73974c1493afbbc7b5b60dc47e6d959dc4fad7b487382355bc0a",
+      "appears_in": "the engagement configuration, which the records name only by digest (payload.engagement.config in manifest.json)",
+      "established": "A demo key generated on 2026-10-06 (UTC) only so that the simulated engagement names a certifier, as the outcome meter requires. Its private half was discarded at once. It signs nothing in this fixture and no E6 check reads it."
+    }
+  ],
+  "times": "Every issued_at, valid_from and history time in this fixture is a simulated time of the sandbox (June to September 2026). Every signature in it was made on 2026-10-06 (UTC).",
+  "obtained_by_paying_side": "Placeholder for this test. A real paying side takes the root fingerprint from its contract or another channel the producer does not control, and pins it before it reads any bundle. Here the keys document travels with the bundle, so pinning it shows the mechanism, not anyone's identity. The consumer is given this document as an input of its own and never uses keys that arrive inside a bundle (case 08).",
+  "generated": {
+    "on": "2026-10-06",
+    "by": "producer/generate.mjs"
+  }
+}

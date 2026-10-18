@@ -1,0 +1,38 @@
+{
+  "format": "e6-fixture.case.v1",
+  "case": "05-receipt-neither-billed-nor-excluded",
+  "title": "An in-scope receipt neither billed nor excluded",
+  "change": "bill.json drops the exclusion of receipt 41 (sha256:303fd03d45370524ec89fdc4954daccb78a237e6eec515f167c9b685c61ba02c, signed state escalation_requested), so it is neither billed nor excluded.",
+  "why": "Receipts to bill coverage: every receipt in the manifest's set is billed or explicitly excluded, so a bill cannot quietly leave one out.",
+  "inputs": {
+    "receipts": "../../receipts/chain.jsonl",
+    "manifest": "../../manifest.json",
+    "bill": "bill.json",
+    "keys": "../../keys.json",
+    "root_fingerprint": "sha256:0a8d834701f5468883e891be97240182dd26c23170cb80174449755d6244f926",
+    "earlier_bills": [],
+    "verifier": "@veritasacta/verify@0.10.21"
+  },
+  "expected": {
+    "verdict": "FAIL",
+    "decisive": [
+      "coverage_receipts_to_bill"
+    ],
+    "claims": {
+      "keys": "PASS",
+      "signatures": "PASS",
+      "scope": "PASS",
+      "coverage_bill_to_receipts": "PASS",
+      "coverage_receipts_to_bill": "FAIL",
+      "uniqueness": "PASS",
+      "quantities": "PASS",
+      "amount": "NOT_EVALUATED"
+    },
+    "codes": {
+      "coverage_receipts_to_bill": [
+        "unaccounted_receipt"
+      ]
+    },
+    "payment_ready": false
+  }
+}

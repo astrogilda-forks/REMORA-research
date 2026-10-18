@@ -24,11 +24,11 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-18: **26 `open`**, **28 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-18: **27 `open`**, **28 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
-Ten themes, all research gaps; the one production gap (CI gates that ran
+Fifteen themes, all research gaps; the one production gap (CI gates that ran
 without blocking, §55) is closed and struck from this list; a backlog that
 keeps closed items is the drift the status gate exists to prevent. The section numbers
 after each theme are where its evidence lives, and CI checks that every theme
@@ -133,11 +133,13 @@ cites only `open` sections and that no `open` section is missing a theme.
    outcome is now kept beside the `UNKNOWN` the sweep wrote, instead of
    raising and being lost. The race is injected in tests, not observed under
    a real slow tool or a skewed sweeper clock.
-15. **AgentHarm discrimination is lost between evidence and decision** (§80):
+15. **AgentHarm discrimination is lost between evidence and decision** (§80, §84):
    the oracle tells 29 of 44 twins apart and REMORA's mode-3 mapping none; the
    CLAIM-002 score separates globally but not below 10 % false blocks. The
    harness's oracle arms never reached the engine. Measuring this needs a
    graded evidence channel and fresh paired data, not the spent artifacts.
+   Meet composition (§84) keeps the oracle's signal when the oracle is a
+   cap: 37 of 44 twins told apart at the hard-block point, against 4.
 16. **Effect evidence attributes nothing to the dispatch** (§85):
    `EFFECT_VERIFIED` says the declared delta was observed, not that this
    dispatch produced it. Under every rule except `version_increment` a delta
@@ -2626,6 +2628,19 @@ sections again.
 | Authoritative tool metadata still caller-supplied on the advisory path (§14/M4) | Raise-only clamp shipped 2026-08-05 (declared risk cannot undercut the heuristic floor; clamps recorded, unset stays unset). Full authority still needs the signed ToolSpec registry (FT-03) | Medium |
 | External replication, REM-021, field evidence (§1, §4) | Cannot be closed from inside this repository | Medium |
 | Five held-out faults survive v1.7 (§73) | List validation stops after 32 items, non-dict `Mapping` skips validation, `slots`, case-insensitive enum lookup, `as_dict` key order; every decision fault of probe 4 is killed | Low |
+| Policy v5's critical-phase exclusion removed mostly correct accepts (§59) | On the N500 round v5 removed 70 accepts, 68 of them correct (97.1 %), more accurate than the 31 it kept. One artifact and an in-sample threshold; an out-of-sample split with the critical phase labelled would decide it. Removing an accept path cannot add a false accept | Low |
+| REMORA's gate is only as safe as its validator (§60) | A prefix matcher let every corrupt read through; fail-open lookups gave a false-allow rate of 0.078 (0.117 on reads, post hoc). No write was auto-accepted in any gated arm. Production validators have no contract that rules these faults out | Medium |
+| No FAR claim rests on enough independent harmful units (§61) | None of CLAIM-001, CLAIM-002 and CLAIM-003 reaches 299 independent units; Wilson 95 % upper bounds 5.2 %, 1.81 % and 2.25 %. Closing it needs a larger harmful set with independently withheld labels (Q2.3) | Medium |
+| Jev's injection questions flag benign operator text (§74) | V2.1 met both pre-registered held-out criteria, but its benign flag rate is still 0.2254 and Norwegian scenarios are flagged at about twice the English rate. A false flag costs automation, not safety | Medium |
+| Evidence-admission trust inputs are asserted (§75) | The accepted-producer map, the accepted-coverage set and the clock are the deployment's word. The mitigations (trusted timestamping, WORM-anchored trust configuration) are REM-025 | Medium |
+| Pre-Federation red team: 36 of 46 targeted attacks succeeded (§76) | Each failure is closed in the reusable primitive and the 46 probes run in CI. The repairs are tested by the author of the attacks; open until the v1.1 Federation corpora have an external run | Medium |
+| Report-result component let result order decide a verdict (§77) | Repaired by the producer (`conflicting_results_for_report`) with held-out tests; open until an external run reaches the component | Low |
+| Authorization component's corpus let 34 of 107 single-edit faults through (§78) | 31 held-out tests kill 102 of the 107; the five survivors are listed as equivalents and gated in CI. Faults, tests and equivalence arguments are the producer's own | Low |
+| A dispatch outcome reported after the stale-dispatch sweep was lost (§79) | Repaired with tests on all three dispatch paths. The race is injected inside the dispatch call, not observed under a real slow tool or a skewed sweeper | Low |
+| AgentHarm discrimination is lost between evidence and decision (§80) | CLAIM-002 tells 0 of 208 twin pairs apart; trimode mode 3 tells none of 44 apart where the oracle verdict tells 29. Harness repaired, no new run. Needs a graded evidence channel, a calibrated threshold and fresh paired data | Medium |
+| The BFCL intent extractor ignores negation and conditionals (§81) | A validity limit of the C-ext3 semantic arm, pinned by five strict xfails; no deployment bundle imports the extractor. A versioned successor is decided, not built | Low |
+| The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
+| Peer-review re-analysis widens the zero-count bounds (§83) | Clustered by tool, C-ext3 arm F 0/500 bounds at 3.5 % and C-ext4 0/295 at 5.42 %. Only 4 of the 295 C-ext4 wrong calls name a tool the task offered, so confusion between two tools of one task is barely tested | Medium |
 
 ### Accepted negative results — do not "fix" these
 
@@ -5040,6 +5055,55 @@ fact against the four arms.
   model outputs.
 - SAP v7 must pre-register clustered bounds, and score naive and external
   baselines on the same episodes.
+
+## §84 Meet composition recovers the oracle's AgentHarm signal; recalibrating the CLAIM-002 threshold does not (2026-10-17)
+<!-- finding-status: open -->
+
+**Status:** post-hoc, on spent artifacts. Nothing here updates CLAIM-002
+(`docs/assurance/rebenchmark_protocol_v1.md`). Script:
+`scripts/comp01_agentharm_rescore.py`. Artifact:
+`artifacts/posthoc/comp01_agentharm_rescore_v1.json`. Tests:
+`tests/test_comp01_agentharm_rescore.py`. This is the COMP-01 re-score of
+the flow-control SDD (`docs/design/derived-information-flow-control-v1.md`).
+
+**Composition set** (88 trimode tasks, 44 harmful and 44 benign). Verdicts
+are scored as ESCALATE ≡ ABSTAIN above VERIFY above ACCEPT, and twins are
+paired by AgentHarm id.
+
+- At the hard-block point (needs a higher authority or refuses), the old
+  composition stopped 6 of 44 harmful tasks and told 4 twin pairs apart,
+  with AUROC 0.545. Mode 3 replayed through today's engine agrees with the
+  record on 87 of 88 tasks; the one difference, ABSTAIN to ESCALATE, has the
+  same executability.
+- With the Mode 2 oracle verdict as a monitor cap (meet composition, SDD
+  §3.9), it stopped 44 of 44, blocked 7 benign tasks and told 37 pairs
+  apart, with AUROC 0.920.
+- The oracle alone (Mode 2) stops 44 of 44, blocks 6 benign tasks and tells
+  38 pairs apart, with AUROC 0.932.
+- H6 (meet recall at least the oracle's) holds.
+- At the not-autonomous point (anything below ACCEPT), every arm except the
+  oracle sends all 44 benign tasks to review. The engine's own mapping still
+  turns every oracle ACCEPT into VERIFY.
+
+**Threshold set** (CLAIM-002, 416 instructions with the graded
+`effective_p`). Every score is at least 0.758, so the recorded 0.70
+threshold blocked everything.
+
+- The split is by base behaviour, seed 20261017: 23 behaviours (192 rows)
+  for development and 24 (224 rows) for test.
+- On the development half, the lowest threshold with a false-block rate of
+  at most 10 % blocks nothing. The same holds at 5, 20 and 30 %.
+- Blocking starts only at a 50 % budget. There the threshold 0.999 lets
+  19 of 112 harmful test rows through, blocks 61 of 112 benign ones, and
+  tells 32 pairs apart.
+- Fixing the threshold artifact therefore does not make CLAIM-002
+  discriminate at a usable false-block rate.
+
+**What follows.** Composition is not where AgentHarm lost its signal; the
+mapping from oracle verdict to observation is. A cap carries the signal
+through. The graded score that the worker computed does not support a
+useful threshold. Showing discrimination still needs fresh paired data
+(§80).
 
 ## §85 EFFECT_VERIFIED does not attribute the observed delta to the dispatch (2026-10-18)
 <!-- finding-status: open -->

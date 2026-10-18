@@ -22,6 +22,7 @@ import pytest
 from remora.policy.decision_engine import RemoraDecisionEngine
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction
+from remora.toolcall.routing import bfcl_semantic_bundle_v2 as v2
 from remora.toolcall.routing.bfcl_semantic_bundle import (
     author_contract,
     extract_intent,
@@ -115,8 +116,9 @@ def test_unrecognised_paraphrase_is_never_supported_for_the_mutation(
 # goal_match sees an unqualified "cancel". The fix belongs in
 # bfcl_semantic_bundle.py, which is frozen by the sealed C-ext3 manifest (its
 # SHA-256 gates run_bfcl_cext3.py), so it is recorded here rather than edited.
-# strict=True makes the suite fail loudly when the defect is fixed, so this
-# marker is removed with the fix.
+# strict=True makes the suite fail loudly if the frozen file ever changes.
+# These xfails stay as the record of the v1 limit (NEGATIVE_RESULTS §81); the
+# same cases run against the successor, bfcl_semantic_bundle_v2, below.
 _EXTRACTOR_DROPS_QUALIFIERS = pytest.mark.xfail(
     strict=True,
     reason="AS-011: extract_intent drops negation and conditionality; "
@@ -145,6 +147,49 @@ def test_negation_in_one_clause_does_not_hide_a_read_request() -> None:
     task = "Do not cancel booking B-104, just show me booking B-104."
     assert _verdict("get_booking", task) is GoalMatch.SUPPORTED
     assert _verdict("cancel_booking", task) is GoalMatch.UNSUPPORTED
+
+
+# The same five cases against bundle v2, the successor NEGATIVE_RESULTS §81
+# asks for. v2 checks the three words before an effect keyword for a negation
+# (_negated), so a negated mutation yields no intent and goal matching returns
+# UNKNOWN, never SUPPORTED.
+
+def _verdict_v2(tool: str, task: str) -> GoalMatch:
+    intent = v2.extract_intent(task, set(LEXICON), FULL)
+    return match_tool_to_intent(
+        contract=v2.author_contract(tool), intent=intent,
+        proposed_args={}, task_text=task,
+    ).verdict
+
+
+@pytest.mark.parametrize("task", [
+    "Please do not cancel booking B-104.",
+    "Never cancel booking B-104.",
+    "Don't cancel booking B-104.",
+])
+def test_v2_a_negated_mutation_is_never_supported(task: str) -> None:
+    assert _verdict_v2("cancel_booking", task) is not GoalMatch.SUPPORTED
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="bundle v2 handles negation only: 'before cancel' still reads as a "
+           "cancel request and the cancel call is SUPPORTED",
+)
+def test_v2_a_conditional_mutation_is_never_supported() -> None:
+    task = "Inspect booking B-104 before cancel."
+    assert _verdict_v2("cancel_booking", task) is not GoalMatch.SUPPORTED
+
+
+def test_v2_negation_in_one_clause_does_not_hide_a_read_request() -> None:
+    task = "Do not cancel booking B-104, just show me booking B-104."
+    assert _verdict_v2("get_booking", task) is GoalMatch.SUPPORTED
+    assert _verdict_v2("cancel_booking", task) is GoalMatch.UNSUPPORTED
+
+
+def test_v2_still_supports_the_unnegated_mutation() -> None:
+    """The negation check must not refuse the plain request."""
+    assert _verdict_v2("cancel_booking", "Please cancel booking B-104.") is GoalMatch.SUPPORTED
 
 
 # ---------------------------------------------------------------------------
