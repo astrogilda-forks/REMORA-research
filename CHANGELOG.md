@@ -32,6 +32,10 @@ This file lists externally relevant changes by release. Fine-grained development
 - `tests/test_invocation_evidence_export.py` (20 tests) and three gateway
   tests. The verifier, the export and the cases are REMORA's own, so nothing
   here is an independent result.
+- The twelve capabilities whose sources this touched (CAP-003, 004, 005,
+  007, 013, 018 to 024) are re-audited and rebound to the code commit, with
+  their evidence tests passing. Their mechanism, status, scope and caveats are
+  unchanged. The boundary declaration and its summary are repinned.
 
 ### Flow control IFC-01 (label lattice)
 
