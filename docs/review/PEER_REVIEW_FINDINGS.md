@@ -208,7 +208,7 @@ conditions?
 | Affected claims | CLAIM-021, CLAIM-019 |
 | Action | Level 2: committed post-hoc naive arms (name overlap, schema-only) with accept-gold against accept-wrong curves, labelled post hoc. Level 3: external baselines (LLM judge, policy engine) in SAP v7. §14 now states that no such baseline was run. |
 | Owning PR | level-2 PR (naive rules); SAP v7 (external baselines) |
-| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): two-token overlap gives 51/291 gold, 2/295 wrong, 1/119 wrong tool and 48/238 missing-argument accepts. One-token overlap gives 178/291, 6/295, 29/119 and 132/238. Schema-only accepts all 295 wrong calls. V2D gives 87/291 and 0 on every other family. The results are reported in §10.9 and §14 and in §83. External baselines (LLM judge, existing guardrail) still need SAP v7. |
+| Verification | `artifacts/posthoc/peer_review_level2_v1.json` (`scripts/peer_review_posthoc.py`, tested by `tests/test_peer_review_posthoc.py`): two-token overlap gives 51/291 gold, 2/295 wrong, 1/119 wrong tool and 48/238 missing-argument accepts. One-token overlap gives 178/291, 6/295, 29/119 and 132/238. Schema-only accepts all 295 wrong calls. V2D gives 87/291 and 0 on every other family. The results are reported in §10.9 and §14 and in §83. External baselines (LLM judge, existing guardrail) still need SAP v7. Pre-registered, not run: SAP v7 §14 (Q7, draft addendum of 2026-10-18) fixes an LLM judge (`claude-sonnet-5-5`, frozen prompt, matched-safety threshold), Invariant Guardrails as the policy engine, hypotheses H5 to H7 and their thresholds, on BFCL v4 multi-turn at gorilla `6ea57973` with model-generated wrong calls. No data yet; owner approval and sealing are pending (§15.5). |
 | Status | IN_PROGRESS |
 
 ### PRF-012 The system routes annotated gold proposals; this was not stated
@@ -611,6 +611,6 @@ conditions?
 | Affected claims | none |
 | Action | Do not grow the list as a defence. State in the threat model that pattern matching is a hint, and measure injection with an external benchmark (AgentDojo or InjecAgent) in level 3. |
 | Owning PR | not yet opened |
-| Verification | Pending. |
+| Verification | Pending. Pre-registered, not run: SAP v7 §13 (Q6, draft addendum of 2026-10-18) runs InjecAgent at `f19c9f2c` through `/v1/execution/assess` against allow-all and a policy-only gateway, with a registry fixed before any agent output, benign twin controls, hypotheses H4a and H4b, and blocks due to the pattern list counted apart (S6.5). No data yet; owner approval and sealing are pending (§15.5). |
 | Status | OPEN |
 

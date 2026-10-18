@@ -4,6 +4,17 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### SAP v7 addenda: InjecAgent and external routing baselines (pre-registration only)
+
+- SAP v7 §12 to §15 pre-register two studies before any data exists (owner
+  decision 2026-10-18). Q6 runs InjecAgent (`f19c9f2c`, MIT) through
+  `/v1/execution/assess` against allow-all and a policy-only gateway, with
+  benign twin controls (PRF-042). Q7 compares REMORA with an LLM judge and
+  Invariant Guardrails on BFCL v4 multi-turn (gorilla `6ea57973`), with
+  model-generated wrong calls and no constructed producers (PRF-010, PRF-011,
+  PRF-013). Nothing has been run; the plan stays a draft until the owner
+  approves and seals it.
+
 ### Flow control IFC-03b (ToolSpec v4 at bundle load)
 
 - The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in
