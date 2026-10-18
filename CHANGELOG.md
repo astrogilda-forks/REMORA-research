@@ -4,6 +4,19 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Federation interop (invocation axes reproduction)
+
+- `.github/workflows/probity-invocation-axes-reproduction.yml` runs Probity's
+  `invocation_axes` reader from agent-evidence-vectors at a pinned commit, then
+  hands each of its execution bundles to the effect-evidence-v1 reference
+  verifier at the frozen revision. It records where the two agree on the
+  observed effect and fails if the split changes. It is a `REPRODUCTION` and
+  advances nothing.
+- The job also asserts the corpus shape at the pinned reader: 23 unique
+  cases, 22 paired bundles, and `no_execution_bundle` as the only case
+  without one. The split alone stayed green if bundles went missing. The
+  agreement it reports is named `observed_effect_binary_agree`, because it
+  compares only REMORA's `EFFECT_VERIFIED` with the reader's `ESTABLISHED`.
 ### Interop (E6 consumer for Veritas Acta receipts, author run)
 
 - New `remora/interop/acta_e6/` (EXPERIMENTAL): a paying-side consumer for
