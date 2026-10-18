@@ -160,7 +160,9 @@ def test_matching_pair_establishes_every_claim(world, verifier):
                      capture_ref={"jsonrpc_id": "7",
                                   "body_sha256": hashlib.sha256(BODY).hexdigest()},
                      call=CALL)
-    assert _results(outcome) == dict.fromkeys(verifier.CLAIMS, "ESTABLISHED"), outcome
+    expected = dict.fromkeys(verifier.CLAIMS, "ESTABLISHED")
+    expected["effect_observed"] = "NOT_ESTABLISHED"
+    assert _results(outcome) == expected, outcome
     assert len(calls) == 1
 
 
@@ -353,3 +355,74 @@ def test_the_cli_reports_a_contradiction_by_exit_code(tmp_path):
         capture_output=True, text=True, check=False)
     assert other.returncode == 1
     assert json.loads(other.stdout)["claims"]["request_corresponds"]["result"] == "CONTRADICTED"
+
+
+# The chain under attack, end to end: enforcement first, then the receiver.
+
+
+def test_a_grant_presented_with_another_call_is_refused_before_dispatch(world):
+    """Wrong call binding at enforcement: the grant names one call, another is
+    presented under the same request reference. Nothing runs, and the grant
+    is still good for the call it names."""
+    client, calls = world
+    ref = _ref(BODY, "7")
+    token = client.post("/v1/execution/assess", json=_proposal(ref),
+                        headers=HEADERS).json()["execution_token"]
+    other = {**_proposal(ref), "arguments": {"asset": "P-2"}}
+    refused = client.post("/v1/execution/execute-accepted", headers=HEADERS,
+                          json={"execution_token": token, "tool_call": other})
+    assert refused.status_code == 409 and "binding_refused" in refused.text, refused.text
+    assert calls == []
+    ran = client.post("/v1/execution/execute-accepted", headers=HEADERS,
+                      json={"execution_token": token, "tool_call": _proposal(ref)})
+    assert ran.status_code == 200 and len(calls) == 1
+
+
+def test_a_denied_call_gets_no_grant_no_dispatch_and_no_export(world):
+    """Dispatch after deny: a call REMORA does not ACCEPT carries no grant,
+    a grant for another call does not carry it, and nothing is exportable as
+    an executed invocation."""
+    client, calls = world
+    denied_call = {"tool_name": "wire_transfer", "arguments": {"amount": 10},
+                   "target_environment": "prod", "request_ref": _ref(OTHER_BODY, "8")}
+    denied = client.post("/v1/execution/assess", json=denied_call, headers=HEADERS)
+    assert denied.status_code == 200, denied.text
+    assert denied.json()["decision"] != "accept"
+    assert "execution_token" not in denied.json()
+    token = client.post("/v1/execution/assess", json=_proposal(_ref(BODY, "7")),
+                        headers=HEADERS).json()["execution_token"]
+    smuggled = client.post("/v1/execution/execute-accepted", headers=HEADERS,
+                           json={"execution_token": token, "tool_call": denied_call})
+    assert smuggled.status_code in (403, 409), smuggled.text
+    assert calls == []
+    export = _export(client, denied.json()["proposal_id"])
+    assert export.status_code == 409 and "not_a_direct_accept" in export.text
+
+
+def test_a_chain_rewritten_to_hide_a_deny_is_contradicted(world, verifier):
+    """The receiver side of dispatch after deny: an exporter that records a
+    deny and then an execution cannot present it as an ACCEPT."""
+    client, _ = world
+    proposal_id, _run_ = _run(client, _ref(BODY, "7"))
+    body = json.loads(base64.b64decode(_export(client, proposal_id).json()["payload_b64"]))
+    body["chain"][0]["payload_canonical"] = body["chain"][0]["payload_canonical"].replace(
+        '"decision":"accept"', '"decision":"abstain"')
+    outcome = _check(verifier, _resign(body))
+    assert outcome["claims"]["chain_consistent"]["result"] == "CONTRADICTED"
+    assert "not_a_direct_accept" in outcome["claims"]["chain_consistent"]["codes"]
+    assert outcome["claims"]["authority_bound"]["result"] == "NOT_ESTABLISHED"
+
+
+def test_the_tools_own_result_is_not_an_observed_effect(world, verifier):
+    """The tool's report about itself is in the export as a result digest. The
+    receiver never turns it into an observed effect."""
+    client, _ = world
+    proposal_id, _run_ = _run(client, _ref(BODY, "7"))
+    outcome = _check(verifier, _export(client, proposal_id).json(),
+                     capture_ref={"jsonrpc_id": "7",
+                                  "body_sha256": hashlib.sha256(BODY).hexdigest()},
+                     call=CALL)
+    assert outcome["claims"]["dispatch_recorded"]["result"] == "ESTABLISHED"
+    assert outcome["result_sha256"]
+    assert outcome["claims"]["effect_observed"] == {
+        "result": "NOT_ESTABLISHED", "codes": ["no_observation_in_export"]}

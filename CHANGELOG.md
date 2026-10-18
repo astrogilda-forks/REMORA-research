@@ -46,8 +46,12 @@ This file lists externally relevant changes by release. Fine-grained development
   path, and a README. Two requests with the same call are told apart:
   `request_corresponds` is CONTRADICTED for the other request while
   `call_corresponds` stays ESTABLISHED.
-- `tests/test_invocation_evidence_export.py` (20 tests) and three gateway
-  tests. The verifier, the export and the cases are REMORA's own, so nothing
+- `tests/test_invocation_evidence_export.py` (24 tests) and three gateway
+  tests. Four of them attack the chain end to end: a grant presented with
+  another call is refused before dispatch, a denied call gets no grant and
+  no export, an export rewritten to hide a deny is CONTRADICTED, and the
+  tool's own result never becomes an observed effect (`effect_observed` is
+  always NOT_ESTABLISHED). The verifier, the export and the cases are REMORA's own, so nothing
   here is an independent result.
 - The twelve capabilities whose sources this touched (CAP-003, 004, 005,
   007, 013, 018 to 024) are re-audited and rebound to the code commit, with

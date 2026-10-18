@@ -49,6 +49,12 @@
       "codes": [
         "export_not_authentic"
       ]
+    },
+    "effect_observed": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "export_not_authentic"
+      ]
     }
   }
 }

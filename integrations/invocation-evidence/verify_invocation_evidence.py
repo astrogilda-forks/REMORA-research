@@ -53,6 +53,7 @@ CLAIMS = (
     "call_corresponds",
     "request_corresponds",
     "dispatch_recorded",
+    "effect_observed",
 )
 
 
@@ -343,6 +344,11 @@ def verify(
         dispatch.contradict("not_executed")
     if result.get("result_sha256"):
         out["result_sha256"] = result["result_sha256"]
+
+    # 7. The effect. The export holds no observation of the target, only the
+    # dispatcher's record and the tool's own result digest, and a tool's
+    # report about itself is not an observation of what it changed.
+    claims["effect_observed"].lack("no_observation_in_export")
     return finish()
 
 

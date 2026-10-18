@@ -37,6 +37,12 @@
     "dispatch_recorded": {
       "result": "ESTABLISHED",
       "codes": []
+    },
+    "effect_observed": {
+      "result": "NOT_ESTABLISHED",
+      "codes": [
+        "no_observation_in_export"
+      ]
     }
   }
 }

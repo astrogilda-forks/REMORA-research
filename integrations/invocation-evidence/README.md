@@ -43,7 +43,7 @@ context inputs are:
 - from the verifier's own capture: the JSON-RPC id, the body digest, and the
   call as `{"name", "arguments", "target"}`.
 
-Each of six claims is `ESTABLISHED`, `CONTRADICTED` or `NOT_ESTABLISHED`
+Each of seven claims is `ESTABLISHED`, `CONTRADICTED` or `NOT_ESTABLISHED`
 with reason codes:
 
 | Claim | ESTABLISHED means |
@@ -54,6 +54,7 @@ with reason codes:
 | `call_corresponds` | the captured call recomputes to the recorded call hash |
 | `request_corresponds` | the captured request is the one the signed grant was bound to |
 | `dispatch_recorded` | REMORA recorded the dispatch as executed, not unknown |
+| `effect_observed` | never: the export holds no observation of the target, so this is always `NOT_ESTABLISHED` (`no_observation_in_export`) |
 
 Exit 0 means nothing is `CONTRADICTED`. `NOT_ESTABLISHED` never counts as a
 pass for its claim.
@@ -71,7 +72,7 @@ discarded. Two MCP requests, ids 7 and 8, carry the same tool call:
 
 | Case | What it pairs | `call_corresponds` | `request_corresponds` | Other |
 |---|---|---|---|---|
-| 01 | export of 7, capture of 7 | ESTABLISHED | ESTABLISHED | all ESTABLISHED |
+| 01 | export of 7, capture of 7 | ESTABLISHED | ESTABLISHED | all ESTABLISHED except `effect_observed` |
 | 02 | export of 7, capture of 8 | ESTABLISHED | CONTRADICTED | |
 | 03 | export of 8, capture of 7 | ESTABLISHED | CONTRADICTED | |
 | 04 | export of 7, no capture | NOT_ESTABLISHED | NOT_ESTABLISHED | authority ESTABLISHED |
@@ -86,10 +87,23 @@ digest does, and only for the request the front end recorded.
 `python integrations/invocation-evidence/fixtures/run_cases.py` runs them,
 and `tests/test_invocation_evidence_export.py` pins the outcomes above.
 
+The same test file attacks the chain end to end through the execution API.
+Enforcement and the receiver are tested separately:
+
+| Attack | Enforcement | Receiver |
+|---|---|---|
+| wrong call binding | a grant presented with other arguments is refused as `binding_refused` before dispatch, and stays good for its own call | another request with the same call is `request_corresponds` CONTRADICTED |
+| dispatch after deny | a call REMORA does not ACCEPT gets no grant, a grant for another call does not carry it, and it is not exportable | an export re-signed to turn a recorded deny into an ACCEPT is `chain_consistent` CONTRADICTED |
+| the tool's own observation | not applicable: REMORA records the tool's result digest, not an observation | `effect_observed` stays NOT_ESTABLISHED |
+
+These tests drive the Python execution API with the request reference the
+gateway would send. They do not run the TypeScript gateway in the same
+process; the gateway's own tests check that it builds the reference.
+
 ## What this does not establish
 
 - That the effect happened. `dispatch_recorded` is REMORA's record of its own
-  dispatch.
+  dispatch, and `effect_observed` is never established from an export.
 - That every path to the tool passes through REMORA, or that a capture on
   either side is complete. `runtime_capability_surface_completeness` stays
   `NOT_ESTABLISHED`.
