@@ -157,12 +157,58 @@ and boundary declarations state what the system establishes and what it does
 not. The execution chain has not yet been evaluated against attacks. One
 frozen interoperability contract has two external fixture-level runs that
 meet the repository's independence rule; production enforcement
-remains unestablished and the system is \texttt{SHADOW\_ONLY}.
+remains unestablished, and the declared deployment status is
+\texttt{SHADOW\_ONLY}: shadow-mode operation is permitted, enforcement is not.
 \end{abstract}
 
 \textbf{Keywords:} agentic AI safety, AI control, agent security,
 governance overlay, policy-as-code, selective prediction, uncertainty
 routing, audit governance, human-in-the-loop.
+
+\paragraph{Identifiers used in this paper.} The repository's registers
+and plans use short identifiers, which this paper keeps so that every
+statement can be traced.
+\begin{description}[leftmargin=1.2em,itemsep=1pt,font=\normalfont\bfseries]
+\item[CLAIM-NNN] an entry in the claim register,
+  \path{docs/assurance/claim_register_v1.yaml}. Each entry binds a stated
+  result to its artifact, sample size, caveat and reproduce command.
+\item[REM-NNN] an item in the remediation register,
+  \path{docs/assurance/remediation_register.yaml}. REM-021, for example,
+  is the independent human review that is still open.
+\item[CAP-NNN] an entry in the capability register,
+  \path{docs/assurance/capability_register_v1.yaml}.
+\item[RMR-CR-NNN] a finding of the producer-owned security review of
+  2026-10-07 (\path{docs/assurance/reviews/2026-10-07-272b6c56/}).
+\item[NEGATIVE\_RESULTS.md \S N] a numbered entry in the repository's
+  record of negative results, falsified hypotheses and limitations.
+\item[SAP vN] version N of the pre-registered statistical analysis plan
+  (\path{docs/assurance/statistical_analysis_plan*.md}). SAP v5 governs
+  C-ext3, SAP v6 governs C-ext4, and SAP v7 is a draft.
+\item[C-ext2, C-ext3, C-ext4] three sealed evaluation tracks on disjoint
+  rows of BFCL v4, each run once. C-ext2 measured the routing pipeline
+  (CLAIM-018, superseded by CLAIM-019 and kept as the wrong-call baseline). C-ext3 added declared tool contracts and task intents
+  (CLAIM-019). C-ext4 spent the remaining reserve on a revised bundle
+  (CLAIM-021).
+\item[Arm F, F1, V2D] evaluation arms. Arm F is the confirmatory C-ext3
+  configuration, with contracts, intents and the semantic-authority floor.
+  In C-ext4, F1 is that same frozen bundle and V2D is the revised bundle v2
+  with deterministic derivation receipts, the confirmatory arm.
+\item[E-ECB, E-FA, E-EE, E7] frozen interoperability contracts for
+  exact-call binding, fresh authority, effect evidence and the runtime
+  capability surface (\S\ref{sec:federation}). CP-F1 to CP-F4 are the four
+  findings of the contract probes against the federation transport.
+\item[Status values] \texttt{NOT\_ESTABLISHED}, \texttt{NOT\_INDEPENDENT},
+  \texttt{EXTERNALLY\_VERIFIED} and \texttt{INDEPENDENT} are status values in
+  the capability, boundary and interoperability declarations
+  (\S\ref{sec:federation}, \S\ref{sec:boundary-declarations}).
+\item[SHADOW\_ONLY] the declared deployment status. Shadow-mode operation is
+  permitted and enforcement is not, until the remaining release gates close
+  (\path{docs/assurance/release_gates.md}).
+\item[AROMER, AII] AROMER is the experimental learning layer; AII, its
+  Autonomous Intelligence Index, is a researcher-defined composite score
+  whose phase labels (WARMUP, LEARNING, CAPABLE, TRAINED) are qualitative
+  (\S\ref{sec:threats}).
+\end{description}
 
 % =====================================================================
 \section{Introduction}
@@ -299,13 +345,17 @@ the conclusion (\S\ref{sec:conclusion}).
 \centering\footnotesize
 \caption{Headline results. Every row is bound to the claim register; BFCL
   wrong calls are cross-task substitutions (\S\ref{sec:routing-blind});
-  CLAIM-018 is superseded by CLAIM-019 and kept as the wrong-call baseline.}
+  CLAIM-018 is superseded by CLAIM-019 and kept as the wrong-call baseline.
+  The AgentHarm false-block floor (at most 40\%) was pre-registered for the
+  re-scoring of the same 208 benign scenarios and is recorded as missed
+  (\texttt{artifacts/verify\_protocols/agentharm\_rescore\_v1.json};
+  NEGATIVE\_RESULTS.md \S19).}
 \begin{tabular}{@{}p{0.40\columnwidth}p{0.54\columnwidth}@{}}
 \toprule
 Study & Result (claim) \\
 \midrule
 Tool-call benchmark, 70 clusters & 0\% unsafe acceptance, Wilson [0.0\%, 5.2\%], upper 6.4\% over the 56 harmful templates; keyword baselines 1.4\%, not significant (CLAIM-001) \\
-AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%], upper 7.6\% over the 47 base behaviours; every benign counterpart also blocked (CLAIM-002) \\
+AgentHarm, 208 harmful scenarios & 0\% false authorizations, Wilson [0.00\%, 1.81\%], upper 7.6\% over the 47 base behaviours; every benign counterpart also blocked, false-block rate 100\% against a pre-registered floor of at most 40\%, missed (CLAIM-002) \\
 Validator study, all-\textsc{unknown} regime & autonomous valid-identifier reads 0/60 (zero by construction) to 60/60 (CLAIM-014) \\
 Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-018, superseded) \\
 Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% by row, 3.5\% over its 106 tools (CLAIM-019) \\
@@ -1456,6 +1506,7 @@ Single model heuristic     & 28.6\% & 1.4\% & 0.16 \\
 Majority vote heuristic    & 28.6\% & 1.4\% & 0.16 \\
 Self-consistency heuristic & 28.6\% & 1.4\% & 0.16 \\
 Verifier heuristic         & 28.6\% & 1.4\% & 0.16 \\
+Temperature-gate heuristic (retired) & 60.0\% & 1.4\% & 0.36 \\
 \textbf{REMORA full policy}& \textbf{90\%} & \textbf{0\%} & \textbf{0.62} \\
 \bottomrule
 \end{tabular}}
@@ -1468,8 +1519,13 @@ over the 56 harmful templates, NEGATIVE\_RESULTS.md \S83); baselines
 produced 1.4\% (1 of 70 clusters). The safety-rate difference is not
 statistically significant at the template-cluster level (one-sided
 $p=0.50$). A post-hoc test, declared after the pre-registered hypothesis
-failed, finds advantages in decision utility ($+0.456$, $p\approx10^{-4}$)
-and accuracy. The complete condition set, including retired research
+failed, finds advantages in decision utility and accuracy. The utility
+gain is $+0.456$ (cluster bootstrap 95\% CI [0.36, 0.56],
+$p\approx10^{-4}$) against each of the four keyword heuristics and
+$+0.259$ ([0.15, 0.37], $p\approx10^{-4}$) against the retired
+temperature-gate heuristic, which maps the derived risk tier to a
+simulated temperature phase and has the same 1.4\% unsafe rate
+(\path{results/toolcall_benchmark_v2_significance.json}, \texttt{comparisons}). The complete condition set, including retired research
 selectors, remains in \path{results/toolcall_benchmark_v2_results.json}.
 Earlier versions of this table reported baselines at
 10--20\% unsafe: those numbers were inflated by baselines and gate
@@ -2137,7 +2193,9 @@ clustered at those levels are wider. Post hoc, the zero-count upper
 bounds are 3.5\% over C-ext3's 106 tools, 5.42\% over C-ext4's 67 tools,
 6.42\% over CLAIM-001's 56 harmful templates and 7.56\% over CLAIM-002's 47
 base behaviours (NEGATIVE\_RESULTS.md \S83). The
-tool-call benchmark's utility gain ($+0.46$) is a post-hoc test, declared
+tool-call benchmark's utility gain ($+0.46$ against the keyword
+heuristics, $+0.26$ against the retired temperature-gate heuristic) is
+a post-hoc test, declared
 after the pre-registered hypothesis failed. Wilson intervals are fixed-$N$
 constructions and are not valid under the continuous monitoring that the
 REM-020 longitudinal gate performs (optional stopping). A time-uniform
@@ -2244,8 +2302,9 @@ here examine three consequences of that design.
 0\% unsafe-acceptance result on the adversarial tool-call benchmark (700
 synthetic rows; 0 of 56 harmful templates, Wilson 95\% upper bound 6.4\%
 over those templates; baselines 1.4\%, difference not significant at
-$p=0.50$; a post-hoc test finds gains in utility, $+0.456$, and
-accuracy) was observed with the deterministic policy gates in place, and
+$p=0.50$; a post-hoc test finds gains in utility, $+0.456$ against the
+keyword heuristics and $+0.259$ against the temperature-gate heuristic,
+and in accuracy) was observed with the deterministic policy gates in place, and
 not produced by the multi-oracle consensus machinery. No experiment
 attributes it to the gates: the committed component ablation records FAR
 $=0.000$ in every condition,
