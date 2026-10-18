@@ -270,6 +270,14 @@ report artifact second.
 
 ## RF-02 — Argument provenance / capability labels (CaMeL-class IFC) `[gating+evidence]` `[P1 slice 1, P2 full, effort L]`
 
+**Status 2026-10-17.** The full design is the frozen SDD
+`docs/design/derived-information-flow-control-v1.md` (v1.3). It derives
+labels at the dispatcher instead of taking them from the caller.
+Implementation follows its release order, and progress is tracked in
+`docs/design/derived-information-flow-control-v1-status.md`. RF-03: the
+SDD's high-water context label covers the "read secret THEN send" pattern
+class.
+
 **Gap (grounded).** Since 2026-07-30 (RemoraDecisionEngine-v4, issue #40,
 PR #94) Stage 1 enforces a tainted-argument floor: untrusted-derived arguments
 can never auto-accept (`TAINTED_ARGUMENT_VERIFY`), and at CRITICAL risk they

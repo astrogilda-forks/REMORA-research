@@ -100,6 +100,8 @@ Several topics have more than one document. This table says which to open.
 | [security/pre-deployment-review.md](security/pre-deployment-review.md) | Pre-deployment security review |
 | [security/owasp_genai_mapping.md](security/owasp_genai_mapping.md) | OWASP GenAI mapping |
 | [security/non-transitivity-of-authority.md](security/non-transitivity-of-authority.md) | Non-Transitivity of Authority (NTA-1, NTA-2): principle, enforcement, conformance vectors, limits |
+| [design/derived-information-flow-control-v1.md](design/derived-information-flow-control-v1.md) | Derived information-flow control for untrusted agents (SDD v1.3, frozen): proposed, implementation in progress |
+| [design/derived-information-flow-control-v1-status.md](design/derived-information-flow-control-v1-status.md) | Work-package status for the flow-control SDD, in its release order |
 | [design/authority-preserving-capability-mediation-v1.md](design/authority-preserving-capability-mediation-v1.md) | Authority-Preserving Capability Mediation (NTA-2): proposed design, phase 1 implemented |
 | [design/evidence-sufficiency-v1.1.md](design/evidence-sufficiency-v1.1.md) | Evidence-sufficiency v1.1: closing the gaps found by external seeded-fault testing; decisions, requirements, rerun protocol |
 | [design/evidence-sufficiency-v1.3.md](design/evidence-sufficiency-v1.3.md) | Evidence-sufficiency v1.3: systematic mutation analysis, the rejection contract, metamorphic relations, the named-survivor gate and the blind external protocol |
