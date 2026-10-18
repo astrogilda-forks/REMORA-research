@@ -128,3 +128,34 @@ class TestBackwardsCompatibility:
         # The layer does not touch the envelope schema; envelope round-trips.
         from remora.governance.envelope import DecisionEnvelope
         assert hasattr(DecisionEnvelope, "from_dict")
+
+
+_ALL_ACTIONS = tuple(DecisionAction.__members__.values())
+
+
+class TestExternalCapsNeverWeaken:
+    """COMP-01 (SDD §3.9): monitor and protocol caps can only lower a decision."""
+
+    @pytest.mark.parametrize("source,reason", [
+        ("monitor", "MONITOR_CAP"), ("protocol", "PROTOCOL_CAP")])
+    def test_a_cap_never_creates_an_accept_or_lifts_a_block(self, source, reason):
+        from remora.policy.composition import Cap, executability
+        from remora.policy.report import DecisionReason
+        raised = []
+        for obs in _grid():
+            baseline = ENGINE.decide(obs)
+            for action in _ALL_ACTIONS:
+                capped = ENGINE.decide(obs, caps=[Cap(source, action, DecisionReason[reason])])
+                if executability(capped.action) > min(executability(baseline.action),
+                                                      executability(action)):
+                    raised.append((obs.question, obs.risk_tier, action, capped.action))
+        assert raised == []
+
+    def test_hard_blocks_survive_any_cap(self):
+        from remora.policy.composition import Cap
+        from remora.policy.report import DecisionReason
+        obs = PolicyObservation(question="q", risk_tier="low", adversarial_detected=True)
+        for action in _ALL_ACTIONS:
+            report = ENGINE.decide(obs, caps=[Cap("monitor", action, DecisionReason.MONITOR_CAP)])
+            assert report.action is DecisionAction.ESCALATE
+
