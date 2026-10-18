@@ -118,9 +118,9 @@ entries:
   - pattern: "disclosure applies once E7 is recorded as independent"
     class: data_conditional
     note: "Guards the exposure disclosure only when the E7 contract is EXTERNALLY_VERIFIED."
-  - pattern: "single-valued enum|checked by test_session_dir_selects_the_session_state"
+  - pattern: "single-valued enum"
     class: data_conditional
-    note: "MCP tool-contract parametrisations that another test covers."
+    note: "MCP tool-contract parametrisations of an enum with one value: there is no second value to change to."
 
   # ── platform ───────────────────────────────────────────────────────────
   - pattern: "local zone is UTC and cannot be changed on this platform"
