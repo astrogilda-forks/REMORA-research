@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Review path binds the intent authority (RMR-AUD-006, part 3)
+
+- An item approved under one intent authority executed under another, and the
+  new `intent_authority_hash` was signed into the grant, the lease and the
+  audit record. The review path now compares it with the `assessed` record,
+  as ACCEPT-token redemption does. A difference is 409 `context_mismatch`
+  with `intent_authority_hash` in `mismatched`, and the approval is not
+  consumed.
+
 ### Review path binds the whole proposal (RMR-AUD-001, binding part)
 
 - The proposal fields outside `canonical_tool_call_hash` (`schema_valid`,

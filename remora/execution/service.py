@@ -525,10 +525,14 @@ class ApprovalContextRefused(RemoraError):
 #: at redemption. The review path re-decides on a fresh observation, so the
 #: other fields are covered elsewhere: the target and arguments by the queue's
 #: payload binding (tool_call_hash), the ToolSpec hash by FT-03, the policy
-#: bundle and intent authority by the fresh decision, the reviewed risk tier
-#: by ReviewQueue step 4b', and the execution context by the queue's own
-#: binding.
-_REVIEW_BOUND_FIELDS = ("principal", "context_id", "task_id", "delegated_executor")
+#: bundle by the fresh decision and the approval-policy hash, the reviewed risk
+#: tier by ReviewQueue step 4b', and the execution context by the queue's own
+#: binding. The intent authority is bound here (RMR-AUD-006): the fresh
+#: decision re-reads it but does not compare it with the one approved, so an
+#: item approved under one intent executed under another, and the new hash was
+#: signed into the grant, the lease and the audit record.
+_REVIEW_BOUND_FIELDS = ("principal", "context_id", "task_id", "delegated_executor",
+                        "intent_authority_hash")
 
 
 #: The proposal fields outside ``canonical_tool_call_hash``. The review path
@@ -661,6 +665,7 @@ def approved_context_refusal(
         context_id=str(record.get("context_id") or ""),
         task_id=str(record.get("task_id") or ""),
         delegated_executor=str(record.get("delegated_executor") or ""),
+        intent_authority_hash=str(record.get("intent_authority_hash") or ""),
     )
     acting_for = _acting_for(record, current.principal)
     presented = (dataclasses.replace(current, principal=acting_for)

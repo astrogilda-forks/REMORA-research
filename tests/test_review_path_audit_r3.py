@@ -26,6 +26,8 @@ Each was reproduced on this branch before it was fixed:
 """
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import json
 import types
 from collections.abc import Iterator
@@ -292,3 +294,49 @@ def test_an_item_whose_assessment_carries_no_proposal_hash_is_refused(
     assert r.status_code == 409, r.text
     assert r.json()["detail"] == "binding_refused"
 
+# ── RMR-AUD-006 part 3: intent_ref_swap_on_review ──────────────────────────
+
+def _intent_authority(world: Deployment, salt: str = "") -> None:
+    """Give each intent_ref its own authority hash, as a resolver would."""
+    original = world.exec._observation_with_context
+
+    def observe(tool_call: Any, tenant: str) -> Any:
+        obs, semantic = original(tool_call, tenant)
+        ref = getattr(tool_call, "intent_ref", None) or ""
+        authority = hashlib.sha256(f"{salt}{ref}".encode()).hexdigest() if ref else ""
+        return obs, {**semantic, "intent_authority_hash": authority}
+
+    world.mp.setattr(world.exec, "_observation_with_context", observe)
+
+
+def test_intent_ref_swap_on_review_is_refused(world: Deployment) -> None:
+    _intent_authority(world)
+    item_id = _approved(world, {**WRITE, "intent_ref": "WO-1"})
+    r = world.execute(item_id, {**WRITE, "intent_ref": "WO-2"})
+    assert not r.ran
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "context_mismatch"
+    assert "intent_authority_hash" in _refusals(world)[-1]["mismatched"]
+    # Not consumed: the item still executes under the intent it was approved for.
+    assert world.execute(item_id, {**WRITE, "intent_ref": "WO-1"}).ran
+
+
+def test_a_changed_intent_authority_under_the_same_ref_is_refused(
+        world: Deployment) -> None:
+    """The authority the reviewer approved, not the reference's spelling."""
+    _intent_authority(world)
+    item_id = _approved(world, {**WRITE, "intent_ref": "WO-1"})
+    _intent_authority(world, salt="re-issued:")
+    r = world.execute(item_id, {**WRITE, "intent_ref": "WO-1"})
+    assert not r.ran
+    assert r.status_code == 409, r.text
+    assert _refusals(world)[-1]["mismatched"] == ["intent_authority_hash"]
+
+
+def test_the_review_path_binds_the_intent_authority_like_the_token() -> None:
+    from remora.enforcement.token import AuthorizationContext
+    from remora.execution.service import _REVIEW_BOUND_FIELDS
+
+    assert "intent_authority_hash" in _REVIEW_BOUND_FIELDS
+    assert {f.name for f in dataclasses.fields(AuthorizationContext)} >= set(
+        _REVIEW_BOUND_FIELDS)

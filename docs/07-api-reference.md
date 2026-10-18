@@ -498,7 +498,11 @@ is touched (RMR-AUD-001). An item assessed before this binding has no hash and
 is refused the same way, so it must be proposed again. Arguments, tool and
 target stay bound by the queue's payload hash, as before. A riskier world
 still comes from the server side: ToolSpec, state, revocation and risk
-metadata re-gate as before.
+metadata re-gate as before. The intent authority the reviewer approved is
+also bound. An `intent_authority_hash` that differs from the `assessed`
+record's is `context_mismatch`, as at ACCEPT-token redemption. That holds when
+the reference changed and when the authority behind the same reference did
+(RMR-AUD-006).
 
 **Approved escalations:** an item records the decision reasons it was
 enqueued with, and its approval records them as `approved_reasons`. An
