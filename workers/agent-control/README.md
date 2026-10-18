@@ -118,6 +118,27 @@ Refusal reason codes: `REVIEWER_IDENTITY_REQUIRED`, `SELF_APPROVAL_FORBIDDEN`,
 `TOOLSPEC_CHANGED_AFTER_APPROVAL`, `POLICY_CHANGED_AFTER_APPROVAL`,
 `APPROVAL_EXPIRED`, `APPROVAL_ALREADY_CONSUMED`, `APPROVAL_REJECTED`.
 
+The input hash covers the tool name, tenant, target and arguments with sorted
+keys (`canonicalToolCallHash`), without `audit_id` and `review_item_id`.
+The same arguments in another key order hash the same; another tool or tenant
+does not.
+
+With `EXECUTION_SERVICE` bound, the canonical REMORA service owns the review
+instead:
+
+```
+1. Agent proposes:   POST /execute {tool, input: {...}}
+                     → 402 CANONICAL_REVIEW_REQUIRED + review_item_id
+2. Human approves the review item on the canonical service
+3. Agent re-submits: POST /execute {tool, input: {..., review_item_id}}
+                     → POST /v1/execution/execute; 200 EXECUTED_VIA_CANONICAL
+```
+
+A re-submission that names the review item redeems it and never opens a new
+one; still unapproved, or approved and then lapsed, answers 402 with the same
+item. Until RMR-AUD-010 every re-submission opened a new review item, so an
+approved write could not run.
+
 ## Security Principles
 
 - Bounded egress: outbound calls go only to the statically-bound service
@@ -129,7 +150,9 @@ Refusal reason codes: `REVIEWER_IDENTITY_REQUIRED`, `SELF_APPROVAL_FORBIDDEN`,
   `store_artifact`) are held until an independent human reviewer approves via
   `POST /approvals`. Reviewer identity comes only from a verified Cloudflare
   Access JWT (`src/auth.ts`; `ACCESS_TEAM_DOMAIN` + `ACCESS_AUD` +
-  `REVIEWER_EMAILS`); the workload bearer is explicitly refused on that
+  `REVIEWER_EMAILS`), verified by `workers/shared/access_jwt.ts`, the same
+  code the MCP gateway uses, including the issuer check this Worker's own copy
+  lacked (RMR-AUD-010); the workload bearer is explicitly refused on that
   endpoint, and a reviewer whose identity equals the requester is refused
   (`SELF_APPROVAL_FORBIDDEN`). Each approval (`src/approval.ts`) is immutable,
   single-use, expires (`APPROVAL_TTL_SECONDS`, default 900), and is bound to

@@ -20,7 +20,7 @@ export { ContainerProxy };
 import { handleRpc, type JsonRpcRequest, type PendingProposal, type ProposalStore } from "./mcp";
 import { RemoraClient } from "./remora";
 import { isReadOnlySql } from "./sql";
-import { verifyGraphWrite } from "./effect";
+import { observeAndRecord, type EffectBinding, type Poster } from "./effect";
 import { admitMcp, productionReadiness } from "./admission";
 import { DuplicateMemberError, parseJsonStrict, UnsafeNumberError } from "./json_numbers";
 
@@ -29,6 +29,17 @@ export interface Env {
   REMORA?: DurableObjectNamespace<RemoraContainer>;
   PROPOSALS: DurableObjectNamespace<ProposalDO>;
   REMORA_AGENT_TOKEN: string;
+  /**
+   * The effect verifier's own credential and the identity it attests under.
+   * Separate from the agent's token, because a receipt filed under the
+   * agent's principal is the executor attesting to itself. The identity must
+   * be bound to this token's principal on the server
+   * (REMORA_EFFECT_VERIFIER_BINDINGS). Either one unset means the gateway
+   * still reads effects back and reports them, labelled unrecorded, and files
+   * nothing.
+   */
+  REMORA_EFFECT_VERIFIER_TOKEN?: string;
+  REMORA_EFFECT_VERIFIER_IDENTITY?: string;
   /** The execution domain's container binding. Absent = unsplit deployment. */
   EXECUTION?: DurableObjectNamespace<RemoraExecutionContainer>;
   /**
@@ -617,46 +628,43 @@ function storeFor(env: Env, session: string): ProposalStore {
   };
 }
 
-/** Submit one verification to the proposal's audit trail. */
-async function recordEffect(
-  env: Env,
-  declared: Record<string, unknown>,
-  v: { status: string; reason_code: string; expected_sha256: string;
-       observed_sha256: string; detail: string },
-  executionId: string,
-  tool: string,
-): Promise<void> {
-  if (v.status === "EFFECT_UNSUPPORTED") return;  // nothing to attest to
-  const proposalId = String(declared.proposal_id ?? executionId);
-  const body = JSON.stringify({
-    execution_id: executionId,
-    tool_id: tool,
-    status: v.status,
-    reason_code: v.reason_code,
-    // Mandatory: an attestation nobody signed is not evidence, because a
-    // reader cannot tell who claimed to have looked.
-    verifier_identity: "remora-mcp-gateway/worker",
-    expected_sha256: v.expected_sha256,
-    observed_sha256: v.observed_sha256,
-  });
-  const request = new Request(
-    `http://remora/v1/execution/proposals/${encodeURIComponent(proposalId)}/effect`,
-    { method: "POST", body,
-      headers: { "Content-Type": "application/json",
-                 Authorization: `Bearer ${env.REMORA_AGENT_TOKEN}` } });
-  try {
-    if (env.REMORA_API_URL) {
-      await fetch(new Request(
-        `${env.REMORA_API_URL}/v1/execution/proposals/` +
-        `${encodeURIComponent(proposalId)}/effect`, request));
-    } else if (env.REMORA) {
-      await getContainer(env.REMORA).fetch(request);
+/** Builds of this gateway, named in every receipt so a verdict's producer can
+ *  be identified. */
+const VERIFIER_VERSION = "remora-mcp-gateway/0.10.0";
+
+/**
+ * POST a receipt under the verifier's own credential and return REMORA's
+ * answer. Null when no verifier credential is configured: the agent's token
+ * is never used here, because then the executor would attest to itself.
+ *
+ * The status and body come back to effect.ts, which reports a refusal as
+ * not recorded. Filing used to be fire-and-forget into an empty catch, so a
+ * receipt REMORA refused still reached the model as EFFECT_VERIFIED.
+ */
+function verifierPoster(env: Env): Poster | null {
+  const token = env.REMORA_EFFECT_VERIFIER_TOKEN;
+  if (!token || !env.REMORA_EFFECT_VERIFIER_IDENTITY) return null;
+  return async (path, body) => {
+    const request = new Request(
+      `${env.REMORA_API_URL ?? "http://remora"}${path}`,
+      { method: "POST", body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json",
+                   Authorization: `Bearer ${token}` } });
+    const res = env.REMORA_API_URL
+      ? await fetch(request)
+      : env.REMORA
+        ? await getContainer(env.REMORA).fetch(request)
+        : new Response(JSON.stringify({ detail: "no REMORA transport" }),
+                       { status: 503 });
+    const text = await res.text();
+    let parsed: unknown = {};
+    try {
+      parsed = text ? JSON.parse(text) : {};
+    } catch {
+      parsed = { detail: text.slice(0, 300) };
     }
-  } catch {
-    // A verification that could not be filed must not undo the execution
-    // that already happened. It is lost from the trail, which is worse than
-    // recording it and better than pretending the call failed.
-  }
+    return { status: res.status, body: parsed };
+  };
 }
 
 export default {
@@ -675,6 +683,9 @@ export default {
         readiness_problems: readiness.problems,
         access_verification:
           env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD ? "in-worker" : "NOT CONFIGURED",
+        effect_receipts: verifierPoster(env)
+          ? `filed as ${env.REMORA_EFFECT_VERIFIER_IDENTITY}`
+          : "NOT CONFIGURED (read-backs reported, not recorded)",
         custody_split: env.REMORA_LEASE_ED25519_PRIVATE && env.EXECUTION
           ? "authority/executor"
           : "unsplit",
@@ -837,26 +848,33 @@ export default {
       // container's involvement. It answers "did it happen", not "was the
       // request accepted".
       verifyEffect: env.STATE_DB || env.GRAPH_DB
-        ? async (tool: string, declared: Record<string, unknown>,
-                 executionId: string) => {
-            const verification = await verifyGraphWrite(
-              tool, declared,
-              async (id: string) => {
+        ? async (tool: string, approvedArgs: Record<string, unknown>,
+                 toolResult: Record<string, unknown>, binding: EffectBinding,
+                 dispatchedAt: number) => {
+            const post = verifierPoster(env);
+            // Filed on the proposal's own trail, as an attestation by a named
+            // verifier bound to the dispatch. REMORA adjudicates the binding;
+            // it does not re-run the comparison, and the record says so.
+            return observeAndRecord({
+              tool, approvedArgs, toolResult, binding, dispatchedAt,
+              read: async (id: string) => {
                 if (!env.GRAPH_DB) return null;
                 const row = await env.GRAPH_DB
                   .prepare(
-                    "SELECT id, subject, predicate, object_json, object_kind, " +
-                    "source, confidence FROM knowledge_facts " +
-                    "WHERE tenant_id = ? AND id = ?")
+                    "SELECT id, graph, subject, predicate, object_json, " +
+                    "object_kind, source, confidence, created_at " +
+                    "FROM knowledge_facts WHERE tenant_id = ? AND id = ?")
                   .bind(env.REMORA_KG_TENANT ?? "", id)
                   .first();
                 return (row as Record<string, unknown> | null) ?? null;
-              });
-            // Recorded on the proposal's own trail, as an attestation by a
-            // named verifier. REMORA stores it as reported; it does not
-            // independently re-check, and the record says so.
-            await recordEffect(env, declared, verification, executionId, tool);
-            return verification;
+              },
+              post: post ?? (async () => ({ status: 0, body: {} })),
+              verifier: post
+                ? { identity: env.REMORA_EFFECT_VERIFIER_IDENTITY!,
+                    version: VERIFIER_VERSION }
+                : null,
+              now: () => new Date(),
+            });
           }
         : undefined,
     };

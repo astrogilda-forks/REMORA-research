@@ -163,3 +163,101 @@ export async function executeViaCanonicalService(
     result: toolExecution.result,
   };
 }
+
+/** Outcomes where the canonical service put the item back in its queue. */
+const LAPSED = new Set(["approval_expired", "approval_invalidated"]);
+
+/**
+ * Redeem a canonical review item a person has approved.
+ *
+ * POST /v1/execution/execute with the item and the call, re-presented in
+ * full so the service re-checks that what runs is what was approved. Until
+ * RMR-AUD-010 nothing called this: every retry ran assess again, opened a new
+ * review item and answered 402, so an approved write never ran.
+ *
+ * Still unapproved, or approved and then lapsed, answers with the SAME review
+ * item; nothing here opens a new one. Changed arguments are refused. A
+ * transport failure after the request was sent is unknown and is not retried.
+ */
+export async function redeemViaCanonicalService(
+  env: CanonicalExecutionEnv,
+  toolName: string,
+  args: Record<string, unknown>,
+  targetEnvironment: string,
+  reviewItemId: string,
+): Promise<CanonicalOutcome> {
+  const toolCall = {
+    tool_name: toolName,
+    arguments: args,
+    target_environment: targetEnvironment,
+  };
+  let exec;
+  try {
+    exec = await post(env, "/v1/execution/execute", {
+      item_id: reviewItemId,
+      tool_call: toolCall,
+    });
+  } catch (e) {
+    return {
+      executed: false,
+      decision: "verify",
+      review_item_id: reviewItemId,
+      refusal_reason: "canonical_execute_unreachable_state_unknown",
+      detail: e instanceof Error ? e.message : String(e),
+    };
+  }
+  const data = exec.data ?? {};
+  const proposalId = data.proposal_id as string | undefined;
+  const waiting = (detail?: string): CanonicalOutcome => ({
+    executed: false,
+    decision: "verify",
+    proposal_id: proposalId,
+    review_item_id: reviewItemId,
+    refusal_reason: "canonical_review_required",
+    ...(detail ? { detail } : {}),
+  });
+  // 409 is the service saying the item is not approved (yet).
+  if (exec.status === 409) return waiting(String(data.detail ?? "not approved"));
+  if (!exec.ok) {
+    return {
+      executed: false,
+      decision: "error",
+      proposal_id: proposalId,
+      refusal_reason: `canonical_execute_refused:${exec.status}`,
+    };
+  }
+  const outcome = String(data.outcome ?? "");
+  if (LAPSED.has(outcome)) return waiting(outcome);
+  if (outcome === "binding_refused") {
+    return {
+      executed: false,
+      decision: "verify",
+      proposal_id: proposalId,
+      refusal_reason: "canonical_binding_refused",
+    };
+  }
+  const toolExecution = (data.tool_execution ?? {}) as Record<string, unknown>;
+  return {
+    executed: toolExecution.executed === true,
+    decision: "verify",
+    proposal_id: proposalId,
+    refusal_reason:
+      toolExecution.executed === true
+        ? undefined
+        : String(toolExecution.refusal_reason ?? "canonical_dispatch_refused"),
+    result: toolExecution.result,
+  };
+}
+
+/** Redeem `reviewItemId` when the caller names one, otherwise assess. */
+export function runViaCanonicalService(
+  env: CanonicalExecutionEnv,
+  toolName: string,
+  args: Record<string, unknown>,
+  targetEnvironment: string,
+  reviewItemId: string | undefined,
+): Promise<CanonicalOutcome> {
+  return reviewItemId
+    ? redeemViaCanonicalService(env, toolName, args, targetEnvironment, reviewItemId)
+    : executeViaCanonicalService(env, toolName, args, targetEnvironment);
+}

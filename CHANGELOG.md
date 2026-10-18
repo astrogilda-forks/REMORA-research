@@ -4,6 +4,45 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Security (Worker effect receipts and agent-control review path, RMR-AUD-004 and RMR-AUD-010)
+
+- **MCP gateway effect read-back checked the tool against itself.** The
+  expected values came from the tool's own result, so a tool that wrote other
+  values and reported them faithfully came out `EFFECT_VERIFIED`. The
+  expected values now come from the approved arguments; the result only
+  locates the row, and the row must be created after the dispatch began and
+  sit in the approved graph. The read-back also runs on the ACCEPT path.
+- **No gateway receipt was ever recorded.** Receipts went to the review item
+  id instead of the proposal, without `tool_call_hash`, `grant_jti` or
+  `verified_at`, under an identity no principal was bound to; REMORA refused
+  every one, the refusal was dropped in an empty `catch`, and the model was
+  told `EFFECT_VERIFIED`. The receipt now carries the binding from REMORA's own
+  assess and execute responses and goes out under a separate verifier
+  credential (`REMORA_EFFECT_VERIFIER_TOKEN`, `REMORA_EFFECT_VERIFIER_IDENTITY`),
+  never the agent's. `effect` is REMORA's recorded verdict only;
+  otherwise the model gets `effect_observation` and `effect_record` with the
+  reason nothing was recorded. `tests/test_mcp_gateway_effect_receipt_contract.py`
+  runs the real gateway code against the real recorder.
+- **A lapsed approval read as an unknown dispatch.** `approval_invalidated`
+  and `approval_expired` come back as 200 with no `tool_execution`; the
+  gateway reported "outcome unknown, may have run, do not retry" and deleted
+  the proposal, so a re-approved item could not be redeemed. Both now report
+  `pending_approval` and keep the proposal; `binding_refused` reports a
+  refusal.
+- **agent-control accepted Access tokens from other teams.** Its own Access
+  verifier never checked `iss` and did not normalise the team domain. Both
+  Workers now use one verifier, `workers/shared/access_jwt.ts`, and a parity
+  test runs the same tokens through both.
+- **agent-control approvals hashed insertion order.** The approval hash was
+  `sha256(JSON.stringify(input))`, so the same call with its keys in another
+  order was refused after approval. It is now the canonical tool-call hash
+  over tool, tenant, target and arguments. Approvals pending at deploy time
+  were made under the old hash and will be refused; re-approve them.
+- **agent-control could not run an approved canonical review item.** With
+  `EXECUTION_SERVICE` bound every retry assessed again, opened a new review
+  item and answered 402. A request with `input.review_item_id` now redeems that
+  item through `/v1/execution/execute`.
+
 ### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §86)
 
 - Both Workers parsed request bodies with `JSON.parse`, which keeps the last
