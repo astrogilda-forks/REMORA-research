@@ -43,6 +43,10 @@ export interface AssessResult {
 
 export interface ExecuteResult {
   outcome: string;
+  /** REMORA's proposal identity, the join key for an effect receipt. */
+  proposal_id?: string;
+  /** The grant consumed by the dispatch; its jti identifies the dispatch. */
+  execution_grant?: { jti?: string } & Record<string, unknown>;
   tool_execution?: Record<string, unknown>;
   /** Error body from a non-200; carried only on the failure path. */
   detail?: unknown;

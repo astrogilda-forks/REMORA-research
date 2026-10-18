@@ -76,7 +76,7 @@ import { isHumanReviewer } from "./principal";
 import { resolveReadTenant } from "./tenant";
 import {
   canonicalExecutionConfigured,
-  executeViaCanonicalService,
+  runViaCanonicalService,
 } from "./execution_adapter";
 import { buildCodegraphPayload } from "./codegraph";
 import { DuplicateMemberError, parseJsonStrict, UnsafeNumberError } from "./json_numbers";
@@ -296,6 +296,36 @@ function json(data: unknown, status = 200): Response {
 
 function err(message: string, status = 400): Response {
   return json({ error: message }, status);
+}
+
+/** Fields a caller adds to redeem an approval. They name the approval, not
+ *  the call, so they are never part of what the approval binds or what runs. */
+const CONTROL_FIELDS = new Set(["audit_id", "review_item_id"]);
+
+/** The tool arguments of a request, without the control fields. */
+export function callArguments(input: Record<string, unknown> | undefined): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input ?? {}).filter(([k]) => !CONTROL_FIELDS.has(k)));
+}
+
+/**
+ * The hash an approval is bound to.
+ *
+ * The canonical tool-call hash (sorted keys, the same form REMORA binds),
+ * over the tool name, tenant and target as well as the arguments. It used to
+ * be sha256(JSON.stringify(input)): insertion order decided the hash, so the
+ * same call with its keys in another order was refused after approval, and
+ * nothing tied the hash to the tool or tenant (RMR-AUD-010). Control fields
+ * (audit_id, review_item_id) are excluded so the redeeming request hashes
+ * the same as the proposal (issue #55).
+ */
+export async function approvalBindingHash(
+  tool: string,
+  input: Record<string, unknown>,
+  tenant: string,
+  target: string,
+): Promise<string> {
+  return canonicalToolCallHash(tool, callArguments(input), tenant, target);
 }
 
 async function sha256(text: string): Promise<string> {
@@ -591,15 +621,13 @@ async function handleExecute(req: Request, env: Env): Promise<Response> {
   // Structural floor + config additions; config can never un-gate a write tool.
   const approval_required = requiresApproval(body.tool, env.APPROVAL_REQUIRED_TOOLS ?? "") ? 1 : 0;
 
-  // Hash the input WITHOUT the audit_id field (issue #55): the approval flow
-  // resubmits the same input plus audit_id, so hashing the raw input made the
-  // approved-call hash differ from the pre-approval hash and the HITL check
-  // ALWAYS 403'd — the only human-in-the-loop control never worked. Stripping
-  // audit_id makes both calls hash identically.
-  const { audit_id: _hashExcludedAuditId, ...hashableInput } =
-    (body.input ?? {}) as Record<string, unknown>;
-  const inputStr = JSON.stringify(hashableInput);
-  const input_hash = await sha256(inputStr);
+  // The approval binds the call, not the control fields that redeem it
+  // (issue #55, RMR-AUD-010): see approvalBindingHash.
+  const hashableInput = callArguments(body.input);
+  const reviewItemId = typeof body.input.review_item_id === "string"
+    ? body.input.review_item_id : undefined;
+  const input_hash = await approvalBindingHash(
+    body.tool, hashableInput, tenantId, env.TARGET_ENVIRONMENT ?? "cloudflare_worker");
 
   const pre_audit_id = await auditInsert(env.AUDIT_DB, {
     session_id: body.session_id,
@@ -633,10 +661,13 @@ async function handleExecute(req: Request, env: Env): Promise<Response> {
   // write-effect tools NEVER execute in-worker — the proposal runs the
   // canonical assess -> grant -> PEP -> lease path, and this worker is pure
   // ingress for them. There is no fallback from canonical to local
-  // execution; verify/escalate surfaces the canonical review item.
+  // execution; verify/escalate surfaces the canonical review item, and a
+  // retry that names that item (input.review_item_id) redeems it instead of
+  // opening another one (RMR-AUD-010).
   if (approval_required === 1 && canonicalExecutionConfigured(env)) {
-    const canonical = await executeViaCanonicalService(
+    const canonical = await runViaCanonicalService(
       env, body.tool, hashableInput, env.TARGET_ENVIRONMENT ?? "cloudflare_worker",
+      reviewItemId,
     );
     try {
       await recordEnvelope(env, {

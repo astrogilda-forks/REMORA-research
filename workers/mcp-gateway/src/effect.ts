@@ -7,14 +7,21 @@
  * distinction REMORA exists to keep.
  *
  * So after a write executes, the fact is read back from the system of record
- * and compared against the delta the tool declared. The result is submitted
- * as an attestation by a named verifier; REMORA records it exactly as
- * reported, mismatches included.
+ * and compared against the call a person approved. The tool's own result only
+ * locates the row (the id it minted); it never supplies the expected values.
+ * Comparing the row with what the tool said it wrote checks the tool against
+ * itself, and a tool that wrote something else and reported it faithfully
+ * came out VERIFIED (RMR-AUD-004, observation_from_the_tool).
  *
- * Only the declared fields are compared. A field the delta does not name is
- * out of scope by construction — a concurrent legitimate write elsewhere in
- * the row is not this action's problem, and reporting it would train whoever
- * reads these to dismiss the signal.
+ * The result is submitted to REMORA as an attestation by a named verifier,
+ * bound to the dispatch it describes. REMORA adjudicates the binding and
+ * records it; the gateway reports REMORA's verdict, and says so when the
+ * receipt was not recorded rather than presenting its own reading as one.
+ *
+ * Only the fields the call names are compared. A field the call does not
+ * name is out of scope by construction — a concurrent legitimate write
+ * elsewhere in the row is not this action's problem, and reporting it would
+ * train whoever reads these to dismiss the signal.
  */
 
 /** The five outcomes, kept distinct because collapsing any pair loses
@@ -25,6 +32,11 @@ export type EffectStatus =
   | "EFFECT_UNOBSERVABLE"
   | "EFFECT_VERIFIER_FAILED"
   | "EFFECT_UNSUPPORTED";
+
+const EFFECT_STATUSES: readonly string[] = [
+  "EFFECT_VERIFIED", "EFFECT_MISMATCH", "EFFECT_UNOBSERVABLE",
+  "EFFECT_VERIFIER_FAILED", "EFFECT_UNSUPPORTED",
+];
 
 export interface Verification {
   status: EffectStatus;
@@ -60,37 +72,78 @@ export async function effectDigest(value: unknown): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Fields of the declared delta that a read-back must reproduce. */
-const ASSERT_FIELDS = ["subject", "predicate", "object_json", "object_kind",
+/** Fields of an asserted fact that a read-back must reproduce. */
+const ASSERT_FIELDS = ["graph", "subject", "predicate", "object", "object_kind",
                        "source", "confidence"] as const;
 
-function project(row: Record<string, unknown>,
-                 fields: readonly string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const f of fields) out[f] = row[f] ?? null;
-  return out;
+/** Seconds a row's created_at may trail the gateway's dispatch clock. The
+ *  row is stamped by the container's clock, not this one. */
+const CLOCK_SKEW_SECONDS = 5;
+
+/** What the approved call asked kg_assert_fact to write, with the tool's own
+ *  defaults applied (deploy/gateway/kg_registry.py). */
+function expectedAssert(args: Record<string, unknown>): Record<string, unknown> {
+  return {
+    graph: String(args.graph ?? ""),
+    subject: String(args.subject ?? ""),
+    predicate: String(args.predicate ?? ""),
+    object: args.object ?? null,
+    object_kind: String(args.object_kind ?? "literal").toLowerCase(),
+    source: String(args.source ?? ""),
+    confidence: Number(args.confidence ?? 1),
+  };
+}
+
+/** The same fields as they landed. object_json is decoded, so the comparison
+ *  is between values and not between two JSON writers' spacing. */
+function observedAssert(row: Record<string, unknown>): Record<string, unknown> {
+  let object: unknown;
+  try {
+    object = JSON.parse(String(row.object_json));
+  } catch {
+    object = { unparseable_object_json: String(row.object_json ?? "") };
+  }
+  return {
+    graph: row.graph ?? null,
+    subject: row.subject ?? null,
+    predicate: row.predicate ?? null,
+    object,
+    object_kind: row.object_kind ?? null,
+    source: row.source ?? null,
+    confidence: row.confidence === null || row.confidence === undefined
+      ? null : Number(row.confidence),
+  };
+}
+
+export interface VerifyOptions {
+  /** Unix seconds when the gateway asked REMORA to dispatch. A row created
+   *  before then was not produced by this call. */
+  dispatchedAt?: number;
 }
 
 /**
  * Verify one graph write against what actually landed.
  *
- * `read` returns the row, or null when the reader could not see it. Null is
- * UNOBSERVABLE, never MISMATCH: not knowing is a different fact from knowing
- * it is wrong, and only one of them justifies compensating.
+ * `approvedArgs` are the arguments a person approved (or the ACCEPT token was
+ * bound to). `toolResult` is what the tool returned; it is read only for the
+ * id of the row it created. `read` returns the row, or null when the reader
+ * could not see it. Null is UNOBSERVABLE, never MISMATCH: not knowing is a
+ * different fact from knowing it is wrong, and only one of them justifies
+ * compensating.
  */
 export async function verifyGraphWrite(
   tool: string,
-  declared: Record<string, unknown>,
+  approvedArgs: Record<string, unknown>,
+  toolResult: Record<string, unknown>,
   read: (id: string) => Promise<Record<string, unknown> | null>,
+  opts: VerifyOptions = {},
 ): Promise<Verification> {
-  const id = String(declared.id ?? "");
-
   if (tool === "kg_retract_fact") {
-    // The declared effect is absence. Present is the mismatch here.
-    const retracted = (declared.retracted ?? {}) as Record<string, unknown>;
-    const target = String(retracted.id ?? "");
+    // The declared effect is absence of the fact the approval named. The id
+    // the tool reports is not consulted: it could name a different fact.
+    const target = String(approvedArgs.id ?? "");
     if (!target) {
-      return { status: "EFFECT_UNSUPPORTED", reason_code: "no_target_in_delta",
+      return { status: "EFFECT_UNSUPPORTED", reason_code: "no_target_in_call",
                expected_sha256: "", observed_sha256: "", detail: "" };
     }
     let row: Record<string, unknown> | null;
@@ -118,8 +171,9 @@ export async function verifyGraphWrite(
              expected_sha256: "", observed_sha256: "", detail: "" };
   }
 
+  const id = String(toolResult.id ?? "");
   if (!id) {
-    return { status: "EFFECT_UNSUPPORTED", reason_code: "no_id_in_delta",
+    return { status: "EFFECT_UNSUPPORTED", reason_code: "no_id_in_result",
              expected_sha256: "", observed_sha256: "", detail: "" };
   }
 
@@ -132,7 +186,7 @@ export async function verifyGraphWrite(
              detail: String(e instanceof Error ? e.message : e).slice(0, 200) };
   }
 
-  const expectedValue = project(declared, ASSERT_FIELDS);
+  const expectedValue = expectedAssert(approvedArgs);
   const expected = await effectDigest(expectedValue);
 
   if (row === null) {
@@ -141,8 +195,19 @@ export async function verifyGraphWrite(
              detail: `fact ${id} could not be read back` };
   }
 
-  const observedValue = project(row, ASSERT_FIELDS);
+  const observedValue = observedAssert(row);
   const observed = await effectDigest(observedValue);
+
+  // A matching row that existed before the dispatch shows the state, not
+  // that this call produced it. Checked only when both times are known.
+  const createdAt = row.created_at;
+  if (opts.dispatchedAt !== undefined && typeof createdAt === "number"
+      && createdAt < opts.dispatchedAt - CLOCK_SKEW_SECONDS) {
+    return { status: "EFFECT_MISMATCH", reason_code: "fact_predates_dispatch",
+             expected_sha256: expected, observed_sha256: observed,
+             detail: `fact ${id} was created at ${createdAt}, before the ` +
+                     `dispatch at ${opts.dispatchedAt}` };
+  }
 
   if (expected === observed) {
     return { status: "EFFECT_VERIFIED", reason_code: "delta_matches",
@@ -153,4 +218,156 @@ export async function verifyGraphWrite(
   return { status: "EFFECT_MISMATCH", reason_code: "delta_differs",
            expected_sha256: expected, observed_sha256: observed,
            detail: `differing: ${differing.join(", ")}` };
+}
+
+// ── the receipt REMORA records ─────────────────────────────────────────────
+
+/** The dispatch a receipt is about, as REMORA reported it at assess and
+ *  execute time. Every field is read from REMORA's own responses. */
+export interface EffectBinding {
+  proposal_id: string;
+  tool_call_hash: string;
+  grant_jti: string;
+  execution_id: string;
+  execution_context_hash: string;
+}
+
+/** Who looked. The identity must be bound to the verifier credential on the
+ *  server (REMORA_EFFECT_VERIFIER_BINDINGS); it is not the agent's. */
+export interface VerifierConfig {
+  identity: string;
+  version: string;
+}
+
+/** The body of POST /v1/execution/proposals/{id}/effect
+ *  (servers/execution_contracts.py EffectVerificationRequest). */
+export interface EffectReceipt {
+  execution_id: string;
+  execution_context_hash?: string;
+  tool_id: string;
+  tool_call_hash: string;
+  grant_jti: string;
+  status: EffectStatus;
+  reason_code: string;
+  verifier_identity: string;
+  verifier_version: string;
+  expected_sha256: string;
+  observed_sha256: string;
+  verified_at: string;
+  detail: string;
+}
+
+/** What happened to a receipt. `status` is REMORA's adjudicated status,
+ *  present only when it recorded the receipt. */
+export interface EffectRecord {
+  recorded: boolean;
+  http_status?: number;
+  status?: EffectStatus;
+  reason?: string;
+  detail?: string;
+}
+
+export interface EffectReport {
+  /** The gateway's own read-back. Not evidence until REMORA records it. */
+  observation: Verification;
+  record: EffectRecord;
+}
+
+export type Poster = (path: string, body: unknown) =>
+  Promise<{ status: number; body: unknown }>;
+
+export function buildEffectReceipt(
+  tool: string,
+  v: Verification,
+  binding: EffectBinding,
+  verifier: VerifierConfig,
+  verifiedAt: string,
+): EffectReceipt {
+  return {
+    execution_id: binding.execution_id,
+    ...(binding.execution_context_hash
+      ? { execution_context_hash: binding.execution_context_hash }
+      : {}),
+    tool_id: tool,
+    tool_call_hash: binding.tool_call_hash,
+    grant_jti: binding.grant_jti,
+    status: v.status,
+    reason_code: v.reason_code,
+    verifier_identity: verifier.identity,
+    verifier_version: verifier.version,
+    expected_sha256: v.expected_sha256,
+    observed_sha256: v.observed_sha256,
+    verified_at: verifiedAt,
+    detail: v.detail.slice(0, 2000),
+  };
+}
+
+/** Submit a receipt and report REMORA's answer, refusals included. A receipt
+ *  that could not be filed is reported as not recorded; it never undoes the
+ *  execution that already happened, and it is never reported as recorded. */
+export async function fileEffectReceipt(
+  post: Poster,
+  proposalId: string,
+  receipt: EffectReceipt,
+): Promise<EffectRecord> {
+  let res: { status: number; body: unknown };
+  try {
+    res = await post(
+      `/v1/execution/proposals/${encodeURIComponent(proposalId)}/effect`,
+      receipt);
+  } catch (e) {
+    return { recorded: false, reason: "transport_error",
+             detail: String(e instanceof Error ? e.message : e).slice(0, 200) };
+  }
+  const body = (res.body ?? {}) as Record<string, unknown>;
+  if (res.status === 200) {
+    const status = String(body.status ?? "");
+    return EFFECT_STATUSES.includes(status)
+      ? { recorded: true, http_status: 200, status: status as EffectStatus }
+      : { recorded: true, http_status: 200 };
+  }
+  const detail = body.detail;
+  return {
+    recorded: false,
+    http_status: res.status,
+    reason: (typeof detail === "string" ? detail : JSON.stringify(detail ?? body))
+      .slice(0, 300),
+  };
+}
+
+export interface ObserveArgs {
+  tool: string;
+  approvedArgs: Record<string, unknown>;
+  toolResult: Record<string, unknown>;
+  binding: EffectBinding;
+  dispatchedAt?: number;
+  read: (id: string) => Promise<Record<string, unknown> | null>;
+  post: Poster;
+  /** Null when no verifier credential is configured: the gateway then reads
+   *  back and says so, but files nothing under the agent's identity. */
+  verifier: VerifierConfig | null;
+  now: () => Date;
+}
+
+/** Read the effect back, then file it as a bound receipt when that is
+ *  possible, and report both. */
+export async function observeAndRecord(a: ObserveArgs): Promise<EffectReport> {
+  const observation = await verifyGraphWrite(
+    a.tool, a.approvedArgs, a.toolResult, a.read,
+    { dispatchedAt: a.dispatchedAt });
+  // Taken after the read, so it is when the verifier looked.
+  const verifiedAt = a.now().toISOString();
+  if (observation.status === "EFFECT_UNSUPPORTED") {
+    return { observation, record: { recorded: false, reason: "nothing_to_attest" } };
+  }
+  if (!a.verifier) {
+    return { observation,
+             record: { recorded: false, reason: "verifier_not_configured" } };
+  }
+  const b = a.binding;
+  if (!b.proposal_id || !b.tool_call_hash || !b.grant_jti || !b.execution_id) {
+    return { observation, record: { recorded: false, reason: "binding_incomplete" } };
+  }
+  const receipt = buildEffectReceipt(a.tool, observation, b, a.verifier, verifiedAt);
+  return { observation, record: await fileEffectReceipt(a.post, b.proposal_id, receipt) };
 }

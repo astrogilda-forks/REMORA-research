@@ -4,7 +4,7 @@
  * Kept as a pure function of (request, dependencies) so the protocol can be
  * tested without a Worker runtime, a container, or a network.
  */
-import type { Verification } from "./effect";
+import type { EffectBinding, EffectReport } from "./effect";
 import { dispatchStatus, statusExplanation } from "./outcome";
 import { governedNames, toolsFor } from "./tools";
 import type { GovernedTool } from "./tools";
@@ -24,6 +24,11 @@ export interface JsonRpcRequest {
 export interface PendingProposal {
   review_item_id: string;
   call: ToolCall;
+  /** REMORA's proposal identity and call hash from assess, kept so an effect
+   *  receipt names the dispatch it is about. Absent on proposals stored
+   *  before receipts were bound. */
+  proposal_id?: string;
+  tool_call_hash?: string;
 }
 
 /** Where a proposal awaiting human approval is remembered between the tool
@@ -38,14 +43,19 @@ export interface Deps {
   remora: RemoraClient;
   store: ProposalStore;
   /**
-   * Read a fact back and compare it against the delta the tool declared.
+   * Read the effect back, compare it against the approved arguments, and file
+   * the result with REMORA as a receipt bound to this dispatch.
    *
-   * Injected rather than imported so the protocol layer stays testable
-   * without a database, and so a deployment with no reader simply does not
-   * verify instead of pretending it did.
+   * `toolResult` only locates what the tool wrote; the expected values come
+   * from `approvedArgs`. Injected rather than imported so the protocol layer
+   * stays testable without a database, and so a deployment with no reader
+   * simply does not verify instead of pretending it did.
    */
-  verifyEffect?: (tool: string, declared: Record<string, unknown>,
-                  proposalId: string) => Promise<Verification | null>;
+  verifyEffect?: (tool: string, approvedArgs: Record<string, unknown>,
+                  toolResult: Record<string, unknown>, binding: EffectBinding,
+                  dispatchedAt: number) => Promise<EffectReport | null>;
+  /** Milliseconds since the epoch. Injected so tests are deterministic. */
+  now?: () => number;
   /** Injected so the protocol layer stays deterministic under test. */
   newId: () => string;
   /** Deployment configuration, which decides which tool sets are live. */
@@ -162,6 +172,84 @@ function renderDecision(a: AssessResult, proposalId?: string): unknown {
   }
 }
 
+/** Outcomes where REMORA returned the item to its queue: nothing ran, and a
+ *  person can approve it again, so the proposal is kept for the next poll. */
+const LAPSED = new Set(["approval_expired", "approval_invalidated"]);
+
+/** The dispatch an effect receipt is about, read from REMORA's own assess
+ *  and execute responses. Nothing here comes from the tool. */
+function bindingFrom(
+  assessed: { proposal_id?: string; tool_call_hash?: string },
+  run: ExecuteResult | undefined,
+  tokenJti: unknown,
+): EffectBinding {
+  const execution = (run?.tool_execution ?? {}) as Record<string, unknown>;
+  const jti = String(run?.execution_grant?.jti ?? tokenJti ?? "");
+  return {
+    proposal_id: String(run?.proposal_id ?? execution.proposal_id
+                        ?? assessed.proposal_id ?? ""),
+    tool_call_hash: String(assessed.tool_call_hash ?? ""),
+    grant_jti: jti,
+    execution_id: String(execution.execution_id ?? jti),
+    execution_context_hash: String(execution.execution_context_hash ?? ""),
+  };
+}
+
+async function readBack(
+  deps: Deps, call: ToolCall, run: ExecuteResult | undefined,
+  binding: EffectBinding, dispatchedAt: number,
+): Promise<EffectReport | null> {
+  if (!deps.verifyEffect) return null;
+  const result = (run?.tool_execution as { result?: unknown } | undefined)?.result;
+  return deps.verifyEffect(
+    call.tool_name, call.arguments,
+    result && typeof result === "object" ? result as Record<string, unknown> : {},
+    binding, dispatchedAt);
+}
+
+/** What the model is told about the effect. `effect` is REMORA's recorded
+ *  verdict and appears only when REMORA recorded the receipt; the gateway's
+ *  own reading is reported beside it, labelled as such. */
+function effectFields(report: EffectReport | null): {
+  fields: Record<string, unknown>; notes: string[]; mismatch: boolean;
+} {
+  if (!report) return { fields: {}, notes: [], mismatch: false };
+  const { observation, record } = report;
+  const mismatch = observation.status === "EFFECT_MISMATCH"
+    || record.status === "EFFECT_MISMATCH";
+  const notes: string[] = [];
+  if (mismatch) {
+    notes.push(
+      "The system of record does not match what was approved. Do not assume " +
+      "it worked. Report this rather than retrying.",
+    );
+  }
+  if (!record.recorded && record.reason !== "nothing_to_attest") {
+    notes.push(
+      "The gateway read the system of record back, but REMORA has not " +
+      `recorded that reading (${record.reason ?? "unknown reason"}). It is ` +
+      "the gateway's own observation, not evidence that the effect happened.",
+    );
+  }
+  return {
+    fields: {
+      ...(record.recorded && record.status
+        ? { effect: record.status, effect_reason: observation.reason_code }
+        : {}),
+      effect_observation: {
+        status: observation.status,
+        reason_code: observation.reason_code,
+        ...(observation.detail ? { detail: observation.detail } : {}),
+      },
+      effect_record: record,
+    },
+    notes,
+    mismatch,
+  };
+}
+
+const nowSeconds = (deps: Deps) => Math.floor((deps.now ?? Date.now)() / 1000);
+
 async function callTool(
   name: string,
   args: Record<string, unknown>,
@@ -223,9 +311,18 @@ async function callTool(
   }
 
   if (body.decision === "accept" && body.execution_token) {
+    const dispatchedAt = nowSeconds(deps);
     const run = await deps.remora.executeAccepted(body.execution_token, call);
     const acceptStatus = dispatchStatus(run.status, run.body?.tool_execution);
-    const acceptExplanation = statusExplanation(acceptStatus);
+    // Read back on the ACCEPT path as on the review path: it is the path
+    // where nobody looked, so the effect is the only check after dispatch.
+    const effect = acceptStatus === "refused" || acceptStatus === "execution_failed"
+      ? effectFields(null)
+      : effectFields(await readBack(
+          deps, call, run.body,
+          bindingFrom(body, run.body, body.execution_token.jti), dispatchedAt));
+    const acceptExplanation = [statusExplanation(acceptStatus), ...effect.notes]
+      .filter(Boolean).join(" ");
     return textResult({
       decision: "accept",
       // An ACCEPT is the one outcome that must never be unexplained: it is
@@ -241,6 +338,7 @@ async function callTool(
       ...(acceptExplanation ? { explanation: acceptExplanation } : {}),
       outcome: run.body?.outcome,
       result: run.body?.tool_execution,
+      ...effect.fields,
       // An execution that failed without a tool_execution object has failed
       // BEFORE enforcement reported anything, which is the case an operator
       // cannot diagnose from a bare "execution_failed". Carried only on the
@@ -248,7 +346,7 @@ async function callTool(
       ...(run.status !== 200
         ? { http_status: run.status, detail: run.body?.detail ?? run.body }
         : {}),
-    }, acceptStatus !== "executed");
+    }, acceptStatus !== "executed" || effect.mismatch);
   }
 
   // Anything that is not an outright ACCEPT leaves the side effect undone.
@@ -257,7 +355,12 @@ async function callTool(
   let proposalId: string | undefined;
   if (body.review_item_id) {
     proposalId = deps.newId();
-    await deps.store.put(proposalId, { review_item_id: body.review_item_id, call });
+    await deps.store.put(proposalId, {
+      review_item_id: body.review_item_id,
+      call,
+      ...(body.proposal_id ? { proposal_id: body.proposal_id } : {}),
+      ...(body.tool_call_hash ? { tool_call_hash: body.tool_call_hash } : {}),
+    });
   }
   return textResult(renderDecision(body, proposalId));
 }
@@ -273,6 +376,7 @@ async function statusTool(proposalId: string, deps: Deps): Promise<unknown> {
     }, true);
   }
 
+  const dispatchedAt = nowSeconds(deps);
   const { status, body } = await deps.remora.execute(
     pending.review_item_id,
     pending.call,
@@ -293,8 +397,42 @@ async function statusTool(proposalId: string, deps: Deps): Promise<unknown> {
     });
   }
 
+  const run = body as ExecuteResult;
+  const outcome = String(run.outcome ?? "");
+
+  // A 200 without a dispatch. REMORA answers 200 when it declines to run an
+  // approved item, and those answers carry no tool_execution. Classified from
+  // the body alone they read as "unknown" — "it may have run, do not retry" —
+  // which is false: nothing ran. The proposal is kept, because the item is
+  // still REMORA's to approve again (lapsed) or still approved (refused).
+  if (LAPSED.has(outcome)) {
+    return textResult({
+      status: "pending_approval",
+      proposal_id: proposalId,
+      outcome,
+      detail: run.detail,
+      explanation:
+        "Nothing has been executed. The approval no longer covers this call " +
+        (outcome === "approval_expired"
+          ? "because it expired"
+          : "because the situation changed after it was given") +
+        ", so REMORA put it back in the queue. A person has to approve it " +
+        "again; then poll remora_proposal_status with the same proposal_id.",
+    });
+  }
+  if (outcome === "binding_refused") {
+    return textResult({
+      status: "refused",
+      proposal_id: proposalId,
+      outcome,
+      detail: run.detail,
+      explanation: statusExplanation("refused") + " The call presented did " +
+        "not match the approved one.",
+    }, true);
+  }
+
   await deps.store.delete(proposalId);
-  const execution = (body as ExecuteResult).tool_execution ?? {};
+  const execution = run.tool_execution ?? {};
 
   const pollStatus = dispatchStatus(status, execution);
 
@@ -306,41 +444,27 @@ async function statusTool(proposalId: string, deps: Deps): Promise<unknown> {
   // record correctly shows no change, and reporting that as EFFECT_MISMATCH
   // would manufacture bad news out of a correct refusal. It IS attempted on an
   // unknown one, which is where a read-back is worth the most.
-  let effect: Verification | null = null;
-  if (deps.verifyEffect && pollStatus !== "refused") {
-    const declared = (execution as { result?: Record<string, unknown> }).result
-      ?? (execution as Record<string, unknown>);
-    effect = await deps.verifyEffect(pending.call.tool_name, declared,
-                                     pending.review_item_id);
-  }
+  const effect = pollStatus === "refused"
+    ? effectFields(null)
+    : effectFields(await readBack(
+        deps, pending.call, run, bindingFrom(pending, run, undefined),
+        dispatchedAt));
 
   // One explanation key, built from every part that has something to say. Two
   // separate `explanation` entries in the same object literal would silently
   // keep the last one, and the one that got dropped would be the dispatch
   // status — the part the model most needs.
-  const notes = [statusExplanation(pollStatus)];
-  if (effect?.status === "EFFECT_MISMATCH") {
-    notes.push(
-      "The system of record does not match what was approved. Do not assume " +
-      "it worked. Report this rather than retrying.",
-    );
-  }
-  const explanation = notes.filter(Boolean).join(" ");
+  const explanation = [statusExplanation(pollStatus), ...effect.notes]
+    .filter(Boolean).join(" ");
 
   return textResult({
     status: pollStatus,
     ...(explanation ? { explanation } : {}),
     proposal_id: proposalId,
-    outcome: (body as ExecuteResult).outcome,
+    outcome: run.outcome,
     result: execution,
-    ...(effect
-      ? {
-          effect: effect.status,
-          effect_reason: effect.reason_code,
-          ...(effect.detail ? { effect_detail: effect.detail } : {}),
-        }
-      : {}),
-  }, pollStatus !== "executed" || effect?.status === "EFFECT_MISMATCH");
+    ...effect.fields,
+  }, pollStatus !== "executed" || effect.mismatch);
 }
 
 /** Handle one JSON-RPC message. Returns null for notifications, which take no
