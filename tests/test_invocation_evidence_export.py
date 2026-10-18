@@ -487,3 +487,28 @@ def test_a_signed_body_with_a_duplicate_key_is_contradicted(world, verifier):
     outcome = _check(verifier, bundle)
     assert outcome["claims"]["export_authentic"] == {
         "result": "CONTRADICTED", "codes": ["body_not_strict_json"]}
+
+
+# Etappe 1, probe P1: one batch body, two requests, one body digest.
+
+BATCH = (b'[{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"read_telemetry",'
+         b'"arguments":{"asset":"P-1"}}},{"jsonrpc":"2.0","id":8,"method":"tools/call",'
+         b'"params":{"name":"read_telemetry","arguments":{"asset":"P-1"}}}]')
+
+
+def test_a_batch_member_grant_does_not_redeem_for_its_sibling(world, verifier):
+    """Both members share body_sha256; the id is what tells them apart, at
+    enforcement and at the receiver."""
+    client, calls = world
+    first, second = _ref(BATCH, "7"), _ref(BATCH, "8")
+    assert first["body_sha256"] == second["body_sha256"]
+    token = client.post("/v1/execution/assess", json=_proposal(first),
+                        headers=HEADERS).json()["execution_token"]
+    sibling = client.post("/v1/execution/execute-accepted", headers=HEADERS,
+                          json={"execution_token": token, "tool_call": _proposal(second)})
+    assert sibling.status_code == 409 and "context_mismatch" in sibling.text
+    assert calls == []
+    proposal_id, _run_ = _run(client, first)
+    outcome = _check(verifier, _export(client, proposal_id).json(),
+                     capture_ref={"jsonrpc_id": "8", "body_sha256": second["body_sha256"]})
+    assert outcome["claims"]["request_corresponds"]["result"] == "CONTRADICTED"
