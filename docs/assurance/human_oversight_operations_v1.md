@@ -32,7 +32,7 @@ These are real, tested controls, the substrate this design builds on.
 | Role reservation | Per-profile `approval_role` (domain_expert / senior_authority / soc_analyst / legal_counsel) enforced from the authenticated credential | `servers/execution_api.py`, `schemas/risk-profiles.yaml`, `servers/api.py` |
 | Non-repudiable identity | Reviewer identity derived from the credential, never a self-reported header | `servers/api.py` (`_authenticated_principal`) |
 
-**Crucial distinction:** the queue TTL is a *safety timeout* (inaction resolves
+**Distinction:** the queue TTL is a *safety timeout* (inaction resolves
 to ABSTAIN), **not** a reviewer response-time SLA. There is no measurement of
 time-to-review today. The `ReviewQueue` class itself
 (`remora/governance/review_queue.py`) is in-memory by design, but the queue
