@@ -30,6 +30,10 @@ Semantics, in the order an item lives through them:
      severity equals or is below the approval's: those never execute, so an
      approved ESCALATE re-decided as ESCALATE is voided, not "stricter".
      Decision monotonicity applied over time.
+   - the approval also covers only the risk tier it was reviewed at. The
+     tier selects the role allowed to approve, which the engine's action
+     does not express, so a changed tier voids the approval
+     (``reviewed_risk_tier_changed``) even when the fresh action is VERIFY.
 
 All state changes append to a hash-chained :class:`ChainedEventLog`
 (tamper-evident; same discipline as the decision audit chain). The queue is
@@ -75,6 +79,18 @@ def _approval_survives(
     """Step 4c: an executable fresh action no stricter than the approval."""
     return (fresh_action in _EXECUTABLE
             and _SEVERITY[fresh_action] <= _SEVERITY[approved_action])
+
+
+def _reviewed_tier(observation: PolicyObservation) -> str | None:
+    """The risk tier a reviewer saw, normalised for comparison.
+
+    The tier decides which role may approve (``approval_role`` per profile in
+    ``schemas/risk-profiles.yaml``), and the engine does not: a medium write
+    and a high write can both decide VERIFY. ``None`` stays ``None``; an
+    unknown tier is never read as equal to a known one.
+    """
+    tier = observation.risk_tier
+    return tier.strip().lower() if isinstance(tier, str) else None
 
 
 _OUTCOME_STATUS: dict[DispatchOutcome, ItemStatus] = {}
@@ -515,6 +531,40 @@ class ReviewQueue:
         # ESCALATE never execute — a numerically-lower severity (e.g. approved
         # ESCALATE=3, fresh ABSTAIN=2) must NOT be read as "safe to run".
         fresh = self._engine.decide(fresh_observation)
+
+        # 4b'. Reviewed authority: an approval covers the risk tier the
+        # reviewer saw, because that tier decided which role was allowed to
+        # approve. A changed tier voids it even when the engine still says
+        # VERIFY, and the item re-enters the queue carrying the fresh
+        # observation, so the next approval is checked against the tier in
+        # force now. Any change, not only a raise: the approval is for what
+        # was reviewed (execution-chain attack evaluation, PR #932).
+        if _reviewed_tier(item.observation) != _reviewed_tier(fresh_observation):
+            reviewed_tier = item.observation.risk_tier
+            item.status = ItemStatus.PENDING
+            item.approval = None
+            item.requested_action = fresh.action
+            item.observation = fresh_observation
+            item.queue_deadline = now + self._default_queue_ttl
+            self._log.append(
+                "approval_invalidated",
+                {
+                    "item_id": item_id,
+                    "reason": "reviewed_risk_tier_changed",
+                    "reviewed_risk_tier": reviewed_tier,
+                    "fresh_risk_tier": fresh_observation.risk_tier,
+                    "approved_action": approval.approved_action.value,
+                    "fresh_action": fresh.action.value,
+                },
+            )
+            return ExecutionOutcome(
+                ExecutionDecision.APPROVAL_INVALIDATED,
+                fresh.action,
+                "risk tier differs from the one the approval was reviewed "
+                "at; approval voided and item re-queued for review under the "
+                "current tier",
+            )
+
         if _approval_survives(fresh.action, approval.approved_action):
             item.status = ItemStatus.AUTHORIZED
             self._log.append(
@@ -597,6 +647,13 @@ class ReviewQueue:
                     ExecutionDecision.APPROVAL_INVALIDATED,
                     None,
                     "approver revoked after authorization",
+                )
+            if _reviewed_tier(item.observation) != _reviewed_tier(fresh_observation):
+                return ExecutionOutcome(
+                    ExecutionDecision.APPROVAL_INVALIDATED,
+                    None,
+                    "risk tier at dispatch differs from the one the approval "
+                    "was reviewed at",
                 )
             fresh = self._engine.decide(fresh_observation)
             if _approval_survives(fresh.action, approval.approved_action):

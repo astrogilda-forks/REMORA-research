@@ -4,6 +4,30 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Review path binds actor, task and reviewed risk tier (behaviour change)
+
+Fixes the two review-path defects measured by the execution-chain attack
+evaluation (PR #932, `scripts/execution_chain_attack_eval.py`).
+
+- `POST /v1/execution/execute` refuses an approved item presented by a
+  principal other than the proposer, or under a task other than the
+  proposal's (including a task stripped or added), with 409
+  `context_mismatch` and an `execution_context_refused` chain record naming
+  the mismatched fields. The comparison is the ACCEPT token's
+  `AuthorizationContext` hash, with the approved side read from the
+  `assessed` record. It runs before the queue is touched, so the approval
+  stays usable by its proposer. A proposal whose assessment cannot be read
+  back is refused as `context_unbound`.
+- `ReviewQueue.execute` and `ReviewQueue.regate_authorized` void an approval
+  when the observation's risk tier differs from the one the approval was
+  reviewed at (`reviewed_risk_tier_changed`), even when the fresh decision is
+  still VERIFY. The item re-enters the queue with the fresh observation, so
+  re-approval is checked against the role the current tier requires
+  (`domain_expert` at high, `senior_authority` at critical).
+- Callers that executed another principal's approved item, or relied on an
+  approval surviving a relabel, now get a refusal. ACCEPT-token and lease
+  semantics are unchanged.
+
 ### Flow control IFC-03b (ToolSpec v4 at bundle load)
 
 - The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in

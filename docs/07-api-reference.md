@@ -423,7 +423,12 @@ enqueues a review item), `POST /approve` (records the authenticated principal;
 mandatory bounded TTL; profile-specific approval role enforced), `POST
 /execute` (re-gates the fresh observation, binds the exact payload, consumes a
 one-time grant, then dispatches the tool through the app-lifecycle
-`GovernedToolDispatcher`), `GET /audit/verify` (recomputes the per-tenant
+`GovernedToolDispatcher`; the executing principal must be the proposer and the
+task must be the proposal's, or the call is refused with 409
+`context_mismatch` before the approval is touched; a risk tier that differs
+from the one the approval was reviewed at voids the approval as
+`approval_invalidated`, so it is re-approved under the role the current tier
+requires), `GET /audit/verify` (recomputes the per-tenant
 chain and reports `records_checked`; an `empty` chain is flagged because it is
 trivially valid). Its `hash_chain_status` (`INTACT` or `BROKEN`) and
 `signature_status` are separate: `CHECKED` when this process holds
@@ -685,7 +690,8 @@ restart-proven by test.
   `append()` is atomic; `verify()` recomputes and checks the HMAC signature.
 - `remora/governance/review_queue.py`, `ReviewQueue`: enqueue (VERIFY/ESCALATE
   only), TTL→ABSTAIN, mandatory-expiry approvals, execution-time re-gate
-  (only ACCEPT/VERIFY execute), all transitions hash-chained.
+  (only ACCEPT/VERIFY execute; a changed risk tier voids the approval), all
+  transitions hash-chained.
 - `remora/governance/degradation.py`, `DegradationRecorder` (G0–G4 ladder with
   tamper-evident transitions) and `g4_refuses()`.
 - `remora/governance/a2a_envelope.py`, `A2AGovernanceEnvelope`, `RegisteredKey`
