@@ -180,6 +180,31 @@ This file lists externally relevant changes by release. Fine-grained development
   PRF-013). Nothing has been run; the plan stays a draft until the owner
   approves and seals it.
 
+### Flow control (RMR-AUD-007, RMR-AUD-008: recipients, FL-01, FL-14, handle references)
+
+- `flow_check` passed a secret payload as clean when the recipient argument
+  of a derived sink (`from_args`, `url_host_of`, `iban_of`, `resource_of`)
+  was `[]`, `null` or missing. Such a rule now reports each argument it
+  reads as `unresolved:<argument>`. An absent `cc` beside a resolved `to`
+  is still allowed.
+- FL-01 refuses a `url` argument that is not the `url_host_of` argument, and,
+  on a tool that writes, an `email` or `iban` argument the recipients rule
+  does not name. Before, it caught only `url` under `recipients: none`.
+- New lint rule FL-14 refuses a BY_VALUE field rule under a container with
+  no BY_VALUE rule. The container is rendered as one handle (SDD §3.2.1), so
+  the field was never shown. The SDD's §5.1 `get_inbox` excerpt fails it as
+  written; the status document records the inconsistency.
+- `HandleStore.resolve` resolves the unchanged `{"$handle", "$type"}`
+  reference the model is shown as a whole handle. Before, the tool received
+  the wrapper object.
+- Not changed: a container without a rule is still one handle, and result
+  labels still join the call's argument labels. Both follow SDD §3.2.1 and
+  §3.3; the reasons are in
+  `docs/design/derived-information-flow-control-v1-status.md`.
+- No committed ToolSpec bundle carries a `flow` block, so no signed bundle
+  changes. `remora/flow/spec.py` is in the policy bundle hash, which
+  changes.
+
 ### Security (MCP gateway readiness fails closed)
 
 - The `/mcp` route acted on readiness problems only when the profile was

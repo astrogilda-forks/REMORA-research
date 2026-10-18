@@ -111,6 +111,49 @@ def test_a_recipient_that_cannot_be_resolved_is_named_unresolved(flow, args):
     assert verdict.conf_viol
 
 
+SEND_IN_TCB = parse_flow({
+    "provider": "tcb",
+    "arguments": {"to": {"kind": "email"}, "body": {"kind": "text"}},
+    "sources": {},
+    "sink": {"recipients": {"from_args": {"to": "email"}}, "payload_args": ["body"]},
+})
+FETCH = parse_flow({"provider": "tcb", "arguments": {"url": {"kind": "url"}}, "sources": {},
+                    "sink": {"recipients": {"url_host_of": "url"}}})
+PAY = parse_flow({"provider": "tcb", "arguments": {"iban": {"kind": "iban"}}, "sources": {},
+                  "sink": {"recipients": {"iban_of": "iban"}}})
+WRITE = parse_flow({"provider": "tcb", "arguments": {"path": {"kind": "resource"}},
+                    "sources": {}, "sink": {"recipients": {"resource_of": "path"}}})
+
+
+@pytest.mark.parametrize("flow, argument", [
+    (SEND_IN_TCB, "to"), (FETCH, "url"), (PAY, "iban"), (WRITE, "path")])
+@pytest.mark.parametrize("value", [[], (), None, "omitted"])
+def test_a_derived_recipient_rule_that_yields_no_one_is_unresolved(flow, argument, value):
+    """RMR-AUD-007: an empty, null or missing recipient argument reached no
+    one, so a secret payload passed as clean. The tool decides where such a
+    call goes, so no reader set can be shown to contain the recipient."""
+    secret = Label({USER}, Integrity.TRUSTED)
+    args = {"body": "TOP_SECRET"}
+    if value != "omitted":
+        args[argument] = value
+    verdict = flow_check(flow, context_label=secret, value_labels={"body": secret},
+                         resolved_args=args, epoch=1,
+                         resource_acl=lambda r: [USER])
+    assert f"unresolved:{argument}" in verdict.conf_viol
+    assert not verdict.clean
+
+
+def test_an_absent_cc_beside_a_resolved_to_is_not_unresolved():
+    """The rule as a whole must name someone; each optional argument need not."""
+    resolved, unresolved = recipients(SEND_EMAIL, {"to": "bob@corp.example", "cc": []})
+    assert resolved == {BOB, "ext://mail.corp.example"} and unresolved == ()
+
+
+def test_a_rule_with_no_values_names_every_argument_unresolved():
+    _, unresolved = recipients(SEND_EMAIL, {"to": None, "cc": []})
+    assert set(unresolved) == {"to", "cc"}
+
+
 # ── confidentiality ───────────────────────────────────────────────────────
 
 def test_a_clean_call_has_no_violations():
