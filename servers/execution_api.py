@@ -52,6 +52,7 @@ from remora.enforcement.outbox import (
 )
 from remora.enforcement.token import PolicyDecisionToken
 from remora.governance import audit_outbox as _audit_outbox
+from remora.governance.delegation import delegated_executor_of, delegation_refusal
 from remora.governance.effect_receipt import (
     ReceiptRefused,
 )
@@ -670,6 +671,7 @@ from remora.execution.dispatch import (
     record_dispatch_intent as _record_dispatch_intent_impl,
 )
 from remora.execution.review_service import (
+    ApprovalAuthority,
     ReviewConflict,
     ReviewNotFound,
     SeparationOfDutiesRefused,
@@ -743,6 +745,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             rebuild_call=_rebuild_tool_call,
             assessed_record=_assessed_record,
             require_execution_context=context_required(),
+            approval_policy=_approval_policy_for(tenant),
         )
         if result is not None:
             results.append(result)
@@ -852,6 +855,7 @@ def _auth(request: Request) -> tuple[str, str, str]:
     return tenant, role, api_mod._authenticated_principal(request)
 
 
+import hashlib
 import json
 
 # Review-state persistence (issue #241 extraction slice 2): the transaction
@@ -882,6 +886,60 @@ def db_transaction_state(tenant: str) -> AbstractContextManager[Any]:
         dsn=_os.environ.get("REMORA_PG_DSN", "").strip(),
         db_path=_os.environ.get("REMORA_CHAIN_DB", "").strip(),
     )
+
+
+def _delegation_or_refuse(req: Any, tenant: str, principal: str) -> None:
+    """Refuse a proposal naming a delegate this deployment has not declared.
+
+    409 with the reason and nothing assessed. The declaration is read from
+    the tenant's own ``tenant_access`` block of the risk-profile config; see
+    remora/governance/delegation.py for why defaults never apply.
+    """
+    delegate = delegated_executor_of(req)
+    if not delegate:
+        return
+    from servers import api as api_mod
+
+    tenant_access = api_mod._RISK_PROFILE_CONFIG.get("tenant_access", {})
+    reason = delegation_refusal(
+        tenant_access if isinstance(tenant_access, dict) else {},
+        tenant=tenant, proposer=principal, delegate=delegate)
+    if reason is not None:
+        raise HTTPException(status_code=409, detail=reason)
+
+
+def _approval_requirement(tenant: str, risk_tier: Any) -> dict[str, Any]:
+    """Who may approve an item at ``risk_tier`` in ``tenant``, as resolved now.
+
+    The two inputs ``_enforce_review_approval_role`` decides with: the
+    profile's ``approval_role`` and the tenant's ``reviewer_roles``. Read from
+    the risk-profile config loaded at startup, so an edited file takes effect
+    at the next restart, and an approval granted before it is compared with
+    the requirement after it.
+    """
+    from servers import api as api_mod
+
+    _, profile_cfg = api_mod._resolve_tenant_policy_profile(
+        tenant, str(risk_tier) if risk_tier is not None else None)
+    required = api_mod._extract_review_requirements(profile_cfg).get("approval_role")
+    access = api_mod._tenant_access_policy(tenant)
+    reviewer_roles = access.get("reviewer_roles", []) if isinstance(access, dict) else []
+    return {
+        "approval_role": str(required).strip().lower() if required else None,
+        "reviewer_roles": sorted({str(r).strip().lower() for r in reviewer_roles
+                                  if isinstance(r, str)}),
+    }
+
+
+def _approval_requirement_hash(requirement: dict[str, Any]) -> str:
+    canonical = json.dumps(requirement, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _approval_policy_for(tenant: str) -> Any:
+    """The hook the execution re-gate uses: observation -> requirement hash."""
+    return lambda observation: _approval_requirement_hash(
+        _approval_requirement(tenant, getattr(observation, "risk_tier", None)))
 
 
 def _queue(tenant: str) -> ReviewQueue:
@@ -1939,6 +1997,7 @@ def assess(req: ToolCallRequest, request: Request) -> dict[str, Any]:
     # finding 4).
     api_mod._require_tenant_capability(role, tenant, "assess")
     _task_or_refuse(req)
+    _delegation_or_refuse(req, tenant, principal)
     claim = None
     if req.idempotency_key:
         claim = _idempotency_claim(tenant, principal, req.idempotency_key, req)
@@ -2062,7 +2121,7 @@ def approve(req: ApproveRequest, request: Request) -> dict[str, Any]:
 
     api_mod._require_tenant_capability(role, tenant, "review")
 
-    def _authorize_approval(item: Any) -> None:
+    def _authorize_approval(item: Any) -> ApprovalAuthority:
         # Profile-specific approval role (review-8 finding): a generic
         # reviewer must not approve what the tenant's risk profile reserves
         # for domain_expert/senior_authority. Raises the same HTTP errors it
@@ -2076,6 +2135,14 @@ def approve(req: ApproveRequest, request: Request) -> dict[str, Any]:
             tenant_id=tenant,
             decision="approved",
             review_requirements=api_mod._extract_review_requirements(profile_cfg),
+        )
+        # What admitted this approver, kept with the approval so execution
+        # can tell whether that requirement is still the one in force.
+        requirement = _approval_requirement(tenant, risk_tier)
+        return ApprovalAuthority(
+            approver_role=(role or "").strip().lower(),
+            required_role=requirement["approval_role"],
+            policy_hash=_approval_requirement_hash(requirement),
         )
 
     try:
@@ -2567,6 +2634,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             async_dispatch=async_mode,
             transactional_append=chain_append_transactional,
             require_execution_context=context_required(),
+            approval_policy=_approval_policy_for(tenant),
         )
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
@@ -2946,6 +3014,9 @@ def get_proposal(proposal_id: str, request: Request) -> dict[str, Any]:
         "tool_name": assessed.get("tool_name"),
         "tool_call_hash": assessed.get("tool_call_hash"),
         "actor": assessed.get("actor"),
+        # Who may execute besides the actor, as admitted at assess. Shown so
+        # a reviewer approves the delegation along with the call.
+        "delegated_executor": assessed.get("delegated_executor"),
         "review_item_id": assessed.get("review_item_id"),
         "current_state": _current_state(events, dispatch),
         "event_count": len(events),

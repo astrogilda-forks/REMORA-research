@@ -297,7 +297,14 @@ class ReviewQueuePort(Protocol):
     def expire_due(self, now: datetime | None = None) -> list[PendingReview]: ...
 
     def approve(
-        self, item_id: str, approver: str, approval_ttl: timedelta
+        self,
+        item_id: str,
+        approver: str,
+        approval_ttl: timedelta,
+        *,
+        approver_role: str | None = None,
+        required_role: str | None = None,
+        approval_policy_hash: str | None = None,
     ) -> Approval: ...
 
     def reject(
@@ -309,12 +316,16 @@ class ReviewQueuePort(Protocol):
         item_id: str,
         fresh_observation: PolicyObservation,
         now: datetime | None = None,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome: ...
 
     def regate_authorized(
         self,
         item_id: str,
         fresh_observation: PolicyObservation,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome: ...
 
     def record_execution_outcome(

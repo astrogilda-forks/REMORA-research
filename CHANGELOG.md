@@ -4,6 +4,37 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Delegated execution and approval policy binding
+
+Follow-ups to the review-path binding below. The default stays fail-closed.
+
+- Opt-in delegated execution. A proposal may name `delegated_executor`. It is
+  admitted at `POST /v1/execution/assess` only when
+  `tenant_access.<tenant>.delegated_executors` in the risk-profile config
+  declares that service identity for the proposing agent. Otherwise the
+  assessment is refused with 409 `delegate_not_declared`,
+  `delegate_cross_tenant` or `delegate_is_proposer`. The shipped config
+  declares none. The delegate is recorded in the `assessed` record, bound into
+  the `AuthorizationContext` hash, shown by `GET /proposals/{id}` and
+  `POST /approve` and recorded on the `approved` event. It may execute on the
+  review path and redeem the ACCEPT token. A delegate added, swapped or stripped
+  after assessment, or any other principal, is `context_mismatch`. The delegate
+  cannot approve the item (403 `approver_is_delegated_executor`).
+  `execution_authorized` records `acting_for`. Without a delegation, behaviour
+  is unchanged.
+- Approvals are bound to the requirement that admitted the approver. The
+  approval and the `approved` event record `approver_role`, `required_role`
+  and `approval_policy_hash`. At execution, and at the async worker's
+  dispatch re-gate, a requirement that changed (for example an edited
+  `schemas/risk-profiles.yaml` and a restart with the item in a durable queue)
+  voids the approval as `approval_invalidated` (`approval_policy_changed`) and
+  returns the item for approval under the current rule. An approval without
+  the record, including one persisted before this change, is voided the same
+  way (`approval_policy_unbound`). Durable approvals pending at upgrade
+  therefore need approving again.
+- `AuthorizationContext` gains `delegated_executor`, which enters the hash
+  only when set, so existing tokens and golden vectors are unchanged.
+
 ### Review path binds actor, task and reviewed risk tier (behaviour change)
 
 Fixes the two review-path defects measured by the execution-chain attack

@@ -732,6 +732,18 @@
           "audit": {
             "$ref": "#/components/schemas/AuditRef"
           },
+          "delegated_executor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The delegate the proposal named at assess time, approved with the call; absent when it named none.",
+            "title": "Delegated Executor"
+          },
           "expires_at": {
             "title": "Expires At",
             "type": "string"
@@ -1584,6 +1596,19 @@
               }
             ],
             "title": "Context Id"
+          },
+          "delegated_executor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegated Executor"
           },
           "derivations": {
             "anyOf": [

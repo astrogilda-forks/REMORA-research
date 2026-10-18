@@ -34,6 +34,14 @@ Semantics, in the order an item lives through them:
      tier selects the role allowed to approve, which the engine's action
      does not express, so a changed tier voids the approval
      (``reviewed_risk_tier_changed``) even when the fresh action is VERIFY.
+   - the approval covers only the approval policy it was granted under. An
+     approval records the approver's role, the role the tier required and a
+     hash of that requirement (``approval_policy_hash``). When the caller
+     passes the requirement in force now and it differs, as after an edited
+     risk-profile file and a restart, the approval is void
+     (``approval_policy_changed``). An approval with no such record is void
+     too (``approval_policy_unbound``): a requirement that cannot be compared
+     is not one that held.
 
 All state changes append to a hash-chained :class:`ChainedEventLog`
 (tamper-evident; same discipline as the decision audit chain). The queue is
@@ -91,6 +99,23 @@ def _reviewed_tier(observation: PolicyObservation) -> str | None:
     """
     tier = observation.risk_tier
     return tier.strip().lower() if isinstance(tier, str) else None
+
+
+def _approval_policy_refusal(
+    approval: Approval, current_policy_hash: str | None
+) -> str | None:
+    """Why ``approval`` does not hold under ``current_policy_hash``, or None.
+
+    None as the current hash means the caller checks no policy. An approval
+    without a recorded hash cannot be compared and fails closed.
+    """
+    if current_policy_hash is None:
+        return None
+    if not approval.approval_policy_hash:
+        return "approval_policy_unbound"
+    if approval.approval_policy_hash != current_policy_hash:
+        return "approval_policy_changed"
+    return None
 
 
 _OUTCOME_STATUS: dict[DispatchOutcome, ItemStatus] = {}
@@ -154,6 +179,14 @@ class Approval:
     expires_at: datetime
     tool_call_hash: str | None
     observation_hash: str
+    #: The authenticated role the approver acted in, the role the item's tier
+    #: required (None when the tier names none) and the hash of that
+    #: requirement as the deployment resolved it. The defaults keep an
+    #: approval persisted before these existed loadable; it is then voided at
+    #: execution as ``approval_policy_unbound`` when the caller checks.
+    approver_role: str | None = None
+    required_role: str | None = None
+    approval_policy_hash: str | None = None
 
 
 @dataclass
@@ -368,15 +401,26 @@ class ReviewQueue:
         item_id: str,
         approver: str,
         approval_ttl: timedelta,
+        *,
+        approver_role: str | None = None,
+        required_role: str | None = None,
+        approval_policy_hash: str | None = None,
     ) -> Approval:
         with self._lock:
-            return self._approve_locked(item_id, approver, approval_ttl)
+            return self._approve_locked(
+                item_id, approver, approval_ttl,
+                approver_role=approver_role, required_role=required_role,
+                approval_policy_hash=approval_policy_hash)
 
     def _approve_locked(
         self,
         item_id: str,
         approver: str,
         approval_ttl: timedelta,
+        *,
+        approver_role: str | None,
+        required_role: str | None,
+        approval_policy_hash: str | None,
     ) -> Approval:
         if approval_ttl <= timedelta(0) or approval_ttl > MAX_APPROVAL_TTL:
             raise ValueError(
@@ -400,6 +444,9 @@ class ReviewQueue:
             expires_at=now + approval_ttl,
             tool_call_hash=item.observation.tool_call_hash,
             observation_hash=_observation_hash(item.observation),
+            approver_role=approver_role,
+            required_role=required_role,
+            approval_policy_hash=approval_policy_hash,
         )
         item.status = ItemStatus.APPROVED
         item.approval = approval
@@ -423,15 +470,28 @@ class ReviewQueue:
         item_id: str,
         fresh_observation: PolicyObservation,
         now: datetime | None = None,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome:
+        """Re-gate an approved item on a fresh observation.
+
+        ``approval_policy_hash`` is the approval requirement in force now for
+        the fresh observation's tier. When given, an approval granted under a
+        different requirement, or recorded without one, is void. None leaves
+        the policy unchecked, for library callers that resolve no roles.
+        """
         with self._lock:
-            return self._execute_locked(item_id, fresh_observation, now)
+            return self._execute_locked(
+                item_id, fresh_observation, now,
+                approval_policy_hash=approval_policy_hash)
 
     def _execute_locked(
         self,
         item_id: str,
         fresh_observation: PolicyObservation,
         now: datetime | None,
+        *,
+        approval_policy_hash: str | None,
     ) -> ExecutionOutcome:
         item = self._items[item_id]
         now = now or self._now_fn()
@@ -565,6 +625,37 @@ class ReviewQueue:
                 "current tier",
             )
 
+        # 4b''. Approval policy: the requirement that decided who could
+        # approve must be the one in force now. Checked after the tier, which
+        # names the more specific cause when both moved.
+        policy_refusal = _approval_policy_refusal(approval, approval_policy_hash)
+        if policy_refusal is not None:
+            item.status = ItemStatus.PENDING
+            item.approval = None
+            item.requested_action = fresh.action
+            item.observation = fresh_observation
+            item.queue_deadline = now + self._default_queue_ttl
+            self._log.append(
+                "approval_invalidated",
+                {
+                    "item_id": item_id,
+                    "reason": policy_refusal,
+                    "approver_role": approval.approver_role,
+                    "required_role": approval.required_role,
+                    "approved_policy_hash": approval.approval_policy_hash,
+                    "current_policy_hash": approval_policy_hash,
+                    "approved_action": approval.approved_action.value,
+                    "fresh_action": fresh.action.value,
+                },
+            )
+            return ExecutionOutcome(
+                ExecutionDecision.APPROVAL_INVALIDATED,
+                fresh.action,
+                "the approval requirement differs from the one the approval "
+                "was granted under, or the approval records none; approval "
+                "voided and item re-queued for review under the current rule",
+            )
+
         if _approval_survives(fresh.action, approval.approved_action):
             item.status = ItemStatus.AUTHORIZED
             self._log.append(
@@ -613,6 +704,8 @@ class ReviewQueue:
         self,
         item_id: str,
         fresh_observation: PolicyObservation,
+        *,
+        approval_policy_hash: str | None = None,
     ) -> ExecutionOutcome:
         """Re-decide an AUTHORIZED item on an observation built at dispatch.
 
@@ -654,6 +747,13 @@ class ReviewQueue:
                     None,
                     "risk tier at dispatch differs from the one the approval "
                     "was reviewed at",
+                )
+            if _approval_policy_refusal(approval, approval_policy_hash) is not None:
+                return ExecutionOutcome(
+                    ExecutionDecision.APPROVAL_INVALIDATED,
+                    None,
+                    "approval requirement at dispatch differs from the one "
+                    "the approval was granted under",
                 )
             fresh = self._engine.decide(fresh_observation)
             if _approval_survives(fresh.action, approval.approved_action):

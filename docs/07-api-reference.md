@@ -423,12 +423,13 @@ enqueues a review item), `POST /approve` (records the authenticated principal;
 mandatory bounded TTL; profile-specific approval role enforced), `POST
 /execute` (re-gates the fresh observation, binds the exact payload, consumes a
 one-time grant, then dispatches the tool through the app-lifecycle
-`GovernedToolDispatcher`; the executing principal must be the proposer and the
-task must be the proposal's, or the call is refused with 409
-`context_mismatch` before the approval is touched; a risk tier that differs
-from the one the approval was reviewed at voids the approval as
-`approval_invalidated`, so it is re-approved under the role the current tier
-requires), `GET /audit/verify` (recomputes the per-tenant
+`GovernedToolDispatcher`; the executing principal must be the proposer, or the
+delegate the proposal named, and the task must be the proposal's, or the call
+is refused with 409 `context_mismatch` before the approval is touched; a risk
+tier that differs from the one the approval was reviewed at voids the approval
+as `approval_invalidated`, so it is re-approved under the role the current tier
+requires, and so does an approval requirement that changed since the approval
+or was never recorded with it), `GET /audit/verify` (recomputes the per-tenant
 chain and reports `records_checked`; an `empty` chain is flagged because it is
 trivially valid). Its `hash_chain_status` (`INTACT` or `BROKEN`) and
 `signature_status` are separate: `CHECKED` when this process holds
@@ -463,6 +464,41 @@ dispatch and effect recording; `/dispatch-leased` then takes the historical
 context as `execution_context`. The authority of the deployment sources stays
 `NOT_ESTABLISHED` (`execution_context_authoritative_binding`). Setup is in the
 [execution quickstart](deployment/execution-quickstart.md#optional-authoritative-execution-context).
+
+**Delegated execution (opt-in):** by default only the proposer executes what
+it proposed, on the review path and with an ACCEPT token. A proposal may name
+`delegated_executor`, a service identity that executes on the proposer's
+behalf. `POST /assess` admits it only when the risk-profile config declares it
+for this agent in this tenant, under
+`tenant_access.<tenant>.delegated_executors` as
+`{service_identity: [agent, ...]}`; `access_defaults` does not apply. Otherwise
+the assessment is refused with 409 and nothing is assessed:
+`delegate_not_declared`, `delegate_cross_tenant` when the identity is declared
+only under another tenant, or `delegate_is_proposer`. The shipped config
+declares none. An admitted delegate is written to the `assessed` record and
+bound into the ACCEPT token's authorization context. `GET /proposals/{id}` and
+`POST /approve` return it and the `approved` event records it, so the reviewer
+approves it with the call. The delegate re-presents the same
+`delegated_executor` and is compared as the proposer it acts for. A delegate
+added, swapped or stripped after assessment is `context_mismatch`, and so is
+any other principal. The delegate cannot approve the item it will execute (403
+`approver_is_delegated_executor`). `execution_authorized` records the delegate
+as `actor` with `acting_for` naming the proposer, and the execution lease is
+minted with the delegate as `actor_identity`. The
+delegation is checked at assess only: withdrawing the declaration later does
+not void an item already assessed, while revoking the approver still does.
+
+**Approval policy binding:** an approval records the approver's
+authenticated role and the role the item's tier required (`required_role`, null
+when the profile names none). It also records `approval_policy_hash`, a hash of
+that requirement and the tenant's `reviewer_roles`. All three are on the
+approval and on the `approved` event. `POST /execute` and the async worker
+recompute the hash for the fresh observation. A typical cause of a difference
+is an edited `schemas/risk-profiles.yaml` and a restart with the item in a
+durable queue. The approval is then void as `approval_invalidated`
+(`approval_policy_changed`), and the item returns for approval under the
+current rule. An approval stored without the record, such as one persisted before this
+binding, is voided the same way (`approval_policy_unbound`).
 
 **Task identity and loop safety (Q7.2):** a tool call may carry `context_id`
 and `task_id`, in A2A's vocabulary, both or neither (one alone is a 422).
@@ -690,8 +726,8 @@ restart-proven by test.
   `append()` is atomic; `verify()` recomputes and checks the HMAC signature.
 - `remora/governance/review_queue.py`, `ReviewQueue`: enqueue (VERIFY/ESCALATE
   only), TTL→ABSTAIN, mandatory-expiry approvals, execution-time re-gate
-  (only ACCEPT/VERIFY execute; a changed risk tier voids the approval), all
-  transitions hash-chained.
+  (only ACCEPT/VERIFY execute; a changed risk tier or approval requirement
+  voids the approval), all transitions hash-chained.
 - `remora/governance/degradation.py`, `DegradationRecorder` (G0–G4 ladder with
   tamper-evident transitions) and `g4_refuses()`.
 - `remora/governance/a2a_envelope.py`, `A2AGovernanceEnvelope`, `RegisteredKey`

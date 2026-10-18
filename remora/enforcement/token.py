@@ -213,6 +213,13 @@ class AuthorizationContext:
     context_id: str = ""
     task_id: str = ""
     execution_context_hash: str = ""
+    #: A service identity the proposal named to execute on the principal's
+    #: behalf, admitted at assess time against the deployment's per-tenant
+    #: declaration. Absent by default and omitted from the hash when empty,
+    #: like the task fields, so a context naming no delegate hashes exactly as
+    #: before. Bound here so a delegate cannot be added or swapped after the
+    #: grant or the approval it rides on.
+    delegated_executor: str = ""
 
     def hash(self) -> str:
         fields = {
@@ -232,6 +239,8 @@ class AuthorizationContext:
             fields["task_id"] = self.task_id
         if self.execution_context_hash:
             fields["execution_context_hash"] = self.execution_context_hash
+        if self.delegated_executor:
+            fields["delegated_executor"] = self.delegated_executor
         canonical = json.dumps(fields, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode()).hexdigest()
 
@@ -265,6 +274,7 @@ class AuthorizationContext:
                 "context_id",
                 "task_id",
                 "execution_context_hash",
+                "delegated_executor",
             )
             if (getattr(self, name) or "") != (getattr(other, name) or "")
         ]

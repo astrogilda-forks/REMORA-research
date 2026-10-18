@@ -143,6 +143,9 @@ class ExecutionApproveResponse(BaseModel):
     item_id: str
     expires_at: str
     audit: AuditRef
+    delegated_executor: str | None = Field(
+        None, description="The delegate the proposal named at assess time, "
+                          "approved with the call; absent when it named none.")
 
 
 class ExecutionExecuteResponse(BaseModel):
@@ -304,6 +307,14 @@ class ToolCallRequest(BaseModel):
     # the caller, and only ever intersected with the authenticated
     # principal's own tools, so choosing a task type cannot widen them.
     task_type: str | None = Field(None, min_length=1, max_length=200)
+    # Opt-in delegated execution: a service identity that may execute this
+    # proposal on the proposer's behalf. Admitted at assess only when the
+    # deployment declares it for this agent in this tenant
+    # (tenant_access.<tenant>.delegated_executors), then bound into the
+    # authorization context, so it is part of what the reviewer approves and
+    # cannot be added or changed afterwards. Absent, only the proposer
+    # executes. See remora/governance/delegation.py.
+    delegated_executor: str | None = Field(None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def _task_identity_is_whole(self) -> ToolCallRequest:
