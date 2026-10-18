@@ -488,6 +488,18 @@ minted with the delegate as `actor_identity`. The
 delegation is checked at assess only: withdrawing the declaration later does
 not void an item already assessed, while revoking the approver still does.
 
+**Proposal binding:** `POST /execute` re-presents the call, and the fields
+outside the payload hash must be the ones assessed. Those are `schema_valid`,
+`rollback_available`, `untrusted_context`, `intent_ref`, `derivations`, the
+task, `plan`, `task_type` and `delegated_executor`. The `assessed` record
+carries `proposal_envelope_hash` over them (the idempotency key excepted). A
+different proposal is refused with 409 `binding_refused` before the approval
+is touched (RMR-AUD-001). An item assessed before this binding has no hash and
+is refused the same way, so it must be proposed again. Arguments, tool and
+target stay bound by the queue's payload hash, as before. A riskier world
+still comes from the server side: ToolSpec, state, revocation and risk
+metadata re-gate as before.
+
 **Approved escalations:** an item records the decision reasons it was
 enqueued with, and its approval records them as `approved_reasons`. An
 approved ESCALATE survives the execution re-gate when the fresh decision is

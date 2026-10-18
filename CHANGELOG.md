@@ -4,6 +4,22 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Review path binds the whole proposal (RMR-AUD-001, binding part)
+
+- The proposal fields outside `canonical_tool_call_hash` (`schema_valid`,
+  `rollback_available`, `untrusted_context`, `intent_ref`, `derivations`, task,
+  `plan`, `task_type`, `delegated_executor`) could differ between assess and
+  execute. A call assessed as ESCALATE because of one downgrade could be
+  approved and then executed as a VERIFY by dropping it and adding another.
+  The `assessed` record now carries `proposal_envelope_hash`, and
+  `POST /v1/execution/execute` refuses a different proposal with 409
+  `binding_refused` before the approval is touched. Items assessed before this
+  change carry no hash and are refused, so they must be proposed again.
+  `tests/test_execution_api.py::test_riskier_world_invalidates_approval_at_execution`
+  simulated a riskier world by re-presenting `rollback_available=false`. That
+  is now a refused proposal, so the test makes the world change on the server
+  side, and a new test pins the refusal.
+
 ### Approved escalations execute (RMR-AUD-002)
 
 - An approved ESCALATE re-decided on the observation the reviewer saw was

@@ -11,6 +11,7 @@ duck-typed proposal carrying tool_name/arguments/target_environment.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import hmac
 import json
 import logging
@@ -363,6 +364,9 @@ def assess_proposal(
     if task is not None:
         record["context_id"] = task.context_id
         record["task_id"] = task.task_id
+    # RMR-AUD-001: the whole proposal, so execution can be refused for
+    # presenting another one under this approval.
+    record["proposal_envelope_hash"] = proposal_envelope_hash(proposal)
     delegate = delegated_executor_of(proposal)
     if delegate:
         # Admitted by the route before this function ran; recorded here so
@@ -525,6 +529,68 @@ class ApprovalContextRefused(RemoraError):
 #: by ReviewQueue step 4b', and the execution context by the queue's own
 #: binding.
 _REVIEW_BOUND_FIELDS = ("principal", "context_id", "task_id", "delegated_executor")
+
+
+#: The proposal fields outside ``canonical_tool_call_hash``. The review path
+#: binds them to the assessment (RMR-AUD-001). The hash covers only the tool,
+#: arguments, tenant and target, which the queue's payload binding already
+#: refuses as ``binding_refused``. The rest still decide: ``schema_valid``,
+#: ``rollback_available`` and ``untrusted_context`` lower trust, ``intent_ref``
+#: selects the intent authority, and ``derivations`` grounds argument values.
+#: Unbound, a caller could get one decision approved and execute under another.
+#: ``idempotency_key`` is exempt because it names a request, not the call.
+#: tests/test_review_path_audit_r3.py pins this tuple to the wire model, so a
+#: new field is bound or exempted on purpose.
+PROPOSAL_ENVELOPE_FIELDS = (
+    "schema_valid", "rollback_available", "intent_ref", "untrusted_context",
+    "derivations", "context_id", "task_id", "plan", "task_type",
+    "delegated_executor",
+)
+
+
+def _plain(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if isinstance(value, dict):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    return value
+
+
+def proposal_envelope_hash(tool_call: Any) -> str:
+    """SHA-256 over the proposal fields outside the payload hash, as presented.
+
+    Read by attribute, so the wire model and a duck-typed call hash alike;
+    an absent field hashes as null.
+    """
+    envelope = {f: _plain(getattr(tool_call, f, None))
+                for f in PROPOSAL_ENVELOPE_FIELDS}
+    canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"),
+                           default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def proposal_envelope_refusal(
+    chain: AuditChainPort, tenant: str, proposal_id: str, tool_call: Any,
+) -> ApprovalContextRefused | None:
+    """The refusal for presenting ``tool_call`` against an approval of a
+    different proposal, or None.
+
+    The approved proposal is the hash the ``assessed`` record carries. A
+    record without one (assessed before this binding) cannot be compared and
+    is refused, so a pending item from before the upgrade must be proposed
+    again rather than executed unbound.
+    """
+    record = _assessed_payload(chain, tenant, proposal_id)
+    approved = str((record or {}).get("proposal_envelope_hash") or "")
+    if approved and approved == proposal_envelope_hash(tool_call):
+        return None
+    return ApprovalContextRefused(
+        "binding refused: the presented proposal differs from the one this "
+        "item was approved for",
+        reason="binding_refused",
+        mismatched=("proposal_envelope",))
 
 
 def _assessed_payload(
@@ -704,6 +770,11 @@ def execute_approved_item(
             task=task_identity_of(tool_call),
             delegated_executor=delegated_executor_of(tool_call),
         ))
+    # Then the proposal itself (RMR-AUD-001): the fields outside the payload
+    # hash must be the ones assessed, or a call approved as one decision could
+    # be re-presented as another. Same placement, same non-consumption.
+    context_refusal = context_refusal or proposal_envelope_refusal(
+        chain, tenant, assessed_proposal_id, tool_call)
     acting_for = _acting_for(
         _assessed_payload(chain, tenant, assessed_proposal_id), principal)
     context = historical_context(

@@ -13,11 +13,11 @@ Each was reproduced on this branch before it was fixed:
 - RMR-AUD-001 (binding part), ``abstain_to_escalate_laundering``: the
   request-side fields outside ``canonical_tool_call_hash`` (``schema_valid``,
   ``rollback_available``, ``untrusted_context``, ``intent_ref``,
-  ``derivations`` and the rest of the proposal) could differ between assess and
-  execute. A call assessed as ESCALATE could be approved and then executed as
+  ``derivations`` and the rest of the proposal outside the payload hash) could
+  differ between assess and execute. A call assessed as ESCALATE could be approved and then executed as
   a VERIFY by dropping the downgrade and adding a different one. The assessed
-  record now carries a hash over every proposal field except the
-  idempotency key, and ``/execute`` refuses a different proposal with 409
+  record now carries a hash over those fields (the idempotency key excepted),
+  and ``/execute`` refuses a different proposal with 409
   ``binding_refused`` before the queue is touched.
 - RMR-AUD-006 part 3, ``intent_ref_swap_on_review``: the review path did not
   bind ``intent_authority_hash``, so an item approved under one intent executed
@@ -36,11 +36,15 @@ import pytest
 
 pytest.importorskip("fastapi")
 
+from tests.test_delegated_execution_and_approval_policy import (  # noqa: E402
+    _refusals,
+)
 from tests.test_review_path_binding import (  # noqa: E402
     METADATA,
     TENANT,
     WRITE,
     Deployment,
+    _approved,
     _chain_events,
     _obs,
 )
@@ -219,4 +223,72 @@ def test_approved_reasons_round_trip_through_the_durable_encoding() -> None:
     assert restored.requested_reasons == ("evidence_insufficient",)
     assert restored.approval is not None
     assert restored.approval.approved_reasons == ("evidence_insufficient",)
+
+# ── RMR-AUD-001 (binding part): abstain_to_escalate_laundering ─────────────
+
+def test_abstain_to_escalate_laundering_is_refused(world: Deployment) -> None:
+    """Assess with a downgrade, get it approved, execute with another one."""
+    assessed_call = {**WRITE, "schema_valid": False}
+    item_id = _propose(world, assessed_call, "escalate")
+    assert world.approve(item_id).status_code == 200
+    laundered = {**WRITE, "untrusted_context": "benign note"}
+    r = world.execute(item_id, laundered)
+    assert not r.ran
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "binding_refused"
+    assert _refusals(world)[-1]["detail"] == "binding_refused"
+    # Refused before the queue was touched: the approval is still there.
+    assert _status(world, item_id) == "approved"
+
+
+@pytest.mark.parametrize("change", [
+    {"schema_valid": False},
+    {"rollback_available": False},
+    {"untrusted_context": "note"},
+    {"intent_ref": "WO-9"},
+    {"task_type": "maintenance"},
+    {"derivations": [{"argument": "value", "source_tool": "read_record",
+                      "source_call": {"record_id": "pub-1"}, "source_path": "value",
+                      "transform": "identity"}]},
+])
+def test_any_proposal_field_added_at_execute_is_refused(
+        world: Deployment, change: dict[str, Any]) -> None:
+    item_id = _approved(world, WRITE)
+    r = world.execute(item_id, {**WRITE, **change})
+    assert not r.ran
+    assert r.status_code in (409, 422), r.text
+    if r.status_code == 409:
+        assert r.json()["detail"] in ("binding_refused", "context_mismatch")
+    assert world.execute(item_id, WRITE).ran
+
+
+def test_a_different_idempotency_key_is_not_a_different_proposal(
+        world: Deployment) -> None:
+    item_id = _approved(world, {**WRITE, "idempotency_key": "k-assess"})
+    r = world.execute(item_id, {**WRITE, "idempotency_key": "k-execute"})
+    assert r.status_code == 200, r.text
+    assert r.ran
+
+
+def test_the_proposal_hash_covers_every_proposal_field() -> None:
+    """A field added to the wire model must be bound or deliberately exempt."""
+    from remora.execution.service import PROPOSAL_ENVELOPE_FIELDS
+    from servers.execution_contracts import ToolCallRequest
+
+    payload = {"tool_name", "arguments", "target_environment"}  # tool_call_hash
+    assert set(ToolCallRequest.model_fields) - {"idempotency_key"} - payload == set(
+        PROPOSAL_ENVELOPE_FIELDS)
+
+
+def test_an_item_whose_assessment_carries_no_proposal_hash_is_refused(
+        world: Deployment) -> None:
+    """Fail closed: an assessed record from before the binding cannot match."""
+    item_id = _approved(world, WRITE)
+    for entry in world.exec._CHAIN.entries(TENANT):
+        if entry.payload.get("event") == "assessed":
+            entry.payload.pop("proposal_envelope_hash", None)
+    r = world.execute(item_id, WRITE)
+    assert not r.ran
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "binding_refused"
 
