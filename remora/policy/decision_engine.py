@@ -16,6 +16,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import ClassVar
 
@@ -25,6 +26,7 @@ from remora.credal import (
     compute_from_obs,
 )
 from remora.observability.events import governance_event
+from remora.policy.composition import EXTERNAL_CAP_REASONS, Cap, executability, meet
 from remora.policy.invariants import InvariantResult, check_all_invariants
 from remora.policy.observation import PolicyObservation
 from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
@@ -896,9 +898,85 @@ class RemoraDecisionEngine:
                            credal=credal, raw_obs=raw_obs)
 
     def decide(
-        self, obs: PolicyObservation, *, _skip_hard_floor: bool = False
+        self,
+        obs: PolicyObservation,
+        *,
+        caps: Sequence[Cap] = (),
+        _skip_hard_floor: bool = False,
     ) -> DecisionReport:
         """Gate a proposed action and return an authoritative DecisionReport.
+
+        Meet composition (SDD flow control §3.9, COMP-01). The priority
+        cascade below decides as before; then each component group that fired,
+        the hard-guard floor and the conditional-gate group (its first gate,
+        as in the cascade), and every external cap in *caps* (a learned
+        monitor, a control protocol) contributes its action,
+        and the final decision is the least executable of them
+        (``ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT``). A cascade decision that no
+        component undercuts is returned unchanged, reasons included. When one
+        does, its action wins and its reason is appended, so the audit record
+        keeps the first-match reason too. External caps must carry
+        ``MONITOR_CAP`` or ``PROTOCOL_CAP``; a cap can never raise a decision.
+        """
+        for cap in caps:
+            if cap.reason not in EXTERNAL_CAP_REASONS:
+                raise ValueError(f"an external cap carries a cap reason, not {cap.reason!r}")
+        report = self._decide_cascade(obs, _skip_hard_floor=_skip_hard_floor)
+        norm = _normalize_observation(obs)
+        components: list[Cap] = [Cap("cascade", report.action, report.reasons[-1])
+                                 if report.reasons else
+                                 Cap("cascade", report.action, DecisionReason.DEFAULT_SAFE_ABSTAIN)]
+        floor = None if _skip_hard_floor else hard_guard_floor(norm)
+        if floor is not None:
+            components.append(Cap("floor", floor[0], floor[1]))
+        credal, trap = compute_from_obs(norm), trap_score(norm)
+        conditional = self._conditional_cap(norm, credal, trap)
+        if conditional is not None:
+            components.append(conditional)
+        components.extend(caps)
+        binding = meet(components)
+        if executability(binding.action) < executability(report.action):
+            report = self._build(binding.action, [*report.reasons, binding.reason], norm,
+                                 credal=credal, raw_obs=obs)
+        # Internal reports are candidates, not decisions. Emit only after
+        # composition and invariant enforcement have selected the final report.
+        governance_event(
+            "decision.made",
+            action=report.action.value,
+            reasons=[r.value for r in report.reasons],
+            source=report.source_of_decision,
+            risk_tier=norm.risk_tier,
+            action_type=norm.action_type,
+            target_environment=norm.target_environment,
+            human_review_required=report.human_review_required,
+        )
+        return report
+
+    def _conditional_cap(
+        self, obs: PolicyObservation, credal: CredalEnvelope, trap: float
+    ) -> Cap | None:
+        """The conditional-gate group's cap: its first gate that fires (§3.9).
+
+        The SDD composes component groups, not the gates inside one: the order
+        of ``_CONDITIONAL_GATES`` is a deliberate priority (evidence gates
+        before minimax, for example), and the cascade's own gate stage keeps
+        it. The §23 rule applies as in the cascade: a VERIFY whose gap nobody
+        can close is an ABSTAIN.
+        """
+        for gate in _CONDITIONAL_GATES:
+            action = gate.evaluate(self, obs, credal, trap)
+            if action is None:
+                continue
+            if action is DecisionAction.VERIFY and _unresolvable_gap(obs):
+                return Cap(f"gate:{gate.name}", DecisionAction.ABSTAIN,
+                           DecisionReason.NO_RESOLVER_AVAILABLE)
+            return Cap(f"gate:{gate.name}", action, gate.reason)
+        return None
+
+    def _decide_cascade(
+        self, obs: PolicyObservation, *, _skip_hard_floor: bool = False
+    ) -> DecisionReport:
+        """The priority cascade: the first component that fires decides.
 
         ``_skip_hard_floor`` is a private ablation hook for shadow-mode
         counterfactual replay ONLY (the ``no_hard_guards`` baseline arm in
@@ -1270,7 +1348,7 @@ class RemoraDecisionEngine:
         reasons.append(DecisionReason.DEFAULT_SAFE_ABSTAIN)
         return self._build(DecisionAction.ABSTAIN, reasons, obs, credal=_credal, raw_obs=_raw_obs)
 
-    def explain(self, obs: PolicyObservation) -> PolicyTrace:
+    def explain(self, obs: PolicyObservation, *, caps: Sequence[Cap] = ()) -> PolicyTrace:
         """Return a full structured explanation of the governance decision.
 
         Evaluates every rule in the decision tree and records which fired,
@@ -1297,7 +1375,7 @@ class RemoraDecisionEngine:
                 print(f"  {marker} [{step.rule}] {step.condition}")
         """
         obs = _normalize_observation(obs)
-        report = self.decide(obs)
+        report = self.decide(obs, caps=caps)
         steps: list[PolicyRuleEvaluation] = []
 
         def r(name: str, fired: bool, cond: str, out: str | None = None) -> None:
@@ -1538,6 +1616,18 @@ class RemoraDecisionEngine:
           "no prior rule matched",
           "ABSTAIN")
 
+        # Meet composition (COMP-01): when a component that fired is stricter
+        # than the cascade's first match, its action is the decision. The row
+        # names the binding component, so a reader sees why a first-match
+        # VERIFY became an ESCALATE.
+        _cascade = self._decide_cascade(obs)
+        _composed = report.action is not _cascade.action
+        r("meet_composition",
+          _composed,
+          f"cascade={_cascade.action.value.upper()}, "
+          f"binding={report.reasons[-1].value if _composed else 'cascade'}",
+          report.action.value.upper() if _composed else _cascade.action.value.upper())
+
         # Runtime invariant enforcement overrides the ladder, so it belongs at
         # the FRONT of the trace: a reader must not see conformal_accept fire
         # and conclude the action was ACCEPT when the decision was withdrawn.
@@ -1731,17 +1821,6 @@ class RemoraDecisionEngine:
                 return self._escalate_invariant_violation(
                     violations, obs, credal=credal, raw_obs=raw_obs
                 )
-        if not _invariant_recheck:
-            governance_event(
-                "decision.made",
-                action=report.action.value,
-                reasons=[r.value for r in report.reasons],
-                source=report.source_of_decision,
-                risk_tier=obs.risk_tier,
-                action_type=obs.action_type,
-                target_environment=obs.target_environment,
-                human_review_required=report.human_review_required,
-            )
         return report
 
     def _escalate_invariant_violation(
