@@ -4,9 +4,9 @@ Reference note for ACS / cMCP / TRACE review.
 Repository state: `darklordVirtual/REMORA-research`, default branch at `2724fa0`.
 Status: reference implementation. The capability register states explicitly that nothing in the repository is `ENFORCED_PRODUCTION` or `EXTERNALLY_VERIFIED`; deployment status is shadow-only. This document describes implemented and tested mechanisms, not deployment assurance.
 
-## What you asked for, and where it is
+## Review points and where they are answered
 
-| your point | answered in | runnable evidence |
+| review point | answered in | runnable evidence |
 |---|---|---|
 | canonical representation covered by the authorization signature | §1 | V-02, V-03 |
 | mutable and defaulted parameters | §2 | V-03 |
