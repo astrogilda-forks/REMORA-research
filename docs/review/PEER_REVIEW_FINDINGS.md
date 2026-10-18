@@ -614,3 +614,16 @@ conditions?
 | Verification | Pending. |
 | Status | OPEN |
 
+### PRF-043 The paper uses BFCL v4 as its main evidence without citing it
+
+| Field | Value |
+|---|---|
+| Severity | MINOR |
+| Claim | The abstract, §10.8 and §10.9 rest on BFCL v4, but the bibliography has no entry for Gorilla or the Berkeley Function Calling Leaderboard (Patil et al.). |
+| Evidence | A grep for Patil, Gorilla and Berkeley Function Calling in paper/remora_paper.md returns nothing (2026-10-17). The code cites the upstream repository (remora/toolcall/routing/sources/bfcl.py), and the research control matrix now records it under RES-023. |
+| Affected claims | CLAIM-018, CLAIM-019, CLAIM-021 |
+| Action | Add the Gorilla/BFCL reference to the .md and .tex bibliographies. Bibliography parity is CI-gated, and every reference needs a role in the research control matrix. |
+| Owning PR | not yet opened |
+| Verification | Pending. |
+| Status | OPEN |
+
