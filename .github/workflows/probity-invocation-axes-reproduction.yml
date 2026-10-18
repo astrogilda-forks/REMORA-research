@@ -45,6 +45,11 @@ env:
   FROZEN_REVISION: fe324dd734734d9227aa894330ac52c2bb916b94
   # Bundles REMORA's verifier alone reads as EFFECT_VERIFIED while the reader's
   # observed_effect is not ESTABLISHED, with the reader's reason for each.
+  # The corpus shape at READER_COMMIT. The pairing skips a case without a
+  # bundle, so the split alone would stay green if bundles went missing.
+  EXPECTED_CASES: "23"
+  EXPECTED_BUNDLES: "22"
+  EXPECTED_WITHOUT_BUNDLE: "no_execution_bundle"
   EXPECTED_SPLIT: >-
     bundle_for_other_call=bundle_bound_to_other_call
     dispatched_after_deny=dispatched_after_deny
@@ -127,7 +132,8 @@ jobs:
           control = [c["id"] for c in fixtures["cases"]
                      if remora.evaluate(c) != {k: c["expected"][k] for k in ("effect_status", "highest_established_state")}]
           corpus = Path("probity-readers/packaging/agent_evidence_vectors/invocation_axes/corpus/cases.json")
-          cases = {c["id"]: c for c in json.loads(corpus.read_text(encoding="utf-8"))["cases"]}
+          case_list = json.loads(corpus.read_text(encoding="utf-8"))["cases"]
+          cases = {c["id"]: c for c in case_list}
           report = json.loads((out / "reader/report.json").read_text(encoding="utf-8"))
           rows, split = [], {}
           for result in report["results"]:
@@ -140,8 +146,12 @@ jobs:
               got = remora.evaluate({"dispatch": bundle["dispatch"], "execution_report": bundle.get("execution_report"),
                                      "postcondition": post, "observed": None if obs is None else obs.get("fields")})
               ours = result["actual"]["observed_effect"]
+              # Binary observed-effect agreement only: REMORA's EFFECT_VERIFIED
+              # against the reader's ESTABLISHED. Not contract agreement, and not
+              # a REMORA verification of the bundle.
               agree = (got["highest_established_state"] == "EFFECT_VERIFIED") == (ours["result"] == "ESTABLISHED")
-              rows.append({"case_id": result["case_id"], "remora": got, "reader": ours, "agree": agree})
+              rows.append({"case_id": result["case_id"], "remora_highest_established_state": got["highest_established_state"],
+                           "remora": got, "reader_observed_effect": ours, "observed_effect_binary_agree": agree})
               if not agree:
                   split[result["case_id"]] = ours["reason"]
           expected = dict(item.split("=", 1) for item in os.environ["EXPECTED_SPLIT"].split())
@@ -150,8 +160,20 @@ jobs:
               problems.append(f"REMORA fixtures failed the control: {control}")
           if split != expected:
               problems.append(f"split {split} != expected {expected}")
+          if len(case_list) != int(os.environ["EXPECTED_CASES"]) or len(cases) != len(case_list):
+              problems.append(f"expected {os.environ['EXPECTED_CASES']} unique cases, got {len(case_list)} ({len(cases)} unique)")
+          without = sorted(i for i, c in cases.items() if c.get("execution") is None)
+          if without != os.environ["EXPECTED_WITHOUT_BUNDLE"].split():
+              problems.append(f"cases without a bundle: {without}")
+          if len(rows) != int(os.environ["EXPECTED_BUNDLES"]):
+              problems.append(f"expected {os.environ['EXPECTED_BUNDLES']} paired bundles, got {len(rows)}")
+          judged = {r["case_id"] for r in report["results"]}
+          if judged != set(cases):
+              problems.append(f"reader judged {len(judged)} of {len(cases)} cases")
           summary = {"frozen_revision": frozen, "control_fixtures": len(fixtures["cases"]), "control_failures": control,
-                     "bundles": len(rows), "agree": sum(r["agree"] for r in rows), "split": split, "problems": problems}
+                     "cases": len(case_list), "bundles": len(rows),
+                     "observed_effect_binary_agree": sum(r["observed_effect_binary_agree"] for r in rows),
+                     "split": split, "problems": problems}
           (out / "pairing.json").write_text(json.dumps({"summary": summary, "rows": rows}, indent=2, sort_keys=True), encoding="utf-8")
           print(json.dumps(summary, indent=2, sort_keys=True))
           sys.exit(1 if problems else 0)

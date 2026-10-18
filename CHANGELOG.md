@@ -12,6 +12,11 @@ This file lists externally relevant changes by release. Fine-grained development
   verifier at the frozen revision. It records where the two agree on the
   observed effect and fails if the split changes. It is a `REPRODUCTION` and
   advances nothing.
+- The job also asserts the corpus shape at the pinned reader: 23 unique
+  cases, 22 paired bundles, and `no_execution_bundle` as the only case
+  without one. The split alone stayed green if bundles went missing. The
+  agreement it reports is named `observed_effect_binary_agree`, because it
+  compares only REMORA's `EFFECT_VERIFIED` with the reader's `ESTABLISHED`.
 ### Flow control IFC-02b (`POST /v1/contexts`)
 
 - `POST /v1/contexts` mints a flow context for the authenticated principal
