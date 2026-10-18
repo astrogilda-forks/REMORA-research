@@ -285,6 +285,14 @@ Two server-side authorities cut into `/v1/assess`'s caller freedom:
   clamp is recorded in `ToolCallAssessment.floored`, never silent. The
   floor clamps explicit declarations only; unset fields stay unset and
   the engine fail-closes on them.
+- Registry labels only, on the library path (PRF-040, 2026-10-18).
+  `assess_tool_call` and `what_if_tool_call` take `registry=`, a mapping
+  from tool name to `risk_tier`/`action_type`. Labels the caller passes or
+  name inference fills are capped: an ACCEPT becomes VERIFY with the reason
+  `caller_labels_untrusted`. A tool a supplied registry does not name is
+  assessed as critical/unknown. `ToolCallAssessment.label_source` records
+  the source, and `should_execute` is True only for ACCEPT with
+  `label_source == "registry"`.
 
 ---
 

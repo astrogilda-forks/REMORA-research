@@ -38,7 +38,7 @@ outbox state -> downstream effect
 effect verification -> tenant audit chain
 ```
 
-`POST /v1/execution/*` is the enforcing surface. `assess_tool_call(...)` is advisory unless downstream execution is forced through the governed dispatcher.
+`POST /v1/execution/*` is the enforcing surface. `assess_tool_call(...)` is advisory unless downstream execution is forced through the governed dispatcher, and it reaches ACCEPT only on labels from its `registry=` argument (PRF-040).
 
 Jev, TypeSafe's typed semantic-judgment model, enters only through `remora/decision_providers/enrich.py` and, on the enforcing path, only in shadow (`servers/semantic_shadow.py`). It informs and never authorises; see [docs/integrations/jev_decision_provider.md](docs/integrations/jev_decision_provider.md).
 

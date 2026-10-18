@@ -4,6 +4,39 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Breaking: library labels need a registry to reach ACCEPT (PRF-040)
+
+- `assess_tool_call` and `what_if_tool_call` take `registry=`, a mapping
+  from tool name to `risk_tier`/`action_type` (the
+  `REMORA_TOOL_METADATA_FILE` entry shape; `remora.assess.load_tool_registry`
+  reads that file). Before this change
+  `assess_tool_call("xfer", {"to": "attacker", "amt": 1e6}, risk_tier="low",
+  action_type="read", trust_score=0.95, phase="ordered")` returned ACCEPT
+  with `should_execute == True`. It now returns VERIFY.
+- Labels passed as `risk_tier=`/`action_type=`, or filled by `infer=True`,
+  can no longer produce ACCEPT. The engine still runs; an ACCEPT is lowered
+  to VERIFY with the added reason `caller_labels_untrusted`, which also
+  appears in the envelope's `policy_triggers`. Code that passed labels as
+  keyword arguments and acted on `should_execute` must pass `registry=`.
+- Next to a registry, a caller `risk_tier` may raise the tier, and a caller
+  `action_type` that differs from the registry caps ACCEPT
+  (`registry_label_conflict`). A tool the registry does not name is assessed
+  as critical/unknown (`tool_not_in_registry`).
+- `ToolCallAssessment` gains `label_source` (`registry`, `caller`,
+  `inferred`, `unregistered`, `none`) and `label_cap`; `to_dict()` carries
+  both. `should_execute` is True only for ACCEPT with
+  `label_source == "registry"`.
+- CLI: `assess`, `explain` and `whatif` take `--registry PATH` and report
+  `label_source`/`label_cap` in `--json`. Without it, an engine ACCEPT is
+  shown as VERIFY, so `assess --exit-code` returns 10 instead of 0 for such
+  calls. `assess --live` applies the same cap to the decision and envelope.
+  The `try` presets take their labels from a demo registry fixed in
+  `remora/cli.py`, so their verdicts are unchanged
+  (`artifacts/demo/whatif_presets_v1.json` regenerates identically).
+- Not changed: the `/v1/execution` path, the engine, hard guards, and the
+  action-gate adapters in `remora/adapters/`, which forward caller labels to
+  a gateway and do not call `assess_tool_call`.
+
 ### Security (Worker effect receipts and agent-control review path, RMR-AUD-004 and RMR-AUD-010)
 
 - **MCP gateway effect read-back checked the tool against itself.** The
@@ -213,6 +246,7 @@ This file lists externally relevant changes by release. Fine-grained development
   docs/09-related-work.md gains §15 and §16 to anchor them.
 - The register's `updated` field moves to 2026-10-17.
 - PRF-043 records that the paper does not cite BFCL.
+
 
 ### Policy COMP-01 (meet composition, P-MONO)
 

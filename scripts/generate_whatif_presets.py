@@ -39,7 +39,7 @@ SAMPLE_LOG = ROOT / "artifacts" / "demo" / "shadow_mode_sample_agent_action_log.
 
 def build() -> dict[str, Any]:
     from remora.assess import assess_tool_call
-    from remora.cli import _TRY_PRESETS
+    from remora.cli import _TRY_PRESETS, _TRY_REGISTRY
     from remora.policy import RemoraDecisionEngine
     from remora.policy.whatif import LEVERS, what_if
 
@@ -49,10 +49,9 @@ def build() -> dict[str, Any]:
     }
     presets = []
     for label, kwargs in _TRY_PRESETS:
+        # Labels come from the demo registry, as in `remora try` (PRF-040).
         assessment = assess_tool_call(
-            kwargs["name"], kwargs["arguments"],
-            risk_tier=kwargs.get("risk_tier"), action_type=kwargs.get("action_type"),
-            target_environment=kwargs.get("target_environment", "prod"),
+            kwargs["name"], kwargs["arguments"], registry=_TRY_REGISTRY,
             trust_score=kwargs.get("trust_score"), phase=kwargs.get("phase"),
         )
         obs = assessment.decision.raw_observation

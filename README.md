@@ -129,17 +129,13 @@ python -m remora doctor                        # check the local configuration
 <details>
 <summary>Library call, and why it is advisory</summary>
 
-`assess_tool_call(...)` evaluates the context the caller supplies. It does not control downstream credentials. For enforcement, route the call through `/v1/execution/*` and make the governed dispatcher the only path to the protected tool.
+`assess_tool_call(...)` evaluates the context the caller supplies. It does not control downstream credentials. Only risk and action labels from a `registry=` the deployment owns can reach ACCEPT; labels passed by the caller can only lower the verdict (PRF-040). For enforcement, route the call through `/v1/execution/*` and make the governed dispatcher the only path to the protected tool.
 
 ```python
 from remora import assess_tool_call
 
-assessment = assess_tool_call(
-    "drop_database",
-    {"db": "prod-main"},
-    risk_tier="critical",
-    action_type="destructive_write",
-)
+REGISTRY = {"drop_database": {"risk_tier": "critical", "action_type": "destructive_write"}}
+assessment = assess_tool_call("drop_database", {"db": "prod-main"}, registry=REGISTRY)
 ```
 
 For external review or pilot work, set `REMORA_RUNTIME_PROFILE=review` or `controlled_pilot`. Those profiles require the Signed ToolSpec and durable-state prerequisites described in the [execution quickstart](docs/deployment/execution-quickstart.md).

@@ -62,13 +62,112 @@ def test_remora_assess_critical_destructive_escalates():
     assert data["decision"]["human_review_required"] is True
 
 
-def test_remora_assess_accepts_low_risk_read_with_trust():
-    """Low-risk read with a high stand-in trust score reaches ACCEPT."""
+def _registry_file(tmp_path: Path) -> str:
+    path = tmp_path / "tools.json"
+    path.write_text(json.dumps({"version": 1, "tools": {
+        "read_file": {"risk_tier": "low", "domain": "files", "action_type": "read"},
+        "xfer": {"risk_tier": "high", "domain": "payments",
+                 "action_type": "financial_write"},
+    }}))
+    return str(path)
+
+
+def test_remora_assess_accepts_low_risk_registry_read_with_trust(tmp_path):
+    """Low-risk read from a registry file with high stand-in trust: ACCEPT."""
     r = _assess("assess", "--name", "read_file", "--arg", "path=/etc/app/config.yaml",
-                "--risk", "low", "--action-type", "read", "--target-env", "staging",
+                "--registry", _registry_file(tmp_path), "--target-env", "staging",
                 "--trust", "0.9", "--phase", "ordered", "--json")
     assert r.returncode == 0, r.stderr
-    assert json.loads(r.stdout)["decision"]["action"] == "accept"
+    data = json.loads(r.stdout)
+    assert data["decision"]["action"] == "accept"
+    assert data["label_source"] == "registry"
+
+
+def test_remora_assess_caller_labels_never_accept():
+    """PRF-040: --risk/--action-type are caller labels; ACCEPT is capped."""
+    r = _assess("assess", "--name", "xfer", "--arg", "to=attacker", "--arg", "amt=1000000",
+                "--risk", "low", "--action-type", "read",
+                "--trust", "0.95", "--phase", "ordered", "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert data["decision"]["action"] == "verify"
+    assert data["label_source"] == "caller"
+    assert data["label_cap"] == "caller_labels_untrusted"
+
+
+def test_remora_assess_text_output_names_the_label_cap():
+    r = _assess("assess", "read_file", "--risk", "low", "--action-type", "read",
+                "--trust", "0.95", "--phase", "ordered", "--no-color")
+    assert r.returncode == 0, r.stderr
+    assert "caller_labels_untrusted" in r.stdout
+    assert "--registry" in r.stdout
+
+
+def test_remora_assess_unknown_tool_in_registry_fails_closed(tmp_path):
+    r = _assess("assess", "mass_update_prices", "--registry", _registry_file(tmp_path),
+                "--risk", "low", "--action-type", "read",
+                "--trust", "0.95", "--phase", "ordered", "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert data["decision"]["action"] != "accept"
+    assert data["label_source"] == "unregistered"
+
+
+def test_remora_assess_bad_registry_is_clean_error(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"version": 1, "tools": {"x": {"risk_tier": "tiny"}}}')
+    r = _assess("assess", "x", "--registry", str(bad))
+    assert r.returncode == 2
+    assert "registry" in r.stderr
+    assert "Traceback" not in r.stderr
+
+
+def test_remora_whatif_honours_registry(tmp_path):
+    r = _assess("whatif", "read_file", "--registry", _registry_file(tmp_path),
+                "--trust", "0.95", "--phase", "ordered", "--target-env", "staging",
+                "--depth", "1", "--json")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    assert data["decision"]["action"] == "accept"
+    assert data["label_source"] == "registry"
+    r = _assess("whatif", "read_file", "--risk", "low", "--action-type", "read",
+                "--trust", "0.95", "--phase", "ordered", "--target-env", "staging",
+                "--depth", "1", "--json")
+    data = json.loads(r.stdout)
+    assert data["decision"]["action"] == "verify"
+    assert data["label_cap"] == "caller_labels_untrusted"
+
+
+def test_live_accept_on_caller_labels_is_capped_in_decision_and_envelope():
+    """PRF-040 for `assess --live`: consensus replaces the stand-in trust, but
+    an ACCEPT on command-line labels is still lowered, envelope included."""
+    import remora.cli as cli
+    from remora.assess import assess_tool_call
+
+    env = assess_tool_call("get_weather", {}, registry={"get_weather": {
+        "risk_tier": "low", "action_type": "read"}}, trust_score=0.95,
+        phase="ordered").envelope
+    assert env.gate.outcome == "accept"
+    pd = {"action": "accept", "reasons": ["ordered_high_trust"], "explanation": "x"}
+    for envelope in (env, env.to_dict()):
+        new_pd, new_env = cli._cap_live_accept(pd, envelope, "caller_labels_untrusted")
+        assert new_pd["action"] == "verify"
+        assert new_pd["human_review_required"] is True
+        assert "caller_labels_untrusted" in new_pd["reasons"]
+        d = new_env.to_dict() if hasattr(new_env, "to_dict") else new_env
+        assert d["gate"]["outcome"] == "verify"
+        assert "caller_labels_untrusted" in d["assessment"]["policy_triggers"]
+    assert pd["action"] == "accept"  # input not mutated
+    blocked = {"action": "escalate", "reasons": []}
+    assert cli._cap_live_accept(blocked, None, "caller_labels_untrusted")[0] is blocked
+
+
+def test_remora_try_read_preset_accepts_on_the_demo_registry():
+    """The presets are classified by REMORA's own demo registry, not by the
+    caller, so the read preset still shows the ACCEPT path."""
+    r = _assess("try", "1", "--no-color")
+    assert r.returncode == 0, r.stderr
+    assert "ACCEPT" in r.stdout
 
 
 def test_remora_assess_prompt_injection_is_blocked():
@@ -126,13 +225,16 @@ def test_remora_version_flag():
     assert any(ch.isdigit() for ch in r.stdout)
 
 
-def test_remora_assess_exit_code_maps_verdict():
+def test_remora_assess_exit_code_maps_verdict(tmp_path):
     esc = _assess("assess", "--name", "drop_database", "--risk", "critical",
                   "--action-type", "destructive_write", "--exit-code", "--json")
     assert esc.returncode == 30, esc.stderr
-    acc = _assess("assess", "--name", "read_file", "--risk", "low", "--action-type",
-                  "read", "--trust", "0.9", "--phase", "ordered", "--exit-code", "--json")
+    acc = _assess("assess", "--name", "read_file", "--registry", _registry_file(tmp_path),
+                  "--trust", "0.9", "--phase", "ordered", "--exit-code", "--json")
     assert acc.returncode == 0, acc.stderr
+    capped = _assess("assess", "--name", "read_file", "--risk", "low", "--action-type",
+                     "read", "--trust", "0.9", "--phase", "ordered", "--exit-code", "--json")
+    assert capped.returncode == 10, capped.stderr
     plain = _assess("assess", "--name", "drop_database", "--risk", "critical",
                     "--action-type", "destructive_write", "--json")
     assert plain.returncode == 0  # exit-code is opt-in

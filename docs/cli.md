@@ -82,11 +82,31 @@ python -m remora assess NAME [--arg KEY=VALUE ...] [options]
 | `--action-type` | e.g. `read` / `deploy` / `destructive_write` (else inferred). |
 | `--target-env` | Target environment (default `prod`). |
 | `--trust`, `--phase` | Stand-in consensus signals (trust must be 0..1). |
+| `--registry PATH` | Tool registry JSON in the `REMORA_TOOL_METADATA_FILE` format. Only labels from it can reach ACCEPT; a tool it does not name fails closed. |
 | `--live` | Real multi-oracle consensus instead of stand-ins (see below). |
-| `--json` | Machine-readable output: `decision`, `trace`, `inferred`. |
+| `--json` | Machine-readable output: `decision`, `trace`, `inferred`, `label_source`, `label_cap`. |
 | `--envelope` | Also print/emit the full auditable DecisionEnvelope. |
 | `--envelope-out PATH` | Write the DecisionEnvelope JSON to PATH (audit artifact). |
 | `--exit-code` | Map the verdict to the exit code (below). |
+
+### Where the labels come from (PRF-040)
+
+`--risk` and `--action-type`, and anything inferred from the name, are
+caller labels. A call labelled by its caller can only lower the verdict: if
+the engine reaches ACCEPT, `assess`, `explain` and `whatif` report VERIFY
+with the reason `caller_labels_untrusted`. To let a call reach ACCEPT, pass
+`--registry FILE`:
+
+```json
+{"version": 1, "tools": {"read_file": {"risk_tier": "low", "domain": "files", "action_type": "read"}}}
+```
+
+With a registry, `--risk` may raise the tier and an `--action-type` that
+disagrees with the registry caps ACCEPT (`registry_label_conflict`). A tool
+the registry does not name is assessed as critical/unknown
+(`label_source: unregistered`). The `try` presets carry labels fixed in
+REMORA's own demo registry, so preset 1 still shows ACCEPT; a custom call
+typed into the menu does not.
 
 ### Exit codes
 
@@ -146,23 +166,29 @@ directly (the CLI delegates to it, so behavior is identical):
 ```python
 from remora import assess_tool_call
 
+REGISTRY = {"drop_database": {"risk_tier": "critical",
+                              "action_type": "destructive_write"}}
 a = assess_tool_call("drop_database", {"db": "prod-main"},
-                     risk_tier="critical",              # from YOUR tool
-                     action_type="destructive_write")   # registry
-if a.should_execute:              # True only on ACCEPT
+                     registry=REGISTRY)            # YOUR tool registry
+if a.should_execute:              # ACCEPT on registry labels only
     run_tool(...)
 audit_log.write(a.envelope.to_dict())   # the canonical DecisionEnvelope
 ```
 
-`a.action` / `a.decision` / `a.trace` / `a.inferred` carry the verdict, full
+`a.action`, `a.decision`, `a.trace` and `a.inferred` carry the verdict, full
 decision report, rule-by-rule trace, and what name inference filled in.
+`a.label_source` says where the labels came from (`registry`, `caller`,
+`inferred`, `unregistered` or `none`) and `a.label_cap` names the reason when
+an ACCEPT was lowered to VERIFY. `remora.assess.load_tool_registry(path)`
+reads a `REMORA_TOOL_METADATA_FILE`-format file into a registry.
 
-**Advisory, not enforcement.** `assess_tool_call` judges the metadata you
-hand it; it is not bound to the callable that will run. Take
-`risk_tier`/`action_type` from a trusted tool registry keyed by callable
-identity; never from the caller, and never from the tool's *name*:
-`infer=True` is for exploration and demos, an inferred verdict has
-`a.advisory == True`, and inference must never drive real execution. The
+Advisory, not enforcement. `assess_tool_call` judges the metadata it is
+given, and the registry binds labels to a tool name, not to the callable that
+will run. Labels passed as `risk_tier=`/`action_type=` or filled by
+`infer=True` cannot produce ACCEPT and `should_execute` stays False for them
+(PRF-040, a breaking change on 2026-10-18). `trust_score`/`phase` are still
+caller-supplied stand-ins; with registry labels they can lift a low-risk read
+to ACCEPT. Argument content is not inspected (PRF-041). The
 enforcement-grade path is the `/v1/execution` API, where metadata is
 resolved server-side and dispatch runs through the `GovernedToolDispatcher`
 under an `ExecutionLease`. Worked registry-based loop:

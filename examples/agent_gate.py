@@ -3,22 +3,20 @@
 """Govern an agent's tool calls — framework-agnostic, registry-based.
 
 The pattern every integration reduces to: for each tool call the agent
-proposes, look up the tool's governance metadata in YOUR registry, ask
-REMORA, execute only on ACCEPT, and keep the envelope as the audit record.
+proposes, hand REMORA the call and YOUR registry, execute only when
+``should_execute`` is True, and keep the envelope as the audit record.
 
-    meta = TOOL_REGISTRY[name]              # unknown tool -> no metadata
-    a = assess_tool_call(name, args, **meta)
-    if a.should_execute:
+    a = assess_tool_call(name, args, registry=TOOL_REGISTRY)
+    if a.should_execute:          # ACCEPT on registry labels only
         run_tool(name, args)
 
-**Where the metadata comes from matters** (external review 2026-07-29 F-04):
-risk_tier / action_type must be bound to the callable's identity in a
-registry the deployment owns — never taken from the caller and never
-guessed from the tool's *name* (`infer=True` is for exploration and demos;
-an inferred verdict has `a.advisory == True` and must not drive real
-execution). The enforcement-grade path is the /v1/execution API, where
-metadata is resolved server-side and dispatch runs through the
-GovernedToolDispatcher under an ExecutionLease.
+**Where the metadata comes from matters** (external review 2026-07-29 F-04,
+PRF-040): risk_tier / action_type come from a registry the deployment owns.
+Labels passed by the caller or guessed from the tool's *name* can never
+produce ACCEPT, and a tool missing from the registry fails closed. The
+enforcement-grade path is the /v1/execution API, where metadata is resolved
+server-side and dispatch runs through the GovernedToolDispatcher under an
+ExecutionLease.
 
 Works the same wherever tool calls come from — OpenAI function-calling,
 LangGraph, CrewAI, AutoGen (worked examples next to this file:
@@ -85,27 +83,19 @@ def main() -> int:
     print("\nGoverning an agent's proposed tool calls (registry-based, offline):\n")
     audit_trail = []
     for name, args, signals in PROPOSED_TOOL_CALLS:
-        meta = TOOL_REGISTRY.get(name)
-        if meta is None:
-            # Not in the registry: we can still ask for an ADVISORY read
-            # (name inference), but an unregistered tool never executes —
-            # high oracle trust cannot substitute for callable identity.
-            a = assess_tool_call(name, args, infer=True, **signals)
-            print(f"  {a.action.upper():9} {name}  "
-                  f"(NOT IN REGISTRY - advisory only, never executed)")
-        else:
-            a = assess_tool_call(name, args, **meta, **signals)
-            reasons = ", ".join(r.value for r in a.decision.reasons[:2])
-            print(f"  {a.action.upper():9} {name}  ({reasons})")
-            if a.should_execute and not a.advisory:
-                run_tool(name, args)
+        # An unregistered tool fails closed (label_source "unregistered");
+        # high oracle trust cannot substitute for a registry entry.
+        a = assess_tool_call(name, args, registry=TOOL_REGISTRY, **signals)
+        reasons = ", ".join(r.value for r in a.decision.reasons[:2])
+        print(f"  {a.action.upper():9} {name}  ({reasons}; labels: {a.label_source})")
+        if a.should_execute:
+            run_tool(name, args)
         audit_trail.append(a.envelope.to_dict())
 
     executed = sum(1 for e in audit_trail if e["gate"]["outcome"] == "accept")
     print(f"\n  {len(audit_trail)} DecisionEnvelopes kept as the audit trail; "
           f"registered ACCEPTs executed, the unregistered tool did not")
-    print(f"  (accepted verdicts: {executed}; execution additionally requires "
-          f"registry-backed metadata)")
+    print(f"  (accepted verdicts: {executed}; only registry labels can reach ACCEPT)")
     print("  (enforcement-grade dispatch: the /v1/execution API + "
           "GovernedToolDispatcher - see docs/cli.md)\n")
     return 0
