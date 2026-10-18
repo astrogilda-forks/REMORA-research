@@ -3,7 +3,7 @@
   "files": {
     "ARCHITECTURE.md": {
       "long_sentence": 8,
-      "meta_governance": 4
+      "meta_governance": 3
     },
     "CLAUDE.md": {
       "meta_governance": 1
@@ -322,12 +322,8 @@
       "long_sentence": 13
     },
     "paper/remora_paper.md": {
-      "long_sentence": 70,
+      "long_sentence": 67,
       "meta_governance": 1
-    },
-    "paper/remora_paper_template.md": {
-      "bold_bullet": 16,
-      "long_sentence": 1
     },
     "workers/agent-control/README.md": {
       "long_sentence": 2

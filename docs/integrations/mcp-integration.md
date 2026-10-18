@@ -133,7 +133,7 @@ That order keeps token use low and makes the session easier to reproduce.
 ```
 Norwegian document (letter, debt collection notice, contract)?
   → remora_verify_legal_citations  — catches hallucinated court decisions (requires DCE)
-  → remora_legal_analysis          — comprehensive legal analysis
+  → remora_legal_analysis          — legal analysis
 
 Single yes/no factual claim?
   → remora_verify_claim
