@@ -4,6 +4,30 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Policy (signal monotonicity, RMR-AUD-003)
+
+- A refusal no review can lift now outranks an ESCALATE. A cross-tenant
+  argument or an unresolved intent provenance stays ABSTAIN, with no review
+  item, when `schema_valid=False`, `adversarial_detected` or
+  `tool_forbidden` also fires. Before, those guards came first and turned
+  the refusal into a review item. `NON_APPROVABLE_REASONS` in
+  `remora/policy/composition.py` names the set, which the OPA adapter
+  already used.
+- The conditional gates compose by meet. An early VERIFY gate
+  (`distribution_shift`, `high_risk_no_evidence`, `oracle_quorum_gate`) no
+  longer hides a later ESCALATE gate such as `rollback_unavailable` or
+  `env_mismatch_escalate`. The trap and minimax gates still yield to the
+  explicit risk matrix, so high-risk production writes stay VERIFY.
+- `ADVERSARIAL_ALWAYS_ESCALATED` accepts ABSTAIN when a non-approvable
+  refusal also applies.
+- Decisions change only toward stricter: 17,166 of 60,000 generated
+  decisions, none looser. C-ext3 (0 of 8,397 episode-arm decisions) and
+  every published count are unchanged.
+- Still open: a risk signal on a call that abstains for lack of evidence
+  opens a review route, and raising a production write from medium to high
+  risk lowers ESCALATE to VERIFY. Both need an owner decision
+  ([ADR](docs/architecture/ADR-flow-meet-composition.md#amendment-2026-10-18-rmr-aud-003)).
+
 ### Security (MCP gateway readiness fails closed)
 
 - The `/mcp` route acted on readiness problems only when the profile was

@@ -92,3 +92,78 @@ monitor or LLM judge, and `protocol_cap` for an RF-04 control protocol.
   R2). The P-MONO violation is still real. The oracle's ESCALATE became the
   engine's VERIFY, which an approver can redeem. The COMP-01 re-score
   measures it with both counts.
+
+## Amendment (2026-10-18): RMR-AUD-003
+
+The R3 audit of master `b64e3cc1` reproduced three ways a risk signal still
+made a decision more executable. Each was reproduced again on `3746bc5d`
+before the change.
+
+1. **A VERIFY gate hid a later ESCALATE gate in the same group.** A critical
+   production write with no rollback ESCALATEs (`rollback_unavailable`).
+   With `distribution_shift_detected` it VERIFIED, because
+   `distribution_shift` comes first in `_CONDITIONAL_GATES`. A high-risk
+   write with an environment mismatch VERIFIED on `high_risk_no_evidence`,
+   which fires on every high or critical call that carries no
+   `evidence_action`, as on `/v1/execution`. That left
+   `env_mismatch_escalate` and `critical_alternative` unreachable there.
+2. **An ESCALATE hard guard hid a refusal review cannot lift.** A
+   cross-tenant argument ABSTAINs with no review item. With
+   `schema_valid=False`, `adversarial_detected` or `tool_forbidden` it
+   ESCALATED and got one, because those guards come first in
+   `hard_guard_floor` and the meet's tie kept the earlier component.
+3. **A risk signal on a call that abstains for lack of evidence opened a
+   review route.** A low-risk read with no trust signal is
+   DEFAULT_SAFE_ABSTAIN. A tainted argument made it VERIFY and
+   `schema_valid=False` made it ESCALATE.
+
+**What changed.**
+- `NON_APPROVABLE_REASONS` (`composition.py`): cross-tenant and unresolved
+  intent provenance, the set the OPA adapter already keeps. Such an ABSTAIN
+  ranks below ESCALATE in the meet, and `hard_guard_floor` is now the meet
+  of every guard that fires. Executability keeps `ABSTAIN ≡ ESCALATE`
+  otherwise.
+- The conditional cap is the meet of every gate that fires. One COMP-01
+  exception stays: `minimax_gate`, `trap_escalate` and `trap_verify` yield
+  to the explicit risk matrix (`production_write_high_or_critical`,
+  `high_risk_no_evidence`, `critical_risk_hard_verify`). Trap reads only
+  the action type, domain and environment the matrix already decides on.
+  Letting it overrule the matrix turned every high-risk production write
+  into ESCALATE, against
+  `test_production_write_matrix_is_explicit_and_conservative`, and it is
+  the same case as the 13 AROMER arena calls above.
+- `ADVERSARIAL_ALWAYS_ESCALATED` accepts ABSTAIN when a non-approvable
+  refusal also applies. Escalating there would open the route the refusal
+  denies. The firewall still blocks, and nothing it flags reaches ACCEPT or
+  VERIFY.
+
+**Measured effect.** Nothing became more executable.
+- On 60,000 generated decisions (30,000 observations, two engine
+  configurations), 17,166 changed. Every change is ESCALATE to a
+  non-approvable ABSTAIN or VERIFY to ESCALATE. The generator draws a
+  cross-tenant argument in a third of observations, so the count does not
+  describe real traffic.
+- C-ext3: 0 of 8,397 episode-arm decisions changed.
+- C-ext4: all 36 published arm-metric counts reproduce
+  (`replay_sealed_cext4.py --at working-tree`).
+- The tool-call benchmark and the other 48 regenerable results reproduce
+  (`reproduce_results.py`, the deterministic round). The COMP-01 AgentHarm
+  re-score, the level-2 post-hoc artifact and the AROMER arena tests pass.
+- The OPA golden cases were not run locally (no `opa` binary); CI's
+  conformance job runs them.
+
+**Open, recorded as strict xfails in `tests/policy/test_signal_monotonicity.py`.**
+- Case 3 is not fixed. The hard guards and the conditional gates are the
+  designed route to a person for calls with no trust signal. A first fix
+  that made every ABSTAIN from the rest of the policy non-approvable failed
+  239 tests, because it removed review from the execution path. Closing it
+  needs an owner decision on what DEFAULT_SAFE_ABSTAIN means. The exploit
+  in RMR-AUD-001 also needs the `/execute` request to differ from the
+  assessed one; the review-path binding is the fix for that half.
+- Raising a production write's risk tier from medium to high lowers it from
+  ESCALATE (trap) to VERIFY (matrix). This was present on master before the
+  change. Which of the two is right is an owner decision.
+- SDD v1.3 §3.9 writes `ABSTAIN ≡ ESCALATE`. This amendment keeps that order
+  and adds a rank below it for refusals no review can lift. On the
+  execution path ESCALATE opens a review item and ABSTAIN does not, so the
+  SDD's tie cannot be read as "equally blocking" there.
