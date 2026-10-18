@@ -155,8 +155,8 @@ kept as the baseline (CLAIM-018, superseded by CLAIM-019).
 Each result cites its claim-register entry, and machine-readable capability
 and boundary declarations state what the system establishes and what it does
 not. The execution chain has not yet been evaluated against attacks. One
-frozen interoperability contract has two independent external reproductions
-under the repository's recorded independence rule; production enforcement
+frozen interoperability contract has two external fixture-level runs that
+meet the repository's independence rule; production enforcement
 remains unestablished and the system is \texttt{SHADOW\_ONLY}.
 \end{abstract}
 
@@ -255,8 +255,9 @@ permission. The reported numbers are tied to committed
 artifacts and their stated scope, not to field validation.
 
 \paragraph{Contributions.} The individual mechanisms are known:
-capabilities with caveats, reference monitors, policy engines and
-tamper-evident logs. The contribution is a systems artifact that integrates
+capabilities with caveats \cite{birgisson2014macaroons}, reference
+monitors \cite{anderson1972planning}, policy engines and tamper-evident
+logs \cite{crosby2009tamper}. The contribution is a systems artifact that integrates
 them and an evaluation method around it. This preprint makes five
 contributions, each
 bound to committed artifacts; Table~\ref{tab:headline} lists the headline
@@ -282,7 +283,8 @@ numbers.
   headline safety number to no component
   (\S\ref{sec:boundary-declarations}, \S\ref{sec:ablation});
 \item frozen interoperability contracts with external run records, one of
-  them independently reproduced, together with contract probes and a
+  them with two external fixture-level runs that meet the repository's
+  independence rule, together with contract probes and a
   formal model contributed to an external federation transport
   (\S\ref{sec:federation}).
 \end{enumerate}
@@ -469,8 +471,11 @@ never become enforcement rules, and the learning layer (AROMER) is
 monotonicity-tested to \emph{never weaken} policy
 (\path{tests/policy/test_governance_intelligence_never_weakens_policy.py}),
 whereas AgentTrust's distillation pipeline makes learned judgments
-load-bearing for enforcement; (2) uncertainty is structural (multi-oracle
-disagreement with conformal abstention), not a single judge's confidence;
+load-bearing for enforcement; (2) on the research path uncertainty is
+structural (multi-oracle disagreement with conformal abstention), not a
+single judge's confidence, while on the governed path these signals are
+left unset and decisions rest on deterministic policy
+(\S\ref{sec:observables-limits});
 (3) every decision emits a DecisionEnvelope, which the API path
 finalizes into a tenant-scoped hash chain and HMAC-signs when a signing
 key is configured.
@@ -510,8 +515,9 @@ and the honest boundary of every internal benchmark claim in this paper.
 Greenblatt et al.\ (2024) \cite{greenblatt2024aicontrol} formalize safety
 protocols that remain effective when the policy model itself is
 intentionally subversive, using trusted monitoring with a limited audit
-budget. In that taxonomy REMORA is a trusted-monitoring protocol with a
-deterministic trusted floor. The hard-block layer and the authority-bound
+budget. REMORA is related to the trusted-monitoring protocols of that
+taxonomy and adds a deterministic trusted floor. The hard-block layer and
+the authority-bound
 execution chain are the trusted components, the oracle swarm is a set of
 weaker trusted monitors, and \textsc{escalate} spends the audit budget. Two
 properties of the design are the control-relevant ones. Within the declared
@@ -519,8 +525,8 @@ custody profile the untrusted agent never holds the material that mints
 authority, and no model output, its own or a monitor's, can clear a hard
 block. Resampling and defer-to-trusted protocols from the control literature
 are implemented as a library (\path{remora/governance/control_protocols.py},
-roadmap item RF-04) and are not wired into the decision path. The threat
-model evaluated here covers injection and oracle compromise. A strategically
+roadmap item RF-04) and are not wired into the decision path.
+Section~\ref{sec:threat-model} states the threat model. A strategically
 subversive agent, collusion between monitors and monitor evasion remain
 open items for the red-team plan, and the benchmarks in
 \S\ref{sec:results} do not measure them.
@@ -550,7 +556,8 @@ rather than introducing a new layer type.
 A 2026 line of work moves the control point from pre-action screening to
 the authorization and evidence of execution itself. AIRGuard
 \cite{qin2026airguard} names \emph{authority confusion} (untrusted
-context may inform reasoning but must not authorize side effects) and
+context may inform reasoning but must not authorize side effects), a form
+of the confused-deputy problem \cite{hardy1988confused}, and
 enforces least privilege as action-time authorization. Proof-Carrying
 Agent Actions \cite{wang2026pcaa} organizes runtime-neutral governance
 around a portable action certificate with admissibility, approval and
@@ -602,6 +609,54 @@ This is not a question of oracle \emph{accuracy}: REMORA does not
 know whether action $a$ is correct. It is a question of
 \emph{assurance conditions}: whether the conditions that justify
 autonomous execution of $a$ are verifiably met.
+
+\subsection{Threat Model}
+\label{sec:threat-model}
+
+This subsection states the adversary and the trusted computing base that
+the execution-chain claims assume. It draws on
+\path{docs/assurance/threat_model_v1.md}, a STRIDE baseline written before
+the execution layer existed, and on the code paths named in
+\S\ref{sec:execution-chain}.
+
+\paragraph{Attacker position.} The attacker is the agent, or content that
+steers the agent, for example through prompt injection. It acts only by
+proposing calls at the gate: a tool name, arguments, and any labels that
+accompany them. It holds no signing key and cannot edit the tool registry
+or the policy bundle. The model assumes it reaches tools only through the
+governed dispatcher; paths that bypass the dispatcher are out of scope.
+
+\paragraph{Trusted computing base.} The claims hold only if four parties
+are trusted. The ToolSpec author signs the specification that defines what
+an approval covers. The policy author owns the versioned bundle that the
+PDP and the PEP evaluate. The intent source is the deployment component
+that supplies or verifies the task intent and the tool contracts. Key
+custody covers the domains that hold the PDP signing key and the Ed25519
+lease key, which the agent never holds (\S\ref{sec:execution-chain}). The
+policy code, the dispatcher and the audit store belong to the same base,
+and a compromise of any of them is out of scope.
+
+\paragraph{Labels supplied by the agent are untrusted.} A risk tier,
+action type or task intent that arrives with a proposed call is a claim,
+not authority. Where the opt-in enrichment stage runs, an inferred higher
+risk overrides a supplied lower label and never the reverse
+(\S\ref{sec:gov_intel}). Untrusted content that controls a sensitive argument
+escalates whatever risk tier the caller declared
+(\texttt{hard\_guard\_floor()}). A model may propose a task intent, but
+its clauses count only where their quoted spans occur in the task text
+(\S\ref{sec:wrongcall-implication}).
+
+\paragraph{Out of scope.} The model does not cover calls that bypass the
+governed dispatcher through alternate credential, network or execution
+paths, or privileged effects that an authorized tool's implementation can
+reach (\S\ref{sec:boundary-declarations}). It does not cover exfiltration
+composed of individually authorized calls, because REMORA does not track
+data flow (\S\ref{sec:related}). A strategically subversive agent,
+collusion between monitors and monitor evasion are open items for the
+red-team plan. Compromise of the host, the keys, or the ToolSpec, policy
+or intent sources is excluded, as are availability attacks such as
+rate-limit exhaustion. Within this model the execution chain has not yet
+been evaluated against attacks (\S\ref{sec:negative}).
 
 % =====================================================================
 \section{REMORA Architecture}
@@ -984,6 +1039,7 @@ and the retired selection hypothesis are recorded in
 \texttt{NEGATIVE\_RESULTS.md} (\S18, \S38).
 
 \subsection{What these observables do not do}
+\label{sec:observables-limits}
 
 The execution boundary matters more than the research observables.
 
@@ -1029,19 +1085,21 @@ the conditions for deciding are not met. Both \textsc{Abstain} and
 \textsc{Escalate} block execution; \textsc{Escalate} additionally
 triggers a human-review workflow.
 
-\subsection{Hard Blocks (Priority Order)}
+\subsection{Hard Blocks and Policy Gates (Headline Subset)}
 
 \begin{table}[h]
 \centering\small
-\caption{Priority-ordered policy gates: unconditional hard blocks
-  (1--3, \texttt{hard\_guard\_floor()}) and conditional policy gates
-  (4--7, \texttt{\_CONDITIONAL\_GATES}). Both sets take precedence
-  over the probabilistic ACCEPT decision; only the unconditional
-  blocks are evaluated before all routing logic.}
+\caption{A headline subset of the policy gates: unconditional hard blocks
+  (1--3b, \texttt{hard\_guard\_floor()}) and conditional policy gates
+  (4--7, \texttt{\_CONDITIONAL\_GATES}). Rows follow the engine's
+  evaluation order, but other guards run between them, so the numbers
+  give the order within this subset, not a rank in the whole floor. Both
+  sets take precedence over the probabilistic ACCEPT decision; only the
+  unconditional blocks are evaluated before all routing logic.}
 \fitcolumn{%
 \begin{tabular}{@{}clll@{}}
 \toprule
-Pri. & Condition & Reason Code & Action \\
+Ord. & Condition & Reason Code & Action \\
 \midrule
 \multicolumn{4}{@{}l}{\textit{Unconditional hard blocks (\texttt{hard\_guard\_floor()})}} \\
 \midrule
@@ -1449,8 +1507,8 @@ evidence router.
 Resolution rate 38.5\%; evidence-accept precision 100\%;
 false-accept rate on contradiction 0\%; abstain precision 99.3\%.
 Trust-only baseline: 0\% resolution (all escalated).
-A separate deterministic cross-domain evidence benchmark (36 cases over
-cybersecurity, AI governance and financial compliance;
+A separate deterministic cross-domain regression suite (36 author-curated
+cases over cybersecurity, AI governance and financial compliance;
 \path{artifacts/domain_benchmark_results.json}) passes all cases with zero
 critical failures; it measures the rule-based evidence layer, not the NLI
 proxy.
@@ -1463,7 +1521,9 @@ The benchmarks above measure whether a \emph{harmful} call is stopped. This
 track also measures whether a harmless-looking but incorrect call is stopped.
 Track C-ext2 retained five targets that were sealed before evaluation. It
 sampled 258 \texttt{live\_multiple} tasks and 258
-\texttt{live\_irrelevance} tasks from BFCL v4 at upstream commit
+\texttt{live\_irrelevance} tasks from BFCL v4, the Berkeley
+Function-Calling Leaderboard \cite{patil2025bfcl} of the Gorilla project
+\cite{patil2023gorilla}, at upstream commit
 \texttt{6ea57973c7a6} (Apache-2.0). The one permitted evaluation contained
 1{,}527 episodes over 516 source clusters, with an empty state index, no
 validator bindings, and a registry derived only from task schemas.
@@ -2230,8 +2290,8 @@ verifier can run without turning foreign results into execution authority.
 The former is not yet wired into effect verification. External run
 records now exist for the exact-call-binding, fresh-authority and
 effect-evidence contracts (E-ECB, E-FA, E-EE), recorded as not independent.
-The E7 runtime-surface contract has two independent external reproductions
-under the repository's recorded rule, with every boundary-level claim
+The E7 runtime-surface contract has two external fixture-level runs that
+meet the repository's independence rule, with every boundary-level claim
 result still \texttt{NOT\_ESTABLISHED}. Contract
 probes and a formal model from this repository found four findings in an
 external federation transport, all fixed upstream
@@ -2646,6 +2706,41 @@ Michael, A.~E., \& Roesner, F.\ (2026).
 How agents ask for permission: User permissions for AI agents, from
 interfaces to enforcement.
 arXiv:2607.13718.
+
+\bibitem{anderson1972planning}
+Anderson, J.~P.\ (1972).
+Computer security technology planning study.
+Technical Report ESD-TR-73-51, Vol.~II, U.S. Air Force Electronic Systems
+Division.
+
+\bibitem{hardy1988confused}
+Hardy, N.\ (1988).
+The confused deputy (or why capabilities might have been invented).
+\emph{ACM SIGOPS Operating Systems Review}, 22(4), 36--38.
+
+\bibitem{birgisson2014macaroons}
+Birgisson, A., Politz, J.~G., Erlingsson, \'U., Taly, A., Vrable, M., \&
+Lentczner, M.\ (2014).
+Macaroons: Cookies with contextual caveats for decentralized authorization
+in the cloud.
+\emph{NDSS 2014}.
+
+\bibitem{crosby2009tamper}
+Crosby, S.~A., \& Wallach, D.~S.\ (2009).
+Efficient data structures for tamper-evident logging.
+\emph{USENIX Security Symposium 2009}.
+
+\bibitem{patil2023gorilla}
+Patil, S.~G., Zhang, T., Wang, X., \& Gonzalez, J.~E.\ (2023).
+Gorilla: Large language model connected with massive APIs.
+arXiv:2305.15334.
+
+\bibitem{patil2025bfcl}
+Patil, S.~G., Mao, H., Yan, F., Ji, C.~C.-J., Suresh, V., Stoica, I., \&
+Gonzalez, J.~E.\ (2025).
+The Berkeley Function Calling Leaderboard (BFCL): From tool use to agentic
+evaluation of large language models.
+\emph{ICML 2025}.
 
 \end{thebibliography}
 

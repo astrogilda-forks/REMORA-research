@@ -590,9 +590,9 @@ Every reference in [`paper/remora_paper.md`](../../paper/remora_paper.md) with t
 |------|-------|---------|
 | Implemented research line | 8 | present in the codebase |
 | Grounds a module (no dedicated line) | 11 | present in the codebase |
-| Evaluation source | 4 | present in the codebase |
+| Evaluation source | 6 | present in the codebase |
 | Standard, regulation or tool | 4 | no code claim |
-| Related-work positioning only | 40 | no code claim |
+| Related-work positioning only | 44 | no code claim |
 
 ### Implemented research line (8)
 
@@ -627,7 +627,7 @@ Cited in a code docstring as the basis for a module, but not large enough to be 
 | `ville-1939-etude` | none | none | [`remora/selective/confidence_sequence.py`](../../remora/selective/confidence_sequence.py) | Ville's inequality is the martingale bound the sequence rests on. |
 | `vovk-2005-algorithmic` | none | none | [`remora/selective/conformal.py`](../../remora/selective/conformal.py) | none |
 
-### Evaluation source (4)
+### Evaluation source (6)
 
 A dataset or benchmark REMORA is evaluated **on**. Not a method REMORA implements.
 
@@ -636,6 +636,8 @@ A dataset or benchmark REMORA is evaluated **on**. Not a method REMORA implement
 | `andriushchenko-2024-agentharm` | arxiv:2410.09024 | none | [`scripts/run_agentharm_benchmark.py`](../../scripts/run_agentharm_benchmark.py) | AgentHarm external validation (CLAIM-002). Imported historical artifact: it cannot be regenerated from this repository. |
 | `clark-2019-boolq` | none | none | [`remora/benchmarks/extended_v2.py`](../../remora/benchmarks/extended_v2.py) | BoolQ items in the QA benchmark composition. |
 | `lin-2022-truthfulqa` | none | none | [`remora/benchmarks/extended_v2.py`](../../remora/benchmarks/extended_v2.py) | TruthfulQA items in the QA benchmark composition. |
+| `patil-2023-gorilla` | arxiv:2305.15334 | none | [`scripts/build_bfcl_v4_cext4.py`](../../scripts/build_bfcl_v4_cext4.py) | Gorilla project; the upstream repository the BFCL v4 data is pinned from. |
+| `patil-2025-bfcl` | none | none | [`scripts/build_bfcl_v4_cext4.py`](../../scripts/build_bfcl_v4_cext4.py) | Berkeley Function Calling Leaderboard; the BFCL v4 rows behind the sealed routing tracks (CLAIM-018, CLAIM-019, CLAIM-021). |
 | `williams-2018-broad` | none | none | [`experiments/rag_critical_router_v1.py`](../../experiments/rag_critical_router_v1.py) | MultiNLI as the evidence-router proxy benchmark. |
 
 ### Standard, regulation or tool (4)
@@ -649,18 +651,21 @@ Aligned with or integrated, not a research result. Alignment is a mapping claim,
 | `open-2024-open` | url:https://www.openpolicyagent.org/ | none | [`remora/policy/opa_adapter.py`](../../remora/policy/opa_adapter.py) | OPA/Rego adapter, failing closed to the Python engine. |
 | `standards-2021-norsok` | none | none | none | NORSOK D-010 well-barrier framing in the case study. |
 
-### Related-work positioning only (40)
+### Related-work positioning only (44)
 
 Compared against or used as framing in the paper. No code, no evaluation - and that is the honest status, not an oversight.
 
 | Source id | Identifier | Line | Code | Note |
 |-----------|------------|------|------|------|
+| `anderson-1972-computer` | none | none | none | Reference monitor; named as a known mechanism REMORA integrates. |
 | `angelopoulos-2021-gentle` | arxiv:2107.07511 | none | none | Conformal tutorial; framing only. |
+| `birgisson-2014-macaroons` | none | none | none | Macaroons - capabilities with caveats; named as a known mechanism REMORA integrates. |
 | `bloomfield-2010-safety` | none | none | none | none |
 | `chennabasappa-2025-llamafirewall` | arxiv:2505.03574 | none | none | LlamaFirewall - closest industrial system in scope. |
 | `choi-2026-membrane` | arxiv:2606.05743 | none | none | Membrane; contrasted with AROMER's never-weaken constraint. |
 | `chow-1970-optimum` | none | none | none | Origin of the error-reject tradeoff. |
 | `corsi-2021-formal` | none | none | none | none |
+| `crosby-2009-efficient` | none | none | none | Tamper-evident logging; named as a known mechanism REMORA integrates. |
 | `debenedetti-2024-agentdojo` | none | none | none | AgentDojo - named as a required replication target, not run. |
 | `debenedetti-2025-defeating` | arxiv:2503.18813 | none | none | CaMeL; shelf SHELF-008. |
 | `dong-2025-evaluating` | arxiv:2502.11347 | none | none | TEE attestation sketch; hardware integration pending. |
@@ -669,6 +674,7 @@ Compared against or used as framing in the paper. No code, no evaluation - and t
 | `ge-2026-governance` | arxiv:2603.07191 | none | none | none |
 | `guldimann-2024-compl` | arxiv:2410.07959 | none | none | COMPL-AI. |
 | `guo-2017-calibration` | none | none | none | Calibration; REMORA deliberately does not calibrate per-oracle. |
+| `hardy-1988-confused` | none | none | none | Confused deputy; frames AIRGuard's authority confusion. |
 | `inan-2023-llama` | arxiv:2312.06674 | none | none | Llama Guard - content guardrail, contrasted with action gating. |
 | `kadavath-2022-language` | arxiv:2207.05221 | none | none | Self-knowledge; motivates structural over self-reported uncertainty. |
 | `kelly-1998-arguing` | none | none | none | Assurance cases; DecisionEnvelope populates one node. |
