@@ -302,6 +302,8 @@ def test_every_route_is_classified_into_a_surface(monkeypatch) -> None:
         "/v1/envelope/{request_id}", "/v1/audit/{request_id}",
         "/v1/audit/chain/verify", "/v1/review", "/v1/follow-up",
         "/v1/policy/version", "/v1/evidence",
+        # Flow contexts (IFC-02b): no oracle, no retrieval store.
+        "/v1/contexts",
     }
     unclassified = (
         served - api._ASSESS_SURFACE_PATHS - known_execution_and_infra

@@ -125,6 +125,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contexts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mint Context
+         * @description Mint a flow context for the authenticated principal (SDD v1.3 §3.2, IFC-02).
+         *
+         *     The id is minted here, never chosen by the caller, and the context starts
+         *     at the bottom label (a child starts at its parent's label). Processors
+         *     must be authorized for the tenant's data. The mint is recorded on the
+         *     tenant chain. Requires the ``assess`` capability.
+         */
+        post: operations["mint_context_v1_contexts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/envelope/{request_id}": {
         parameters: {
             query?: never;
@@ -949,6 +974,38 @@ export interface components {
              * @description Chain index; null when deferred is true.
              */
             sequence_no?: number | null;
+        };
+        /**
+         * ContextMintRequest
+         * @description Mint a flow context (flow-control SDD v1.3 §3.2, §5.2).
+         *
+         *     The scaffold mints a context before the agent's first turn and passes its
+         *     ``context_id`` on every later call. ``user_principal`` must belong to the
+         *     authenticated tenant (``user://<tenant>/<id>``). ``model_principal`` is
+         *     where the model's context is sent for inference; it and ``q_principal``
+         *     (the quarantined extractor, if any) must be authorized processors under
+         *     the deployment's processing policy. A child context names its parent and
+         *     inherits its label.
+         */
+        ContextMintRequest: {
+            /** Model Principal */
+            model_principal: string;
+            /** Parent Context Id */
+            parent_context_id?: string | null;
+            /** Q Principal */
+            q_principal?: string | null;
+            /** User Principal */
+            user_principal: string;
+        };
+        /**
+         * ContextMintResponse
+         * @description A freshly minted context: its id and its label epoch (0 at mint).
+         */
+        ContextMintResponse: {
+            /** Context Id */
+            context_id: string;
+            /** Label Epoch */
+            label_epoch: number;
         };
         /**
          * DerivationProposal
@@ -1804,6 +1861,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mint_context_v1_contexts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContextMintRequest"];
+            };
+        };
+        responses: {
+            /** @description A fresh context; pass its context_id on every later call. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContextMintResponse"];
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The user principal belongs to another tenant, or a processor may not read this tenant's data (processing_not_authorized). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The parent context is unknown to this tenant and principal (flow_context_unknown). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Flow control is not enabled in this deployment (flow_control_disabled). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description A principal is missing or not canonical. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Flow store unavailable (flow_state_unavailable). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };

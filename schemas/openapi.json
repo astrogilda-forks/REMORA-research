@@ -333,6 +333,75 @@
         "title": "AuditRef",
         "type": "object"
       },
+      "ContextMintRequest": {
+        "additionalProperties": false,
+        "description": "Mint a flow context (flow-control SDD v1.3 §3.2, §5.2).\n\nThe scaffold mints a context before the agent's first turn and passes its\n``context_id`` on every later call. ``user_principal`` must belong to the\nauthenticated tenant (``user://<tenant>/<id>``). ``model_principal`` is\nwhere the model's context is sent for inference; it and ``q_principal``\n(the quarantined extractor, if any) must be authorized processors under\nthe deployment's processing policy. A child context names its parent and\ninherits its label.",
+        "properties": {
+          "model_principal": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Model Principal",
+            "type": "string"
+          },
+          "parent_context_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Context Id"
+          },
+          "q_principal": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q Principal"
+          },
+          "user_principal": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "User Principal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_principal",
+          "model_principal"
+        ],
+        "title": "ContextMintRequest",
+        "type": "object"
+      },
+      "ContextMintResponse": {
+        "description": "A freshly minted context: its id and its label epoch (0 at mint).",
+        "properties": {
+          "context_id": {
+            "title": "Context Id",
+            "type": "string"
+          },
+          "label_epoch": {
+            "title": "Label Epoch",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "context_id",
+          "label_epoch"
+        ],
+        "title": "ContextMintResponse",
+        "type": "object"
+      },
       "DerivationProposal": {
         "additionalProperties": false,
         "description": "One proposed derivation receipt (theme 3): value = transform(span).\n\nA PROPOSAL only — acceptance happens exclusively in\n``remora.toolcall.routing.derivation.verify_receipt``'s deterministic\nre-execution. ``extra=\"forbid\"``: semantic verdicts or any other\nunknown key cannot ride along inside a receipt.",
@@ -1981,6 +2050,98 @@
         "summary": "Get Audit Record",
         "tags": [
           "governance"
+        ]
+      }
+    },
+    "/v1/contexts": {
+      "post": {
+        "description": "Mint a flow context for the authenticated principal (SDD v1.3 §3.2, IFC-02).\n\nThe id is minted here, never chosen by the caller, and the context starts\nat the bottom label (a child starts at its parent's label). Processors\nmust be authorized for the tenant's data. The mint is recorded on the\ntenant chain. Requires the ``assess`` capability.",
+        "operationId": "mint_context_v1_contexts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextMintRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextMintResponse"
+                }
+              }
+            },
+            "description": "A fresh context; pass its context_id on every later call."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The user principal belongs to another tenant, or a processor may not read this tenant's data (processing_not_authorized)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The parent context is unknown to this tenant and principal (flow_context_unknown)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Flow control is not enabled in this deployment (flow_control_disabled)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "A principal is missing or not canonical."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Flow store unavailable (flow_state_unavailable)."
+          }
+        },
+        "summary": "Mint Context",
+        "tags": [
+          "flow"
         ]
       }
     },

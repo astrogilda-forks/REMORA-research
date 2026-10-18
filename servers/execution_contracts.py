@@ -368,6 +368,33 @@ class RevokePrincipalRequest(BaseModel):
     reason: str | None = Field(None, max_length=512)
 
 
+class ContextMintRequest(BaseModel):
+    """Mint a flow context (flow-control SDD v1.3 §3.2, §5.2).
+
+    The scaffold mints a context before the agent's first turn and passes its
+    ``context_id`` on every later call. ``user_principal`` must belong to the
+    authenticated tenant (``user://<tenant>/<id>``). ``model_principal`` is
+    where the model's context is sent for inference; it and ``q_principal``
+    (the quarantined extractor, if any) must be authorized processors under
+    the deployment's processing policy. A child context names its parent and
+    inherits its label.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    parent_context_id: str | None = Field(default=None, min_length=1, max_length=64)
+    user_principal: str = Field(..., min_length=1, max_length=512)
+    model_principal: str = Field(..., min_length=1, max_length=512)
+    q_principal: str | None = Field(default=None, min_length=1, max_length=512)
+
+
+class ContextMintResponse(BaseModel):
+    """A freshly minted context: its id and its label epoch (0 at mint)."""
+
+    context_id: str
+    label_epoch: int
+
+
 class LoopSafetyResetRequest(BaseModel):
     """Start a context's loop safety count again, under a named policy decision.
 
