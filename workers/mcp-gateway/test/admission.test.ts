@@ -316,7 +316,7 @@ describe("deployment configuration", () => {
     const route = source.indexOf('url.pathname !== "/mcp"');
     const admit = source.indexOf("await admitMcp(request, env)", route);
     const ready = source.indexOf("productionReadiness(env)", route);
-    const parse = source.indexOf("body = parseJsonStrict(await request.text())", route);
+    const parse = source.indexOf("new Uint8Array(await request.arrayBuffer())", route);
     expect(route).toBeGreaterThan(-1);
     expect(ready).toBeGreaterThan(route);
     expect(admit).toBeGreaterThan(ready);

@@ -35,6 +35,7 @@ from remora.execution.ports import (
     appender,
     audit_ref,
 )
+from remora.execution.request_ref import RequestRef, request_ref_of
 from remora.governance.audit_outbox import encode_key
 from remora.governance.execution_identity import (
     ExecutionContextProvider,
@@ -271,6 +272,7 @@ def assess_proposal(
     ``servers/semantic_shadow.py``.
     """
     task = task_identity_of(proposal)
+    request_ref = request_ref_of(proposal)
     prior_loop = (
         loop_safety.assess(tenant, task.context_id)
         if loop_safety is not None and task is not None else None
@@ -362,6 +364,9 @@ def assess_proposal(
     if task is not None:
         record["context_id"] = task.context_id
         record["task_id"] = task.task_id
+    if request_ref is not None:
+        record["request_ref"] = request_ref.to_dict()
+        record["request_ref_hash"] = request_ref.digest()
     if context is not None:
         record["execution_context_hash"] = context.digest()
         record["execution_context_canonical"] = context.canonical_bytes().decode("utf-8")
@@ -412,6 +417,14 @@ def assess_proposal(
         # /execute-accepted, which deliberately does not re-run the engine. The
         # conditions the decision was made under are therefore signed into it,
         # or redemption has nothing to check them against (RMR-001).
+        grant_context = authorization_context(
+            tenant=tenant, principal=principal, semantic=semantic,
+            target_environment=proposal.target_environment or "",
+            policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+            toolspec_hash=str(toolspec_identity["hash"]),
+            task=task,
+            request_ref=request_ref,
+        )
         token = PolicyDecisionToken.issue(
             action="accept",
             observation_hash=observation_binding(obs),
@@ -419,15 +432,12 @@ def assess_proposal(
             issued_at=now.isoformat(),
             expires_at=(now + timedelta(seconds=token_ttl_seconds)).isoformat(),
             audience=token_audience,
-            context=authorization_context(
-                tenant=tenant, principal=principal, semantic=semantic,
-                target_environment=proposal.target_environment or "",
-                policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
-                toolspec_hash=str(toolspec_identity["hash"]),
-                task=task,
-            ),
+            context=grant_context,
         )
         record["grant_jti"] = token.jti
+        # The fields the grant's context_hash covers, so an exported grant can
+        # be checked against them without re-deriving any of them.
+        record["authorization_context"] = grant_context.to_dict()
         response["execution_token"] = token.to_dict()
     else:
         with transaction(tenant) as q:
@@ -1370,6 +1380,7 @@ def authorization_context(
     policy_bundle_hash: str,
     toolspec_hash: str,
     task: TaskIdentity | None = None,
+    request_ref: RequestRef | None = None,
 ) -> AuthorizationContext:
     """The conditions a decision is made under, in one place.
 
@@ -1390,6 +1401,11 @@ def authorization_context(
     only when present, so a request that names no task hashes as before, and
     a token issued under one task and redeemed under another is refused as
     ``context_mismatch`` before the grant is consumed.
+
+    ``request_ref`` is the request the call arrived in
+    (:mod:`remora.execution.request_ref`). It enters the hash only when
+    present, by the same rule, so a grant issued for one request is refused,
+    unspent, when its call is re-presented under another.
     """
 
     return AuthorizationContext(
@@ -1402,6 +1418,7 @@ def authorization_context(
         context_id=task.context_id if task is not None else "",
         task_id=task.task_id if task is not None else "",
         execution_context_hash=str(semantic.get("execution_context_hash", "")),
+        request_ref_hash=request_ref.digest() if request_ref is not None else "",
     )
 
 
@@ -1539,13 +1556,17 @@ def redeem_accept_token(
     # being redeemed. Deliberately checked BEFORE consumption, like the payload
     # binding above: a token presented under different conditions must not burn
     # the grant for the conditions it actually authorizes.
+    request_ref = request_ref_of(tool_call)
     current_context = authorization_context(
         tenant=tenant, principal=principal, semantic=semantic,
         target_environment=tool_call.target_environment or "",
         policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
         toolspec_hash=str((toolspec_identity or {}).get("hash", "")),
         task=task_identity_of(tool_call),
+        request_ref=request_ref,
     )
+    request_ref_fields = (
+        {"request_ref_hash": request_ref.digest()} if request_ref is not None else {})
     context_check = token.verify(observation_binding(obs), context=current_context)
     if not context_check.verified and context_check.reason in {
         "context_mismatch",
@@ -1614,6 +1635,11 @@ def redeem_accept_token(
            if obs.execution_context_hash else {}),
         "tool_contract_bundle_hash": semantic["tool_contract_bundle_hash"],
         "intent_authority_hash": semantic["intent_authority_hash"],
+        **request_ref_fields,
+        # The signed grant itself, recorded only now that the gate has
+        # consumed it: a spent grant authorizes nothing, and without it an
+        # export has a jti and no signature to check it against.
+        "grant": token.to_dict(),
     })
     # Unlike the review path, consumption stays ahead of the claim here: the
     # presented token IS the authority, and it must be proven single-use
@@ -1637,6 +1663,7 @@ def redeem_accept_token(
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or token.jti),
         grant_jti=token.jti,
+        report_lease=True,
         **_task_kwargs(tool_call),
     )
 
@@ -1675,6 +1702,7 @@ def redeem_accept_token(
         # receipt may resolve an UNKNOWN dispatch -- a lost response does not
         # mean nothing happened -- so the chain has to carry the distinction.
         "state_unknown": bool(tool_execution.get("state_unknown")),
+        **request_ref_fields,
     }
     envelope_meta = tool_execution.get("result_envelope")
     if envelope_meta:
@@ -1683,6 +1711,11 @@ def redeem_accept_token(
         result_record["result_truncated"] = envelope_meta["truncated"]
     if tool_execution.get("refusal_reason"):
         result_record["tool_refusal_reason"] = tool_execution["refusal_reason"]
+    # The lease the dispatcher acted under, when this process minted it.
+    # Recorded after dispatch, when its nonce is spent.
+    spent_lease = tool_execution.pop("lease", None)
+    if spent_lease is not None:
+        result_record["lease"] = spent_lease
     result_record.update(_nested_effects_fields(tool_execution))
     if settled_before is not None:
         _mark_reported_after_terminal(result_record, settled_before)

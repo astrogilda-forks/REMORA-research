@@ -239,9 +239,15 @@ form. The plan reports both, and states the cluster count.
    record the LF SHA-256 of every file the run depends on in
    `data/control_eval_v1/manifest.json`, with status `locked_never_run`.
 2. The owner registers the plan on OSF.
-3. Run once on the test split. Write raw logs (every proposed call, decision
+3. Stamp the locked manifest and this plan with OpenTimestamps
+   (`python scripts/ots_seal.py stamp artifacts/timestamps/seal_manifest_<date>.json`,
+   procedure in `docs/06-reproducibility.md`) and commit the manifest and its
+   pending `.ots` proof before the first test-split episode. Only the digest
+   goes to the public calendars. Upgrade the proof to its Bitcoin attestation
+   once that exists and commit the upgraded proof (PRF-026).
+4. Run once on the test split. Write raw logs (every proposed call, decision
    and AgentDojo judgement) and the result file. Refuse a second run.
-4. Publish every outcome, met or missed, beside CLAIM-019 and CLAIM-021,
+5. Publish every outcome, met or missed, beside CLAIM-019 and CLAIM-021,
    with misses in NEGATIVE_RESULTS.md.
 
 ## 11. Threats to validity, known now

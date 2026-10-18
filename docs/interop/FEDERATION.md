@@ -121,6 +121,42 @@ v1 packages keep their bytes, their freeze and the external runs against
 them, and the index marks them `superseded_by` with that note. The new cases
 were written with the faults known and are labelled as repair.
 
+### What effect-evidence cannot express (invocation axes, #918)
+
+Probity's `invocation_axes` corpus (`probityai/agent-evidence-vectors` at
+`d2bdacc7`) pins one MCP `tools/call`. It has 23 cases, 22 with an execution
+bundle. Handed to the `effect-evidence-v1` reference verifier at `fe324dd7`,
+19 bundles agree with Probity's reader on the binary observed-effect result.
+On three, the verifier returns `EFFECT_VERIFIED` and the reader does not.
+REMORA reproduced this split locally on 2026-10-18. Each of the three turns
+on a fact the v1 input has no field for:
+
+| Case | Fact the v1 input cannot carry | Already a v1 non-claim? |
+|---|---|---|
+| `bundle_for_other_call` | the call the bundle is bound to (`call_binding`) | yes: "that the observed object is the one the call targeted" |
+| `observation_from_the_tool` | who observed (`observation.source`) | yes: "that the reader is independent of the tool that acted" |
+| `dispatched_after_deny` | the decision captured for the request | no |
+
+So the verifier answers correctly within its contract on all 22 bundles, and
+the contract is narrower than an invocation claim. A v1 `EFFECT_VERIFIED`
+says only that the declared delta was observed after a dispatch. It does not
+say that the dispatch was the invocation in question, that a captured
+decision allowed it, or that someone other than the tool observed it. The
+first two non-claims were already stated. The third, decision
+correspondence, was not, and is stated here as a limit of `effect-evidence-v1`
+and of `effect-evidence-v1.1`, which repairs other comparison faults and not
+this one. `tests/test_effect_evidence_v1_projection_limits.py` pins all three:
+the variants project to identical v1 input and get identical verdicts.
+
+Nothing here changes the frozen package, its lifecycle or its records, and
+none of it is a REMORA runtime result: the experiment never ran REMORA's
+dispatcher. Capture authenticity and capture coverage stay `NOT_ESTABLISHED`,
+and under FED-INV-005 Probity's results confer no REMORA authority. Carrying
+these facts needs a separate, versioned contract with explicit binding rules.
+`integrations/invocation-evidence/` is REMORA's export for its own
+executions: it binds the call and the captured decision under signed keys,
+and it has no observer identity.
+
 The fixtures are the invitation. A project that wants to attack a claim
 implements the contract without REMORA code, adds its own mutation, replay,
 malformed, stale and wrong-subject cases, and publishes an

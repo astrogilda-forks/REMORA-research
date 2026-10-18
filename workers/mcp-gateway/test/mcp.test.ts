@@ -6,9 +6,13 @@
  * that it never reaches a side effect without an authorisation.
  */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseJsonStrict } from "../src/json_numbers";
 import {
   handleRpc,
   PROTOCOL_VERSION,
+  requestRefFor,
   type Deps,
   type PendingProposal,
   type ProposalStore,
@@ -492,4 +496,51 @@ describe("a 200 is not a claim that the tool ran (RMR-006)", () => {
     expect(p.status).toBe("executed");
     expect(p.explanation).toBeUndefined();
   });
+});
+
+describe("request reference", () => {
+  const digest = "ab".repeat(32);
+
+  it("binds the JSON-RPC id text and the body digest into the proposal", async () => {
+    const { deps: d, rec } = deps({ decision: "accept", execution_token: { jti: "j" } });
+    d.bodySha256 = digest;
+    await handleRpc(
+      call("gh_read_issue", { repo: "o/r", number: 1, intent_ref: "o/r#1" }, 7), d);
+    expect(rec.assess[0].request_ref).toEqual({
+      transport: "mcp-streamable-http", jsonrpc_id: "7", body_sha256: digest,
+    });
+    // Re-presented unchanged at redemption, or the grant would refuse.
+    expect(rec.accepted[0].request_ref).toEqual(rec.assess[0].request_ref);
+  });
+
+  it("keeps a string id distinct from a number", async () => {
+    const { deps: d, rec } = deps({ decision: "abstain" });
+    d.bodySha256 = digest;
+    await handleRpc({ ...call("gh_read_issue",
+      { repo: "o/r", number: 1, intent_ref: "o/r#1" }), id: "7" } as any, d);
+    expect(rec.assess[0].request_ref?.jsonrpc_id).toBe('"7"');
+  });
+
+  it("sends no reference without a body digest", async () => {
+    const { deps: d, rec } = deps({ decision: "abstain" });
+    await handleRpc(
+      call("gh_read_issue", { repo: "o/r", number: 1, intent_ref: "o/r#1" }), d);
+    expect(rec.assess[0].request_ref).toBeUndefined();
+  });
+});
+
+describe("request reference id canonical form (shared vectors)", () => {
+  // The same file the Python request_ref and the standalone verifier test.
+  const vectors: { wire: string; canonical: string | null }[] = JSON.parse(
+    readFileSync(join(process.cwd(), "..", "..", "integrations", "invocation-evidence",
+                      "fixtures", "jsonrpc-id-vectors.json"), "utf8")).vectors;
+
+  for (const v of vectors) {
+    it(`id ${v.wire} -> ${v.canonical ?? "no reference"}`, async () => {
+      const body = `{"jsonrpc":"2.0","id":${v.wire},"method":"tools/call","params":{}}`;
+      const req = parseJsonStrict(body) as any;
+      const ref = requestRefFor(req, { bodySha256: "ab".repeat(32) } as Deps);
+      expect(ref?.jsonrpc_id ?? null).toBe(v.canonical);
+    });
+  }
 });
