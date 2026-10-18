@@ -18,6 +18,179 @@ This file lists externally relevant changes by release. Fine-grained development
   dispatch path are unchanged but collapsed below. Next steps are grouped
   by reader: research, code, or another project.
 
+### Research control matrix (RES-023, RES-024)
+
+- RES-023 covers semantic authority for tool routing: declared contracts,
+  a re-derived intent, the UNKNOWN floor and derivation receipts, evaluated
+  on the sealed C-ext3 and C-ext4 BFCL tracks. Its scope limits come from
+  §39, §81, §82 and §83.
+- RES-024 covers authority-preserving effect mediation (NTA-2: mediator,
+  effect domain, custody split). It builds on the confused deputy (Hardy,
+  1988) and object capabilities (Miller, 2006).
+- Both rows are internal designs (`in_code_citation: false`).
+  docs/09-related-work.md gains §15 and §16 to anchor them.
+- The register's `updated` field moves to 2026-10-17.
+- PRF-043 records that the paper does not cite BFCL.
+
+### Policy COMP-01 (meet composition, P-MONO)
+
+- `RemoraDecisionEngine.decide` now returns the least executable of its
+  component groups (`ABSTAIN ≡ ESCALATE < VERIFY < ACCEPT`). The groups are
+  the cascade, the hard-guard floor, the conditional-gate group, and any
+  external `caps` (new reason codes `monitor_cap` and `protocol_cap`).
+  Before, a first-match VERIFY from the taint floor masked a conditional
+  gate's ESCALATE or ABSTAIN, so an ordinary approver could redeem a call
+  another component had sent to a higher authority.
+- Decisions change only in the stricter direction. On a 30,000-observation
+  search in two engine configurations, 1,784 masked decisions were found.
+  The OPA golden cases, the tool-call benchmark, C-ext4 and the AROMER arena
+  are unchanged. One C-ext3 episode moves from VERIFY to ABSTAIN, and no
+  published count changes.
+- §3.9 composes groups, so the order inside `_CONDITIONAL_GATES` is kept. A
+  per-gate meet would have turned 13 benign AROMER arena VERIFYs into false
+  ESCALATEs. `docs/architecture/ADR-flow-meet-composition.md` records this
+  finding.
+- `composition.py` joins the policy bundle hash. `explain()` takes the same
+  caps and shows a `meet_composition` row. P-MONO is checked as a Hypothesis
+  property in `tests/policy/test_meet_composition.py`, and the never-weakens
+  tests cover monitor and protocol caps. The version label stays
+  `RemoraDecisionEngine-v5`; the SDD reserves v6 for the flow rungs.
+### Flow control IFC-03b (ToolSpec v4 at bundle load)
+
+- The ToolSpec bundle loader accepts `schema_version: 4`. A `flow` block in
+  an older bundle is refused (`toolspec_flow_requires_v4`). Every block is
+  parsed and linted at load, so a correctly signed block that breaks a rule
+  does not load (`toolspec_flow_invalid`, `toolspec_flow_lint_failed`).
+  `ToolSpec.flow` carries the parsed block.
+- Under a strict runtime profile with `REMORA_FLOW_CONTROL=1`, startup
+  refuses a bundle in which any spec has no block (FL-13).
+- `remora/flow/label.py` and `remora/flow/spec.py` join the policy bundle
+  hash, which now covers ten files including COMP-01 composition. Every envelope's `policy_bundle_hash`
+  changes value with this release.
+- Contracts touched: three additive reason codes in
+  `schemas/tool_spec_v1.yaml`; `schemas/tool_spec_v4.yaml` is now
+  implemented. Nothing reads `ToolSpec.flow` to decide yet (IFC-05).
+### Flow control IFC-05a (recipients and the flow check)
+
+- `remora/flow/check.py`: `recipients` computes who receives a resolved
+  call's payload from the ToolSpec sink (email, principal, URL host, IBAN,
+  resource ACL, static), plus the provider of a tool outside the TCB. An
+  argument that cannot be mapped to one canonical principal (a display-name
+  address, a URL with user information or a non-http scheme) is unresolved,
+  and the check counts it as a confidentiality violation.
+- `flow_check` returns a `FlowVerdict` with the confidentiality, integrity
+  (including parameter role binding) and control violations of SDD §3.5,
+  and a digest over the violations and the payload label for the lease to
+  bind (§3.8).
+- The four invariant tests the SDD makes mandatory for IFC-05 pass at the
+  level of the check: a TRUSTED parameter handle satisfies
+  `integrity_required` after an untrusted read; the same value retyped does
+  not; a parameter in a field that does not accept its role is refused; and
+  the payload label includes the context label when only handles are passed.
+- Not yet wired: no decision reads the verdict. Rungs F1 to F6 in the
+  decision engine are IFC-05b (protected path).
+
+### Flow control IFC-04a (result labelling and handles)
+
+- `remora/flow/labeler.py`: `FlowLabeler.label_result` gives every node of
+  a JSON tool result a label from the ToolSpec `flow.sources` rules and
+  decides what the model sees. A node is shown by value only when its rule
+  says BY_VALUE and its label flows to the model principal; otherwise it and
+  everything under it becomes one handle labelled with the join of the
+  subtree. Every label is joined with the call's argument labels. The
+  labeler is pure: it returns the rendered result, the label to raise the
+  context by and the handle records to store.
+- `remora/flow/handles.py`: fixed-width `⟦h:…⟧` tokens (80 random bits),
+  records valid only in the minting context and its descendants, and
+  `HandleStore.resolve`, which substitutes handles anywhere in a call's
+  arguments and returns a value label per field (`L_h` for a whole-handle
+  field, `L_ctx ⊔ …` otherwise). A foreign, unknown or expired handle is
+  refused with `flow_handle_invalid`.
+- `remora/flow/render.py`: the agent-facing handle reference, with a type
+  tag taken only from a declared field `type` (new optional key in the
+  ToolSpec v4 block).
+- Two readings of the SDD are stated in the module docstrings. Rules match
+  exact paths and are not inherited. A container's structure carries the
+  container's own label.
+- Not yet wired: no dispatcher calls the labeler (IFC-04b), and handles are
+  held in process only; the durable, encrypted backend follows separately.
+
+### Flow control IFC-03a (ToolSpec v4 `flow` block, parser and linter)
+
+- `schemas/tool_spec_v4.yaml` defines the signed `flow` block: `sources`
+  (how each result field is labelled and whether the model sees it by value
+  or as a handle) and `sink` (who receives the arguments).
+- `remora/flow/spec.py` parses a block into frozen data and refuses any key
+  it does not define (`toolspec_flow_invalid`). Defaults fail closed: an
+  undeclared field is UNTRUSTED, a handle, and readable by the user alone.
+- Thirteen lint rules, FL-01 to FL-13, each with a test. They include the
+  four the SDD names for IFC-03 (a url argument under `recipients: none`, an
+  unknown argument in `integrity_required`, BY_VALUE on undeclared fields, a
+  missing block under the strict profile) and the ones §3.3 and §3.5 assign
+  to the linter.
+- Three fields go beyond the SDD's §5.1 excerpt, because a rule could not be
+  checked without them: `provider` (where the tool runs), `arguments` (the
+  kind of every argument, since the argument schema refuses `format`) and a
+  `disclosure` per source metadata entry. The schema file states why.
+- `scripts/check_toolspec_flow.py [--strict] BUNDLE...` lints a bundle
+  before signing.
+- Not yet wired: the bundle loader does not accept schema version 4 until
+  IFC-03b, so no deployment can carry a block yet.
+### Flow control IFC-02b (`POST /v1/contexts`)
+
+- `POST /v1/contexts` mints a flow context for the authenticated principal
+  and returns `context_id` and `label_epoch`. The caller cannot choose the
+  id, the label or the epoch (extra fields are a 422). A child named by
+  `parent_context_id` starts at its parent's label.
+- **Refusals:** 409 `flow_control_disabled` unless `REMORA_FLOW_CONTROL=1`;
+  403 `principal_mismatch` for a user principal outside the caller's tenant;
+  403 `processing_not_authorized` for a processor the processing policy
+  (`REMORA_FLOW_PROCESSING_POLICY`) does not authorize; 404
+  `flow_context_unknown`; 503 `flow_state_unavailable`. Without a
+  processing policy nothing is authorized.
+- Each mint is recorded on the tenant chain as `flow_context_minted`.
+- The store uses the same three durable switches as the loop-safety store,
+  declared as wiring point ASW-006 for AST-016, and the Postgres cases now
+  run in the CI Postgres job.
+- Contracts touched: `schemas/openapi.json` and the generated TypeScript
+  client gain the route. No existing route changes. Labels are not yet
+  raised by any tool result; that is IFC-03.
+
+### Flow control IFC-02a (context store)
+
+- `remora/flow/context.py` adds `FlowContextStore`, which provides `mint`,
+  `fork`, `load`, `raise_label` and `charge_budget`.
+- **Contexts:** ids are minted server-side (`ctx_` + 128 random bits). A
+  fork inherits its parent's label and shares the root context's budget
+  ledger.
+- **The label:** it only rises, and there is no lowering or reset API. Every
+  raise keeps `flows_to(label, model_principal)`.
+- **Minting:** refused with `processing_not_authorized` unless the
+  deployment's processing policy authorizes each processor.
+- **Event store:** the flow event stream is separate from the loop-safety
+  stream, so a loop reset cannot lower a label. `append_if(expected_seq)`
+  gives exactly one winner per sequence on the in-process, SQLite, Postgres
+  and D1 backends. Concurrency is tested with eight threads on each,
+  Postgres in the CI Postgres job. An unreachable store raises
+  `FlowStoreUnavailable` and never reads as empty.
+- The HTTP route `POST /v1/contexts` follows in IFC-02b (protected path).
+
+### Flow control IFC-01 (label lattice)
+
+- New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).
+  `label.py` implements the SDD §3.1 lattice: `Label(readers, integrity)`,
+  `join`, `leq`, `flows_to`, `BOTTOM`, `canonical_bytes`, and
+  `field_value_label` for §3.4's split between value integrity and context.
+  Reader sets are kept as minimal antichains of
+  `remora.capabilities.resource` patterns. Patterns form a tree, so the
+  pairwise intersection is exact.
+- `schemas/value_label_schema.yaml` documents the label contract and its
+  pinned serialisation.
+- `tests/flow/test_label_lattice.py`: Hypothesis properties for every
+  IFC-01 acceptance law, plus exactness of join for flows. Run with three
+  seeds. Mutation testing with mutmut kills every mutant except five
+  equivalent ones, which the test module names.
+
 ### Research (SAP v7 draft and control-evaluation harness, no model call)
 
 - `docs/assurance/statistical_analysis_plan_v7_control_eval.md` (draft, not

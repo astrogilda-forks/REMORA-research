@@ -1,0 +1,92 @@
+# ToolSpec schema version 4: additions to tool_spec_v3.yaml (IFC-03).
+#
+# Version 4 is version 3 plus one optional, signed block, `flow`, that states
+# how a tool's results are labelled (sources) and where its arguments go
+# (sink). Everything in tool_spec_v1.yaml to tool_spec_v3.yaml applies
+# unchanged. The block sits inside the spec, so the bundle signature and the
+# spec's toolspec_hash cover it with no extra step. A spec that declares
+# `flow` in a bundle with schema_version below 4 is refused
+# (toolspec_flow_requires_v4).
+#
+# Design: docs/design/derived-information-flow-control-v1.md §3.3, §3.5, §5.1.
+# Parser and linter: remora/flow/spec.py. CLI: scripts/check_toolspec_flow.py.
+#
+# Three fields are not in the SDD's §5.1 excerpt. Each closes a hole the
+# excerpt leaves for the linter:
+#   provider:   the SDD refuses `recipients: none` on a tool outside the TCB
+#               and adds the provider as an implicit recipient, but names no
+#               field that says where a tool runs.
+#   arguments:  the SDD refuses a url-typed argument under `recipients: none`.
+#               The v1 argument schema refuses `format`, so the argument's
+#               kind must be declared here, and every argument must declare
+#               one, or the rule could be dodged by saying nothing.
+#   disclosure: the SDD requires the fields a reader set is derived from to be
+#               BY_VALUE, or every decision on that label to charge one bit,
+#               and says the linter enforces one of the two. Each source
+#               metadata entry states which.
+
+schema_version: 4
+extends: tool_spec_v3.yaml
+status: implemented
+implemented_at: "2026-10-18"
+# The bundle loader (remora/toolcall/toolspec.py) accepts schema_version 4,
+# refuses `flow` below it (toolspec_flow_requires_v4), and parses and lints
+# every block at load, so a signed block that breaks a rule does not load
+# (toolspec_flow_invalid, toolspec_flow_lint_failed). FL-13 is checked at
+# startup (remora/toolcall/runtime_profile.py): under a strict profile with
+# REMORA_FLOW_CONTROL=1, a spec without a block refuses the process.
+
+optional_fields:
+  flow:
+    provider: >-
+      REQUIRED. "tcb" for a tool that runs inside the trusted computing base,
+      otherwise the canonical principal of the service that executes it
+      (ext://<host>). That principal sees the arguments and is added to every
+      recipient set (SDD §3.5).
+    arguments: >-
+      REQUIRED. {argument name: {kind: K}} for every property of the
+      argument schema, K one of url, email, iban, resource, principal, text,
+      scalar. No other names.
+    sources:
+      default_integrity: "TRUSTED or UNTRUSTED; absent means UNTRUSTED"
+      default_return_mode: "BY_HANDLE; BY_VALUE is refused (an undeclared field is never rendered by value)"
+      fields: >-
+        list of {path, integrity?, readers?, return_mode?, public_justification?,
+        length_public?, type?}. type is string, bytes, number, list or object;
+        a handle's type tag comes from it only (absent: "value"). path is "$", "$.a.b" or "$[*].a" (a field name or
+        [*] per step). readers is PUBLIC, {static: [patterns]},
+        {from_source_metadata: [names]}, {resource_acl: <argument>} or
+        {inherit_args: true}, each with optional plus_user and
+        plus_processors. Absent readers mean {user_principal}.
+      source_metadata: >-
+        {name: {authority: source_system, from: <text>, disclosure: BY_VALUE
+        or CHARGE_BUDGET}}
+    sink:
+      recipients: >-
+        none, or one of {from_args: {argument: email|principal}},
+        {url_host_of: <argument>}, {iban_of: <argument>},
+        {resource_of: <argument>}, {static: [principals]}
+      payload_args: "list of arguments; absent means all"
+      integrity_required: "list of arguments that must be TRUSTED"
+      roles_accepted: "{argument: [roles]}"
+      control_integrity_required: "bool; absent means false"
+
+lint_rules:
+  FL-01: "an argument of kind url under recipients: none -> refuse"
+  FL-02: "integrity_required, payload_args, roles_accepted or a recipients rule names an unknown argument -> refuse"
+  FL-03: "default_return_mode BY_VALUE (BY_VALUE on an undeclared field) -> refuse"
+  FL-04: "readers PUBLIC without a public_justification -> refuse"
+  FL-05: "a tool that is not read-only and takes a resource argument, without recipients resource_of -> refuse"
+  FL-06: "recipients: none on a tool whose provider is not tcb -> refuse"
+  FL-07: "from_source_metadata naming metadata that is undeclared or not authority: source_system -> refuse"
+  FL-08: "from_source_metadata naming metadata without disclosure BY_VALUE or CHARGE_BUDGET -> refuse"
+  FL-09: "a sink other than none without effect_mode MEDIATED, or effect_mode NONE or absent with a sink other than none -> refuse"
+  FL-10: "an argument of the argument schema without a declared kind, or a declared kind for no argument -> refuse"
+  FL-11: "a tool that is not read-only with recipients: none -> refuse"
+  FL-12: "a from_args kind that differs from the argument's declared kind -> refuse"
+  FL-13: "flow missing under the strict profile -> refuse (at registry load; IFC-03b)"
+
+reason_codes_added:
+  - toolspec_flow_requires_v4
+  - toolspec_flow_invalid
+  - toolspec_flow_lint_failed

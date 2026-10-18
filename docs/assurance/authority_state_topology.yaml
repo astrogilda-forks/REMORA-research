@@ -249,6 +249,37 @@ state:
       in-process store is the bounded LRU used when no durable switch is set;
       strict profiles require one of them.
 
+  - id: AST-016
+    symbol: "remora/flow/context.py::InMemoryFlowEventStore"
+    gates: "A flow context's high-water label, epoch, fork lineage and root budget ledger (flow-control SDD v1.3 §3.2, IFC-02)."
+    on_loss: reauthorizes
+    durable_adapter: "remora/flow/context.py::DurableFlowEventStore"
+    reference_implementation: true
+    wired_at: "servers/execution_api.py::_flow_contexts"
+    note: >-
+      Classed reauthorizes because losing a context's stream resets its label
+      to nothing: data the model had already been shown could then be sent to
+      a recipient the label would have refused, and a spent budget would be
+      spent again. The durable adapter uses the loop-safety store's three
+      backends (REMORA_PG_DSN, REMORA_CHAIN_DB, REMORA_STATE_ENDPOINT) and a
+      conditional append with one winner per sequence. Wired into
+      POST /v1/contexts behind REMORA_FLOW_CONTROL=1 (IFC-02b).
+  - id: AST-017
+    symbol: "remora/flow/handles.py::InMemoryHandleBackend"
+    gates: "The values and labels behind the handles the model holds (flow-control SDD v1.3 §3.4, IFC-04)."
+    on_loss: loses_evidence
+    durable_adapter: none
+    tracking: "docs/design/derived-information-flow-control-v1.md section 3.4 (durable handle store, values encrypted at rest)"
+    note: >-
+      Losing a record makes its handle unknown, and a call that names an
+      unknown handle is refused (flow_handle_invalid), so nothing becomes
+      executable that was refused before. A model that retypes the value
+      as a literal gets the context label for it, which can only be as
+      restrictive or more. What is lost is the data and the record of where
+      it came from. The SDD puts handles on the durable backends with values
+      encrypted under the deployment data key; that backend is not built.
+      Not wired into any route yet.
+
 # THE SWITCHES
 #
 # `switches` names the environment variables the durability guard in
@@ -301,6 +332,12 @@ wiring:
       now reads the endpoint switch to name that case
       (UnbackedExecutionOutbox) and to refuse it in production, and the
       production guard no longer admits the endpoint alone.
+
+  - id: ASW-006
+    for: AST-016
+    symbol: "servers/execution_api.py::_flow_contexts"
+    selects: "the flow context store POST /v1/contexts mints into"
+    switches: [REMORA_PG_DSN, REMORA_CHAIN_DB, REMORA_STATE_ENDPOINT]
 
 # What a PASS from this gate does NOT establish.
 #

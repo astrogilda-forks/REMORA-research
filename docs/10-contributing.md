@@ -27,6 +27,12 @@ One topic should have one canonical source:
 
 Do not add another overview or architecture narrative to avoid editing an existing canonical document.
 
+`python scripts/check_doc_sprawl.py` lists documents that may be sprawl:
+archive copies with nothing of their own, orphans, near-duplicates, stale
+entries and template text. It only reports. The `remora-desprawl` skill
+(`.claude/skills/remora-desprawl/`) says what each signal means and what a
+removal must change in the same commit.
+
 ### Documentation style
 
 Use precise, testable language. Prefer:
