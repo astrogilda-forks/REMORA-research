@@ -110,6 +110,12 @@ paired tests. It re-routes C-ext3 and C-ext4 first and refuses to write
 reproduce. The one exception is the documented C-ext3 drift from commit
 `edd9d144`, which moved no episode into or out of ACCEPT.
 
+`scripts/execution_chain_attack_eval.py --check` reruns the attack
+evaluation of the execution chain (NEGATIVE_RESULTS §84, PRF-015, PRF-041)
+and compares it with `artifacts/posthoc/execution_chain_attack_eval_v1.json`.
+It runs offline in a few seconds, uses no randomness and fails if the
+script changed since the artifact was written.
+
 The `sealed-replay` job in `.github/workflows/ci.yml` runs both replay
 commands and `verify_replication_pack.py --regenerate` on every pull request
 and master push. It uses a fresh full-history clone and only the documented

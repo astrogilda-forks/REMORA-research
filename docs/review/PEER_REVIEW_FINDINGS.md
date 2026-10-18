@@ -259,9 +259,9 @@ conditions?
 | Evidence | §4.4, §10, §2.11 ("covers injection and oracle compromise"). |
 | Affected claims | none (no claim measures the chain) |
 | Action | Level 3: a threat-model section and an attack evaluation against a policy-only gateway baseline. New §13.13 and contribution 1 now state that the chain is not evaluated. |
-| Owning PR | level-1 PR (disclosure); level 3 to follow |
-| Verification | Pending for the evaluation. |
-| Status | OPEN |
+| Owning PR | level-1 PR (disclosure); evaluation in the evidence/execution-chain-attack-eval PR; threat model in #927 |
+| Verification | The attack evaluation exists: `scripts/execution_chain_attack_eval.py`, `artifacts/posthoc/execution_chain_attack_eval_v1.json`, `tests/test_execution_chain_attack_eval.py`, NEGATIVE_RESULTS.md §84. It drives `/v1/execution` (signed ToolSpec bundle, ACCEPT token, review grant, lease, dispatch re-check) and a policy-only gateway that takes the same proposal-time decision. Over replay, argument substitution, ToolSpec redeploy or callable swap, cross-task/actor/tenant reuse, forgery and expiry, REMORA ran 4 of 37 attacks and the gateway 31; 27 ran only on the gateway. REMORA ran all 16 benign controls. The four that ran on REMORA: the review path binds neither the executing actor nor the task, and a risk raise after approval keeps the approval while the fresh decision stays VERIFY. Remaining: the threat-model section (#927), which should cite the artifact; the evaluation is the author's own catalogue in one profile with in-process state and HMAC signing. |
+| Status | IN_PROGRESS |
 
 ### PRF-016 Per-call authorization does not stop attacks composed of allowed calls
 
@@ -584,8 +584,8 @@ conditions?
 | Evidence | Reproduced 2026-10-17 on `bce4bfeb`. Without the labels the same call returns VERIFY. The README states that the library call is advisory and that enforcement is `/v1/execution/*`, where risk comes from a registry keyed by tool name. |
 | Affected claims | none (no claim measures the library path) |
 | Action | Level 3: the threat model must state that labels from the agent are untrusted. The library API should refuse caller labels by default, or mark its result advisory in the type; a test should pin that an untrusted label cannot raise autonomy. |
-| Owning PR | not yet opened (touches `remora/policy/`, a protected path) |
-| Verification | Pending. |
+| Owning PR | fix: branch fix/library-labels-require-registry (touches `remora/policy/`, a protected path) |
+| Verification | Pending for the fix. Measured at master before it in `artifacts/posthoc/execution_chain_attack_eval_v1.json` (NEGATIVE_RESULTS.md §84): R2's `xfer` call with low/read labels and trust 0.95 is accepted and run by an advisory consumer; the raise-only clamp stops four write-named tools; the server path ignored the same labels in 4 of 4 cases. The fix should regenerate the artifact with `--library-label`. |
 | Status | OPEN |
 
 ### PRF-041 No assessment of argument content, so a read tool can exfiltrate
@@ -597,9 +597,9 @@ conditions?
 | Evidence | Reproduced 2026-10-17 on `bce4bfeb`. On the server path, taint comes from a request field the agent can omit. §13.13 of the paper already disclaims trajectory-level and data-flow enforcement. |
 | Affected claims | none |
 | Action | Level 3: put argument-content and destination policy in the threat model, and measure exfiltration in the attack evaluation (PRF-015) against a policy-only and an information-flow baseline. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | evidence/execution-chain-attack-eval PR (measurement) |
+| Verification | Measured in `artifacts/posthoc/execution_chain_attack_eval_v1.json` (`scripts/execution_chain_attack_eval.py`, `tests/test_execution_chain_attack_eval.py`, NEGATIVE_RESULTS.md §84). On `/v1/execution` with `REMORA_LOW_CONSEQUENCE_ACCEPT=1`, `/assess` gives the exfiltrating `http_get` the same ACCEPT as a benign one, and the secret reached the sink in 6 of 6 read-exfiltration and 5 of 5 composed read-then-send attacks, on REMORA and on the policy-only baseline alike. Declaring the untrusted context did not change the decision, because without a semantic bundle it never reaches the observation. The information-flow baseline is `remora.flow.check.flow_check`, applied by the harness and labelled library_only: it refused 10 of 10 and also refused 1 of 4 benign controls. Remaining: argument-content and destination policy in the threat model (#927), and a decision path that reads the flow verdict (IFC-05b); the grounded-read path was not configured and is unmeasured. |
+| Status | IN_PROGRESS |
 
 ### PRF-042 The injection pattern list misses simple paraphrases
 

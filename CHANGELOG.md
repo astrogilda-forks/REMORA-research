@@ -164,6 +164,20 @@ This file lists externally relevant changes by release. Fine-grained development
 - `local.env`, which holds the experiment API key, is now in the committed
   `.gitignore`.
 
+### Evidence (execution-chain attack evaluation, PRF-015 and PRF-041)
+
+- `scripts/execution_chain_attack_eval.py` writes
+  `artifacts/posthoc/execution_chain_attack_eval_v1.json` (status
+  `post_hoc_descriptive`): 52 attacks and 16 benign controls against
+  `/v1/execution`, a policy-only gateway with the same proposal-time
+  decision, the library flow check (library_only) and the advisory library
+  path at master before the PRF-040 fix. Scoring is by the tool body's side
+  effect, not the API verdict.
+- REMORA ran 4 of 37 chain attacks (replay, substitution, ToolSpec change,
+  cross-context reuse, forgery, expiry) and the gateway 31. The secret
+  reached the sink in all 11 exfiltration attacks on both. NEGATIVE_RESULTS
+  §84 has the table and the four chain attacks REMORA did not stop.
+
 ### Evidence (peer-review level 2: post-hoc re-analysis, no sealed number changed)
 
 - `scripts/peer_review_posthoc.py` writes
