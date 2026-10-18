@@ -4,6 +4,25 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow control IFC-02a (context store)
+
+- `remora/flow/context.py` adds `FlowContextStore`, which provides `mint`,
+  `fork`, `load`, `raise_label` and `charge_budget`.
+- **Contexts:** ids are minted server-side (`ctx_` + 128 random bits). A
+  fork inherits its parent's label and shares the root context's budget
+  ledger.
+- **The label:** it only rises, and there is no lowering or reset API. Every
+  raise keeps `flows_to(label, model_principal)`.
+- **Minting:** refused with `processing_not_authorized` unless the
+  deployment's processing policy authorizes each processor.
+- **Event store:** the flow event stream is separate from the loop-safety
+  stream, so a loop reset cannot lower a label. `append_if(expected_seq)`
+  gives exactly one winner per sequence on the in-process, SQLite, Postgres
+  and D1 backends. Concurrency is tested with eight threads on each,
+  Postgres in the CI Postgres job. An unreachable store raises
+  `FlowStoreUnavailable` and never reads as empty.
+- The HTTP route `POST /v1/contexts` follows in IFC-02b (protected path).
+
 ### Flow control IFC-01 (label lattice)
 
 - New package `remora/flow/` (EXPERIMENTAL, not wired into any decision).

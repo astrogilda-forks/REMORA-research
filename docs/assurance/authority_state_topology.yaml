@@ -249,6 +249,21 @@ state:
       in-process store is the bounded LRU used when no durable switch is set;
       strict profiles require one of them.
 
+  - id: AST-016
+    symbol: "remora/flow/context.py::InMemoryFlowEventStore"
+    gates: "A flow context's high-water label, epoch, fork lineage and root budget ledger (flow-control SDD v1.3 §3.2, IFC-02)."
+    on_loss: reauthorizes
+    durable_adapter: "remora/flow/context.py::DurableFlowEventStore"
+    reference_implementation: true
+    note: >-
+      Classed reauthorizes because losing a context's stream resets its label
+      to nothing: data the model had already been shown could then be sent to
+      a recipient the label would have refused, and a spent budget would be
+      spent again. The durable adapter uses the loop-safety store's three
+      backends (REMORA_PG_DSN, REMORA_CHAIN_DB, REMORA_STATE_ENDPOINT) and a
+      conditional append with one winner per sequence. Not wired into any
+      route yet; IFC-02b wires it behind REMORA_FLOW_CONTROL.
+
 # THE SWITCHES
 #
 # `switches` names the environment variables the durability guard in
