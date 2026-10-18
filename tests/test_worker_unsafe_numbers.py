@@ -98,7 +98,7 @@ DUPLICATE_BODIES = [
 def test_the_worker_refuses_exactly_the_members_the_api_ingress_refuses(tmp_path) -> None:
     """The Worker collapses a repeated member before forwarding, so the API's
     json_duplicate_member check never sees it. The edge has to refuse the
-    same bodies the API would (NEGATIVE_RESULTS §85)."""
+    same bodies the API would (NEGATIVE_RESULTS §86)."""
     from servers.strict_json_ingress import StrictJsonRefusal, admit_strict_json
 
     def api_refuses(body: str) -> bool:

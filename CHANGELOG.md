@@ -4,7 +4,7 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
-### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §85)
+### Security (Worker edge refuses repeated JSON members, NEGATIVE_RESULTS §86)
 
 - Both Workers parsed request bodies with `JSON.parse`, which keeps the last
   value of a repeated member, and re-serialised the call without the
@@ -13,8 +13,8 @@ This file lists externally relevant changes by release. Fine-grained development
   call. `parseJsonStrict` (byte-identical in `mcp-gateway` and
   `agent-control`) now refuses a repeated member name after decoding, and
   both edges answer it as they answer an unsafe number.
-- `NEGATIVE_RESULTS.md` §84 (open) records that `EFFECT_VERIFIED` does not
-  attribute the observed delta to the dispatch; §85 (accepted) records this
+- `NEGATIVE_RESULTS.md` §85 (open) records that `EFFECT_VERIFIED` does not
+  attribute the observed delta to the dispatch; §86 (accepted) records this
   finding and its fix.
 - Three adversarial probes hold, each pinned by a test:
   - P1: a batch member's grant does not redeem for its sibling, although

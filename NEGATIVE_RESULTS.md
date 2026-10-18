@@ -138,7 +138,7 @@ cites only `open` sections and that no `open` section is missing a theme.
    CLAIM-002 score separates globally but not below 10 % false blocks. The
    harness's oracle arms never reached the engine. Measuring this needs a
    graded evidence channel and fresh paired data, not the spent artifacts.
-16. **Effect evidence attributes nothing to the dispatch** (§84):
+16. **Effect evidence attributes nothing to the dispatch** (§85):
    `EFFECT_VERIFIED` says the declared delta was observed, not that this
    dispatch produced it. Under every rule except `version_increment` a delta
    that was already true, or that another writer made, verifies the same way.
@@ -5041,7 +5041,7 @@ fact against the four arms.
 - SAP v7 must pre-register clustered bounds, and score naive and external
   baselines on the same episodes.
 
-## §84 EFFECT_VERIFIED does not attribute the observed delta to the dispatch (2026-10-18)
+## §85 EFFECT_VERIFIED does not attribute the observed delta to the dispatch (2026-10-18)
 <!-- finding-status: open -->
 
 **Status:** a stated limit, found by reading the code against its design text
@@ -5088,7 +5088,7 @@ field, or a target-side operation id or revision that the dispatch returns
 and the reader confirms. Until then, causal attribution is NOT_ESTABLISHED
 for every effect REMORA verifies.
 
-## §85 The Worker edge collapsed repeated JSON members before the API could refuse them (2026-10-18)
+## §86 The Worker edge collapsed repeated JSON members before the API could refuse them (2026-10-18)
 <!-- finding-status: accepted -->
 
 **Status:** found and fixed in the same change. The fix is the edge refusing,

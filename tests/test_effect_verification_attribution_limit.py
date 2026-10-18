@@ -1,6 +1,6 @@
 # Author: Stian Skogbrott
 # SPDX-License-Identifier: BUSL-1.1
-"""What EFFECT_VERIFIED does not attribute (NEGATIVE_RESULTS §84).
+"""What EFFECT_VERIFIED does not attribute (NEGATIVE_RESULTS §85).
 
 The module's design rule says to compare the declared delta "against the
 version your own write produced". ``verify_declared_delta`` takes no prior
