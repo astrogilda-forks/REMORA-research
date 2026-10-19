@@ -218,6 +218,7 @@ Several topics have more than one document. This table says which to open.
 | [statistical_analysis_plan_v5_bfcl_semantic.md](assurance/statistical_analysis_plan_v5_bfcl_semantic.md) | Pre-registered BFCL semantic-authority confirmation (C-ext3; executed 2026-08-19, 3 of 7 targets met, CLAIM-019) |
 | [statistical_analysis_plan_v6_bfcl_utility.md](assurance/statistical_analysis_plan_v6_bfcl_utility.md) | Pre-registered BFCL utility track (C-ext4; executed 2026-10-17, 8 of 8 targets met, CLAIM-021) |
 | [statistical_analysis_plan_v7_control_eval.md](assurance/statistical_analysis_plan_v7_control_eval.md) | Draft pre-registration: defences against an untrusted Claude agent on AgentDojo, plus addenda for InjecAgent (PRF-042) and external routing baselines on BFCL multi-turn (PRF-011) (not registered, not run) |
+| [ws1_composition_study_v1.md](assurance/ws1_composition_study_v1.md) | Draft preregistration of WS1 Study B (#953): evidence-directed verification against H0 and H-DET; not sealed, only the synthetic fake run exists |
 | [rebenchmark_protocol_v1.md](assurance/rebenchmark_protocol_v1.md) | Rebenchmark protocol |
 | [experiment_manifest_spec_v1.md](assurance/experiment_manifest_spec_v1.md) | Experiment manifest specification |
 | [artifact_provenance_spec_v1.md](assurance/artifact_provenance_spec_v1.md) | Artifact provenance specification |

@@ -4,6 +4,25 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1 on the execution path and the Study B harness (#953, WP4 and WP5)
+
+- `REMORA_WS1_MODE` (`off` by default, `shadow`, `enforce`) with
+  `REMORA_WS1_DEPLOYMENT_MODULE` runs the WS1 gate on `/v1/execution/assess`
+  after every other component. Shadow records it and changes nothing. Enforce
+  makes any WS1 cap an ABSTAIN and binds `ws1_binding_hash` into the ACCEPT
+  token's authorization context. `/execute-accepted`, `/execute` and the async
+  worker re-run the gate with fresh lookups before consumption and refuse with
+  `ws1_regate_refused`. Enforce refuses startup without flow control and named
+  evidence for the prerequisite IFC work packages.
+- The execution core sees the gate only through `Ws1GatePort`
+  (`remora/execution/ports.py`); `AuthorizationContext` gains the optional
+  `ws1_binding_hash`, omitted from the hash when empty, so existing tokens
+  hash as before.
+- Study B draft preregistration (`docs/assurance/ws1_composition_study_v1.md`),
+  a draft manifest and guards that refuse a paid or holdout run before any data
+  or provider call, the analysis, and a synthetic fake run
+  (`artifacts/ws1/fake_run_v1.json`, not a result). Nothing is sealed.
+
 ### WS1 execution preconditions and monitor composition (#953, library only)
 
 - `remora/verification/` compiles a deployment-owned requirement set per

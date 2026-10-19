@@ -1,0 +1,36 @@
+{
+  "budget": null,
+  "frozen_sha256": {
+    "docs/assurance/ws1_composition_study_v1.md": "1c83bcd1f36ec623eb762fa518e60f014b29dd5d5064db4311919ba833e8e7a1",
+    "experiments/control_eval/metrics.py": "580efb69e0ee5f4a9e8a8766e5e4c167db627a116e43a1b7c340d965ae1af462",
+    "experiments/ws1_composition/analysis.py": "f30f841c9a6cb902362adada8199bb1693f1b4546426873da88c8e9677c00181",
+    "experiments/ws1_composition/simulator.py": "3ce5320b0e9aba3720369d9e55333dc19d00d324a3cd87a44fe69ab0c46bbd6f",
+    "experiments/ws1_composition/study.py": "37c6ef55bf4efc0baefc79dd08a1898256c6d338a6ef2611b7c1e529b47c217b",
+    "remora/decision_providers/composition_adapter.py": "68543eb92255c294e25e114991c9f9aaff988a7615c3be60d8cb7790cb2180cd",
+    "remora/policy/composition.py": "25e662e87aed1f8b94cf55517fee50299b5aeb7e33bfba0bcbee8ac7906261bb",
+    "remora/verification/check.py": "87e04f8e481aca7834733c8cb03936404ed7fce2320b16d93403e77b1d218622",
+    "remora/verification/compose.py": "97d84ea9daf501b9d9134b9a0092dec6fca562edbed8802c405ed3e0d963e46b",
+    "remora/verification/planner.py": "eb7cf6dd944a049020be33e21d745b2e402a2b789041d6136aaabcbc3a166df0",
+    "remora/verification/preconditions.py": "c9ef79e4864639f074e194026d447575d50b9a71c0a77d05ed433b4970bb1609",
+    "remora/verification/registry.py": "b4c8563445ea277be391c40ea3b0a91d72813d1500d8fa2058619b1c388942f2"
+  },
+  "holdout": null,
+  "models": [],
+  "n_boot": 10000,
+  "note": "Draft. frozen_sha256 is a snapshot for drift checks; sealing rewrites it at the sealing commit.",
+  "owner_decisions_pending": [
+    "models_and_prices",
+    "cost_cap",
+    "monitor_prompt_and_question_set",
+    "thresholds",
+    "agentdojo_requirement_set_and_resolvers",
+    "power_simulation",
+    "holdout_definition",
+    "osf_registration"
+  ],
+  "plan": "docs/assurance/ws1_composition_study_v1.md",
+  "schema": "remora-ws1-study-manifest/v1",
+  "seed": 20261019,
+  "status": "draft",
+  "study": "WS1 composition study v1 (Study B)"
+}
