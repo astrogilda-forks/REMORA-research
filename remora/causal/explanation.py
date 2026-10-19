@@ -61,6 +61,7 @@ REASON_TO_LABEL: dict[str, str] = {
     "flow_confidentiality_violation": "Payload would reach a recipient outside its readers",
     "flow_integrity_violation_verify": "Untrusted data controls an integrity-required field",
     "flow_integrity_violation_escalate": "Untrusted data controls an integrity-required field at critical risk",
+    "precondition_cap":          "A required execution precondition is not proved (WS1 record names which)",
 }
 
 # Maps DecisionReason values to the PolicyObservation field(s) that trigger them.

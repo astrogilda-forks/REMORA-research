@@ -152,6 +152,9 @@ class DecisionReason(str, Enum):
     # capped the decision below what the engine's own components allowed.
     MONITOR_CAP                   = "monitor_cap"                   # a learned monitor or LLM judge
     PROTOCOL_CAP                  = "protocol_cap"                  # an RF-04 control protocol
+    # WS1 (issue #953): a required execution precondition is not PROVED.
+    # remora/verification/compose.py; the detailed cause stays in the WS1 record.
+    PRECONDITION_CAP              = "precondition_cap"
 
 
 @dataclass(frozen=True)

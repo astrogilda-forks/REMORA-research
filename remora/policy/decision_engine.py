@@ -1035,8 +1035,9 @@ class RemoraDecisionEngine:
         with a refusal no review can lift below all of them). A cascade decision that no
         component undercuts is returned unchanged, reasons included. When one
         does, its action wins and its reason is appended, so the audit record
-        keeps the first-match reason too. External caps must carry
-        ``MONITOR_CAP`` or ``PROTOCOL_CAP``; a cap can never raise a decision.
+        keeps the first-match reason too. External caps must carry a reason in
+        ``EXTERNAL_CAP_REASONS`` (``MONITOR_CAP``, ``PROTOCOL_CAP``,
+        ``PRECONDITION_CAP``); a cap can never raise a decision.
         """
         for cap in caps:
             if cap.reason not in EXTERNAL_CAP_REASONS:
