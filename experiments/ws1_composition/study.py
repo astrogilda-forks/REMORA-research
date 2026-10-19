@@ -6,9 +6,9 @@ one way: ``draft`` -> ``sealed_never_run`` -> ``locked_never_run`` ->
 ``evaluated``, as in the C-ext3/C-ext4 runners. What each purpose needs:
 
 * ``fake``: nothing. Synthetic simulator only; no data split, no provider.
-* ``pilot``: a paid development run. Every frozen file must match, and the
-  manifest must name a cost cap, a price for every model and worst-case
-  tokens per call. A pilot never opens the holdout.
+* ``pilot``: a paid development run. Status ``pilot_ready``, every frozen
+  file matching, and the manifest naming a cost cap, a price for every model
+  and worst-case tokens per call. A pilot never opens the holdout.
 * ``holdout``: status ``locked_never_run``, every frozen file and the
   holdout file matching their recorded hashes, and the budget block above.
 
@@ -37,6 +37,13 @@ SCHEMA = "remora-ws1-study-manifest/v1"
 FROZEN_FILES = (
     "docs/assurance/ws1_composition_study_v1.md",
     "experiments/ws1_composition/analysis.py",
+    "experiments/ws1_composition/isp_study/__init__.py",
+    "experiments/ws1_composition/isp_study/agents.py",
+    "experiments/ws1_composition/isp_study/authority.py",
+    "experiments/ws1_composition/isp_study/defence.py",
+    "experiments/ws1_composition/isp_study/domain.py",
+    "experiments/ws1_composition/isp_study/runner.py",
+    "experiments/ws1_composition/isp_study/study_b.py",
     "experiments/ws1_composition/simulator.py",
     "experiments/ws1_composition/study.py",
     "experiments/control_eval/metrics.py",
@@ -111,6 +118,8 @@ def require_ready(manifest: Mapping[str, Any], purpose: str, root: Path = ROOT) 
     problems = _budget_problems(manifest)
     if problems:
         raise StudyRefused(f"a paid run needs {problems} in the manifest")
+    if purpose == "pilot" and status not in ("pilot_ready", "locked_never_run"):
+        raise StudyRefused(f"a pilot needs status pilot_ready, not {status!r}")
     if purpose == "holdout":
         if status != "locked_never_run":
             raise StudyRefused(f"holdout needs status locked_never_run, not {status!r}")

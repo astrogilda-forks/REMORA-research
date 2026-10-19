@@ -101,12 +101,21 @@ def test_a_changed_holdout_refuses_and_a_spent_manifest_stays_spent(tree, tmp_pa
         load_manifest(tmp_path / "missing.json")
 
 
-def test_the_committed_manifest_is_a_draft_that_allows_no_paid_run():
+def test_the_committed_manifest_opens_no_holdout_before_it_is_locked():
     manifest = load_manifest()
-    assert manifest["status"] == "draft" and manifest["owner_decisions_pending"]
-    for purpose in ("pilot", "holdout"):
+    status = manifest["status"]
+    assert status in ("draft", "pilot_ready", "locked_never_run", "evaluated",
+                      "not_run_insufficient_budget")
+    if status in ("draft", "pilot_ready", "not_run_insufficient_budget"):
         with pytest.raises(StudyRefused):
-            require_ready(manifest, purpose)
+            require_ready(manifest, "holdout")
+    if status == "draft":
+        with pytest.raises(StudyRefused):
+            require_ready(manifest, "pilot")
+    if status == "evaluated":
+        for purpose in ("pilot", "holdout"):
+            with pytest.raises(StudyRefused):
+                require_ready(manifest, purpose)
 
 
 def test_h3_ineligible_is_reported_uninformative():

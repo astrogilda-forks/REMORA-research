@@ -33,7 +33,8 @@ class PredicateSpec:
     """One predicate a tool's calls need.
 
     ``subject_argument`` names the call argument the predicate is about (the
-    port, the recipient, the invoice). ``None`` makes the tenant the subject.
+    port, the recipient, the invoice). ``None`` makes the tenant the subject,
+    and ``"@intent"`` the server-resolved intent authority (the work order).
     """
 
     predicate_id: str

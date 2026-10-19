@@ -1,0 +1,4 @@
+# Study B paid runs (scripts/run_ws1_study.py --pilot / --holdout).
+# Same pin as experiments/control_eval/requirements.txt. Not in the CI install
+# set: the harness tests drive the agent and monitor with a fake client.
+anthropic==1.15.0

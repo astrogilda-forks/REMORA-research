@@ -100,11 +100,11 @@ theorem exists yet; MODEL_PROVEN is not claimed for anything.
 ## `ws1_composition/model.py`
 
 WS1 composition, issuance and dispatch (#953,
-[WS1 SDD §12.1](../docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md)),
-as an explicit-state breadth-first search in Python rather than TLA+, so two
-transitions can call the implementation: the decision and every re-gate run
-`compose_authorized_decision` over a real `check_preconditions` result, and
-issuance and redemption compare `AuthorizationContext.hash` with the WS1
+[WS1 SDD §12.1](../docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md)).
+It is an explicit-state breadth-first search in Python rather than TLA+, so two
+transitions can call the implementation. The decision and every re-gate run
+`compose_authorized_decision` over a real `check_preconditions` result.
+Issuance and redemption compare `AuthorizationContext.hash` with the WS1
 binding in it. Consumption of the single-use grant is modelled as one atomic
 step after the re-gate, as in the code. Three preconditions in four logical
 states, required and optional monitors with arbitrary output, a grant-only

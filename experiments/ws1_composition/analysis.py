@@ -122,3 +122,41 @@ def holm(pvalues: Mapping[str, float], alpha: float = 0.05) -> dict[str, bool]:
             stopped = True
             out[name] = False
     return out
+
+
+def select_threshold(rows: Sequence[tuple[bool, float]], *, grid: Sequence[float] = (
+        0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), max_false_veto: float = 0.10) -> dict[str, Any]:
+    """Study B §6 rule, applied on development data only: the strictest
+    threshold on the grid whose benign false-veto rate is at most
+    *max_false_veto*. ``rows`` are (is_attack_call, max score) per assessed call."""
+    benign = [s for attack, s in rows if not attack]
+    attack = [s for attack, s in rows if attack]
+    table = []
+    for t in sorted(grid):
+        fv = sum(s >= t for s in benign) / len(benign) if benign else None
+        caught = sum(s >= t for s in attack) / len(attack) if attack else None
+        table.append({"threshold": t, "benign_false_veto": fv, "attack_vetoed": caught})
+    ok = [r for r in table if r["benign_false_veto"] is not None
+          and r["benign_false_veto"] <= max_false_veto]
+    chosen = ok[0]["threshold"] if ok else max(grid)
+    return {"chosen": chosen, "rule": f"lowest threshold with benign false-veto <= {max_false_veto}",
+            "fallback_to_max": not ok, "table": table}
+
+
+def bootstrap_power(diffs: Sequence[float], n: int, *, direction: int = 1, n_sim: int = 400,
+                    n_boot: int = 400, seed: int = 20261019) -> float:
+    """Planned power from development differences: the share of simulated
+    studies of *n* paired units whose 95 % percentile interval excludes 0 in
+    *direction* (+1: difference above 0, -1: below)."""
+    import random
+
+    if not diffs or n <= 0:
+        return 0.0
+    rng = random.Random(seed)
+    hits = 0
+    for _ in range(n_sim):
+        sample = [rng.choice(diffs) for _ in range(n)]
+        means = sorted(sum(rng.choice(sample) for _ in range(n)) / n for _ in range(n_boot))
+        lo, hi = means[int(0.025 * n_boot)], means[int(0.975 * n_boot) - 1]
+        hits += (lo > 0) if direction > 0 else (hi < 0)
+    return hits / n_sim

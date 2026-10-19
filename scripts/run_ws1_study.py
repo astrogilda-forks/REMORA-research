@@ -8,11 +8,19 @@
     model call, no cost. Checks that the analysis runs end to end and reports
     what it must report; its numbers describe eight author-written scenarios
     and are not a result.
-``--pilot`` / ``--holdout``
-    Pass the manifest guards (``experiments/ws1_composition/study.py``) and
-    then stop: the AgentDojo arms for Study B need the owner decisions listed
-    in the plan, and NEGATIVE_RESULTS.md §93 says they have nothing to recover
-    until intent and contract coverage exist.
+``--isp-fake``
+    Study B's harness on the development split with a scripted agent that
+    follows every injection and a scripted monitor. Free.
+``--pilot``
+    Claude (``claude-opus-5-5``) on a development subset, cap 10 USD.
+    Needs ANTHROPIC_API_KEY.
+``--seal``
+    From the pilot only: threshold, holdout size within 80 % of the remaining
+    budget, power, holdout task list; locks the manifest.
+``--holdout``
+    The sealed test tasks, once. Needs ANTHROPIC_API_KEY.
+
+The AgentDojo arms are not run: NEGATIVE_RESULTS.md §93.
 
     python scripts/run_ws1_study.py --fake --out artifacts/ws1/fake_run_v1.json
 """
@@ -80,29 +88,39 @@ def main(argv: list[str] | None = None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--fake", action="store_true")
+    mode.add_argument("--isp-fake", action="store_true")
+    mode.add_argument("--prepare", action="store_true")
     mode.add_argument("--pilot", action="store_true")
+    mode.add_argument("--seal", action="store_true")
     mode.add_argument("--holdout", action="store_true")
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
 
-    from experiments.ws1_composition.study import StudyRefused, load_manifest, require_ready
+    from experiments.ws1_composition.isp_study import study_b
+    from experiments.ws1_composition.study import StudyRefused
 
-    if not args.fake:
-        purpose = "pilot" if args.pilot else "holdout"
-        try:
-            require_ready(load_manifest(), purpose)
-        except StudyRefused as exc:
-            print(f"REFUSING: {exc}", file=sys.stderr)
-            return 2
-        print("REFUSING: the Study B AgentDojo arms are not built; they wait for the owner "
-              "decisions in docs/assurance/ws1_composition_study_v1.md §8", file=sys.stderr)
+    try:
+        if args.fake:
+            body = fake_run()
+        elif args.isp_fake:
+            body = study_b.fake()
+        elif args.prepare:
+            body = study_b.prepare()
+        elif args.pilot:
+            body = study_b.pilot()
+        elif args.seal:
+            body = study_b.seal()
+        else:
+            body = study_b.holdout()
+    except StudyRefused as exc:
+        print(f"REFUSING: {exc}", file=sys.stderr)
         return 2
-    body = json.dumps(fake_run(), indent=2, sort_keys=True) + "\n"
+    text = json.dumps(body, indent=2, sort_keys=True) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(body, encoding="utf-8")
+        args.out.write_text(text, encoding="utf-8")
     else:
-        sys.stdout.write(body)
+        sys.stdout.write(text)
     return 0
 
 

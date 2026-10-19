@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 __all__ = [
     "CANONICALIZATION_ID",
     "DOMAIN",
+    "INTENT_SUBJECT",
     "ExecutionPrecondition",
     "LogicalState",
     "ProcessingStatus",
@@ -45,6 +46,9 @@ __all__ = [
     "tagged_digest",
 ]
 
+#: ``subject_argument`` value that makes the server-resolved intent authority
+#: (the work order) the subject. No call argument can name it.
+INTENT_SUBJECT = "@intent"
 #: Domain separation for every WS1 commitment (WS1 §6.4).
 DOMAIN = "REMORA/WS1-COMPOSITION/v1"
 #: The evidence-admission encoding: sorted keys, no floats. Not RFC 8785.
@@ -209,6 +213,8 @@ def derive_preconditions(context: ProposalContext, arguments: Mapping[str, Any],
     for spec in specs:
         if spec.subject_argument is None:
             subject = context.tenant_id
+        elif spec.subject_argument == INTENT_SUBJECT:
+            subject = context.intent_authority_hash
         else:
             if spec.subject_argument not in arguments:
                 return incomplete(f"subject_argument_missing:{spec.predicate_id}")
