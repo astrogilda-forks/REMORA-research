@@ -10,8 +10,22 @@ This file lists externally relevant changes by release. Fine-grained development
   counters (`spent_calls`, `spent_monitor_calls`, `rounds`) within `[0, limit]`,
   checks the wall deadline before each lookup inside a round with a closed
   timeout boundary (`>=`), and adds the deterministic cost-per-settlement
-  baseline (`LookupEstimate`, `choose_next_by_cost`, `PlannerMode.H_COST`) and
-  durable SQLite task reservation reference (`TaskCallLedger`).
+  baseline (`LookupEstimate`, `choose_next_by_cost`, `PlannerMode.H_COST`),
+  bounded lookahead planner (`choose_next_lookahead`, `PlannerMode.H_AR`,
+  AR-026), durable SQLite task reservation reference (`TaskCallLedger`,
+  AR-013..016), multi-cause refusal diagnostic (`diagnose_refusal_causes`,
+  AR-023) and independent recovery-bundle verifier (`verify_recovery_bundle`,
+  AR-029..032).
+- `remora/verification/resolvers.py` adds `ResolverAdapterContract`,
+  `TransportResponse` and `BoundedResolverAdapter` (separate monotonic and wall
+  clocks, destination allowlist, redirect/raw-URL refusal, byte limit, tenant
+  filter and source-version pin; AR-010..012).
+- `remora/flow/labeler.py` adds `commit_labeled_result` (commit-before-return
+  persistence of handles and context label raise with redacted `FlowCommitFailed`
+  on fault; AR-017 / IFC-04b) and `verify_flow_at_dispatch` (`flow_epoch`,
+  `flow_digest` and resolved-argument verification before dispatch; AR-018 /
+  IFC-06), with end-to-end paraphrase/split and fault-injection tests in
+  `tests/flow/test_labeler_handles.py` (AR-020).
 - `experiments/ws1_composition/analysis.py` adds `ObservedEpisode`,
   `zero_event_upper` and `summarize_observed_episodes` (refuses incomplete
   effect observation and aggregates violations by cluster).

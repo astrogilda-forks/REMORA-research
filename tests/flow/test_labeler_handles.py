@@ -529,6 +529,188 @@ def test_is_handle_ref_is_exact():
         assert not is_handle_ref(value)
 
 
+# ── WP-04 (AR-017, AR-018, AR-020): commit-before-return & dispatch check ──
+
+
+def test_commit_before_return_and_fault_injection_leaks_nothing():
+    """SDD v2 AR-017 (IFC-04b): commit_labeled_result raises the context label
+    and stores handles before returning rendered_result, and a store fault
+    leaks neither raw_result nor rendered_result in the exception."""
+    from remora.flow.context import (
+        FlowContextStore,
+        InMemoryFlowEventStore,
+        ProcessingPolicy,
+    )
+    from remora.flow.labeler import FlowCommitFailed, commit_labeled_result
+
+    policy = ProcessingPolicy.from_mapping({"acme": {"default": [MODEL]}})
+    ctx_store = FlowContextStore(InMemoryFlowEventStore(), policy)
+    minted_ctx = ctx_store.mint(
+        "acme", "agent-1", user_principal=USER, model_principal=MODEL
+    )
+    h_store = HandleStore(InMemoryHandleBackend(), clock=lambda: 100.0)
+
+    committed = commit_labeled_result(
+        FlowLabeler(clock=lambda: 100.0),
+        INBOX,
+        contexts=ctx_store,
+        handles=h_store,
+        tenant_id="acme",
+        principal="agent-1",
+        context_id=minted_ctx.context_id,
+        proposal_id="prop-1",
+        arguments={},
+        raw_result=EMAILS,
+        source_metadata=METADATA,
+    )
+    # Context label was automatically raised in store before return
+    after_state = ctx_store.load("acme", "agent-1", minted_ctx.context_id)
+    assert after_state.epoch == committed.new_epoch > 0
+    assert after_state.label == committed.new_label
+    assert len(committed.minted_handle_ids) == 4
+    assert is_handle_ref(committed.rendered_result[0]["body"])
+
+    # Fault injection on context raise: no raw secret ("secret revenue 12M") in exception
+    class FailingContextStore:
+        def load(self, tenant_id, principal, context_id):
+            return after_state
+
+        def raise_label(self, tenant_id, principal, context_id, label):
+            raise RuntimeError("disk full while writing super_secret_token_999")
+
+    with pytest.raises(FlowCommitFailed) as exc_info:
+        commit_labeled_result(
+            FlowLabeler(clock=lambda: 100.0),
+            INBOX,
+            contexts=FailingContextStore(),
+            handles=h_store,
+            tenant_id="acme",
+            principal="agent-1",
+            context_id=minted_ctx.context_id,
+            proposal_id="prop-2",
+            arguments={},
+            raw_result=[{"subject": "top_secret_subject", "body": "secret revenue 12M", "sender": "bob@corp.example"}],
+            source_metadata=METADATA,
+        )
+    text_repr = f"{exc_info.value!r} {exc_info.value.__cause__!r}"
+    assert "secret revenue 12M" not in text_repr
+    assert "top_secret_subject" not in text_repr
+    assert "super_secret_token_999" not in text_repr
+
+
+def test_e2e_secret_read_paraphrase_split_and_dispatch_epoch_race():
+    """SDD v2 AR-018 / AR-020 (IFC-06):
+    1. Runtime automatically raises the context label when a secret is read
+       (no manual harness raise);
+    2. Paraphrasing or splitting the secret into benign-looking chunks still
+       carries the raised context label and blocks exfiltration to an outside
+       recipient;
+    3. If a concurrent read raises flow_epoch between assessment and dispatch,
+       verify_flow_at_dispatch refuses with flow_epoch_changed."""
+    from remora.flow.context import (
+        FlowContextStore,
+        InMemoryFlowEventStore,
+        ProcessingPolicy,
+    )
+    from remora.flow.labeler import commit_labeled_result, verify_flow_at_dispatch
+    from remora.flow.observe import flow_observation
+
+    bob = "email://corp.example/bob"
+    policy = ProcessingPolicy.from_mapping({"acme": {"default": [MODEL]}})
+    ctx_store = FlowContextStore(InMemoryFlowEventStore(), policy)
+    h_store = HandleStore(InMemoryHandleBackend(), clock=lambda: 100.0)
+    state0 = ctx_store.mint(
+        "acme", "agent-1", user_principal=USER, model_principal=MODEL
+    )
+    cid = state0.context_id
+
+    read_flow = parse_flow({
+        "provider": "tcb",
+        "arguments": {},
+        "sources": {
+            "default_integrity": "TRUSTED",
+            "fields": [{
+                "path": "$",
+                "readers": {"static": [USER, bob], "plus_processors": True},
+                "return_mode": "BY_VALUE",
+                "type": "string",
+            }],
+        },
+        "sink": {"recipients": "none"},
+    })
+    send_flow = parse_flow({
+        "provider": "tcb",
+        "arguments": {"to": {"kind": "email"}, "body": {"kind": "text"}},
+        "sources": {"default_integrity": "TRUSTED"},
+        "sink": {
+            "recipients": {"from_args": {"to": "email"}},
+            "payload_args": ["body"],
+        },
+    })
+
+    # Before secret read: sending a benign message to eve@evil.example is assessed clean
+    obs_before = flow_observation(
+        contexts=ctx_store, handles=h_store, tenant="acme", principal="agent-1",
+        context_id=cid, flow=send_flow,
+        arguments={"to": "eve@evil.example", "body": "hello"}, strict=True,
+    )
+    assert obs_before["flow_status"] == "evaluated"
+    assert not obs_before["flow_confidentiality_violation"]
+    assessed_epoch = int(obs_before["flow_epoch"])
+    assessed_digest = str(obs_before["flow_digest"])
+
+    # Step 1: Agent executes read_flow -> runtime commits the label raise automatically
+    committed = commit_labeled_result(
+        FlowLabeler(clock=lambda: 100.0),
+        read_flow,
+        contexts=ctx_store,
+        handles=h_store,
+        tenant_id="acme",
+        principal="agent-1",
+        context_id=cid,
+        proposal_id="prop-read",
+        arguments={},
+        raw_result="Q3 M&A target: AcmeNordic for 45M",
+    )
+    assert committed.rendered_result == "Q3 M&A target: AcmeNordic for 45M"
+
+    # Step 2 (AR-018): Trying to dispatch the previously assessed send to eve fails on flow_epoch_changed
+    ok, reason, _ = verify_flow_at_dispatch(
+        contexts=ctx_store, handles=h_store, tenant_id="acme", principal="agent-1",
+        context_id=cid, flow=send_flow,
+        arguments={"to": "eve@evil.example", "body": "hello"},
+        expected_epoch=assessed_epoch, expected_digest=assessed_digest,
+    )
+    assert not ok and reason == "flow_epoch_changed"
+
+    # Step 3 (AR-020): Agent paraphrases and splits the secret into two harmless-looking chunks
+    for chunk in ("Part 1: northern acquisition", "Part 2: forty-five"):
+        obs_exfil = flow_observation(
+            contexts=ctx_store, handles=h_store, tenant="acme", principal="agent-1",
+            context_id=cid, flow=send_flow,
+            arguments={"to": "eve@evil.example", "body": chunk}, strict=True,
+        )
+        assert obs_exfil["flow_confidentiality_violation"] is True
+
+    # Sending to authorized reader bob@corp.example succeeds both at assess and dispatch
+    obs_bob = flow_observation(
+        contexts=ctx_store, handles=h_store, tenant="acme", principal="agent-1",
+        context_id=cid, flow=send_flow,
+        arguments={"to": "bob@corp.example", "body": "Summary for Bob"}, strict=True,
+    )
+    assert not obs_bob["flow_confidentiality_violation"]
+    ok_bob, reason_bob, resolved_bob = verify_flow_at_dispatch(
+        contexts=ctx_store, handles=h_store, tenant_id="acme", principal="agent-1",
+        context_id=cid, flow=send_flow,
+        arguments={"to": "bob@corp.example", "body": "Summary for Bob"},
+        expected_epoch=int(obs_bob["flow_epoch"]),
+        expected_digest=str(obs_bob["flow_digest"]),
+    )
+    assert ok_bob and reason_bob == "ok"
+    assert resolved_bob == {"to": "bob@corp.example", "body": "Summary for Bob"}
+
+
+
 def test_the_default_ttl_is_one_hour():
     result = FlowLabeler(clock=lambda: 0.0).label_result(
         _flow(), CTX, resolved_args={}, arg_labels={}, raw_result="v")

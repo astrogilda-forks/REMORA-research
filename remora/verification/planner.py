@@ -22,14 +22,17 @@ injected clock; nothing here reads one.
 """
 from __future__ import annotations
 
+import hashlib
 import random
 import sqlite3
+import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from fractions import Fraction
 from pathlib import Path
+from typing import Any
 
 from remora.verification.check import (
     CheckedPreconditions,
@@ -49,15 +52,28 @@ from remora.verification.preconditions import (
 from remora.verification.registry import PreconditionRegistry
 from remora.verification.resolvers import Resolver, ResolverRefused, run_request
 
-__all__ = ["FamilyLedger", "LookupEstimate", "PlannerMode", "TaskCallLedger",
-           "VerificationBudget", "VerificationRun", "choose_next_by_cost",
-           "open_candidates", "plan_verification", "run_verification"]
+__all__ = [
+    "FamilyLedger",
+    "LookupEstimate",
+    "PlannerMode",
+    "TaskCallLedger",
+    "VerificationBudget",
+    "VerificationRun",
+    "choose_next_by_cost",
+    "choose_next_lookahead",
+    "diagnose_refusal_causes",
+    "open_candidates",
+    "plan_verification",
+    "run_verification",
+    "verify_recovery_bundle",
+]
 
 
 class PlannerMode(StrEnum):
     H0 = "h0"              # no new lookups
     H_DET = "h_det"
     H_COST = "h_cost"      # deterministic cost-per-settlement baseline (SDD v2 AR-025)
+    H_AR = "h_ar"          # bounded lookahead over required MACHINE preconditions (SDD v2 AR-026)
     H_EDV = "h_edv"
     H_RANDOM = "h_random"
 
@@ -324,6 +340,114 @@ def choose_next_by_cost(
     return tuple(selected)
 
 
+def choose_next_lookahead(
+    requirements: RequirementSet,
+    checked: CheckedPreconditions,
+    budget: VerificationBudget,
+    estimates: Mapping[tuple[str, str], LookupEstimate],
+    *,
+    remaining_cost_units: int,
+    max_candidates: int = 64,
+    max_depth: int = 3,
+    beam_width: int = 16,
+    cpu_deadline_ms: float = 50.0,
+    mono_ns: Callable[[], int] | None = None,
+) -> tuple[tuple[str, str], ...]:
+    """Bounded lookahead over which required MACHINE facts can be settled within
+    budget (SDD v2 WP-06 / AR-026).
+
+    Never mutates ``checked``: modelled transitions are planning hypotheses only.
+    Aborts expansion on the hard CPU deadline and returns the best prefix found.
+    """
+    if type(remaining_cost_units) is not int or remaining_cost_units < 0:
+        raise ValueError("invalid remaining cost")
+    if type(max_candidates) is not int or not 1 <= max_candidates <= 64:
+        raise ValueError("max_candidates must be in [1, 64]")
+    if type(max_depth) is not int or not 1 <= max_depth <= 3:
+        raise ValueError("max_depth must be in [1, 3]")
+    if type(beam_width) is not int or not 1 <= beam_width <= 16:
+        raise ValueError("beam_width must be in [1, 16]")
+    if (checked.context_hash != requirements.context_hash
+            or checked.requirements_hash != requirements.requirements_hash):
+        raise ValueError("checked state does not belong to these requirements")
+    if not requirements.authorizable or not checked.complete or budget.exhausted:
+        return ()
+    required = [p for p in requirements.preconditions if p.required]
+    for pre in required:
+        state = checked.state(pre.precondition_id)
+        if state in (LogicalState.REFUTED, LogicalState.CONFLICT):
+            return ()
+        if pre.resolution_class is ResolutionClass.TERMINAL and state is not LogicalState.PROVED:
+            return ()
+    candidates = open_candidates(requirements, checked, budget)
+    if len(candidates) > max_candidates:
+        raise ValueError("candidate limit exceeded")
+    if not candidates:
+        return ()
+    if any(c not in estimates for c in candidates):
+        raise ValueError("missing deployment estimate")
+
+    open_pids = sorted({pid for pid, _ in candidates})
+    need_count = len(open_pids)
+    step_limit = min(max_depth, budget.calls_left)
+    if step_limit < need_count:
+        # Cannot settle all required open MACHINE preconditions within call budget
+        return ()
+
+    clock = mono_ns or time.monotonic_ns
+    start_ns = clock()
+    deadline_ns = start_ns + int(cpu_deadline_ms * 1_000_000)
+
+    # Beam state: (sequence of (pid, rid), settled_pids frozenset, spent_cost, joint_prob_ppm)
+    beam: list[tuple[tuple[tuple[str, str], ...], frozenset[str], int, int]] = [
+        ((), frozenset(), 0, 1_000_000)
+    ]
+    completed_plans: list[tuple[tuple[tuple[str, str], ...], int, int]] = []
+
+    for _depth in range(step_limit):
+        if clock() >= deadline_ns:
+            break
+        next_beam: list[tuple[tuple[tuple[str, str], ...], frozenset[str], int, int]] = []
+        for seq, settled, cost_so_far, prob_ppm in beam:
+            if clock() >= deadline_ns:
+                break
+            for cand in candidates:
+                pid, _rid = cand
+                if pid in settled:
+                    continue
+                est = estimates[cand]
+                new_cost = cost_so_far + est.cost_units
+                if new_cost > remaining_cost_units:
+                    continue
+                new_seq = (*seq, cand)
+                new_settled = settled | {pid}
+                new_prob = max(1, (prob_ppm * est.settle_ppm) // 1_000_000)
+                if len(new_settled) == need_count:
+                    completed_plans.append((new_seq, new_cost, new_prob))
+                else:
+                    next_beam.append((new_seq, new_settled, new_cost, new_prob))
+        if not next_beam:
+            break
+        next_beam.sort(key=lambda item: (Fraction(item[2], item[3]), item[0]))
+        beam = next_beam[:beam_width]
+
+    if completed_plans:
+        # Rank complete plans by lowest cost per joint settlement probability, then first step's cost/settle
+        completed_plans.sort(key=lambda item: (
+            Fraction(item[1], item[2]),
+            Fraction(estimates[item[0][0]].cost_units, estimates[item[0][0]].settle_ppm),
+            item[0],
+        ))
+        best_seq = completed_plans[0][0]
+        return best_seq[: min(budget.calls_left, budget.requests_per_round)]
+
+    # Fallback if CPU deadline interrupted before full depth
+    return choose_next_by_cost(
+        requirements, checked, budget, estimates,
+        remaining_cost_units=remaining_cost_units,
+    )
+
+
 def plan_verification(requirements: RequirementSet, checked: CheckedPreconditions,
                       budget: VerificationBudget, mode: PlannerMode, *,
                       hints: Sequence[str] = (), seed: int = 0,
@@ -340,6 +464,13 @@ def plan_verification(requirements: RequirementSet, checked: CheckedPrecondition
         if estimates is None or remaining_cost_units is None:
             raise ValueError("H_COST requires deployment estimates and remaining_cost_units")
         return list(choose_next_by_cost(
+            requirements, checked, budget, estimates,
+            remaining_cost_units=remaining_cost_units,
+        )), rejected
+    if mode is PlannerMode.H_AR:
+        if estimates is None or remaining_cost_units is None:
+            raise ValueError("H_AR requires deployment estimates and remaining_cost_units")
+        return list(choose_next_lookahead(
             requirements, checked, budget, estimates,
             remaining_cost_units=remaining_cost_units,
         )), rejected
@@ -489,3 +620,176 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
             # Keep the check, but a round that settled nothing ends the loop.
             if not open_candidates(requirements, checked, budget):
                 return done("no_progress")
+
+
+def diagnose_refusal_causes(
+    requirements: RequirementSet,
+    checked: CheckedPreconditions,
+    record: Any,
+    *,
+    agent_error: bool = False,
+) -> tuple[str, ...]:
+    """Multi-cause refusal diagnostic (SDD v2 WP-05 / AR-023).
+
+    Preserves all applicable refusal causes in canonical order rather than
+    collapsing a refusal into a single mutually exclusive bucket.
+    """
+    from remora.policy.composition import NON_APPROVABLE_REASONS
+
+    causes: list[str] = []
+    if not requirements.authorizable:
+        causes.append("contract_missing")
+    non_app_vals = {r.value for r in NON_APPROVABLE_REASONS}
+    base_reasons = set(getattr(record, "base_reasons", ()) or ())
+    required = [p for p in requirements.preconditions if p.required]
+    has_refuted_or_terminal = any(
+        checked.state(p.precondition_id) in (LogicalState.REFUTED, LogicalState.CONFLICT)
+        or (
+            p.resolution_class is ResolutionClass.TERMINAL
+            and checked.state(p.precondition_id) is not LogicalState.PROVED
+        )
+        for p in required
+    )
+    if (base_reasons & non_app_vals) or has_refuted_or_terminal:
+        causes.append("hard_deny")
+    if any(
+        p.resolution_class is ResolutionClass.MACHINE
+        and checked.state(p.precondition_id) is LogicalState.UNKNOWN
+        for p in required
+    ):
+        causes.append("machine_uncertainty")
+    if getattr(record, "review_class", "") == "review" or any(
+        p.resolution_class is ResolutionClass.REVIEW
+        and checked.state(p.precondition_id) is not LogicalState.PROVED
+        for p in required
+    ):
+        causes.append("review_required")
+    if getattr(record, "review_class", "") == "grant" or any(
+        p.resolution_class is ResolutionClass.GRANT
+        and checked.state(p.precondition_id) is not LogicalState.PROVED
+        for p in required
+    ):
+        causes.append("grant_required")
+    mon_status = str(getattr(record, "monitor_status", "") or "")
+    if getattr(record, "monitor_veto", False) or mon_status.startswith(("unavailable:", "invalid:")):
+        causes.append("monitor_veto_or_outage")
+    if agent_error:
+        causes.append("agent_error")
+    return tuple(causes)
+
+
+def verify_recovery_bundle(bundle: Mapping[str, Any]) -> tuple[bool, tuple[str, ...]]:
+    """Independent checker for a recovery bundle (SDD v2 WP-07 / AR-029..032).
+
+    Verifies signatures/digests, context and requirement bindings, every
+    required precondition's evidence freshness/tenant/source_version/role, and
+    the independent observer's delta and side-effect report without trusting
+    any stored ``final_action`` field.
+    """
+    problems: list[str] = []
+    required_top = (
+        "context_hash",
+        "requirements_hash",
+        "evidence_digest",
+        "profile_hash",
+        "policy_bundle_hash",
+        "toolspec_hash",
+        "key_id",
+        "signed_grant_bytes",
+        "expected_grant_sha256",
+        "tenant_id",
+        "proposal_id",
+        "verified_at_s",
+        "requirements",
+        "evidence_records",
+        "observer_report",
+    )
+    for k in required_top:
+        if k not in bundle or bundle[k] is None or bundle[k] == "":
+            problems.append(f"missing_field:{k}")
+    if problems:
+        return False, tuple(problems)
+
+    grant_bytes = bundle["signed_grant_bytes"]
+    if not isinstance(grant_bytes, (bytes, bytearray)):
+        problems.append("invalid_signed_grant_bytes")
+    else:
+        actual_sha = hashlib.sha256(grant_bytes).hexdigest()
+        if actual_sha != bundle["expected_grant_sha256"]:
+            problems.append("grant_signature_digest_mismatch")
+
+    reqs = bundle["requirements"]
+    if not isinstance(reqs, Mapping):
+        return False, ("invalid_requirements_block",)
+    if reqs.get("context_hash") != bundle["context_hash"]:
+        problems.append("context_hash_mismatch")
+    if reqs.get("requirements_hash") != bundle["requirements_hash"]:
+        problems.append("requirements_hash_mismatch")
+    if reqs.get("authorizable") is not True:
+        problems.append("requirements_not_authorizable")
+    preconditions = reqs.get("preconditions")
+    if not isinstance(preconditions, Sequence) or not preconditions:
+        problems.append("empty_preconditions")
+        preconditions = ()
+
+    ev_map: dict[str, Mapping[str, Any]] = {}
+    for ev in bundle["evidence_records"]:
+        if isinstance(ev, Mapping) and isinstance(ev.get("precondition_id"), str):
+            ev_map[ev["precondition_id"]] = ev
+
+    now_s = int(bundle["verified_at_s"])
+    tenant_id = str(bundle["tenant_id"])
+    proposal_id = str(bundle["proposal_id"])
+    review_att = bundle.get("review_attestation")
+
+    for pre in preconditions:
+        if not isinstance(pre, Mapping) or not pre.get("required", True):
+            continue
+        pid = str(pre.get("precondition_id", ""))
+        rclass = str(pre.get("resolution_class", ""))
+        if rclass == "machine":
+            ev = ev_map.get(pid)
+            if ev is None:
+                problems.append(f"missing_evidence:{pid}")
+                continue
+            if ev.get("tenant_id") != tenant_id:
+                problems.append(f"evidence_tenant_mismatch:{pid}")
+            if ev.get("subject_ref") != pre.get("subject_ref"):
+                problems.append(f"evidence_subject_mismatch:{pid}")
+            if ev.get("source_version") != pre.get("expected_source_version"):
+                problems.append(f"evidence_source_version_mismatch:{pid}")
+            acq = ev.get("acquired_at")
+            val = ev.get("valid_until")
+            if not (isinstance(acq, int) and isinstance(val, int) and acq <= now_s < val):
+                problems.append(f"evidence_stale_or_future:{pid}")
+            payload = ev.get("payload")
+            if not isinstance(payload, (bytes, bytearray)) or (
+                hashlib.sha256(payload).hexdigest() != ev.get("payload_hash")
+            ):
+                problems.append(f"evidence_payload_hash_mismatch:{pid}")
+            if ev.get("proved") is not True:
+                problems.append(f"precondition_not_proved:{pid}")
+        elif rclass == "review":
+            if not isinstance(review_att, Mapping):
+                problems.append(f"missing_review_attestation:{pid}")
+            else:
+                if review_att.get("proposal_id") != proposal_id:
+                    problems.append(f"review_proposal_mismatch:{pid}")
+                if review_att.get("approver_role") != pre.get("review_role"):
+                    problems.append(f"review_role_mismatch:{pid}")
+        else:
+            problems.append(f"unresolvable_class_in_recovery_bundle:{pid}:{rclass}")
+
+    obs = bundle["observer_report"]
+    if not isinstance(obs, Mapping):
+        problems.append("invalid_observer_report")
+    else:
+        if obs.get("observer_complete") is not True:
+            problems.append("observer_incomplete")
+        if obs.get("desired_delta_matched") is not True:
+            problems.append("postcondition_delta_mismatch")
+        if obs.get("unauthorized_side_effects"):
+            problems.append("unauthorized_side_effect_observed")
+
+    return len(problems) == 0, tuple(problems)
+

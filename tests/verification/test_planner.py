@@ -19,11 +19,20 @@ from remora.verification.planner import (
     TaskCallLedger,
     VerificationBudget,
     choose_next_by_cost,
+    choose_next_lookahead,
+    diagnose_refusal_causes,
     plan_verification,
     run_verification,
+    verify_recovery_bundle,
 )
 from remora.verification.preconditions import LogicalState, derive_preconditions
-from remora.verification.resolvers import InMemorySource
+from remora.verification.resolvers import (
+    BoundedResolverAdapter,
+    InMemorySource,
+    ResolverAdapterContract,
+    ResolverRefused,
+    TransportResponse,
+)
 from tests.verification._ws1 import (
     ALL_CAPS,
     NOW_MS,
@@ -346,5 +355,289 @@ def test_task_call_ledger_atomic_reservation_and_persistence(tmp_path):
             ledger2.reserve("task-2", binding, "two", "req-1", bad_units)
     ledger2.close("task-2", binding)
     assert ledger2.reserve("task-2", binding, "two", "req-1") is False
+
+
+def test_bounded_resolver_adapter_enforces_clocks_destinations_and_limits():
+    """SDD v2 WP-02 (AR-010..012): separate monotonic and wall clocks, destination
+    allowlist, redirect refusal, raw URL refusal, byte cap, tenant filter and
+    source-version pin."""
+    from remora.verification.check import VerificationRequest
+
+    contract = ResolverAdapterContract(
+        resolver_id="inventory",
+        source_id="netbox",
+        allowed_destinations=frozenset({"https://netbox.internal.example/api"}),
+        required_capability="resolve:inventory",
+        expected_source_version="v2",
+        max_response_bytes=64,
+        connect_timeout_ms=100,
+        read_timeout_ms=200,
+        total_timeout_ms=300,
+    )
+    mono = [1_000]
+    wall = [1_800_000_500]
+
+    def make_req(subject: str = "sw1/p1", deadline_ms: int = 1_500) -> VerificationRequest:
+        return VerificationRequest(
+            request_id="req-1", context_hash="c" * 64, evidence_revision=0,
+            precondition_id="port_in_work_order", resolver_id="inventory",
+            subject_ref=subject, deadline_ms=deadline_ms, budget_ref="p-1",
+        )
+
+    # 1. Valid response uses wall_clock_s (not mono_clock_ms // 1000) for acquired_at
+    adapter_ok = BoundedResolverAdapter(
+        contract=contract,
+        transport=lambda _req, _t, _to: TransportResponse(
+            destination="https://netbox.internal.example/api",
+            tenant_id="tenant-a",
+            source_version="v2",
+            payload=b'{"found":true}',
+            connect_ms=20,
+            read_ms=40,
+        ),
+        mono_clock_ms=lambda: mono[0],
+        wall_clock_s=lambda: wall[0],
+        ttl_s=90,
+    )
+    ev = adapter_ok.fetch(make_req(), "tenant-a", now_s=1)
+    assert ev.acquired_at == 1_800_000_500
+    assert ev.valid_until == 1_800_000_590
+    assert len(adapter_ok.calls) == 1
+
+    # 2. Raw URL in subject_ref is refused before transport is called
+    calls_url: list[str] = []
+    adapter_url = BoundedResolverAdapter(
+        contract=contract,
+        transport=lambda _r, _t, _to: calls_url.append("called") or TransportResponse(  # type: ignore[func-returns-value]
+            destination="https://netbox.internal.example/api",
+            tenant_id="tenant-a", source_version="v2", payload=b"{}",
+        ),
+        mono_clock_ms=lambda: mono[0],
+        wall_clock_s=lambda: wall[0],
+    )
+    with pytest.raises(ResolverRefused, match="raw_url_in_subject_refused"):
+        adapter_url.fetch(make_req(subject="https://attacker.invalid/pwn"), "tenant-a", 0)
+    assert calls_url == []
+
+    # 3. Redirect, wrong destination, oversized payload, wrong tenant, wrong version, and timeouts
+    cases = [
+        ("redirect_refused", TransportResponse("https://netbox.internal.example/api", "tenant-a", "v2", b"{}", redirected=True)),
+        ("destination_not_allowed", TransportResponse("https://evil.example/api", "tenant-a", "v2", b"{}")),
+        ("response_too_large", TransportResponse("https://netbox.internal.example/api", "tenant-a", "v2", b"x" * 65)),
+        ("tenant_mismatch", TransportResponse("https://netbox.internal.example/api", "tenant-b", "v2", b"{}")),
+        ("source_version_mismatch", TransportResponse("https://netbox.internal.example/api", "tenant-a", "v1", b"{}")),
+        ("transport_timeout", TransportResponse("https://netbox.internal.example/api", "tenant-a", "v2", b"{}", connect_ms=150)),
+        ("transport_timeout", TransportResponse("https://netbox.internal.example/api", "tenant-a", "v2", b"{}", read_ms=250)),
+    ]
+    for expected_reason, resp in cases:
+        ad = BoundedResolverAdapter(
+            contract=contract,
+            transport=lambda _r, _t, _to, r=resp: r,
+            mono_clock_ms=lambda: mono[0],
+            wall_clock_s=lambda: wall[0],
+        )
+        with pytest.raises(ResolverRefused, match=expected_reason):
+            ad.fetch(make_req(), "tenant-a", 0)
+
+    # 4. Expired request deadline refused before transport
+    with pytest.raises(ResolverRefused, match="request_deadline_expired"):
+        adapter_ok.fetch(make_req(deadline_ms=1_000), "tenant-a", 0)
+
+
+def test_h_ar_bounded_lookahead_and_multi_cause_diagnostics():
+    """SDD v2 WP-05/WP-06 (AR-023, AR-026..028):
+    - H_AR selects a feasible joint plan when H_COST's greedy choice would leave
+      insufficient budget for the second required precondition;
+    - H_AR never mutates CheckedPreconditions and respects CPU deadlines and bounds;
+    - diagnose_refusal_causes preserves multiple simultaneous refusal causes."""
+    import types
+    from remora.verification.registry import (
+        PreconditionRegistry,
+        PredicateSpec,
+        ResolverSpec,
+    )
+    from remora.verification.preconditions import ResolutionClass
+
+    # Build a 2-predicate requirement set where p1 has two resolvers (cheap=4, expensive=7)
+    # and p2 has one resolver (cost=5), with total remaining_cost_units=9:
+    # Greedy H_COST picks p2 (cost=5, settle=900k -> 5/0.9=5.55) if p1_exp has (cost=7, settle=1M)
+    # and p1_cheap has (cost=4, settle=700k -> 4/0.7=5.71), which leaves 9-5=4 so p1_cheap still fits;
+    # whereas if p2 has two resolvers: p2_greedy (cost=6, settle=950k -> 6/0.95=6.31) and
+    # p2_frugal (cost=4, settle=600k -> 4/0.6=6.66), and p1 only has r1 (cost=5, settle=700k -> 5/0.7=7.14):
+    # At remaining_cost_units=9:
+    # - Greedy H_COST picks (p2, r_greedy) first (ratio 6.31 < 6.66 < 7.14), spending 6 and leaving 3 < 5,
+    #   so p1 CANNOT be resolved in round 2!
+    # - Lookahead H_AR sees that only ((p2, r_frugal), (p1, r1)) or ((p1, r1), (p2, r_frugal))
+    #   has total cost 4 + 5 = 9 <= 9 and settles both required preconditions!
+    reg = PreconditionRegistry(
+        tools={
+            "set_port_profile": (
+                PredicateSpec("p1", ResolutionClass.MACHINE, "v_port", ("r1",), subject_argument="port"),
+                PredicateSpec("p2", ResolutionClass.MACHINE, "v_cust", ("r_frugal", "r_greedy"), subject_argument="customer"),
+            )
+        },
+        resolvers={
+            "r1": ResolverSpec("r1", "s1", frozenset({"p1"}), "cap:1"),
+            "r_frugal": ResolverSpec("r_frugal", "s2", frozenset({"p2"}), "cap:2"),
+            "r_greedy": ResolverSpec("r_greedy", "s3", frozenset({"p2"}), "cap:3"),
+        },
+    )
+    ctx, args = context()
+    reqs = derive_preconditions(ctx, args, reg)
+    checked = check_preconditions(
+        ctx, reqs, (), issued={}, registry=reg,
+        verifiers=VERIFIERS, now_s=NOW_S, evidence_revision=0,
+    )
+    p1_id, p2_id = (p.precondition_id for p in reqs.preconditions)
+    estimates = {
+        (p1_id, "r1"): LookupEstimate(5, 700_000),
+        (p2_id, "r_greedy"): LookupEstimate(6, 950_000),
+        (p2_id, "r_frugal"): LookupEstimate(4, 600_000),
+    }
+    budget1 = VerificationBudget(requests_per_round=1, max_resolver_calls=2)
+
+    greedy_choice = choose_next_by_cost(reqs, checked, budget1, estimates, remaining_cost_units=9)
+    assert greedy_choice == ((p2_id, "r_greedy"),)
+
+    ar_choice = choose_next_lookahead(reqs, checked, budget1, estimates, remaining_cost_units=9)
+    assert ar_choice in (((p2_id, "r_frugal"),), ((p1_id, "r1"),))
+    # And checked state is untouched (AR-026)
+    assert checked.state(p1_id) is LogicalState.UNKNOWN
+    assert checked.state(p2_id) is LogicalState.UNKNOWN
+
+    # plan_verification dispatches H_AR
+    plan_ar, _ = plan_verification(
+        reqs, checked, budget1, PlannerMode.H_AR,
+        estimates=estimates, remaining_cost_units=9,
+    )
+    assert tuple(plan_ar) == ar_choice
+
+    # Bounds checks on H_AR parameters
+    for kw in (
+        {"max_candidates": 65},
+        {"max_depth": 4},
+        {"beam_width": 17},
+        {"remaining_cost_units": -1},
+    ):
+        with pytest.raises(ValueError):
+            choose_next_lookahead(reqs, checked, budget1, estimates, **{"remaining_cost_units": 9, **kw})
+
+    # AR-023: multi-cause refusal diagnostic keeps all simultaneous causes
+    fake_rec = types.SimpleNamespace(
+        base_reasons=("cross_tenant_argument_blocked",),
+        review_class="review",
+        monitor_veto=True,
+        monitor_status="assessed:veto",
+    )
+    causes = diagnose_refusal_causes(reqs, checked, fake_rec, agent_error=True)
+    assert causes == (
+        "hard_deny",
+        "machine_uncertainty",
+        "review_required",
+        "monitor_veto_or_outage",
+        "agent_error",
+    )
+
+
+def test_independent_recovery_bundle_verifier_and_tamper_suite():
+    """SDD v2 WP-07 (AR-029..032): independent recovery bundle verification
+    passes on a complete bundle and fails when any single binding, role,
+    source_version, observation, digest byte or observer field is tampered."""
+    import copy
+    import hashlib
+
+    grant_bytes = b'{"jti":"g-1","context_hash":"ctx-1","sig":"ed25519"}'
+    payload_bytes = b'{"found":true,"port":"sw1/p1"}'
+    valid_bundle = {
+        "context_hash": "c" * 64,
+        "requirements_hash": "r" * 64,
+        "evidence_digest": "e" * 64,
+        "profile_hash": "p" * 64,
+        "policy_bundle_hash": "b" * 64,
+        "toolspec_hash": "t" * 64,
+        "key_id": "key-ed25519-1",
+        "signed_grant_bytes": grant_bytes,
+        "expected_grant_sha256": hashlib.sha256(grant_bytes).hexdigest(),
+        "tenant_id": "tenant-a",
+        "proposal_id": "prop-1",
+        "verified_at_s": 1_800_000_010,
+        "requirements": {
+            "context_hash": "c" * 64,
+            "requirements_hash": "r" * 64,
+            "authorizable": True,
+            "preconditions": [
+                {
+                    "precondition_id": "pre_port",
+                    "required": True,
+                    "resolution_class": "machine",
+                    "subject_ref": "sw1/p1",
+                    "expected_source_version": "v2",
+                },
+                {
+                    "precondition_id": "pre_review",
+                    "required": True,
+                    "resolution_class": "review",
+                    "review_role": "senior_authority",
+                },
+            ],
+        },
+        "evidence_records": [
+            {
+                "precondition_id": "pre_port",
+                "tenant_id": "tenant-a",
+                "subject_ref": "sw1/p1",
+                "source_version": "v2",
+                "acquired_at": 1_800_000_000,
+                "valid_until": 1_800_000_060,
+                "payload": payload_bytes,
+                "payload_hash": hashlib.sha256(payload_bytes).hexdigest(),
+                "proved": True,
+            }
+        ],
+        "review_attestation": {
+            "proposal_id": "prop-1",
+            "approver": "alice",
+            "approver_role": "senior_authority",
+        },
+        "observer_report": {
+            "observer_complete": True,
+            "desired_delta_matched": True,
+            "unauthorized_side_effects": [],
+        },
+    }
+
+    ok, problems = verify_recovery_bundle(valid_bundle)
+    assert ok and problems == ()
+
+    # Single-change tamper suite (AR-032)
+    def tamper(mutator):
+        b = copy.deepcopy(valid_bundle)
+        mutator(b)
+        return verify_recovery_bundle(b)
+
+    tampers = [
+        ("grant_signature_digest_mismatch", lambda b: b.__setitem__("signed_grant_bytes", grant_bytes + b"x")),
+        ("context_hash_mismatch", lambda b: b["requirements"].__setitem__("context_hash", "0" * 64)),
+        ("requirements_hash_mismatch", lambda b: b["requirements"].__setitem__("requirements_hash", "0" * 64)),
+        ("requirements_not_authorizable", lambda b: b["requirements"].__setitem__("authorizable", False)),
+        ("evidence_tenant_mismatch:pre_port", lambda b: b["evidence_records"][0].__setitem__("tenant_id", "tenant-b")),
+        ("evidence_subject_mismatch:pre_port", lambda b: b["evidence_records"][0].__setitem__("subject_ref", "sw1/p9")),
+        ("evidence_source_version_mismatch:pre_port", lambda b: b["evidence_records"][0].__setitem__("source_version", "v1")),
+        ("evidence_stale_or_future:pre_port", lambda b: b["evidence_records"][0].__setitem__("valid_until", 1_800_000_010)),
+        ("evidence_payload_hash_mismatch:pre_port", lambda b: b["evidence_records"][0].__setitem__("payload", b"tampered")),
+        ("precondition_not_proved:pre_port", lambda b: b["evidence_records"][0].__setitem__("proved", False)),
+        ("review_role_mismatch:pre_review", lambda b: b["review_attestation"].__setitem__("approver_role", "reviewer")),
+        ("review_proposal_mismatch:pre_review", lambda b: b["review_attestation"].__setitem__("proposal_id", "other-prop")),
+        ("observer_incomplete", lambda b: b["observer_report"].__setitem__("observer_complete", False)),
+        ("postcondition_delta_mismatch", lambda b: b["observer_report"].__setitem__("desired_delta_matched", False)),
+        ("unauthorized_side_effect_observed", lambda b: b["observer_report"].__setitem__("unauthorized_side_effects", ["contact_exported"])),
+        ("missing_field:observer_report", lambda b: b.pop("observer_report")),
+    ]
+    for expected_problem, fn in tampers:
+        is_ok, probs = tamper(fn)
+        assert not is_ok, f"tamper {expected_problem} was not caught"
+        assert expected_problem in probs, (expected_problem, probs)
+
+
 
 
