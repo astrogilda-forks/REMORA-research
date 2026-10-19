@@ -209,8 +209,9 @@ capabilities:
       - remora/enforcement/gate.py
       - tests/test_token_hardening.py
       - servers/execution_api.py
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. Token issuance, expiry, audience, max age and jti consumption are unchanged. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -325,8 +326,9 @@ capabilities:
   - id: CAP-004
     name: "Tool-call payload binding (canonical hash, recomputed before execution)"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: remora/policy/observation.py adds five flow_* fields with neutral defaults; canonical_tool_call_hash and its preimage are unchanged. servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -385,8 +387,9 @@ capabilities:
   - id: CAP-005
     name: "Audit chain (hash-chained decision history)"
     status: PERSISTED_ATOMIC
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. No chain entry is added, removed or reshaped. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -462,8 +465,9 @@ capabilities:
   - id: CAP-007
     name: "Review queue with TTL-to-ABSTAIN and approval freshness re-gate"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: remora/governance/review_queue.py: _approval_survives returns False when the fresh decision carries a reason in GRANT_ONLY_REASONS (flow_confidentiality_violation), so a reviewer's approval cannot release data to a recipient outside its readers; only a flow grant, which changes the verdict, can (SDD v1.3 §3.6 c). Strictly narrowing; the reason only occurs with REMORA_FLOW_CONTROL=1. Pinned by tests/policy/test_flow_rungs.py::test_an_approval_does_not_cover_a_confidentiality_violation. servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -637,8 +641,9 @@ capabilities:
       - tests/test_effect_receipt_atomicity.py
       - tests/test_effect_record_endpoint.py
       - docs/deployment/authority-custody-evidence.md
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -899,8 +904,9 @@ capabilities:
   - id: CAP-018
     name: "Task-bound authority and non-decaying loop safety on the execution API"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -965,8 +971,9 @@ capabilities:
   - id: CAP-019
     name: "Evidence coverage verdicts on the evidence export"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -1018,8 +1025,9 @@ capabilities:
   - id: CAP-020
     name: "Pre-dispatch premise checks: resolved effect, plan premises, procedure obligations"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -1085,8 +1093,9 @@ capabilities:
   - id: CAP-021
     name: "Independent recorder: evidence captured outside the executing process"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -1188,8 +1197,9 @@ capabilities:
   - id: CAP-023
     name: "Capability minimization: task-scoped capability sets enforced at assess, execution and dispatch"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -1268,8 +1278,9 @@ capabilities:
   - id: CAP-024
     name: "Capability mediation for implementation effects, with an effect domain for strict deployments (NTA-2 phases 1 to 3)"
     status: WIRED_API_PATH
-    verified_at_sha: 5906b013210063abdb71ac5686f42d43165dcc2b
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
     verified_by: >-
+      re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at 51e4422 (IFC-05B FLOW RUNGS), from ac97406: servers/execution_api.py gains _with_flow, _flow_spec, _flow_handles and the _FLOW_PRINCIPAL context variable set in _auth; with REMORA_FLOW_CONTROL unset _with_flow returns the observation unchanged, and no route, token, lease, dispatch, outbox or audit path is otherwise touched. The full suite passes on the commit (11529 passed). Status, scope and caveats unchanged.
@@ -1561,3 +1572,46 @@ capabilities:
       verdict and does not establish that the native verifier is correct; key
       revocation is not checked. LATE cases are local synthetic reproductions.
       Producer-written component and tests; independence NOT_ESTABLISHED.
+
+  - id: CAP-030
+    name: "WS1 execution preconditions and monitor composition on the execution API (opt-in)"
+    status: WIRED_API_PATH
+    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
+    verified_by: >-
+      audit 2026-10-19 at registration (#953 WP5): with REMORA_WS1_MODE set to
+      shadow or enforce, servers/execution_api.py builds
+      remora/verification/execution_gate.Ws1Gate from the deployment module
+      and passes it to remora/execution/service.py as a Ws1GatePort. The gate
+      compiles the deployment's requirement set, runs the bounded lookup loop
+      and composes engine, precondition and monitor caps with the policy meet.
+      Shadow leaves the decision unchanged; enforce makes any WS1 cap an
+      ABSTAIN, binds ws1_binding_hash into the ACCEPT token's context and
+      re-runs the gate with fresh lookups before consumption on
+      /execute-accepted, /execute and the async worker. Evidence: the route
+      tests (A18-A23), the library tests (A01-A17, A28 and an exhaustive check
+      of the composition over a finite domain with negative controls). Removing
+      the re-gate fails six route tests.
+    evidence:
+      - remora/verification/execution_gate.py
+      - remora/verification/compose.py
+      - remora/verification/planner.py
+      - remora/verification/check.py
+      - remora/decision_providers/composition_adapter.py
+      - remora/execution/service.py
+      - servers/execution_api.py
+      - tests/test_ws1_execution_binding.py
+      - tests/verification/test_authority_ceiling.py
+      - tests/verification/test_architecture_boundary.py
+      - docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md
+    caveat: >-
+      Off by default and never enabled in any deployment here. Enforce is
+      refused without REMORA_FLOW_CONTROL=1 and evidence named for IFC-04b,
+      -06, -11, -12 and -13, but that evidence is the deployment's word; the
+      code checks that it is named, not that it is true, and those work
+      packages are not complete in this repository. No route binds a review or
+      a grant to the WS1 precondition it would close, so under enforce any WS1
+      cap is a refusal. No calibrated monitor profile exists, and on the
+      AgentDojo development split no blocked call is recoverable by a bounded
+      lookup (NEGATIVE_RESULTS.md section 93), so no utility gain is claimed.
+      The verifiers and resolvers in the tests are fixtures. Producer-written
+      code and tests; independence NOT_ESTABLISHED.
