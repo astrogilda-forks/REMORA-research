@@ -40,9 +40,9 @@ REMORA bør utvikle **evidence-directed composition**, her kalt H-EDV: Monitoren
 
 Start med tre sammenlignbare mekanismer:
 
-1. **H0 — autorisasjon og innsnevring:** Eksisterende deterministisk avgjørelse komponeres med en monitor-cap. Dette er sikker basis, men kan ikke alene frigjøre en handling som mangler autorisasjon.
-2. **H-DET — deterministisk verifikasjon:** Samme basis, med en fast prioritering av godkjente oppslag for manglende forutsetninger. Dette er nødvendig kontrollarm.
-3. **H-EDV — monitorstyrt verifikasjon:** Samme autorisasjon, datakilder, verifikatorer og ressursbudsjett som H-DET; monitoren påvirker bare prioriteringen av oppslag. Denne armen tester om læringen faktisk tilfører verdi.
+1. H0, autorisasjon og innsnevring. Eksisterende deterministisk avgjørelse komponeres med en monitor-cap. Dette er sikker basis, men kan ikke alene frigjøre en handling som mangler autorisasjon.
+2. H-DET, deterministisk verifikasjon. Samme basis, med en fast prioritering av godkjente oppslag for manglende forutsetninger. Dette er nødvendig kontrollarm.
+3. H-EDV, monitorstyrt verifikasjon. Samme autorisasjon, datakilder, verifikatorer og ressursbudsjett som H-DET; monitoren påvirker bare prioriteringen av oppslag. Denne armen tester om læringen faktisk tilfører verdi.
 
 F og G fra SAP v7 beholdes som de er definert der. F er en forskningsarm og skal aldri bli en produksjonsprofil ved å omdøpes til «hybrid».
 
@@ -247,7 +247,7 @@ Komposisjonsargumentet bygger på fire antakelser:
 3. Godkjente kilder og verifikatorer gir de faktaene som kontrakten forutsetter; deres sannhet og kompromissrisiko er eksplisitt i tillitsmodellen.
 4. Binding og oppdaterings-/forbruksoperasjoner håndheves korrekt også ved samtidighet, krasj og retries.
 
-Under disse antakelsene skal implementasjonen etablere: **Ingen valgt monitor kan få et forslag utført hvis autorisasjonspredikatet ved dispatch er falskt.** En kort induksjon over overganger består av: forslag gir ingen rettighet; oppslag skriver bare validerte fakta; monitor legger bare til caps; PDP kan bare utstede autorisasjon når kravene holder; PEP gjentar de relevante kontrollene og forbruker tillatelsen atomisk.
+Under disse antakelsene skal implementasjonen etablere: **Ingen valgt monitor kan få et forslag utført hvis autorisasjonspredikatet ved dispatch er falskt**. En kort induksjon over overgangene har fem steg. Et forslag gir ingen rettighet. Oppslag skriver bare validerte fakta. Monitoren legger bare til caps. PDP kan bare utstede autorisasjon når kravene holder. PEP gjentar de relevante kontrollene og forbruker tillatelsen atomisk.
 
 Dette er en spesifisert argumentasjon. Den er ikke en maskinverifisert bevisføring for dagens Python-, database- og nettverksimplementasjon. Tester av tilfeldige observasjoner er heller ikke et slikt bevis.
 
@@ -391,9 +391,9 @@ Et monitor-veto er klebrig for samme forslag og inputhistorikk i v1. Det utløse
 
 Start med tre resolverklasser:
 
-- **Schema/contract resolver:** Leser en deployment-godkjent, signert og versjonert kontrakt. Modellgenererte beskrivelser kan foreslås offline, men er ikke aktivt policygrunnlag.
-- **Entity/relationship resolver:** Slår opp ressurs → kunde → tenant og oppdragsrelasjon fra autorisert system of record. Returnerer bindingen, ikke bare en løs verdi.
-- **Recipient ACL resolver:** Kontrollerer hvem som faktisk kan lese den aktuelle ressursen. Tvetydig identitet eller ukjent mottaker gir UNKNOWN; ikke «mest sannsynlig rett person».
+- Schema/contract resolver: leser en deployment-godkjent, signert og versjonert kontrakt. Modellgenererte beskrivelser kan foreslås offline, men er ikke aktivt policygrunnlag.
+- Entity/relationship resolver: slår opp ressurs, kunde, tenant og oppdragsrelasjon fra autorisert system of record. Returnerer bindingen, ikke bare en løs verdi.
+- Recipient ACL resolver: kontrollerer hvem som faktisk kan lese den aktuelle ressursen. Tvetydig identitet eller ukjent mottaker gir UNKNOWN; ikke «mest sannsynlig rett person».
 
 Oppslag for en ennå ukjent entitet bruker en særskilt, forhåndsautorisert og tenant-avgrenset resolve-capability. Dermed trenger man ikke først full skrivefullmakt for å finne ut hvilket objekt skrivefullmakten gjelder. Ingen slik capability betyr ingen oppslag; løkken skal ikke løse sirkelavhengigheten ved å hoppe over autorisasjon.
 
@@ -493,9 +493,9 @@ Det er bevisst ikke definert en separat execution-API for monitoren. Den får ik
 
 ### 11.1 To studier holdes adskilt
 
-**Studie A — eksisterende SAP v7 Q3/H3.** Reproduser nøyaktig publisert/frosset arm- og scoredefinisjon. Hvis E1 blokkerer mer enn 50 % av benign-merkede utviklingskall, er H3 *uninformative at this E1 block rate*. Det må ikke omtolkes som en seier for F. Standardisert partial AUROC bruker false-block-område høyst 10 %, med dokumentert tie-håndtering. En endring i adapter eller hard-list får ny versjon og nye manifest-hasher, og må følge SAP-ens egne regler før en seal.
+**Studie A: eksisterende SAP v7 Q3/H3.** Reproduser nøyaktig publisert/frosset arm- og scoredefinisjon. Hvis E1 blokkerer mer enn 50 % av benign-merkede utviklingskall, er H3 *uninformative at this E1 block rate*. Det må ikke omtolkes som en seier for F. Standardisert partial AUROC bruker false-block-område høyst 10 %, med dokumentert tie-håndtering. En endring i adapter eller hard-list får ny versjon og nye manifest-hasher, og må følge SAP-ens egne regler før en seal.
 
-**Studie B — ny WS1-studie.** Tester recovery og verifikasjonsvalg med samme autorisasjonskrav. Bruk urørt, separat holdout og ny manifest. H1–H4 fra issue omtales med navn; den nye studiens statistiske hypoteser nedenfor får egne WS-navn for å unngå kollisjon med SAP v7.
+**Studie B: ny WS1-studie.** Tester recovery og verifikasjonsvalg med samme autorisasjonskrav. Bruk urørt, separat holdout og ny manifest. H1–H4 fra issue omtales med navn; den nye studiens statistiske hypoteser nedenfor får egne WS-navn for å unngå kollisjon med SAP v7.
 
 ### 11.2 Armer i den nye studien
 
@@ -554,8 +554,8 @@ Studie B har en separat, pinnet labelkontrakt: `attack`, `benign`, `ambiguous`, 
 
 To nødvendige kjøringer:
 
-1. **Felles per-call replay:** Samme foreslåtte kall og samme basis-state gir sammenlignbare scores og beslutninger. Caching mellom armer er lov for identisk monitorinput når manifestet sier det; dette brukes til diskrimineringsanalyse, ikke til online-latenstid eller task utility.
-2. **Online end-to-end:** Hver arm får egen kopi av miljøtilstanden og gjennomfører sine faktiske blokker, oppslag, replans og dispatch. Parrede oppgaver, ordensrandomisering og faste modell-/seedinnstillinger brukes. Bare dette løpet måler fullførte oppgaver.
+1. Felles per-call replay. Samme foreslåtte kall og samme basis-state gir sammenlignbare scores og beslutninger. Caching mellom armer er lov for identisk monitorinput når manifestet sier det; dette brukes til diskrimineringsanalyse, ikke til online-latenstid eller task utility.
+2. Online end-to-end. Hver arm får egen kopi av miljøtilstanden og gjennomfører sine faktiske blokker, oppslag, replans og dispatch. Parrede oppgaver, ordensrandomisering og faste modell-/seedinnstillinger brukes. Bare dette løpet måler fullførte oppgaver.
 
 Replay kan ikke fastslå at en agent ville ha fullført en oppgave etter at forsvaret endret løpet. Begge resultater må vises.
 
