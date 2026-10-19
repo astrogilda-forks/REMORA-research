@@ -96,3 +96,35 @@ The state spaces are finite (three attempts, a lookup budget of two). "Holds" me
 that space, not a proof for any number of attempts. The model abstracts
 time to one deadline tick and the provider to one idempotent refund. No Lean
 theorem exists yet; MODEL_PROVEN is not claimed for anything.
+
+## `ws1_composition/model.py`
+
+WS1 composition, issuance and dispatch (#953,
+[WS1 SDD §12.1](../docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md)),
+as an explicit-state breadth-first search in Python rather than TLA+, so two
+transitions can call the implementation: the decision and every re-gate run
+`compose_authorized_decision` over a real `check_preconditions` result, and
+issuance and redemption compare `AuthorizationContext.hash` with the WS1
+binding in it. Consumption of the single-use grant is modelled as one atomic
+step after the re-gate, as in the code. Three preconditions in four logical
+states, required and optional monitors with arbitrary output, a grant-only
+engine restriction, evidence revoked or refuted between steps, a profile
+change and two concurrent redemptions. Results in
+[`ws1_composition/expected.json`](ws1_composition/expected.json); every
+counterexample trace is pinned in `counterexamples.json` and by
+`tests/test_ws1_formal_model.py`.
+
+| Configuration | Result |
+|---|---|
+| `all_machine` | the design invariants hold; the residual window (below) shows |
+| `machine_review_terminal`, `grant_class` | hold, trivially: a REVIEW, GRANT or TERMINAL precondition is never PROVED here, so no grant is issued |
+| `no_regate` | violated: `FreshAtRegate` (evidence revoked after ACCEPT, dispatched anyway) |
+| `nonatomic_consume` | violated: `SingleUse` (two redemptions both dispatch) |
+| `no_profile_binding` | violated: `FreshAtRegate` (profile changed after ACCEPT) |
+| `monitor_can_prove` | violated: `AuthorityCeiling`, `MonitorNonExpansion`, `RefusalPersistence` (a clean reading treated as proof) |
+
+`Residual_ProvedAtDispatchInstant` is reported, not claimed: the world can
+move between the re-gate and the consuming step, so a precondition proved at
+the re-gate may no longer hold at the instant of dispatch. Evidence TTLs bound
+that window; nothing in WS1 closes it. The design's claim is `FreshAtRegate`.
+The model does not cover the review route, crashes, retries or the outbox.

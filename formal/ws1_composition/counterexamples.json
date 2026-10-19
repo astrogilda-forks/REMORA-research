@@ -1,0 +1,115 @@
+{
+  "all_machine": {
+    "Residual_ProvedAtDispatchInstant": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "check 0",
+      "world p0->unknown",
+      "consume 0"
+    ]
+  },
+  "grant_class": {},
+  "machine_review_terminal": {},
+  "monitor_can_prove": {
+    "AuthorityCeiling": [
+      "init",
+      "monitor clean",
+      "decide accept"
+    ],
+    "FreshAtRegate": [
+      "init",
+      "monitor clean",
+      "decide accept",
+      "check 0",
+      "consume 0"
+    ],
+    "MonitorNonExpansion": [
+      "init",
+      "monitor clean",
+      "decide accept"
+    ],
+    "RefusalPersistence": [
+      "init",
+      "lookup p0=refuted",
+      "monitor clean",
+      "decide accept"
+    ],
+    "Residual_ProvedAtDispatchInstant": [
+      "init",
+      "monitor clean",
+      "decide accept",
+      "check 0",
+      "consume 0"
+    ]
+  },
+  "no_profile_binding": {
+    "FreshAtRegate": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "world profile change",
+      "check 0",
+      "consume 0"
+    ],
+    "Residual_ProvedAtDispatchInstant": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "world profile change",
+      "check 0",
+      "consume 0"
+    ]
+  },
+  "no_regate": {
+    "FreshAtRegate": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "world p0->unknown",
+      "check 0",
+      "consume 0"
+    ],
+    "Residual_ProvedAtDispatchInstant": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "world p0->unknown",
+      "check 0",
+      "consume 0"
+    ]
+  },
+  "nonatomic_consume": {
+    "Residual_ProvedAtDispatchInstant": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "check 0",
+      "world p0->unknown",
+      "consume 0"
+    ],
+    "SingleUse": [
+      "init",
+      "lookup p0=proved",
+      "lookup p1=proved",
+      "lookup p2=proved",
+      "decide accept",
+      "check 0",
+      "consume 0",
+      "check 1",
+      "consume 1"
+    ]
+  }
+}
