@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-18: **30 `open`**, **31 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-19: **31 `open`**, **31 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39, §81, §82, §83, §92): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -54,6 +54,10 @@ cites only `open` sections and that no `open` section is missing a theme.
    task's own catalogue (§83). Outside BFCL the floor grounds almost
    nothing: in the AgentDojo development dry run it blocked 90 of 91
    legitimate calls and completed one task more than refuse-all (§92).
+   No bounded lookup recovers any of them. With the arguments
+   schema-valid, every call still lacks an intent match or a declared risk
+   tier (§93). Evidence-directed verification (#953) has nothing to recover
+   until contract and intent coverage exist.
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -2659,6 +2663,7 @@ sections again.
 | The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
 | Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. Two strict xfails; the owner decided on 2026-10-18 and the change is pending | Medium |
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
+| No blocked development call is recoverable by a bounded lookup alone (§93) | After schema validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT. Causes: no extracted intent (71), undeclared risk tier on a write (16), ground-truth call refused as the wrong tool (5). WS1 recovery needs intent and contract coverage first | **High** |
 | Peer-review re-analysis widens the zero-count bounds (§83) | Clustered by tool, C-ext3 arm F 0/500 bounds at 3.5 % and C-ext4 0/295 at 5.42 %. Only 4 of the 295 C-ext4 wrong calls name a tool the task offered, so confusion between two tools of one task is barely tested | Medium |
 
 ### Accepted negative results — do not "fix" these
@@ -5504,3 +5509,40 @@ refuse-all on utility. The design response is in
 `docs/design/compositional-authority-preservation-v1.md`: let reads run
 under information-flow labels instead of lexical intent matching (CAPR-03).
 It is not built.
+
+## §93 No blocked development call is recoverable by a bounded lookup alone (2026-10-19)
+<!-- finding-status: open -->
+
+**Status:** development audit for WS1 WP0 (#953), not a confirmatory result.
+
+`artifacts/ws1/resolvability_audit_v1.json` reruns the SAP v7 development
+dry run and, for each call arm E1 blocks, decides again after the one
+bounded lookup the harness has: validating the exact arguments against the
+tool's own parameter schema. The development split now holds 30 tasks and 93
+calls, because banking `user_task_0` moved into it under RMR-AUD-012 after
+§92's artifact was stored; that artifact is unchanged. E1 blocks 92 of the 93
+calls and completes 11 of the 30 tasks.
+
+| Gap (WS1 SDD §13.1) | E1-blocked calls |
+|---|---|
+| 1. A bounded lookup suffices | 0 of 92 |
+| 2. Contract, intent vocabulary or source model missing | 92 of 92 |
+| 3. Wrong or out-of-scope call | 0 of 92 |
+
+All 92 argument sets pass schema validation. Every block then remains on a
+coverage reason: no intent extracted from the task (71), an undeclared risk
+tier on a write (16), or a ground-truth call refused as the wrong tool (5).
+In those five the extractor misread the task. Group 3 is empty because the scripted
+agent proposes ground-truth calls only; this audit says nothing about how
+REMORA treats wrong calls.
+
+**What it means.** On this harness neither WS1 verification arm can recover
+a call, deterministic (H-DET) or monitor-directed (H-EDV). A lookup proves a
+fact a contract asks for, and here no contract asks for one it could settle. A monitor that prioritises lookups has nothing to
+prioritise. The WS1 library and simulator (`remora/verification/`,
+`experiments/ws1_composition/`) test the composition contract on synthetic
+cases and do not change this count. The next step is typed intent contracts
+and offline contract coverage (WS1 SDD S09, S20), measured against this
+audit. Reproduce with `python scripts/ws1_resolvability_audit.py --out
+artifacts/ws1/resolvability_audit_v1.json` (needs
+`experiments/control_eval/requirements.txt`).

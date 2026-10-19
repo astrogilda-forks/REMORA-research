@@ -25,8 +25,8 @@ item. A cap is non-approvable when its reason is in ``NON_APPROVABLE_REASONS``
 or its source says so (``approvable=False``).
 
 External components (a learned monitor or an LLM judge, an RF-04 control
-protocol) enter as caps with their own reason codes and can only lower a
-decision.
+protocol, a WS1 execution precondition that is not PROVED) enter as caps with
+their own reason codes and can only lower a decision.
 """
 from __future__ import annotations
 
@@ -59,6 +59,7 @@ EXECUTABILITY: Final[dict[DecisionAction, int]] = {
 EXTERNAL_CAP_REASONS: Final = frozenset({
     DecisionReason.MONITOR_CAP,
     DecisionReason.PROTOCOL_CAP,
+    DecisionReason.PRECONDITION_CAP,
 })
 
 

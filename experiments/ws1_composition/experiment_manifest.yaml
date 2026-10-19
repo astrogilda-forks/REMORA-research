@@ -1,0 +1,26 @@
+# Experiment manifest — spec: docs/assurance/experiment_manifest_spec_v1.md
+experiment_id: EXP-WS1-COMPOSITION-01
+title: WS1 resolvability audit and composition simulator (#953, WP0-WP3)
+status: completed
+hypothesis: >
+  WP0: some E1-blocked AgentDojo development calls reach ACCEPT after a
+  bounded lookup from a deployment-owned source (WS1 SDD §13.1 group 1).
+  Not met: 0 of 92 (NEGATIVE_RESULTS.md §93). The simulator is a structural
+  check, not a hypothesis test: no arm and no fake monitor dispatches a call
+  the synthetic records do not authorize.
+baseline: E1 (REMORA strict) as in SAP v7, and refuse-all
+policy_configuration:
+  bounded_lookup: exact arguments validated against the tool's own parameter schema
+  simulator_arms: [H0, H_DET, H_EDV, H_RANDOM, H_ORACLE]
+  simulator_monitors: [honest, malicious_allow, saboteur, outage]
+seeds: [20261019]
+datasets:
+  - AgentDojo v1.2.2 SAP v7 development split (scripted ground-truth agent, no model call)
+  - eight synthetic ISP scenarios in experiments/ws1_composition/simulator.py
+result_artifacts:
+  - artifacts/ws1/resolvability_audit_v1.json
+promotion_target: none
+known_limitations:
+  - The scripted agent proposes ground-truth calls only, so wrong-call handling is not measured.
+  - Schema validation is the only lookup the harness can make; richer sources need contracts that ask for them.
+  - The simulator's scenarios, sources and monitor fakes are author-written; its counts are not rates.

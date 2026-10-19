@@ -4,6 +4,27 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1 execution preconditions and monitor composition (#953, library only)
+
+- `remora/verification/` compiles a deployment-owned requirement set per
+  call, checks resolver evidence (PROVED, REFUTED, UNKNOWN, CONFLICT), plans
+  bounded lookups (H0, H-DET, H-EDV, H-RANDOM) and composes the engine's
+  decision, the precondition caps and the monitor cap with the existing
+  `meet`. A monitor can cap a decision or reorder registered lookups. It
+  cannot satisfy a precondition, add a source or lift a refusal.
+- `remora/decision_providers/composition_adapter.py` accepts a monitor
+  response only when every required question has one finite score and the
+  response names the pinned model, question set, calibration, language,
+  context and evidence revision. Anything else is `invalid` or
+  `unavailable`, never low risk.
+- New external cap reason `precondition_cap` (`EXTERNAL_CAP_REASONS`). It can
+  only lower a decision. Nothing in `servers/` or `remora/execution/` uses
+  it yet.
+- WP0 audit (`artifacts/ws1/resolvability_audit_v1.json`): after schema
+  validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT.
+  All 92 are intent or contract gaps (NEGATIVE_RESULTS.md §93).
+- Design: `docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md`.
+
 ### Flow verdict in the decision (IFC-05b, PRF-041)
 
 - With `REMORA_FLOW_CONTROL=1`, `/v1/execution` derives `flow_status`, two
