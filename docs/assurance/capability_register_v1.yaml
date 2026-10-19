@@ -904,8 +904,9 @@ capabilities:
   - id: CAP-018
     name: "Task-bound authority and non-decaying loop safety on the execution API"
     status: WIRED_API_PATH
-    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
+    verified_at_sha: 2b32f33612885b807f7d1885c960bdc89ee4339a
     verified_by: >-
+      re-audited 2026-10-19 at 2b32f33 (WS1 REVIEW ROUTE), from e6c56e1: remora/execution/service.py adds stored_approval() and passes the stored approval's approver and role to ws1_regate on the review and async paths only; _never_raised now also admits an ESCALATE out of an ACCEPT or VERIFY (never out of a refusal). With REMORA_WS1_MODE unset neither runs and this capability's path is unchanged. The full suite passes on the commit. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
@@ -1197,8 +1198,9 @@ capabilities:
   - id: CAP-023
     name: "Capability minimization: task-scoped capability sets enforced at assess, execution and dispatch"
     status: WIRED_API_PATH
-    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
+    verified_at_sha: 2b32f33612885b807f7d1885c960bdc89ee4339a
     verified_by: >-
+      re-audited 2026-10-19 at 2b32f33 (WS1 REVIEW ROUTE), from e6c56e1: remora/execution/service.py adds stored_approval() and passes the stored approval's approver and role to ws1_regate on the review and async paths only; _never_raised now also admits an ESCALATE out of an ACCEPT or VERIFY (never out of a refusal). With REMORA_WS1_MODE unset neither runs and this capability's path is unchanged. The full suite passes on the commit. Status, scope and caveats unchanged.
       re-audited 2026-10-19 at e6c56e1 (WS1 WP5 GATE), from 5906b01: servers/execution_api.py adds _ws1_gate() and _ws1_capability() and passes ws1_gate to assess, execute, execute-accepted and the async worker; remora/execution/service.py adds the optional ws1_gate and ws1_capability parameters and ws1_regate(); remora/enforcement/token.py adds AuthorizationContext.ws1_binding_hash, omitted from to_dict and hash when empty. With REMORA_WS1_MODE unset or off, _ws1_gate() returns None, no WS1 code runs and every context hashes exactly as before, so this capability's path is unchanged. Under shadow the decision is unchanged; under enforce the gate can only lower a decision or refuse before consumption (tests/test_ws1_execution_binding.py). The full suite passes on the commit. Status, scope and caveats unchanged.
       rebound 2026-10-19 to 5906b01, the squash-merge commit of #950 on master; the merge commit 2bb5726 it was bound to is not on master. Verified content-identical on every cited evidence file with `git diff 2bb5726 5906b01 -- <evidence>` (empty). No status, scope or caveat change.
       re-audited 2026-10-19 at 2bb5726 (MERGE L7 UNSIGNED RECEIPTS WITH IFC-05B), from 935fa8f and 51e4422: the merge combines #950's unsigned effect path (servers/execution_api.py record_effect and the effect projection in remora/execution/projections.py, as audited at 935fa8f) with #952's flow wiring (_auth, _with_flow and _observation_with_context, as audited at 51e4422). The two touch disjoint regions and neither reads the other's state. The full suite passes on the merge. Status, scope and caveats unchanged.
@@ -1576,8 +1578,9 @@ capabilities:
   - id: CAP-030
     name: "WS1 execution preconditions and monitor composition on the execution API (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: e6c56e11517f94dda13a825e240c85a57b438aed
+    verified_at_sha: 2b32f33612885b807f7d1885c960bdc89ee4339a
     verified_by: >-
+      re-audited 2026-10-19 at 2b32f33 (WS1 REVIEW ROUTE), from e6c56e1: a REVIEW precondition names one role and is closed only by the stored approval of exactly that role for the same proposal (remora/verification/check.py ReviewAttestation); under enforce a call whose only WS1 caps are such preconditions escalates instead of abstaining (execution_gate.py). run_verification charges H-EDV hint requests to max_monitor_calls; '@intent' makes the server-resolved work order a predicate's subject. GRANT preconditions still refuse. Evidence: the review-route tests in tests/test_ws1_execution_binding.py (a mismatched role fails a removed role check), tests/test_ws1_formal_model.py, tests/flow/test_ws1_egress.py. Status unchanged; the caveat on the review route is updated below.
       audit 2026-10-19 at registration (#953 WP5): with REMORA_WS1_MODE set to
       shadow or enforce, servers/execution_api.py builds
       remora/verification/execution_gate.Ws1Gate from the deployment module
@@ -1608,9 +1611,10 @@ capabilities:
       refused without REMORA_FLOW_CONTROL=1 and evidence named for IFC-04b,
       -06, -11, -12 and -13, but that evidence is the deployment's word; the
       code checks that it is named, not that it is true, and those work
-      packages are not complete in this repository. No route binds a review or
-      a grant to the WS1 precondition it would close, so under enforce any WS1
-      cap is a refusal. No calibrated monitor profile exists, and on the
+      packages are not complete in this repository. A REVIEW precondition is
+      closed only by an approval in the one role it names; no route binds a
+      grant (IFC-08), so a GRANT precondition is a refusal, and so is every
+      other WS1 cap under enforce. No calibrated monitor profile exists, and on the
       AgentDojo development split no blocked call is recoverable by a bounded
       lookup (NEGATIVE_RESULTS.md section 93), so no utility gain is claimed.
       The verifiers and resolvers in the tests are fixtures. Producer-written
