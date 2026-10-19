@@ -1,36 +1,67 @@
 {
-  "budget": null,
+  "arms": [
+    "A_no_gate",
+    "H0",
+    "H_DET",
+    "H_RANDOM",
+    "H_EDV"
+  ],
+  "budget": {
+    "cap_usd": 50.0,
+    "pilot_cap_usd": 10.0,
+    "prices_usd_per_mtok": {
+      "claude-opus-5-5": [
+        4.0,
+        20.0
+      ]
+    },
+    "total_cap_usd": 50.0,
+    "worst_case_tokens": {
+      "claude-opus-5-5": [
+        24000,
+        4000
+      ]
+    }
+  },
+  "domain": "synthetic ISP work orders (Study B, plan \u00a72)",
   "frozen_sha256": {
-    "docs/assurance/ws1_composition_study_v1.md": "1c83bcd1f36ec623eb762fa518e60f014b29dd5d5064db4311919ba833e8e7a1",
+    "docs/assurance/ws1_composition_study_v1.md": "df3f80acf6d192a2766db9d2c5657d725e5328ed583308fb3f276c3404b96037",
     "experiments/control_eval/metrics.py": "580efb69e0ee5f4a9e8a8766e5e4c167db627a116e43a1b7c340d965ae1af462",
-    "experiments/ws1_composition/analysis.py": "f30f841c9a6cb902362adada8199bb1693f1b4546426873da88c8e9677c00181",
+    "experiments/ws1_composition/analysis.py": "efe1223b56b2bcb533acd3c6d2bf6d059d35ff2ce47cf3635d95f980fda886bd",
+    "experiments/ws1_composition/isp_study/__init__.py": "5d44ac802fe5809836c35279316867864c7c820d76cf10d4e50c5acdbd35cf46",
+    "experiments/ws1_composition/isp_study/agents.py": "7828ec5d485bde99085bc0c29e2d2a27fe411896162e4e9d8c841449192b2051",
+    "experiments/ws1_composition/isp_study/authority.py": "da026cabf1549028000e1b0bade16c569dca2ce712d068745153c9db23d73aae",
+    "experiments/ws1_composition/isp_study/defence.py": "4adde3f29c0d93058cff5a3152030295a61ef0ff313e498200c587770259a403",
+    "experiments/ws1_composition/isp_study/domain.py": "3c9531916ec0aee7acb7eb3618cc41e8079e066a895719a93dd3e2afe4c44269",
+    "experiments/ws1_composition/isp_study/runner.py": "735419f5dc918807ddb0779eb29fd1798f31805fb42b03dc197c48cb37cd5d56",
+    "experiments/ws1_composition/isp_study/study_b.py": "0de6b6f62d5ad46a7d8e255552a57a3ff6ff6bb68107a0bfdcfa38e6a79044ea",
     "experiments/ws1_composition/simulator.py": "3ce5320b0e9aba3720369d9e55333dc19d00d324a3cd87a44fe69ab0c46bbd6f",
-    "experiments/ws1_composition/study.py": "37c6ef55bf4efc0baefc79dd08a1898256c6d338a6ef2611b7c1e529b47c217b",
+    "experiments/ws1_composition/study.py": "5b8d591dc488ca3a4963b397c5e6eae45724c51057313db802a693379deb7b78",
     "remora/decision_providers/composition_adapter.py": "68543eb92255c294e25e114991c9f9aaff988a7615c3be60d8cb7790cb2180cd",
     "remora/policy/composition.py": "25e662e87aed1f8b94cf55517fee50299b5aeb7e33bfba0bcbee8ac7906261bb",
-    "remora/verification/check.py": "87e04f8e481aca7834733c8cb03936404ed7fce2320b16d93403e77b1d218622",
+    "remora/verification/check.py": "6e43212de709019e05438d4750dee3fa16cb996355a0d82c3d63a235f8934c3d",
     "remora/verification/compose.py": "97d84ea9daf501b9d9134b9a0092dec6fca562edbed8802c405ed3e0d963e46b",
-    "remora/verification/planner.py": "eb7cf6dd944a049020be33e21d745b2e402a2b789041d6136aaabcbc3a166df0",
-    "remora/verification/preconditions.py": "c9ef79e4864639f074e194026d447575d50b9a71c0a77d05ed433b4970bb1609",
-    "remora/verification/registry.py": "b4c8563445ea277be391c40ea3b0a91d72813d1500d8fa2058619b1c388942f2"
+    "remora/verification/planner.py": "6fb8f1bcfea2ec84f14e7047a3116bbfacd2755045301c1cd9b327ca2f174594",
+    "remora/verification/preconditions.py": "d3fe52721e646f3489596f771a91714d668ff1256780cc664eb015310a764b40",
+    "remora/verification/registry.py": "d735f7726f96979e11186bf197de1e81cea0b1f804bf1def8c403f7999130111"
   },
   "holdout": null,
-  "models": [],
+  "models": [
+    "claude-opus-5-5"
+  ],
   "n_boot": 10000,
   "note": "Draft. frozen_sha256 is a snapshot for drift checks; sealing rewrites it at the sealing commit.",
+  "owner_decisions": {
+    "cost_cap_usd": 50.0,
+    "decided": "2026-10-19",
+    "models": "claude-opus-5-5"
+  },
   "owner_decisions_pending": [
-    "models_and_prices",
-    "cost_cap",
-    "monitor_prompt_and_question_set",
-    "thresholds",
-    "agentdojo_requirement_set_and_resolvers",
-    "power_simulation",
-    "holdout_definition",
     "osf_registration"
   ],
   "plan": "docs/assurance/ws1_composition_study_v1.md",
   "schema": "remora-ws1-study-manifest/v1",
   "seed": 20261019,
-  "status": "draft",
+  "status": "pilot_ready",
   "study": "WS1 composition study v1 (Study B)"
 }
