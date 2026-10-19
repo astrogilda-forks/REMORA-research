@@ -4,6 +4,25 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1 review route, formal model and Study B on a work-order domain (#953)
+
+- A REVIEW precondition names one role. Under enforce, a call whose only WS1
+  caps are REVIEW preconditions of that role escalates; at execution the
+  stored approval closes them only on an exact role match for the same
+  proposal. GRANT preconditions still refuse (IFC-08 not started).
+- `formal/ws1_composition/`: an explicit-state model whose decision and
+  re-gate call the real composition. Each weakened configuration breaks
+  exactly the rule it removes; the window between re-gate and consumption is
+  reported as a residual.
+- `tests/flow/test_ws1_egress.py`: with flow control on, WS1 does not open a
+  recipient the flow check refused.
+- Study B moves to a synthetic ISP domain with structured work orders, because
+  its AgentDojo branch fails its own precondition (NEGATIVE_RESULTS.md §93).
+  Claude `claude-opus-5-5` as agent and monitor, 50 USD total cap, H-RANDOM as
+  a full control arm. Frozen for the development pilot; nothing paid has run.
+- `scripts/ws1_shadow_report.py` reads a shadow deployment's chain and counts
+  what enforce would have changed (WP6 preparation).
+
 ### WS1 on the execution path and the Study B harness (#953, WP4 and WP5)
 
 - `REMORA_WS1_MODE` (`off` by default, `shadow`, `enforce`) with

@@ -403,3 +403,34 @@ tests; **not enabled in any reference profile**, so the reference
 deployments stay synchronous until the async activation gate (issue
 #423) closes. Both scripts refuse an in-process outbox: durable state
 (`REMORA_PG_DSN`/`REMORA_CHAIN_DB`) is mandatory.
+
+## WS1 execution preconditions (opt-in, #953)
+
+Off unless `REMORA_WS1_MODE` is set. Start in shadow: the decision, the token
+and the review item stay the engine's, and every `assessed` record gains a
+`ws1` block.
+
+```bash
+export REMORA_WS1_MODE=shadow
+export REMORA_WS1_DEPLOYMENT_MODULE=acme_ws1   # exposes build_ws1_deployment()
+```
+
+`build_ws1_deployment()` returns a `remora.verification.execution_gate.Ws1Deployment`:
+the precondition registry, the verifiers, the resolvers bound to your systems of
+record, the read capabilities each principal holds, the monitor profile and an
+injected clock. `tests/verification/ws1_deployment_fixture.py` is a minimal
+example. Keep the pilot to one tenant and a few named tools.
+
+Read back what enforce would have changed:
+
+```bash
+python scripts/ws1_shadow_report.py --tenant acme --sqlite /var/lib/remora/execution.db
+```
+
+`REMORA_WS1_MODE=enforce` refuses startup without `REMORA_FLOW_CONTROL=1` and
+evidence named for IFC-04b, -06, -11, -12 and -13. That evidence is your
+word; REMORA checks that it is named, not that it is true. Under enforce any
+WS1 cap is a refusal, except a REVIEW precondition, which escalates to the one
+role it names. The grant route waits for IFC-08. Design and status:
+[WS1 SDD](../design/ws1-deterministic-authorization-learned-monitoring-v1.md).
+

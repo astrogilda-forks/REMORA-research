@@ -446,3 +446,24 @@ def test_without_a_review_role_an_unproved_machine_precondition_still_refuses(cl
     body = client.post("/v1/execution/assess", json=WRITE_CALL).json()
     assert body["decision"] == "abstain" and "review_item_id" not in body
     assert _events("assessed")[-1]["ws1"]["review_role"] == ""
+
+
+def test_the_shadow_report_counts_what_enforce_would_change(client, monkeypatch):
+    """WP6: a shadow chain read back says what enforce would have done."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from ws1_shadow_report import report
+
+    _install(monkeypatch, "shadow")
+    client.post("/v1/execution/assess", json=CALL)
+    fixture.ASSETS["acme"].clear()
+    client.post("/v1/execution/assess", json=CALL)
+    out = report(e.payload for e in _mod()._CHAIN.entries("acme"))
+    assert out["assessed_with_ws1"] == 2 and out["modes"] == {"shadow": 2}
+    assert out["records_failing_hash_check"] == 0
+    counts = out["by_tool"]["read_telemetry"]
+    assert counts.get("unchanged") == 1 and sum(counts.values()) == 2
+    assert "verification_budget_exhausted" in out["ws1_reason_codes"] or \
+        "lookup_did_not_prove" in out["ws1_reason_codes"]
