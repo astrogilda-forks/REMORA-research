@@ -139,3 +139,40 @@ def test_absence_from_an_open_source_is_unknown():
     checked = check_preconditions(ctx, reqs, [item], issued={"r": req}, registry=REGISTRY,
                                   verifiers=VERIFIERS, now_s=NOW_S, evidence_revision=0)
     assert checked.state(pre.precondition_id) is LogicalState.UNKNOWN
+
+
+def test_a_review_attestation_closes_only_its_role_and_proposal():
+    from remora.verification.check import ReviewAttestation
+
+    ctx, args = context("change_billing", {"x": "1"})
+    reqs = derive_preconditions(ctx, args, REGISTRY)
+    pre = reqs.preconditions[0]
+
+    def state(review):
+        return check_preconditions(ctx, reqs, [], issued={}, registry=REGISTRY,
+                                   verifiers=VERIFIERS, now_s=NOW_S, evidence_revision=0,
+                                   review=review).result(pre.precondition_id)
+
+    assert state(None).logical_state is LogicalState.UNKNOWN
+    assert state(ReviewAttestation(ctx.proposal_id, "ann", "Billing-Lead")).logical_state \
+        is LogicalState.PROVED
+    assert state(ReviewAttestation(ctx.proposal_id, "ann", "admin")).reason_code == \
+        "review_by_another_role"
+    assert state(ReviewAttestation("p-other", "ann", "billing-lead")).reason_code == \
+        "review_for_another_proposal"
+    # A review never reaches a MACHINE precondition.
+    checked = check_preconditions(CTX, REQS, [], issued={}, registry=REGISTRY,
+                                  verifiers=VERIFIERS, now_s=NOW_S, evidence_revision=0,
+                                  review=ReviewAttestation(CTX.proposal_id, "ann", "billing-lead"))
+    assert all(r.logical_state is LogicalState.UNKNOWN for r in checked.results)
+
+
+def test_a_review_predicate_names_exactly_one_role():
+    from remora.verification.preconditions import ResolutionClass
+    from remora.verification.registry import PredicateSpec, PreconditionRegistry, RegistryError
+
+    with pytest.raises(RegistryError, match="review role"):
+        PreconditionRegistry(tools={"t": (PredicateSpec("p", ResolutionClass.REVIEW, "v"),)})
+    with pytest.raises(RegistryError, match="review role"):
+        PreconditionRegistry(tools={"t": (PredicateSpec("p", ResolutionClass.TERMINAL, "v",
+                                                        review_role="x"),)})

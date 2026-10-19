@@ -52,7 +52,8 @@ REGISTRY = PreconditionRegistry(
             PredicateSpec("declassification", GRANT, "grant-verifier"),
         ),
         "change_billing": (
-            PredicateSpec("change_window_approved", REVIEW, "review-verifier"),
+            PredicateSpec("change_window_approved", REVIEW, "review-verifier",
+                          review_role="billing-lead"),
         ),
         "transfer": (
             PredicateSpec("intent_authority", TERMINAL, "intent-verifier"),

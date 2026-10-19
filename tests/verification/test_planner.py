@@ -157,3 +157,20 @@ def test_budget_refuses_negative_or_non_integer_limits(field):
         VerificationBudget(**{field: -1})
     with pytest.raises(ValueError):
         VerificationBudget(**{field: 1.5})
+
+
+def test_hint_requests_are_charged_to_the_monitor_budget():
+    asked = []
+
+    def hints(checked):
+        asked.append(checked.evidence_revision)
+        return ()
+
+    ctx, args = context()
+    reqs = derive_preconditions(ctx, args, REGISTRY)
+    run = run_verification(ctx, reqs, registry=REGISTRY, verifiers=VERIFIERS, resolvers=sources(),
+                           held_capabilities=ALL_CAPS, mode=PlannerMode.H_EDV,
+                           budget=VerificationBudget(max_monitor_calls=1, requests_per_round=1),
+                           clock_ms=Clock(), hints_for=hints)
+    assert len(asked) == 1 and run.budget.spent_monitor_calls == 1
+    assert run.stop_reason == "machine_preconditions_settled"  # ran on in H_DET order

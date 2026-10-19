@@ -33,7 +33,8 @@ class PredicateSpec:
     """One predicate a tool's calls need.
 
     ``subject_argument`` names the call argument the predicate is about (the
-    port, the recipient, the invoice). ``None`` makes the tenant the subject.
+    port, the recipient, the invoice). ``None`` makes the tenant the subject,
+    and ``"@intent"`` the server-resolved intent authority (the work order).
     """
 
     predicate_id: str
@@ -43,9 +44,12 @@ class PredicateSpec:
     subject_argument: str | None = None
     max_age_s: int = MAX_EVIDENCE_AGE_S
     required: bool = True
+    #: The one role whose approval closes a REVIEW predicate. Required for
+    #: REVIEW and refused for every other class.
+    review_role: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"predicate_id": self.predicate_id,
+        return {"predicate_id": self.predicate_id, "review_role": self.review_role,
                 "resolution_class": self.resolution_class.value,
                 "verifier_id": self.verifier_id, "resolver_ids": list(self.resolver_ids),
                 "subject_argument": self.subject_argument, "max_age_s": self.max_age_s,
@@ -91,6 +95,11 @@ class PreconditionRegistry:
                         f"{tool}/{spec.predicate_id}: max_age_s must be 1..{MAX_EVIDENCE_AGE_S}")
                 if not spec.verifier_id.strip():
                     raise RegistryError(f"{tool}/{spec.predicate_id}: verifier required")
+                if (spec.resolution_class is ResolutionClass.REVIEW) != bool(
+                        spec.review_role and spec.review_role.strip()):
+                    raise RegistryError(
+                        f"{tool}/{spec.predicate_id}: a REVIEW predicate names exactly one "
+                        "review role, and no other class names one")
                 if spec.resolver_ids and spec.resolution_class is not ResolutionClass.MACHINE:
                     raise RegistryError(
                         f"{tool}/{spec.predicate_id}: only a machine predicate has resolvers")

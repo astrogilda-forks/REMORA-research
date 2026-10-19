@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 __all__ = [
     "CANONICALIZATION_ID",
     "DOMAIN",
+    "INTENT_SUBJECT",
     "ExecutionPrecondition",
     "LogicalState",
     "ProcessingStatus",
@@ -45,6 +46,9 @@ __all__ = [
     "tagged_digest",
 ]
 
+#: ``subject_argument`` value that makes the server-resolved intent authority
+#: (the work order) the subject. No call argument can name it.
+INTENT_SUBJECT = "@intent"
 #: Domain separation for every WS1 commitment (WS1 §6.4).
 DOMAIN = "REMORA/WS1-COMPOSITION/v1"
 #: The evidence-admission encoding: sorted keys, no floats. Not RFC 8785.
@@ -142,6 +146,7 @@ class ExecutionPrecondition:
     required: bool
     resolution_class: ResolutionClass
     max_age_s: int
+    review_role: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"precondition_id": self.precondition_id, "predicate_id": self.predicate_id,
@@ -149,7 +154,7 @@ class ExecutionPrecondition:
                 "subject_binding_hash": self.subject_binding_hash,
                 "verifier_id": self.verifier_id, "resolver_ids": list(self.resolver_ids),
                 "required": self.required, "resolution_class": self.resolution_class.value,
-                "max_age_s": self.max_age_s}
+                "max_age_s": self.max_age_s, "review_role": self.review_role}
 
 
 @dataclass(frozen=True)
@@ -208,6 +213,8 @@ def derive_preconditions(context: ProposalContext, arguments: Mapping[str, Any],
     for spec in specs:
         if spec.subject_argument is None:
             subject = context.tenant_id
+        elif spec.subject_argument == INTENT_SUBJECT:
+            subject = context.intent_authority_hash
         else:
             if spec.subject_argument not in arguments:
                 return incomplete(f"subject_argument_missing:{spec.predicate_id}")
@@ -223,7 +230,8 @@ def derive_preconditions(context: ProposalContext, arguments: Mapping[str, Any],
             predicate_id=spec.predicate_id, subject_ref=subject,
             subject_binding_hash=binding, verifier_id=spec.verifier_id,
             resolver_ids=spec.resolver_ids, required=spec.required,
-            resolution_class=spec.resolution_class, max_age_s=spec.max_age_s))
+            resolution_class=spec.resolution_class, max_age_s=spec.max_age_s,
+            review_role=spec.review_role.strip().lower() if spec.review_role else None))
     result = RequirementSet(context.context_hash, registry.registry_hash, tuple(compiled), True)
     if not result.authorizable:
         return incomplete("no_required_precondition")

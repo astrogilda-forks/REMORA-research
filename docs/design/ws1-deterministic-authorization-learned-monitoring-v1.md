@@ -5,7 +5,7 @@
 | Felt | Verdi |
 |---|---|
 | Problem | [REMORA-research #953](https://github.com/darklordVirtual/REMORA-research/issues/953) |
-| Status | WP0–WP3 implementert som bibliotek og simulator (19.10.2026), se «Implementeringsstatus». Ikke koblet til `servers/` eller `remora/execution/`; ingen produksjonsaktivering. WP4–WP6 gjenstår. |
+| Status | WP0–WP5 implementert og WP6 forberedt som shadow-pilot (19.10.2026), se «Implementeringsstatus». WP5 er koblet til `/v1/execution` bak `REMORA_WS1_MODE`, med `off` som standard; ingen produksjonsaktivering. Studie B kjører på et syntetisk ISP-domene og er låst for dev-piloten (`pilot_ready`). |
 | Kodegrunnlag | `85d2abdbf66a1523f3089e905f4af7bc76faa2df`, master observert 19.10.2026 |
 | Hovedbeslutning | Deterministisk autorisasjon + monitor som bare begrenser + kontrollert innhenting av autoritative bevis + ny deterministisk vurdering |
 | Primærleveranse | Testbar komposisjonskontrakt, forskningsopplegg og trinnvis gjennomføring |
@@ -22,17 +22,28 @@ Dette avsnittet er lagt til etter at spesifikasjonen ble skrevet. Resten av doku
 | WP2 | H0, H-DET og H-RANDOM, budsjett, deduplisering, familietak og egen resolve-capability per oppslag. | `remora/verification/{planner,resolvers}.py` |
 | WP3 | Streng validering av monitorrespons, profil-låsing, klebrig veto, shadow, og hints som bare omprioriterer (H-EDV). | `remora/decision_providers/composition_adapter.py` |
 | Simulator | Syntetisk ISP-domene: åtte scenarier, fem armer og fire fake-monitorer. Tester strukturelle egenskaper. Gir ikke nytte- eller sikkerhetsrater. | `experiments/ws1_composition/simulator.py` |
+| WP4 | AgentDojo-grenen av Studie B feiler sin egen forutsetning (§93) og rapporteres som ikke kjørt. Studie B kjører på et syntetisk ISP-domene med strukturerte arbeidsordrer, med armene A, B, H0, H-DET, H-RANDOM og H-EDV, Claude (`claude-opus-5-5`) som agent og monitor, og et totalt kostnadstak på 50 USD. Det finnes vakter mot betalt kjøring og holdout, en terskel-, størrelses- og power-regel fra dev-piloten, og en deskriptiv replay av F og G. Status: `pilot_ready`. | `docs/assurance/ws1_composition_study_v1.md`, `data/ws1_composition_v1/manifest.json`, `experiments/ws1_composition/isp_study/`, `scripts/run_ws1_study.py` |
+| WP6 | Shadow-pilot er forberedt: deployment-oppsett, en rapport over hva `enforce` ville ha endret (`scripts/ws1_shadow_report.py`) og en runbook. En pilot i et ekte miljø og en overgang til `enforce` er en driftsbeslutning, og `enforce` venter på IFC-pakkene. | `docs/deployment/execution-quickstart.md`, `scripts/ws1_shadow_report.py` |
+| Formell modell | Eksplisitt tilstandsmodell der beslutning og re-gate kaller den ekte komposisjonen. Hver svekket konfigurasjon bryter nøyaktig den invarianten den skal. Vinduet mellom re-gate og forbruk rapporteres som en rest. | `formal/ws1_composition/` |
+| WP5 | Gaten kjører i `/v1/execution/assess` etter alle andre komponenter. Under `enforce` går bindingen inn i ACCEPT-tokenets autorisasjonskontekst (`ws1_binding_hash`). Gaten kjøres på nytt med ferske oppslag før forbruk på ACCEPT-, review- og async-stien. Execution-kjernen ser bare `Ws1GatePort`; den importerer aldri `remora/verification`. | `remora/verification/execution_gate.py`, `remora/execution/{ports,service}.py`, `remora/enforcement/token.py`, `servers/execution_api.py` |
 
-Akseptansetester som finnes: A01–A17, A23 og A28 i `tests/verification/` og `tests/policy/test_ws1_composition.py`. A18 er delvis dekket: alle bundne kontekstfelt flytter kontekst-hashen, og en record kan ikke gjenbrukes, men det finnes ingen dispatch. Den uttømmende sjekken av `compose_authorized_decision` dekker et endelig inndomene. Hver invariant der har en negativ kontroll med en bevisst svekket implementasjon. Den formelle modellen i §12.1 med lease og samtidige execute-forsøk er ikke laget.
+Akseptansetester som finnes: A01–A28, i `tests/verification/`, `tests/policy/test_ws1_composition.py`, `tests/test_ws1_execution_binding.py` og `tests/test_ws1_harness.py`. Avgrensninger: A18 dekker WS1-feltene (register, profil, budsjett, planner) og argumentene gjennom ruten; tenant, principal, intent, policy, ToolSpec og oppgave bindes av eksisterende kontekstfelt og testes der. A20 viser at eksisterende engangskontrakt holder under WS1, ikke exactly-once-effekt. A21 dekker det WS1 selv sender videre, og en ende-til-ende-test med flytkontroll (`tests/flow/test_ws1_egress.py`) viser at WS1 ikke åpner en F4-sperret mottaker. Den uttømmende sjekken av `compose_authorized_decision` dekker et endelig inndomene, og hver invariant der har en negativ kontroll. Den formelle modellen (`formal/ws1_composition/`) dekker lease, profilbinding og to samtidige execute-forsøk. Den dekker ikke review-stien, krasj eller outbox.
 
 Avvik fra spesifikasjonen:
 
 - `VerificationBudget` har i tillegg `requests_per_round` (default 2) og `resolver_timeout_ms`. En runde kjører høyst `requests_per_round` oppslag; `max_resolver_calls` er fortsatt totaltaket.
 - `ProposalContext` har i tillegg `tool_name`. `derive_preconditions` regner ut kall-hashen på nytt med motorens `canonical_tool_call_hash` og avviser argumenter som ikke stemmer.
 - Når løkken har stoppet, er et uløst MACHINE-krav ABSTAIN og ikke VERIFY. Ny kode `lookup_did_not_prove` brukes når et oppslag ble gjort uten å bevise kravet.
-- Review- og grant-utfall kan ennå ikke registreres som bevis. Slike krav ender alltid i ESCALATE på riktig rute.
+- Et REVIEW-predikat navngir nøyaktig én rolle. Under `enforce` blir et kall ESCALATE med den rollen når de eneste WS1-capene er REVIEW-krav av samme rolle. Ved utførelse lukker den lagrede godkjenningen (godkjenner og autentisert rolle) bare REVIEW-krav med eksakt samme rolle for samme forslag. Alle andre WS1-caps er ABSTAIN under `enforce`. GRANT-krav er fortsatt en nekt, fordi grants (IFC-08) ikke er påbegynt.
+- `@intent` som subjekt gjør den server-løste arbeidsordren til subjektet for et predikat; ingen argumentverdi kan sette den.
+- H-EDV-hint teller mot `max_monitor_calls` i selve løkken.
+- Monitor-veto fra en hint-runde beholdes gjennom senere vurderinger. Komposisjonen avviser bevis som har utløpt mens monitoren svarte.
+- Review- og async-stien sammenligner bindingen fra den opprinnelige vurderingen med ferskt register, profil, budsjett og planner før godkjenningen forbrukes. En tidligere håndhevet godkjenning avvises også etter overgang til `off` eller `shadow`.
+- Studie B teller sluttvurderingen og feilede modellkall mot samme monitorbudsjett per forslag.
+- `enforce` nektes ved oppstart uten `REMORA_FLOW_CONTROL=1` og uten at deploymenten navngir evidens for IFC-04b, IFC-06, IFC-11, IFC-12 og IFC-13. Denne evidensen er deploymentens egen påstand; koden sjekker at den er navngitt, ikke at den er sann.
+- Monitoren får aldri argumentverdier. En resolver sender kravets subject (en argumentverdi) til sin registrerte kilde.
 
-Gjenstår: WP4 (preregistrering, manifest, A24–A27), WP5 (execution-integrasjon, A18 fullt, A19–A22) og WP6. WP0 viser at H-DET og H-EDV ikke kan gjenopprette noe på AgentDojo før intent- og kontraktsdekning finnes (S09, S20). Det arbeidet kommer før en meningsfull WS-UTILITY- eller WS-ATTRIBUTION-studie.
+Gjenstår: dev-piloten, forseglingen og holdout-kjøringen av Studie B (krever API-nøkkel), OSF-registrering, grant-ruten (venter på IFC-08), en pilot i et ekte miljø, og `enforce` i produksjon (venter på IFC-pakkene). WP0 viser at H-DET og H-EDV ikke kan gjenopprette noe på AgentDojo før intent- og kontraktsdekning finnes (S09, S20). Det arbeidet kommer før en meningsfull WS-UTILITY- eller WS-ATTRIBUTION-studie.
 
 ## 0. Beslutningsgrunnlag
 

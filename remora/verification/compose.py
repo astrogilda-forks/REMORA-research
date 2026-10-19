@@ -164,6 +164,8 @@ def compose_authorized_decision(
             or checked.requirements_hash != requirements.requirements_hash \
             or context.profile_hash != profile.profile_hash:
         caps.append((Cap("binding", AB, _PRE, approvable=False), "binding_mismatch"))
+    if checked.earliest_expiry is not None and now_s >= checked.earliest_expiry:
+        caps.append((Cap("freshness", AB, _PRE, approvable=False), "evidence_expired"))
     caps.extend(_precondition_caps(requirements, checked, verifiable, budget_exhausted))
 
     outcome, monitor_reason = monitor_usable(assessment, profile, context, checked, now_s)

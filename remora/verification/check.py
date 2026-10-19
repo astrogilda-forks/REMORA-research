@@ -28,6 +28,7 @@ from remora.verification.preconditions import (
     ProcessingStatus,
     ProposalContext,
     RequirementSet,
+    ResolutionClass,
     tagged_digest,
 )
 from remora.verification.registry import PreconditionRegistry
@@ -36,6 +37,7 @@ __all__ = [
     "CheckedPreconditions",
     "PreconditionResult",
     "ResolverEvidence",
+    "ReviewAttestation",
     "VerificationRequest",
     "Verifier",
     "check_preconditions",
@@ -91,6 +93,24 @@ class ResolverEvidence:
             "acquired_at": self.acquired_at, "valid_until": self.valid_until,
             "payload_hash": self.payload_hash, "capture_method": self.capture_method,
             "integrity_ref": self.integrity_ref})
+
+
+@dataclass(frozen=True)
+class ReviewAttestation:
+    """An approval as the review queue recorded it: who approved, in which
+    authenticated role, for which proposal. Built by the execution layer from
+    the stored approval, never from a request. It closes only a REVIEW
+    precondition whose role it matches exactly, for the same proposal."""
+
+    proposal_id: str
+    approver: str
+    approver_role: str
+
+    @property
+    def evidence_ref(self) -> str:
+        return tagged_digest("review-attestation", {
+            "proposal_id": self.proposal_id, "approver": self.approver,
+            "approver_role": self.approver_role})
 
 
 class Verifier(Protocol):
@@ -210,13 +230,34 @@ def _fold(pre: ExecutionPrecondition, verdicts: list[tuple[LogicalState, str, Re
                               verdicts[0][1], now_s, None, None, version)
 
 
+def _reviewed(pre: ExecutionPrecondition, review: ReviewAttestation | None,
+              context: ProposalContext, now_s: int) -> PreconditionResult:
+    pid = pre.precondition_id
+    if review is None:
+        return PreconditionResult(pid, LogicalState.UNKNOWN, ProcessingStatus.NO_DATA, (),
+                                  "no_review")
+    if review.proposal_id != context.proposal_id:
+        return PreconditionResult(pid, LogicalState.UNKNOWN, ProcessingStatus.COMPLETED, (),
+                                  "review_for_another_proposal")
+    if not pre.review_role or review.approver_role.strip().lower() != pre.review_role:
+        return PreconditionResult(pid, LogicalState.UNKNOWN, ProcessingStatus.COMPLETED, (),
+                                  "review_by_another_role")
+    return PreconditionResult(pid, LogicalState.PROVED, ProcessingStatus.COMPLETED,
+                              (review.evidence_ref,), "reviewed_by_role", now_s)
+
+
 def check_preconditions(context: ProposalContext, requirements: RequirementSet,
                         evidence: Sequence[ResolverEvidence], *,
                         issued: Mapping[str, VerificationRequest],
                         registry: PreconditionRegistry,
                         verifiers: Mapping[str, Verifier],
-                        now_s: int, evidence_revision: int) -> CheckedPreconditions:
-    """Derive every precondition's state from scratch from *evidence*."""
+                        now_s: int, evidence_revision: int,
+                        review: ReviewAttestation | None = None) -> CheckedPreconditions:
+    """Derive every precondition's state from scratch from *evidence*.
+
+    *review* closes REVIEW preconditions whose role it matches, and nothing
+    else: a MACHINE, GRANT or TERMINAL precondition never reads it.
+    """
     if requirements.context_hash != context.context_hash:
         raise ValueError("requirement set belongs to another context")
     if registry.registry_hash != requirements.registry_hash:
@@ -249,8 +290,9 @@ def check_preconditions(context: ProposalContext, requirements: RequirementSet,
             continue
         per.setdefault(pre.precondition_id, []).append((state, str(reason), item))
     results = tuple(
-        _fold(pre, per.get(pre.precondition_id, []), failed.get(pre.precondition_id, []),
-              pre.precondition_id in unsupported, verifiers.get(pre.verifier_id), now_s)
+        _reviewed(pre, review, context, now_s) if pre.resolution_class is ResolutionClass.REVIEW
+        else _fold(pre, per.get(pre.precondition_id, []), failed.get(pre.precondition_id, []),
+                   pre.precondition_id in unsupported, verifiers.get(pre.verifier_id), now_s)
         for pre in requirements.preconditions)
     expiries = [r.valid_until for r in results
                 if r.logical_state is LogicalState.PROVED and r.valid_until is not None]

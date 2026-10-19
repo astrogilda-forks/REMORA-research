@@ -747,6 +747,8 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             assessed_record=_assessed_record,
             require_execution_context=context_required(),
             approval_policy=_approval_policy_for(tenant),
+            ws1_gate=_ws1_gate(),
+            ws1_capability=_ws1_capability(tenant),
         )
         if result is not None:
             results.append(result)
@@ -1043,6 +1045,44 @@ _FLOW_CONTEXTS: Any = None
 def _flow_control_enabled() -> bool:
     """``REMORA_FLOW_CONTROL=1`` turns on derived flow control (SDD v1.3)."""
     return _os.environ.get("REMORA_FLOW_CONTROL", "").strip() == "1"
+
+
+_WS1_GATE: Any = None
+
+
+def _ws1_gate() -> Any:
+    """The WS1 gate (issue #953), or None when ``REMORA_WS1_MODE`` is unset or off.
+
+    ``REMORA_WS1_MODE`` is ``off`` (default), ``shadow`` or ``enforce``; any
+    other value, ``research`` included, is refused: research runs in the
+    isolated runner, never behind this API. A mode other than off needs
+    ``REMORA_WS1_DEPLOYMENT_MODULE``, a module exposing
+    ``build_ws1_deployment()``. Enforce is refused unless flow control is on
+    and the deployment names evidence for every prerequisite work package
+    (``remora.verification.execution_gate.ENFORCE_DEPENDENCIES``).
+    """
+    global _WS1_GATE
+    mode = _os.environ.get("REMORA_WS1_MODE", "").strip().lower() or "off"
+    if mode == "off":
+        return None
+    if mode not in ("shadow", "enforce"):
+        raise ValueError(f"REMORA_WS1_MODE={mode!r} is not one of off, shadow, enforce")
+    if _WS1_GATE is None or _WS1_GATE.mode != mode:
+        module = _deployment_module(_os.environ.get("REMORA_WS1_DEPLOYMENT_MODULE", ""))
+        if module is None:
+            raise ValueError(f"REMORA_WS1_MODE={mode} needs REMORA_WS1_DEPLOYMENT_MODULE")
+        from remora.verification.execution_gate import Ws1Gate
+
+        _WS1_GATE = Ws1Gate(mode, module.build_ws1_deployment(),
+                            flow_control=_flow_control_enabled())
+    return _WS1_GATE
+
+
+def _ws1_capability(tenant: str) -> Any:
+    """The capability block a WS1 binding covers, for a call and its proposer."""
+    if _capability_resolver() is None:
+        return None
+    return lambda call, who: _capability_block(call, who, tenant)
 
 
 def _flow_contexts() -> Any:
@@ -2134,6 +2174,9 @@ from servers.semantic_shadow import (
     build_semantic_shadow_from_env,
 )
 
+# Refused at startup when REMORA_WS1_MODE is set without a usable deployment.
+_ws1_gate()
+
 _SEMANTIC_SHADOW = build_semantic_shadow_from_env(
     engine=_ENGINE, tool_description=_toolspec_description,
 )
@@ -2160,6 +2203,7 @@ def _assess_proposal_with_loop_state(
         semantic_shadow=_SEMANTIC_SHADOW,
         execution_context_provider=context_provider(),
         require_execution_context=context_required(),
+        ws1_gate=_ws1_gate(),
     )
 
 
@@ -2701,6 +2745,8 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             transactional_append=chain_append_transactional,
             require_execution_context=context_required(),
             approval_policy=_approval_policy_for(tenant),
+            ws1_gate=_ws1_gate(),
+            ws1_capability=_ws1_capability(tenant),
         )
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
@@ -2791,6 +2837,8 @@ def execute_accepted(req: ExecuteAcceptedRequest, request: Request) -> dict[str,
             assessed_toolspec=_assessed_toolspec_for_proposal,
             policy_bundle_hash=_current_policy_bundle_hash,
             require_execution_context=context_required(),
+            ws1_gate=_ws1_gate(),
+            ws1_capability=_ws1_capability(tenant),
         )
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc

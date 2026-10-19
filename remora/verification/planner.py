@@ -30,6 +30,7 @@ from enum import StrEnum
 from remora.verification.check import (
     CheckedPreconditions,
     ResolverEvidence,
+    ReviewAttestation,
     VerificationRequest,
     Verifier,
     check_preconditions,
@@ -181,7 +182,8 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                      hints_for: Callable[[CheckedPreconditions], Sequence[str]] | None = None,
                      seed: int = 0,
                      evidence: Sequence[ResolverEvidence] = (),
-                     issued: Mapping[str, VerificationRequest] | None = None) -> VerificationRun:
+                     issued: Mapping[str, VerificationRequest] | None = None,
+                     review: ReviewAttestation | None = None) -> VerificationRun:
     """Check, then look up and re-check until a stop condition holds.
 
     The loop has stopped when this returns, so a composition over the result
@@ -189,8 +191,9 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     pending VERIFY.
 
     *hints_for* is called once per round with the current check and returns
-    the monitor's hinted precondition IDs (H_EDV only). It is how the monitor
-    reaches the loop; it cannot reach anything else.
+    the monitor's hinted precondition IDs (H_EDV only), at most
+    ``budget.max_monitor_calls`` times. It is how the monitor reaches the
+    loop; it cannot reach anything else.
     """
     start = clock_ms()
     deadline = start + budget.wall_deadline_ms
@@ -201,7 +204,8 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     def check(revision: int) -> CheckedPreconditions:
         return check_preconditions(context, requirements, evidence_list, issued=issued_map,
                                    registry=registry, verifiers=verifiers,
-                                   now_s=clock_ms() // 1000, evidence_revision=revision)
+                                   now_s=clock_ms() // 1000, evidence_revision=revision,
+                                   review=review)
 
     revision = 0
     checked = check(revision)
@@ -228,7 +232,11 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
         if clock_ms() >= deadline:
             return done("deadline")
         hints: Sequence[str] = ()
-        if mode is PlannerMode.H_EDV and hints_for is not None:
+        if mode is PlannerMode.H_EDV and hints_for is not None \
+                and budget.spent_monitor_calls < budget.max_monitor_calls:
+            # Each hint request is a monitor call and is charged to the budget;
+            # past the cap the round runs in H_DET order.
+            budget = replace(budget, spent_monitor_calls=budget.spent_monitor_calls + 1)
             hints = tuple(hints_for(checked))
         plan, dropped = plan_verification(requirements, checked, budget, mode,
                                           hints=hints, seed=seed)

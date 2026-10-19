@@ -1,0 +1,26 @@
+{
+  "all_machine": [
+    "Residual_ProvedAtDispatchInstant"
+  ],
+  "grant_class": [],
+  "machine_review_terminal": [],
+  "monitor_can_prove": [
+    "AuthorityCeiling",
+    "FreshAtRegate",
+    "MonitorNonExpansion",
+    "RefusalPersistence",
+    "Residual_ProvedAtDispatchInstant"
+  ],
+  "no_profile_binding": [
+    "FreshAtRegate",
+    "Residual_ProvedAtDispatchInstant"
+  ],
+  "no_regate": [
+    "FreshAtRegate",
+    "Residual_ProvedAtDispatchInstant"
+  ],
+  "nonatomic_consume": [
+    "Residual_ProvedAtDispatchInstant",
+    "SingleUse"
+  ]
+}

@@ -24,7 +24,9 @@ from remora.decision_providers.composition_adapter import (
 from remora.policy.composition import Cap, meet, rank
 from remora.policy.report import DecisionAction, DecisionReason
 from remora.verification.compose import compose_authorized_decision
-from remora.verification.preconditions import LogicalState, derive_preconditions
+from remora.verification.preconditions import LogicalState, ResolutionClass, derive_preconditions
+
+MACHINE_CLASS = ResolutionClass.MACHINE
 from tests.verification._ws1 import (
     NOW_S,
     REGISTRY,
@@ -242,3 +244,14 @@ def test_composition_agrees_with_the_engines_own_meet():
                     approvable=c.approvable) for c in rec.all_caps]
         assert meet(caps).action.value == rec.final_action
         assert rank(meet(caps)) <= rank(Cap("engine", A, DecisionReason.GROUNDED_READ_ACCEPT))
+
+
+def test_the_intent_subject_is_the_contexts_authority_never_an_argument():
+    from remora.verification.preconditions import INTENT_SUBJECT
+    from remora.verification.registry import PredicateSpec, PreconditionRegistry
+
+    registry = PreconditionRegistry(tools={"set_port_profile": (
+        PredicateSpec("tool_in_work_order", MACHINE_CLASS, "v", subject_argument=INTENT_SUBJECT),)})
+    ctx, args = context(args={"port": "sw1/p4", "@intent": "forged"})
+    reqs = derive_preconditions(ctx, args, registry)
+    assert reqs.preconditions[0].subject_ref == ctx.intent_authority_hash

@@ -620,6 +620,22 @@ and nothing about recipients, fields or handles. Tool results do not yet
 raise a context's label (IFC-04b), so in this release only a raise recorded
 by other means changes a decision.
 
+**WS1 execution preconditions (#953, opt-in, default off):**
+`REMORA_WS1_MODE` is `off`, `shadow` or `enforce`; any other value refuses
+startup. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
+exposing `build_ws1_deployment()`: the precondition registry, verifiers,
+resolvers, read capabilities, monitor profile and budget. `/assess` then runs
+the WS1 loop after every other component, records it under `ws1` in the chain
+and returns `ws1.mode`, `ws1.status` and `ws1.final_action`. In shadow nothing
+else changes. In enforce any WS1 cap makes the call ABSTAIN with
+`precondition_cap` or `monitor_cap`, and an ACCEPT token binds
+`ws1_binding_hash` in its authorization context. `/execute-accepted`,
+`/execute` and the async worker run the gate again with fresh lookups before
+anything is consumed and refuse with `ws1_regate_refused`; a moved requirement
+set or profile refuses as `context_mismatch`. Enforce refuses startup without
+`REMORA_FLOW_CONTROL=1` and evidence named for the prerequisite IFC work
+packages ([design](design/ws1-deterministic-authorization-learned-monitoring-v1.md)).
+
 **Capability sets (WS8 Q8.2, opt-in):** with
 `REMORA_CAPABILITY_POLICY_FILE` naming a YAML or JSON capability policy,
 the API resolves an `EffectiveCapabilitySet` for every call. It uses the

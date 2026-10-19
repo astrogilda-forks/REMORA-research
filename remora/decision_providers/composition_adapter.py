@@ -16,7 +16,8 @@ to check first. Neither can satisfy a precondition or name a new source.
 Scores are kept on the assessment for analysis and never enter a commitment:
 the record binds the SHA-256 of the raw response bytes instead.
 
-LIBRARY ONLY: nothing in ``servers/`` or ``remora/execution/`` imports this module.
+Reached from the execution path only through
+:mod:`remora.verification.execution_gate`, and only when ``REMORA_WS1_MODE`` is set.
 """
 from __future__ import annotations
 

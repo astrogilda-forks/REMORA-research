@@ -224,6 +224,13 @@ class AuthorizationContext:
     #: before. Bound here so a delegate cannot be added or swapped after the
     #: grant or the approval it rides on.
     delegated_executor: str = ""
+    #: The WS1 binding (issue #953): context, requirement set, monitor profile,
+    #: registry, planner and budget the composition reached ACCEPT under.
+    #: Absent unless WS1 runs in enforce mode, and omitted from the hash when
+    #: empty, so a context without it hashes exactly as before. Redemption
+    #: recomputes it from a fresh WS1 re-gate, so a moved requirement or a
+    #: precondition no longer proved refuses as context_mismatch.
+    ws1_binding_hash: str = ""
 
     def hash(self) -> str:
         # The optional fields are omitted rather than defaulted to "" (see
@@ -265,6 +272,7 @@ class AuthorizationContext:
                 "execution_context_hash",
                 "request_ref_hash",
                 "delegated_executor",
+                "ws1_binding_hash",
             )
             if (getattr(self, name) or "") != (getattr(other, name) or "")
         ]
@@ -284,7 +292,7 @@ class AuthorizationContext:
             "toolspec_hash": self.toolspec_hash or "",
         }
         for name in ("context_id", "task_id", "execution_context_hash",
-                     "request_ref_hash", "delegated_executor"):
+                     "request_ref_hash", "delegated_executor", "ws1_binding_hash"):
             if getattr(self, name):
                 out[name] = getattr(self, name)
         return out
