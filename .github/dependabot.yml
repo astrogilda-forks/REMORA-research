@@ -86,7 +86,7 @@ updates:
   # Probity's invocation_axes reader for the reproduction job. The pin stays
   # exact, so a release reaches CI only as a pull request that runs the job.
   - package-ecosystem: "pip"
-    directory: "/ci/probity-readers"
+    directory: "/ci/agent-evidence-vectors"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 1

@@ -1,7 +1,7 @@
 name: Probity invocation axes (reproduction)
 
 # REMORA re-runs Probity's separately maintained invocation_axes reader, pinned
-# by version and hash in ci/probity-readers/requirements.txt, and pairs it with REMORA's own effect-evidence-v1 reference
+# by version and hash in ci/agent-evidence-vectors/requirements.txt, and pairs it with REMORA's own effect-evidence-v1 reference
 # verifier at the frozen revision. The corpus pins one MCP tools/call and judges
 # a decision capture package and an execution bundle on three separate claims:
 # package integrity, request and decision correspondence, and observed effect.
@@ -29,13 +29,13 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/probity-invocation-axes-reproduction.yml"
-      - "ci/probity-readers/**"
+      - "ci/agent-evidence-vectors/**"
       - "artifacts/interop/effect-evidence-v2/**"
   push:
     branches: [master]
     paths:
       - ".github/workflows/probity-invocation-axes-reproduction.yml"
-      - "ci/probity-readers/**"
+      - "ci/agent-evidence-vectors/**"
       - "artifacts/interop/effect-evidence-v1/**"
       - "artifacts/interop/effect-evidence-v2/**"
   workflow_dispatch:
@@ -48,7 +48,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  READER_REQUIREMENTS: ci/probity-readers/requirements.txt
+  READER_REQUIREMENTS: ci/agent-evidence-vectors/requirements.txt
   # REMORA revision effect-evidence-v1 was frozen at (#728).
   FROZEN_REVISION: fe324dd734734d9227aa894330ac52c2bb916b94
   # Bundles REMORA's verifier alone reads as EFFECT_VERIFIED while the reader's
