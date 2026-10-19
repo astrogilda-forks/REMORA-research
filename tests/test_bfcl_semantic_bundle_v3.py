@@ -62,10 +62,29 @@ def test_v3_a_qualified_mutation_is_never_supported(task: str) -> None:
     "Tell me if I can cancel booking B-104.",
     "Review the policy before we cancel booking B-104.",
     "Do not cancel booking B-104, just show me booking B-104.",
+    'The error message says "Cancel booking B-104" failed; show me booking B-104.',
+    "The customer said to cancel booking B-104; show me booking B-104.",
+    "The system failed to cancel booking B-104; show me booking B-104.",
 ])
 def test_v3_the_information_request_is_the_read(task: str) -> None:
     assert _verdict("get_booking", task) is GoalMatch.SUPPORTED
     assert _verdict("cancel_booking", task) is GoalMatch.UNSUPPORTED
+
+
+@pytest.mark.parametrize("task", [
+    'The log contains "cancel booking B-104".',
+    'Why did "cancel booking B-104" fail?',
+    "Why did we cancel booking B-104?",
+    "The customer said they might cancel booking B-104.",
+    "According to the ticket, they might cancel booking B-104.",
+    "The system failed to cancel booking B-104.",
+])
+def test_v3_quoted_and_reported_mutations_are_never_supported(task: str) -> None:
+    assert _verdict("cancel_booking", task) is not GoalMatch.SUPPORTED
+
+
+def test_v3_quoted_argument_still_supports_plain_mutation() -> None:
+    assert _verdict("cancel_booking", 'Please cancel booking "B-104".') is GoalMatch.SUPPORTED
 
 
 def test_v3_an_inspect_only_task_yields_no_intent() -> None:

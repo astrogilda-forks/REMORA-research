@@ -27,7 +27,7 @@
   "frozen_sha256": {
     "docs/assurance/ws1_composition_study_v1.md": "df3f80acf6d192a2766db9d2c5657d725e5328ed583308fb3f276c3404b96037",
     "experiments/control_eval/metrics.py": "580efb69e0ee5f4a9e8a8766e5e4c167db627a116e43a1b7c340d965ae1af462",
-    "experiments/ws1_composition/analysis.py": "efe1223b56b2bcb533acd3c6d2bf6d059d35ff2ce47cf3635d95f980fda886bd",
+    "experiments/ws1_composition/analysis.py": "40f631d14365ea225de6baa878dd4b9d913977295a736a86b8c09814270e1782",
     "experiments/ws1_composition/isp_study/__init__.py": "5d44ac802fe5809836c35279316867864c7c820d76cf10d4e50c5acdbd35cf46",
     "experiments/ws1_composition/isp_study/agents.py": "7828ec5d485bde99085bc0c29e2d2a27fe411896162e4e9d8c841449192b2051",
     "experiments/ws1_composition/isp_study/authority.py": "da026cabf1549028000e1b0bade16c569dca2ce712d068745153c9db23d73aae",
@@ -41,7 +41,7 @@
     "remora/policy/composition.py": "25e662e87aed1f8b94cf55517fee50299b5aeb7e33bfba0bcbee8ac7906261bb",
     "remora/verification/check.py": "6e43212de709019e05438d4750dee3fa16cb996355a0d82c3d63a235f8934c3d",
     "remora/verification/compose.py": "52435242105b522b2f79f5e0d218b2e86f4700a3f3a0705350be270697854bd0",
-    "remora/verification/planner.py": "6fb8f1bcfea2ec84f14e7047a3116bbfacd2755045301c1cd9b327ca2f174594",
+    "remora/verification/planner.py": "043ec487f844dc28531118a4a3e4d1eea18d3d904a86a25e99e62be2cecd3e00",
     "remora/verification/preconditions.py": "d3fe52721e646f3489596f771a91714d668ff1256780cc664eb015310a764b40",
     "remora/verification/registry.py": "d735f7726f96979e11186bf197de1e81cea0b1f804bf1def8c403f7999130111"
   },

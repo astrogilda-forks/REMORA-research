@@ -74,3 +74,36 @@ def test_enforce_is_deprecated_and_has_no_production_caller() -> None:
         except PermissionError:
             pass  # an abstain token is refused; the warning is what is tested
     assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+
+
+def test_every_production_gate_check_consumes_with_observation_and_context() -> None:
+    """Every production call to EnforcementGate.check in remora/execution and
+    servers/ must be atomic-consuming and pass both expected_observation_hash
+    and context explicitly."""
+    violations: list[str] = []
+    for folder in ("remora/execution", "servers"):
+        for path in (ROOT / folder).rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "check"
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "gate"
+                ):
+                    continue
+                kw = {k.arg: k.value for k in node.keywords if k.arg is not None}
+                has_obs = len(node.args) >= 2 or "expected_observation_hash" in kw
+                consume_node = kw.get("consume")
+                has_consume_true = (
+                    isinstance(consume_node, ast.Constant)
+                    and consume_node.value is True
+                )
+                ctx_node = kw.get("context")
+                has_context = ctx_node is not None and not (
+                    isinstance(ctx_node, ast.Constant) and ctx_node.value is None
+                )
+                if not (has_obs and has_consume_true and has_context):
+                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+    assert violations == [], violations
