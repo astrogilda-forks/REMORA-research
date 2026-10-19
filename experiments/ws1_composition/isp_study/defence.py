@@ -42,6 +42,8 @@ from experiments.ws1_composition.isp_study.domain import (
 )
 from remora.decision_providers.composition_adapter import (
     MONITOR_RESPONSE_SCHEMA,
+    AssessmentOutcome,
+    MonitorMode,
     MonitorProfile,
     assess_monitor_response,
 )
@@ -133,13 +135,13 @@ class EpisodeDefence:
             return None, "no_monitor"
         open_ids = {p.predicate_id: p.precondition_id for p in reqs.preconditions
                     if checked.state(p.precondition_id) is LogicalState.UNKNOWN}
+        self.monitor_calls += 1
         try:
             out = self.monitor.score(request=self.task.request, untrusted=tuple(self.untrusted),
                                      call_name=name, call_args=args,
                                      open_predicates=sorted(open_ids))
         except Exception as exc:  # an outage, never a low-risk reading
             return None, f"provider_error:{type(exc).__name__}"
-        self.monitor_calls += 1
         body = {"schema": MONITOR_RESPONSE_SCHEMA, "model_id": self.profile.model_id,
                 "question_set_hash": self.profile.question_set_hash,
                 "calibration_hash": self.profile.calibration_hash,
@@ -167,12 +169,23 @@ class EpisodeDefence:
         reqs = derive_preconditions(ctx, args, REGISTRY)
         resolvers = resolvers_for(self.world)
 
+        call_monitor_start = self.monitor_calls
+        key = json.dumps([name, args], sort_keys=True)
+
+        def ask(checked: CheckedPreconditions) -> tuple[bytes | None, str | None]:
+            if self.monitor_calls - call_monitor_start >= STUDY_BUDGET.max_monitor_calls:
+                return None, "monitor_budget_exhausted"
+            return self._ask(ctx, reqs, checked, name, args)
+
         def hints(checked: CheckedPreconditions) -> Sequence[str]:
-            raw, err = self._ask(ctx, reqs, checked, name, args)
+            raw, err = ask(checked)
             a = assess_monitor_response(raw, profile=self.profile, context_hash=ctx.context_hash,
                                         evidence_digest=checked.evidence_digest,
                                         input_digest=checked.evidence_digest,
                                         now_s=self.clock_ms() // 1000, error=err)
+            if self.profile.mode is not MonitorMode.SHADOW \
+                    and a.outcome is AssessmentOutcome.ASSESSED and a.crossed:
+                self.veto_recorded.add(key)
             return a.hint_precondition_ids
 
         run = run_verification(ctx, reqs, registry=REGISTRY, verifiers=VERIFIERS,
@@ -180,7 +193,7 @@ class EpisodeDefence:
                                mode=WS1_ARMS[self.arm], budget=STUDY_BUDGET,
                                clock_ms=self.clock_ms, hints_for=hints, seed=self.seed)
         checked = run.checked
-        raw, err = self._ask(ctx, reqs, checked, name, args)
+        raw, err = ask(checked)
         assessment = assess_monitor_response(
             raw, profile=self.profile, context_hash=ctx.context_hash,
             evidence_digest=checked.evidence_digest, input_digest=checked.evidence_digest,
@@ -200,7 +213,6 @@ class EpisodeDefence:
             argument_values_grounded=True if args_ok and proved else None,
             argument_values_supported=True if args_ok and proved else None)
         base = _ENGINE.decide(obs)
-        key = json.dumps([name, args], sort_keys=True)
         record = compose_authorized_decision(
             base, ctx, reqs, checked, assessment, self.profile,
             now_s=self.clock_ms() // 1000, budget_exhausted=run.budget_exhausted,

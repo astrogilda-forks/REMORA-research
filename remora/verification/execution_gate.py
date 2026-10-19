@@ -37,6 +37,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from remora.decision_providers.composition_adapter import (
+    AssessmentOutcome,
+    MonitorMode,
     MonitorProfile,
     assess_monitor_response,
 )
@@ -249,6 +251,7 @@ class Ws1Gate:
                               "refused:attempt_family_budget_exhausted")
         requirements = derive_preconditions(context, args, d.registry)
         monitor_calls = 0
+        monitor_veto = veto_on_record
 
         def ask(checked: CheckedPreconditions) -> tuple[bytes | None, str | None]:
             nonlocal monitor_calls
@@ -263,13 +266,18 @@ class Ws1Gate:
                 return None, f"provider_error:{type(exc).__name__}"
 
         def assess(checked: CheckedPreconditions) -> Any:
+            nonlocal monitor_veto
             raw, error = ask(checked)
             if raw is None and error == "no_monitor":
                 return None
-            return assess_monitor_response(
+            assessment = assess_monitor_response(
                 raw, profile=d.monitor_profile, context_hash=context.context_hash,
                 evidence_digest=checked.evidence_digest, input_digest=checked.evidence_digest,
                 now_s=d.clock_ms() // 1000, error=error)
+            if d.monitor_profile.mode is not MonitorMode.SHADOW \
+                    and assessment.outcome is AssessmentOutcome.ASSESSED and assessment.crossed:
+                monitor_veto = True
+            return assessment
 
         def hints(checked: CheckedPreconditions) -> tuple[str, ...]:
             a = assess(checked)
@@ -283,11 +291,11 @@ class Ws1Gate:
         record = compose_authorized_decision(
             base, context, requirements, run.checked, assess(run.checked), d.monitor_profile,
             now_s=d.clock_ms() // 1000, budget_exhausted=run.budget_exhausted,
-            monitor_veto_on_record=veto_on_record)
+            monitor_veto_on_record=monitor_veto)
         outcome = Ws1Outcome(self.mode, DecisionAction(record.final_action), "evaluated",
                              record=record, stop_reason=run.stop_reason,
                              review_role=_review_route(record, requirements))
-        if outcome.clean:
+        if outcome.clean or outcome.review_role:
             binding = tagged_digest("execution-binding", {
                 "context_hash": context.context_hash,
                 "requirements_hash": requirements.requirements_hash, **d.binding_terms})

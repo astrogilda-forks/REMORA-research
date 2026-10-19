@@ -840,13 +840,17 @@ def execute_approved_item(
                         if ws1_capability is not None else None),
             review_attestation=(stored_approval(transaction, tenant, item_id)
                                 if ws1_gate is not None else None))
-        if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
+        ws1_binding_matches = _ws1_approval_binding_matches(
+            chain, tenant, assessed_proposal_id, ws1)
+        if not ws1_binding_matches or (
+                ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT):
             chain.append(tenant, {
                 "event": "execution_ws1_refused",
                 "proposal_id": assessed_proposal_id,
                 "actor": principal,
                 "item_id": item_id,
-                "ws1": ws1.audit_block(),
+                "ws1": ws1.audit_block() if ws1 is not None else {"mode": "off_or_shadow"},
+                "ws1_binding_matches": ws1_binding_matches,
             })
             context_refusal = ApprovalContextRefused(
                 "WS1 re-gate refused: a precondition is not proved now",
@@ -1505,9 +1509,13 @@ def dispatch_pending_intent(
                         if ws1_capability is not None else None),
             review_attestation=(stored_approval(transaction, tenant, row.item_id)
                                 if ws1_gate is not None else None))
-        if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
+        ws1_binding_matches = _ws1_approval_binding_matches(
+            chain, tenant, str(proposal_id or ""), ws1)
+        if not ws1_binding_matches or (
+                ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT):
             refusal = WS1_REGATE_REFUSED
-            refusal_detail = {"ws1": ws1.audit_block()}
+            refusal_detail = {"ws1": ws1.audit_block() if ws1 is not None else {"mode": "off_or_shadow"},
+                              "ws1_binding_matches": ws1_binding_matches}
     # Issue #420 (RMR-CR-005): every record carries the principal the
     # authorization was granted FOR; the worker's own identity is reported
     # separately as executed_by and never substituted for the requester's.
@@ -1775,6 +1783,21 @@ def ws1_regate(
         veto_on_record=bool(prior.get("monitor_veto")),
         review_attestation=review_attestation)
 
+
+
+def _ws1_approval_binding_matches(chain: AuditChainPort, tenant: str,
+                                  proposal_id: str, outcome: Ws1OutcomePort | None) -> bool:
+    """An approval closes only the WS1 requirement set/configuration assessed.
+
+    Direct ACCEPT tokens bind this through AuthorizationContext. Review and
+    worker paths must compare the same binding before consuming an approval.
+    """
+    prior = (_assessed_payload(chain, tenant, proposal_id) or {}).get("ws1") or {}
+    if outcome is None:
+        return prior.get("mode") != "enforce"
+    expected = prior.get("binding_hash")
+    return (prior.get("mode") == "enforce" and isinstance(expected, str)
+            and bool(expected) and hmac.compare_digest(expected, outcome.binding_hash))
 
 def stored_approval(transaction: Callable[[str], Any], tenant: str,
                     item_id: str) -> tuple[str, str] | None:

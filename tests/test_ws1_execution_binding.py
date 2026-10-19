@@ -467,3 +467,85 @@ def test_the_shadow_report_counts_what_enforce_would_change(client, monkeypatch)
     assert counts.get("unchanged") == 1 and sum(counts.values()) == 2
     assert "verification_budget_exhausted" in out["ws1_reason_codes"] or \
         "lookup_did_not_prove" in out["ws1_reason_codes"]
+
+
+@pytest.mark.parametrize("expired", [False, True])
+def test_monitor_cannot_clear_a_hint_veto_or_outlive_authority(expired):
+    from remora.verification.execution_gate import ENFORCE_DEPENDENCIES, Ws1Deployment
+    from remora.verification.planner import PlannerMode
+    from tests.verification import _ws1 as lib
+
+    now = [lib.NOW_MS]
+    calls = []
+
+    def monitor(ctx, checked):
+        calls.append(checked.evidence_revision)
+        if expired:
+            now[0] += 60_000
+        return lib.response(ctx, checked.evidence_digest,
+                            scores={"injection": 0.9 if not expired and len(calls) == 1 else 0.1,
+                                    "target_mismatch": 0.1})
+
+    deployment = Ws1Deployment(
+        lib.REGISTRY, lib.VERIFIERS, lib.sources(), lib.PROFILE,
+        lambda tenant, principal: lib.ALL_CAPS, lambda: now[0], monitor=monitor,
+        planner_mode=PlannerMode.H_DET if expired else PlannerMode.H_EDV,
+        enforce_dependencies=dict.fromkeys(ENFORCE_DEPENDENCIES, "test-only"))
+    gate = Ws1Gate("enforce", deployment, flow_control=True)
+    outcome = gate.evaluate(
+        proposal_id="p-monitor-lifecycle", tenant="t1", principal="agent-7",
+        tool_name="set_port_profile",
+        arguments={"port": "sw1/p4", "customer": "C-1", "profile": "gold"},
+        intent_authority_hash=lib.WORK_ORDER, policy_bundle_hash=lib.h("policy"),
+        toolspec_hash=lib.h("tool"), capability=None, flow_digest=None, flow_epoch=0,
+        attempt_family_id=None, base=lib.base_report())
+    assert outcome.final_action is not DecisionAction.ACCEPT
+    assert outcome.apply(lib.base_report()).action is DecisionAction.ABSTAIN
+    assert not outcome.binding_hash
+    if expired:
+        assert "evidence_expired" in outcome.record.reason_codes
+    else:
+        assert len(calls) == 2 and outcome.monitor_veto
+
+
+@pytest.mark.parametrize("async_dispatch", [False, True])
+@pytest.mark.parametrize("change", ["registry", "monitor_profile", "budget", "planner",
+                                    "off", "shadow"])
+def test_review_binds_ws1_configuration_before_consumption(client, monkeypatch,
+                                                          async_dispatch, change):
+    from dataclasses import replace
+
+    from remora.verification.planner import PlannerMode, VerificationBudget
+
+    original = _review_deployment()
+    _install(monkeypatch, "enforce", **original)
+    item_id = _assess_write(client)["review_item_id"]
+    _as_role(monkeypatch, "change-manager")
+    assert client.post("/v1/execution/approve", json={"item_id": item_id}).status_code == 200
+    request = {"item_id": item_id, "tool_call": WRITE_CALL}
+    if async_dispatch:
+        monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+        assert client.post("/v1/execution/execute", json=request).status_code in (200, 202)
+    changed = dict(original)
+    if change == "registry":
+        tools = dict(original["registry"].tools)
+        predicates = tools["store_artifact"]
+        tools["store_artifact"] = (replace(predicates[0], max_age_s=20), *predicates[1:])
+        changed["registry"] = replace(original["registry"], tools=tools)
+    elif change == "monitor_profile":
+        changed["monitor_profile"] = replace(fixture.PROFILE, profile_id="new-profile")
+    elif change == "budget":
+        changed["budget"] = VerificationBudget(max_resolver_calls=2)
+    elif change == "planner":
+        changed["planner_mode"] = PlannerMode.H_EDV
+    if change == "off":
+        monkeypatch.setattr(_mod(), "_ws1_gate", lambda: None)
+    else:
+        _install(monkeypatch, "shadow" if change == "shadow" else "enforce", **changed)
+    if async_dispatch:
+        results = _mod().dispatch_pending_intents("acme", worker_id="ws1-binding-test")
+        assert "ws1_regate_refused" in json.dumps(results)
+    else:
+        r = client.post("/v1/execution/execute", json=request)
+        assert (r.status_code, r.json().get("detail")) == (409, "ws1_regate_refused")
+    assert not _events("execution_authorized")

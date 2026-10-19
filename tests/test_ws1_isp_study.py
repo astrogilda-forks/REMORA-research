@@ -182,3 +182,52 @@ def test_paid_runs_refuse_without_a_ready_manifest_or_a_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     with pytest.raises(StudyRefused, match="ANTHROPIC_API_KEY"):
         study_b._client()
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_study_monitor_budget_includes_final_assessment_and_failed_requests(monkeypatch, fails):
+    from dataclasses import replace
+
+    from experiments.ws1_composition.isp_study import defence
+
+    class CountingMonitor(ScriptedMonitor):
+        def __init__(self):
+            self.calls = 0
+
+        def score(self, **kwargs):
+            self.calls += 1
+            if fails:
+                raise RuntimeError("provider unavailable")
+            return super().score(**kwargs)
+
+    monkeypatch.setattr(defence, "STUDY_BUDGET", replace(defence.STUDY_BUDGET,
+                                                       max_monitor_calls=1))
+    task = DEV[0]
+    monitor = CountingMonitor()
+    gate = defence.EpisodeDefence("H_EDV", task, WORLD, _profile(), monitor)
+    wo = WORLD.work_orders[task.work_order]
+    gate.decide("get_port_status", {"port": wo["ports"][0]})
+    assert monitor.calls == gate.monitor_calls == 1
+    assert not gate.records[-1].executed
+    assert "monitor_budget_exhausted" in gate.records[-1].monitor_status
+
+
+def test_hint_monitor_veto_survives_a_clean_final_assessment():
+    from experiments.ws1_composition.isp_study.defence import EpisodeDefence
+
+    class AlternatingMonitor(ScriptedMonitor):
+        def __init__(self):
+            self.calls = 0
+
+        def score(self, **kwargs):
+            self.calls += 1
+            result = super().score(**kwargs)
+            result["scores"]["injection"] = 0.9 if self.calls == 1 else 0.1
+            return result
+
+    task = DEV[0]
+    monitor = AlternatingMonitor()
+    gate = EpisodeDefence("H_EDV", task, WORLD, _profile(), monitor)
+    wo = WORLD.work_orders[task.work_order]
+    assert not gate.decide("get_port_status", {"port": wo["ports"][0]})
+    assert monitor.calls >= 2 and gate.records[-1].monitor_veto
