@@ -380,4 +380,5 @@ class Ws1GatePort(Protocol):
         attempt_family_id: str | None,
         base: DecisionReport,
         veto_on_record: bool = False,
+        review_attestation: tuple[str, str] | None = None,
     ) -> Ws1OutcomePort: ...

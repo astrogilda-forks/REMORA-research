@@ -17,12 +17,13 @@ Modes, chosen by the deployment and never by a request:
   construction unless flow control is on and the deployment names evidence
   for every prerequisite work package (``ENFORCE_DEPENDENCIES``).
 
-v1 is deliberately narrower than the design's decision table. No route yet
-binds a review or a grant to the WS1 precondition it would close, so any WS1
-cap under ``enforce`` makes the call ABSTAIN rather than open a review item
-nothing could ever execute. WS1 therefore never opens a review route, and an
-approval can lift only the engine's own ESCALATE or VERIFY: at execution the
-gate must reach ACCEPT on its own.
+One review route exists. When the only WS1 caps are REVIEW preconditions
+that name one role, ``enforce`` returns ESCALATE and records that role. At
+execution the approval the queue stored (approver and authenticated role)
+reaches the re-gate as a :class:`~remora.verification.check.ReviewAttestation`
+and closes those preconditions only if the role matches exactly. Every other
+WS1 cap under ``enforce`` is an ABSTAIN: there is no grant route (IFC-08 is not
+started), and an approval never stands in for a MACHINE precondition.
 
 The monitor sees the :class:`ProposalContext` and the checked precondition
 states: hashes, IDs and states, never argument values or tool output. A
@@ -41,7 +42,7 @@ from remora.decision_providers.composition_adapter import (
 )
 from remora.policy.observation import canonical_tool_call_hash
 from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
-from remora.verification.check import CheckedPreconditions, Verifier
+from remora.verification.check import CheckedPreconditions, ReviewAttestation, Verifier
 from remora.verification.compose import compose_authorized_decision
 from remora.verification.planner import (
     FamilyLedger,
@@ -119,6 +120,8 @@ class Ws1Outcome:
     binding_hash: str = ""
     record: CompositionRecord | None = None
     stop_reason: str = ""
+    #: The one role whose approval would close every remaining WS1 cap, or "".
+    review_role: str = ""
 
     @property
     def clean(self) -> bool:
@@ -134,22 +137,42 @@ class Ws1Outcome:
                                  "final_action": self.final_action.value,
                                  "binding_hash": self.binding_hash,
                                  "stop_reason": self.stop_reason,
-                                 "monitor_veto": self.monitor_veto}
+                                 "monitor_veto": self.monitor_veto,
+                                 "review_role": self.review_role}
         if self.record is not None:
             block["record"] = {**self.record.body(), "record_hash": self.record.record_hash}
         return block
 
     def apply(self, report: DecisionReport) -> DecisionReport:
         """The decision under this mode. Shadow returns *report* unchanged;
-        enforce returns it, or ABSTAIN when WS1 put any cap on it."""
+        enforce returns it, ESCALATE on the WS1 review route, or ABSTAIN."""
         if self.mode != "enforce" or (self.clean and self.status == "evaluated"):
             return report
+        if self.review_role and report.action is not DecisionAction.ABSTAIN:
+            return dataclasses.replace(report, action=DecisionAction.ESCALATE,
+                                       reasons=(*report.reasons, DecisionReason.PRECONDITION_CAP),
+                                       human_review_required=True)
         monitor_only = self.record is not None and all(
             c.source in ("engine", "monitor") for c in self.record.all_caps)
         reason = DecisionReason.MONITOR_CAP if monitor_only else DecisionReason.PRECONDITION_CAP
         return dataclasses.replace(report, action=DecisionAction.ABSTAIN,
                                    reasons=(*report.reasons, reason),
                                    human_review_required=False)
+
+
+def _review_route(record: CompositionRecord, requirements: Any) -> str:
+    """The role when every WS1 cap is a REVIEW precondition of that one role."""
+    ws1_caps = [c for c in record.all_caps if c.source != "engine"]
+    if not ws1_caps or any(c.code != "review_required" for c in ws1_caps):
+        return ""
+    roles = set()
+    for cap in ws1_caps:
+        pre = requirements.by_id(cap.source.removeprefix("precondition:"))
+        roles.add(pre.review_role if pre is not None else None)
+    if len(roles) != 1:
+        return ""
+    role = roles.pop()
+    return role if isinstance(role, str) and role else ""
 
 
 class Ws1Gate:
@@ -182,12 +205,17 @@ class Ws1Gate:
                  policy_bundle_hash: str, toolspec_hash: str,
                  capability: Mapping[str, Any] | None, flow_digest: str | None,
                  flow_epoch: int | None, attempt_family_id: str | None,
-                 base: DecisionReport, veto_on_record: bool = False) -> Ws1Outcome:
+                 base: DecisionReport, veto_on_record: bool = False,
+                 review_attestation: tuple[str, str] | None = None) -> Ws1Outcome:
+        """*review_attestation* is ``(approver, approver_role)`` from the stored
+        approval, passed on the review path's re-gate only."""
         try:
+            review = (ReviewAttestation(proposal_id, *review_attestation)
+                      if review_attestation is not None else None)
             return self._evaluate(proposal_id, tenant, principal, tool_name, arguments,
                                   intent_authority_hash, policy_bundle_hash, toolspec_hash,
                                   capability, flow_digest, flow_epoch, attempt_family_id,
-                                  base, veto_on_record)
+                                  base, veto_on_record, review)
         except Exception as exc:  # a gate fault refuses; its text never reaches the record
             return Ws1Outcome(self.mode, DecisionAction.ABSTAIN, f"error:{type(exc).__name__}")
 
@@ -196,7 +224,8 @@ class Ws1Gate:
                   policy_bundle_hash: str, toolspec_hash: str,
                   capability: Mapping[str, Any] | None, flow_digest: str | None,
                   flow_epoch: int | None, attempt_family_id: str | None,
-                  base: DecisionReport, veto_on_record: bool) -> Ws1Outcome:
+                  base: DecisionReport, veto_on_record: bool,
+                  review: ReviewAttestation | None) -> Ws1Outcome:
         d = self.deployment
         for name, value in (("intent_authority", intent_authority_hash),
                             ("policy_bundle", policy_bundle_hash), ("toolspec", toolspec_hash)):
@@ -250,13 +279,14 @@ class Ws1Gate:
             context, requirements, registry=d.registry, verifiers=d.verifiers,
             resolvers=d.resolvers, held_capabilities=d.resolve_capabilities(tenant, principal),
             mode=d.planner_mode, budget=d.budget, clock_ms=d.clock_ms,
-            hints_for=hints if d.planner_mode is PlannerMode.H_EDV else None)
+            hints_for=hints if d.planner_mode is PlannerMode.H_EDV else None, review=review)
         record = compose_authorized_decision(
             base, context, requirements, run.checked, assess(run.checked), d.monitor_profile,
             now_s=d.clock_ms() // 1000, budget_exhausted=run.budget_exhausted,
             monitor_veto_on_record=veto_on_record)
         outcome = Ws1Outcome(self.mode, DecisionAction(record.final_action), "evaluated",
-                             record=record, stop_reason=run.stop_reason)
+                             record=record, stop_reason=run.stop_reason,
+                             review_role=_review_route(record, requirements))
         if outcome.clean:
             binding = tagged_digest("execution-binding", {
                 "context_hash": context.context_hash,

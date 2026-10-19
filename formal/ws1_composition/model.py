@@ -86,7 +86,8 @@ def _h(label: str) -> str:
 
 def _registry(classes: tuple[ResolutionClass, ...]) -> PreconditionRegistry:
     specs = tuple(PredicateSpec(f"p{i}", cls, "scripted", ("r",) if cls is M else (),
-                                subject_argument="x")
+                                subject_argument="x",
+                                review_role="reviewer" if cls is RV else None)
                   for i, cls in enumerate(classes))
     return PreconditionRegistry(tools={"t": specs}, resolvers={
         "r": ResolverSpec("r", "src", frozenset(f"p{i}" for i, c in enumerate(classes)

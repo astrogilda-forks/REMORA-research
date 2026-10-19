@@ -372,3 +372,77 @@ def test_the_async_worker_runs_the_ws1_regate_before_minting(client, monkeypatch
     rows = [e for e in _mod()._CHAIN.entries("acme")]
     assert "ws1_regate_refused" in json.dumps([e.payload for e in rows]) or \
         "ws1_regate_refused" in json.dumps(results)
+
+
+# ── the WS1 review route ───────────────────────────────────────────────
+
+
+def _review_deployment():
+    from remora.verification.preconditions import ResolutionClass
+    from remora.verification.registry import PredicateSpec, PreconditionRegistry
+
+    tools = dict(fixture.REGISTRY.tools)
+    tools["store_artifact"] = (*tools["store_artifact"],
+                               PredicateSpec("change_approved", ResolutionClass.REVIEW,
+                                             "review", review_role="change-manager"))
+    return {"registry": PreconditionRegistry(tools=tools, resolvers=fixture.REGISTRY.resolvers)}
+
+
+def _as_role(monkeypatch, role):
+    import servers.api as api_mod
+
+    monkeypatch.setattr(api_mod, "_authenticate", lambda request: ("acme", role))
+
+
+def _assess_write(client):
+    body = client.post("/v1/execution/assess", json=WRITE_CALL).json()
+    assert body["decision"] == "escalate", body
+    return body
+
+
+def test_a_review_precondition_opens_a_review_route_with_its_role(client, monkeypatch):
+    _install(monkeypatch, "enforce", **_review_deployment())
+    body = _assess_write(client)
+    block = _events("assessed")[-1]["ws1"]
+    assert block["review_role"] == "change-manager"
+    assert body["review_item_id"]
+
+
+def test_an_approval_in_another_role_does_not_close_it(client, monkeypatch):
+    _install(monkeypatch, "enforce", **_review_deployment())
+    item_id = _assess_write(client)["review_item_id"]
+    _as_role(monkeypatch, "reviewer")
+    assert client.post("/v1/execution/approve", json={"item_id": item_id}).status_code == 200
+    r = client.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": WRITE_CALL})
+    assert (r.status_code, r.json()["detail"]) == (409, "ws1_regate_refused")
+    refused = _events("execution_ws1_refused")[-1]["ws1"]["record"]
+    states = {p["precondition_id"].split(":")[0]: p for p in refused["all_precondition_results"]}
+    assert states["change_approved"]["reason_code"] == "review_by_another_role"
+
+
+def test_an_approval_in_the_named_role_closes_it_and_executes(client, monkeypatch):
+    _install(monkeypatch, "enforce", **_review_deployment())
+    item_id = _assess_write(client)["review_item_id"]
+    _as_role(monkeypatch, "change-manager")
+    assert client.post("/v1/execution/approve", json={"item_id": item_id}).status_code == 200
+    r = client.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": WRITE_CALL})
+    assert r.status_code == 200, r.text
+
+
+def test_an_approval_never_closes_a_machine_precondition(client, monkeypatch):
+    _install(monkeypatch, "enforce", **_review_deployment())
+    item_id = _assess_write(client)["review_item_id"]
+    _as_role(monkeypatch, "change-manager")
+    assert client.post("/v1/execution/approve", json={"item_id": item_id}).status_code == 200
+    fixture.ASSETS["acme"].pop("wired-1")
+    r = client.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": WRITE_CALL})
+    assert (r.status_code, r.json()["detail"]) == (409, "ws1_regate_refused")
+
+
+def test_without_a_review_role_an_unproved_machine_precondition_still_refuses(client, monkeypatch):
+    """The route exists only when every WS1 cap is a REVIEW precondition of one role."""
+    _install(monkeypatch, "enforce", **_review_deployment())
+    fixture.ASSETS["acme"].pop("wired-1")
+    body = client.post("/v1/execution/assess", json=WRITE_CALL).json()
+    assert body["decision"] == "abstain" and "review_item_id" not in body
+    assert _events("assessed")[-1]["ws1"]["review_role"] == ""

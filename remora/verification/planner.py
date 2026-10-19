@@ -30,6 +30,7 @@ from enum import StrEnum
 from remora.verification.check import (
     CheckedPreconditions,
     ResolverEvidence,
+    ReviewAttestation,
     VerificationRequest,
     Verifier,
     check_preconditions,
@@ -181,7 +182,8 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                      hints_for: Callable[[CheckedPreconditions], Sequence[str]] | None = None,
                      seed: int = 0,
                      evidence: Sequence[ResolverEvidence] = (),
-                     issued: Mapping[str, VerificationRequest] | None = None) -> VerificationRun:
+                     issued: Mapping[str, VerificationRequest] | None = None,
+                     review: ReviewAttestation | None = None) -> VerificationRun:
     """Check, then look up and re-check until a stop condition holds.
 
     The loop has stopped when this returns, so a composition over the result
@@ -201,7 +203,8 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     def check(revision: int) -> CheckedPreconditions:
         return check_preconditions(context, requirements, evidence_list, issued=issued_map,
                                    registry=registry, verifiers=verifiers,
-                                   now_s=clock_ms() // 1000, evidence_revision=revision)
+                                   now_s=clock_ms() // 1000, evidence_revision=revision,
+                                   review=review)
 
     revision = 0
     checked = check(revision)

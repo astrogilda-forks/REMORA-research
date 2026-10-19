@@ -837,7 +837,9 @@ def execute_approved_item(
             observation=fresh_obs, toolspec_hash=str(toolspec_identity["hash"]),
             policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
             capability=(ws1_capability(tool_call, proposer)
-                        if ws1_capability is not None else None))
+                        if ws1_capability is not None else None),
+            review_attestation=(stored_approval(transaction, tenant, item_id)
+                                if ws1_gate is not None else None))
         if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
             chain.append(tenant, {
                 "event": "execution_ws1_refused",
@@ -1500,7 +1502,9 @@ def dispatch_pending_intent(
             toolspec_hash=str((toolspec_identity or {}).get("hash", "")),
             policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
             capability=(ws1_capability(tool_call, proposer)
-                        if ws1_capability is not None else None))
+                        if ws1_capability is not None else None),
+            review_attestation=(stored_approval(transaction, tenant, row.item_id)
+                                if ws1_gate is not None else None))
         if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
             refusal = WS1_REGATE_REFUSED
             refusal_detail = {"ws1": ws1.audit_block()}
@@ -1709,10 +1713,18 @@ WS1_REGATE_REFUSED = "ws1_regate_refused"
 
 
 def _never_raised(before: DecisionReport, after: DecisionReport) -> DecisionReport:
-    """``after`` when it keeps ``before``'s action or refuses outright.
-    A gate port returning anything else (a raised decision, or an ESCALATE
-    that would open a review route) is ignored rather than trusted."""
-    return after if after.action in (before.action, DecisionAction.ABSTAIN) else before
+    """``after`` when it keeps ``before``'s action, refuses outright, or sends
+    an ACCEPT or VERIFY to review. A gate port returning anything else (a
+    raised decision, or an ESCALATE out of a refusal) is ignored rather than
+    trusted."""
+    if after.action in (before.action, DecisionAction.ABSTAIN):
+        return after
+    # ESCALATE lowers ACCEPT or VERIFY onto a review route; it never turns
+    # a refusal into one.
+    if after.action is DecisionAction.ESCALATE and before.action in (
+            DecisionAction.ACCEPT, DecisionAction.VERIFY):
+        return after
+    return before
 
 
 def _ws1_regate_base(observation: Any) -> DecisionReport:
@@ -1739,11 +1751,15 @@ def ws1_regate(
     toolspec_hash: str,
     policy_bundle_hash: str,
     capability: Any,
+    review_attestation: tuple[str, str] | None = None,
 ) -> Ws1OutcomePort | None:
     """A fresh WS1 evaluation before a dispatch path consumes anything, or
     None when WS1 does not enforce. Fresh lookups, so evidence that expired,
     was revoked or now refutes stops the call (WS1-09). A monitor veto the
-    assessment recorded stays a veto (A13)."""
+    assessment recorded stays a veto (A13). *review_attestation* is
+    ``(approver, approver_role)`` of the approval the queue stored, on the
+    review path only: it closes a REVIEW precondition of exactly that role
+    and nothing else."""
     if gate is None or gate.mode != "enforce":
         return None
     assessed = _assessed_payload(chain, tenant, proposal_id) or {}
@@ -1756,7 +1772,25 @@ def ws1_regate(
         capability=capability, flow_digest=getattr(observation, "flow_digest", None),
         flow_epoch=getattr(observation, "flow_epoch", None), attempt_family_id=None,
         base=_ws1_regate_base(observation),
-        veto_on_record=bool(prior.get("monitor_veto")))
+        veto_on_record=bool(prior.get("monitor_veto")),
+        review_attestation=review_attestation)
+
+
+def stored_approval(transaction: Callable[[str], Any], tenant: str,
+                    item_id: str) -> tuple[str, str] | None:
+    """``(approver, approver_role)`` of the item's stored approval, or None.
+
+    Read in its own short transaction, before the execute transaction, like
+    the other pre-checks; an unknown item or an approval without a recorded
+    role gives None, which closes no REVIEW precondition."""
+    try:
+        with transaction(tenant) as q:
+            approval = q.item(item_id).approval
+    except (KeyError, LookupError):
+        return None
+    if approval is None or not approval.approver_role:
+        return None
+    return str(approval.approver), str(approval.approver_role)
 
 
 def authorization_context(
