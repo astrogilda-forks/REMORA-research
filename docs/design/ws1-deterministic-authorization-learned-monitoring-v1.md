@@ -37,6 +37,9 @@ Avvik fra spesifikasjonen:
 - Et REVIEW-predikat navngir nøyaktig én rolle. Under `enforce` blir et kall ESCALATE med den rollen når de eneste WS1-capene er REVIEW-krav av samme rolle. Ved utførelse lukker den lagrede godkjenningen (godkjenner og autentisert rolle) bare REVIEW-krav med eksakt samme rolle for samme forslag. Alle andre WS1-caps er ABSTAIN under `enforce`. GRANT-krav er fortsatt en nekt, fordi grants (IFC-08) ikke er påbegynt.
 - `@intent` som subjekt gjør den server-løste arbeidsordren til subjektet for et predikat; ingen argumentverdi kan sette den.
 - H-EDV-hint teller mot `max_monitor_calls` i selve løkken.
+- Monitor-veto fra en hint-runde beholdes gjennom senere vurderinger. Komposisjonen avviser bevis som har utløpt mens monitoren svarte.
+- Review- og async-stien sammenligner bindingen fra den opprinnelige vurderingen med ferskt register, profil, budsjett og planner før godkjenningen forbrukes. En tidligere håndhevet godkjenning avvises også etter overgang til `off` eller `shadow`.
+- Studie B teller sluttvurderingen og feilede modellkall mot samme monitorbudsjett per forslag.
 - `enforce` nektes ved oppstart uten `REMORA_FLOW_CONTROL=1` og uten at deploymenten navngir evidens for IFC-04b, IFC-06, IFC-11, IFC-12 og IFC-13. Denne evidensen er deploymentens egen påstand; koden sjekker at den er navngitt, ikke at den er sann.
 - Monitoren får aldri argumentverdier. En resolver sender kravets subject (en argumentverdi) til sin registrerte kilde.
 
