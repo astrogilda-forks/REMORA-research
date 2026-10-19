@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     )
     from remora.governance.tenant_chain import ChainEntry
     from remora.policy.observation import PolicyObservation
-    from remora.policy.report import DecisionAction
+    from remora.policy.report import DecisionAction, DecisionReport
 
 __all__ = [
     "AuditChainPort",
@@ -59,6 +59,8 @@ __all__ = [
     "ToolCallPort",
     "ToolDispatcherPort",
     "TransactionalAppendPort",
+    "Ws1GatePort",
+    "Ws1OutcomePort",
     "appender",
     "audit_ref",
 ]
@@ -338,3 +340,44 @@ class ReviewQueuePort(Protocol):
         outcome: DispatchOutcome,
         reason: str | None = None,
     ) -> PendingReview: ...
+
+
+class Ws1OutcomePort(Protocol):
+    """One WS1 evaluation (issue #953). Built in ``remora/verification``,
+    which the execution core never imports."""
+
+    mode: str
+    final_action: DecisionAction
+    binding_hash: str
+
+    @property
+    def monitor_veto(self) -> bool: ...
+
+    def audit_block(self) -> dict[str, Any]: ...
+
+    def apply(self, report: DecisionReport) -> DecisionReport: ...
+
+
+class Ws1GatePort(Protocol):
+    """The WS1 gate the server wires in when ``REMORA_WS1_MODE`` is not off."""
+
+    mode: str
+
+    def evaluate(
+        self,
+        *,
+        proposal_id: str,
+        tenant: str,
+        principal: str,
+        tool_name: str,
+        arguments: Any,
+        intent_authority_hash: str,
+        policy_bundle_hash: str,
+        toolspec_hash: str,
+        capability: Any,
+        flow_digest: str | None,
+        flow_epoch: int | None,
+        attempt_family_id: str | None,
+        base: DecisionReport,
+        veto_on_record: bool = False,
+    ) -> Ws1OutcomePort: ...

@@ -33,6 +33,8 @@ from remora.execution.ports import (
     PolicyEnginePort,
     ToolCallPort,
     TransactionalAppendPort,
+    Ws1GatePort,
+    Ws1OutcomePort,
     appender,
     audit_ref,
 )
@@ -49,7 +51,7 @@ from remora.governance.execution_identity import (
 from remora.governance.proposal_lineage import derive_lineage, lineage_key_for
 from remora.governance.review_queue import ExecutionDecision
 from remora.governance.task_identity import TaskIdentity
-from remora.policy.report import DecisionAction, DecisionReason
+from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
 from remora.toolcall.toolspec import ToolSpecRefused
 
 logger = logging.getLogger(__name__)
@@ -243,6 +245,7 @@ def assess_proposal(
     semantic_shadow: Callable[[dict[str, Any]], None] | None = None,
     execution_context_provider: ExecutionContextProvider | None = None,
     require_execution_context: bool = False,
+    ws1_gate: Ws1GatePort | None = None,
 ) -> dict[str, Any]:
     """Assess a proposed tool call — nothing executes here.
 
@@ -272,6 +275,11 @@ def assess_proposal(
     after everything that decides, records or responds, its return value is
     ignored, and any exception it raises is swallowed. See
     ``servers/semantic_shadow.py``.
+
+    ``ws1_gate`` (issue #953) runs the WS1 precondition loop and composition
+    after every other component. In shadow mode its record is audited and
+    nothing else changes. In enforce mode any WS1 cap makes the call ABSTAIN,
+    and an ACCEPT carries the WS1 binding in its authorization context.
     """
     task = task_identity_of(proposal)
     request_ref = request_ref_of(proposal)
@@ -320,6 +328,20 @@ def assess_proposal(
             action=DecisionAction.ABSTAIN,
             reasons=(*report.reasons, DecisionReason.CAPABILITY_NOT_ALLOWED),
         )
+    ws1: Ws1OutcomePort | None = None
+    if ws1_gate is not None:
+        # Last, so it composes against every other component's decision. It
+        # can only lower that decision (Ws1Outcome.apply), never raise it.
+        ws1 = ws1_gate.evaluate(
+            proposal_id=proposal_id, tenant=tenant, principal=principal,
+            tool_name=proposal.tool_name, arguments=proposal.arguments,
+            intent_authority_hash=str(semantic.get("intent_authority_hash") or ""),
+            policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+            toolspec_hash=str(toolspec_identity.get("hash") or ""),
+            capability=capability, flow_digest=obs.flow_digest, flow_epoch=obs.flow_epoch,
+            attempt_family_id=task.context_id if task is not None else None,
+            base=report)
+        report = _never_raised(report, ws1.apply(report))
     now = datetime.now(UTC)
 
     # Derived from the chain, never from the request: a caller-declared
@@ -383,6 +405,8 @@ def assess_proposal(
         record["observation_binding_hash"] = observation_binding(obs)
     if capability is not None:
         record["capability"] = capability
+    if ws1 is not None:
+        record["ws1"] = ws1.audit_block()
     response: dict[str, Any] = {
         "proposal_id": proposal_id,
         "decision": report.action.value,
@@ -393,6 +417,9 @@ def assess_proposal(
     }
     if capability is not None:
         response["capability"] = capability
+    if ws1 is not None:
+        block = ws1.audit_block()
+        response["ws1"] = {k: block[k] for k in ("mode", "status", "final_action")}
     # FT-01 conformance BEFORE anything is recorded.
     branch_event = {
         DecisionAction.ACCEPT: "direct_accept_token",
@@ -435,6 +462,8 @@ def assess_proposal(
             task=task,
             request_ref=request_ref,
             delegated_executor=delegate,
+            ws1_binding_hash=(ws1.binding_hash
+                              if ws1 is not None and ws1.mode == "enforce" else ""),
         )
         token = PolicyDecisionToken.issue(
             action="accept",
@@ -719,6 +748,8 @@ def execute_approved_item(
     transactional_append: TransactionalAppendPort | None = None,
     require_execution_context: bool = False,
     approval_policy: Callable[[Any], str] | None = None,
+    ws1_gate: Ws1GatePort | None = None,
+    ws1_capability: Callable[[Any, str], Any] | None = None,
 ) -> dict[str, Any]:
     """Execute a previously approved item under full re-gating.
 
@@ -739,6 +770,11 @@ def execute_approved_item(
     approval requirement in force for it now (the role its tier requires).
     The queue voids an approval granted under another requirement, or under
     none recorded. None leaves the requirement unchecked (library use).
+
+    Under WS1 enforce (issue #953) the WS1 gate must reach ACCEPT again,
+    with fresh lookups, before the queue is touched. An approval lifts the
+    engine's route only; it never stands in for a WS1 precondition. A refusal
+    leaves the approval standing, like a context refusal.
     """
     # RMR-CR-002: the review path mints and consumes in this process. A
     # redeemer holding only verify keys cannot do the first half, so it refuses
@@ -792,6 +828,27 @@ def execute_approved_item(
         chain, tenant, assessed_proposal_id, tool_call)
     acting_for = _acting_for(
         _assessed_payload(chain, tenant, assessed_proposal_id), principal)
+    if context_refusal is None:
+        proposer = str((_assessed_payload(chain, tenant, assessed_proposal_id) or {})
+                       .get("actor") or principal)
+        ws1 = ws1_regate(
+            ws1_gate, chain=chain, tenant=tenant, proposal_id=assessed_proposal_id,
+            proposer=proposer, tool_call=tool_call, semantic=fresh_semantic,
+            observation=fresh_obs, toolspec_hash=str(toolspec_identity["hash"]),
+            policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+            capability=(ws1_capability(tool_call, proposer)
+                        if ws1_capability is not None else None))
+        if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
+            chain.append(tenant, {
+                "event": "execution_ws1_refused",
+                "proposal_id": assessed_proposal_id,
+                "actor": principal,
+                "item_id": item_id,
+                "ws1": ws1.audit_block(),
+            })
+            context_refusal = ApprovalContextRefused(
+                "WS1 re-gate refused: a precondition is not proved now",
+                reason=WS1_REGATE_REFUSED)
     context = historical_context(
         chain, tenant, assessed_proposal_id, required=require_execution_context)
     fresh_obs = _bind_execution_context(
@@ -1289,6 +1346,8 @@ def dispatch_pending_intent(
     assessed_record: Callable[[str, str], tuple[str, str]] | None = None,
     require_execution_context: bool = False,
     approval_policy: Callable[[Any], str] | None = None,
+    ws1_gate: Ws1GatePort | None = None,
+    ws1_capability: Callable[[Any, str], Any] | None = None,
 ) -> dict[str, Any] | None:
     """Dispatch one DISPATCH_PENDING intent from a separate worker (issue #82).
 
@@ -1326,6 +1385,9 @@ def dispatch_pending_intent(
       queue's own engine (``ReviewQueue.regate_authorized``), under the
       same equal-or-safer rule the 202 applied. Anything else refuses as
       ``fresh_regate_refused``.
+
+    Under WS1 enforce (issue #953) the WS1 gate must reach ACCEPT again with
+    fresh lookups too, or the row refuses as ``ws1_regate_refused``.
     """
     _refuse_minting_on_a_redeemer()
     if row.state is not OutboxState.DISPATCH_PENDING:
@@ -1429,6 +1491,19 @@ def dispatch_pending_intent(
                                  and regate.fresh_action is not None
                                  else None),
             }
+    if refusal is None and fresh_semantic is not None:
+        proposer = acting_for or actor
+        ws1 = ws1_regate(
+            ws1_gate, chain=chain, tenant=tenant, proposal_id=str(proposal_id or ""),
+            proposer=proposer, tool_call=tool_call, semantic=fresh_semantic,
+            observation=fresh_obs,
+            toolspec_hash=str((toolspec_identity or {}).get("hash", "")),
+            policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+            capability=(ws1_capability(tool_call, proposer)
+                        if ws1_capability is not None else None))
+        if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
+            refusal = WS1_REGATE_REFUSED
+            refusal_detail = {"ws1": ws1.audit_block()}
     # Issue #420 (RMR-CR-005): every record carries the principal the
     # authorization was granted FOR; the worker's own identity is reported
     # separately as executed_by and never substituted for the requester's.
@@ -1629,6 +1704,61 @@ class TokenRefused(RemoraError):
         self.refusal = refusal
 
 
+#: Wire detail when a WS1 re-gate refuses a dispatch path (issue #953).
+WS1_REGATE_REFUSED = "ws1_regate_refused"
+
+
+def _never_raised(before: DecisionReport, after: DecisionReport) -> DecisionReport:
+    """``after`` when it keeps ``before``'s action or refuses outright.
+    A gate port returning anything else (a raised decision, or an ESCALATE
+    that would open a review route) is ignored rather than trusted."""
+    return after if after.action in (before.action, DecisionAction.ABSTAIN) else before
+
+
+def _ws1_regate_base(observation: Any) -> DecisionReport:
+    """The engine part of a re-gate on a dispatch path, already decided and
+    bound by the grant or the approval: the WS1 gate composes against ACCEPT
+    and must reach ACCEPT on its own preconditions."""
+    return DecisionReport(
+        action=DecisionAction.ACCEPT, reasons=(), risk_estimate=None, confidence=None,
+        coverage_policy="ws1_regate", evidence_required=False,
+        human_review_required=False, audit_root=None,
+        explanation="WS1 re-gate before dispatch", raw_observation=observation)
+
+
+def ws1_regate(
+    gate: Ws1GatePort | None,
+    *,
+    chain: AuditChainPort,
+    tenant: str,
+    proposal_id: str,
+    proposer: str,
+    tool_call: Any,
+    semantic: dict[str, Any],
+    observation: Any,
+    toolspec_hash: str,
+    policy_bundle_hash: str,
+    capability: Any,
+) -> Ws1OutcomePort | None:
+    """A fresh WS1 evaluation before a dispatch path consumes anything, or
+    None when WS1 does not enforce. Fresh lookups, so evidence that expired,
+    was revoked or now refutes stops the call (WS1-09). A monitor veto the
+    assessment recorded stays a veto (A13)."""
+    if gate is None or gate.mode != "enforce":
+        return None
+    assessed = _assessed_payload(chain, tenant, proposal_id) or {}
+    prior = assessed.get("ws1") or {}
+    return gate.evaluate(
+        proposal_id=proposal_id, tenant=tenant, principal=proposer,
+        tool_name=tool_call.tool_name, arguments=tool_call.arguments,
+        intent_authority_hash=str(semantic.get("intent_authority_hash") or ""),
+        policy_bundle_hash=policy_bundle_hash, toolspec_hash=toolspec_hash,
+        capability=capability, flow_digest=getattr(observation, "flow_digest", None),
+        flow_epoch=getattr(observation, "flow_epoch", None), attempt_family_id=None,
+        base=_ws1_regate_base(observation),
+        veto_on_record=bool(prior.get("monitor_veto")))
+
+
 def authorization_context(
     *,
     tenant: str,
@@ -1640,6 +1770,7 @@ def authorization_context(
     task: TaskIdentity | None = None,
     request_ref: RequestRef | None = None,
     delegated_executor: str = "",
+    ws1_binding_hash: str = "",
 ) -> AuthorizationContext:
     """The conditions a decision is made under, in one place.
 
@@ -1670,6 +1801,9 @@ def authorization_context(
     assess time (remora/governance/delegation.py). It enters the hash only
     when present, for the same reason, so a delegate cannot be added to or
     swapped in a grant or an approval after the fact.
+
+    ``ws1_binding_hash`` is the WS1 binding (issue #953), present only under
+    WS1 enforce. Redemption recomputes it from a fresh WS1 re-gate.
     """
 
     return AuthorizationContext(
@@ -1684,6 +1818,7 @@ def authorization_context(
         execution_context_hash=str(semantic.get("execution_context_hash", "")),
         request_ref_hash=request_ref.digest() if request_ref is not None else "",
         delegated_executor=delegated_executor or "",
+        ws1_binding_hash=ws1_binding_hash or "",
     )
 
 
@@ -1744,6 +1879,8 @@ def redeem_accept_token(
     assessed_toolspec: Callable[[str, str], str] | None = None,
     policy_bundle_hash: Callable[[], str] | None = None,
     require_execution_context: bool = False,
+    ws1_gate: Ws1GatePort | None = None,
+    ws1_capability: Callable[[Any, str], Any] | None = None,
 ) -> dict[str, Any]:
     """Execute a directly-ACCEPTed proposal under its single-use token.
 
@@ -1762,6 +1899,13 @@ def redeem_accept_token(
     while the dispatcher's resolver reported the live one, so every redemption
     under a configured bundle refused with ``toolspec_hash_mismatch`` after
     consumption had already made the token unusable (audit 2026-09-02).
+
+    Under WS1 enforce (issue #953) the WS1 gate runs again with fresh
+    lookups before the context check, and its binding is part of that
+    context: a precondition no longer proved refuses as
+    ``ws1_regate_refused``, a moved requirement as ``context_mismatch``, and
+    neither spends the grant. ``ws1_capability(call, principal)`` gives the
+    capability block the binding covers.
     """
     obs, semantic = build_observation(tool_call, tenant)
     proposal_id = token.request_id or None
@@ -1827,6 +1971,24 @@ def redeem_accept_token(
     # else is compared as themselves and refused as context_mismatch.
     acting_for = _acting_for(
         _assessed_payload(chain, tenant, str(proposal_id or "")), principal)
+    ws1 = ws1_regate(
+        ws1_gate, chain=chain, tenant=tenant, proposal_id=str(proposal_id or ""),
+        proposer=acting_for or principal, tool_call=tool_call, semantic=semantic,
+        observation=obs, toolspec_hash=str((toolspec_identity or {}).get("hash", "")),
+        policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
+        capability=(ws1_capability(tool_call, acting_for or principal)
+                    if ws1_capability is not None else None))
+    if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
+        chain.append(tenant, {
+            "event": "execution_ws1_refused",
+            "proposal_id": proposal_id,
+            "actor": principal,
+            "grant_jti": token.jti,
+            "ws1": ws1.audit_block(),
+        })
+        raise TokenRefused(
+            "WS1 re-gate refused: a precondition this grant was issued under "
+            "is not proved now", WS1_REGATE_REFUSED)
     current_context = authorization_context(
         tenant=tenant, principal=acting_for or principal, semantic=semantic,
         target_environment=tool_call.target_environment or "",
@@ -1835,6 +1997,7 @@ def redeem_accept_token(
         task=task_identity_of(tool_call),
         request_ref=request_ref,
         delegated_executor=delegated_executor_of(tool_call),
+        ws1_binding_hash=ws1.binding_hash if ws1 is not None else "",
     )
     request_ref_fields = (
         {"request_ref_hash": request_ref.digest()} if request_ref is not None else {})

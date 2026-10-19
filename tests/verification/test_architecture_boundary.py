@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: BUSL-1.1
 """WS1-01/05: the WS1 layer and its monitor adapter hold no authority exports (A28).
 
-Same pattern as tests/test_advisory_assessment_cannot_authorize.py: nothing on
-the enforcing path imports the library, the library imports nothing that
-mints a token, lease, grant or approval, and its outputs carry no such field.
+Since WP5 the server wires the gate in through ``Ws1GatePort``; the import
+rule below pins that it is the only way in.
+
+Same pattern as tests/test_advisory_assessment_cannot_authorize.py: the
+library imports nothing that mints a token, lease, grant or approval, and its
+outputs carry no such field.
 """
 from __future__ import annotations
 
@@ -51,15 +54,19 @@ def test_ws1_imports_no_issuer_or_settlement_machinery():
     assert offenders == []
 
 
-def test_nothing_on_the_enforcing_path_imports_ws1():
-    importers = []
-    for package in ENFORCING:
+def test_the_execution_core_reaches_ws1_only_through_its_port():
+    """WP5: ``remora/execution`` and ``remora/enforcement`` see a
+    ``Ws1GatePort``; the one importer of the library is the server, and it
+    imports only the gate it wires in."""
+    importers = {}
+    for package in ENFORCING + ("remora/enforcement",):
         for source in (ROOT / package).rglob("*.py"):
-            for name in _imports(source):
-                if name.startswith("remora.verification") \
-                        or name == "remora.decision_providers.composition_adapter":
-                    importers.append(str(source.relative_to(ROOT)))
-    assert importers == []
+            names = [n for n in _imports(source)
+                     if n.startswith("remora.verification")
+                     or n == "remora.decision_providers.composition_adapter"]
+            if names:
+                importers[str(source.relative_to(ROOT))] = sorted(set(names))
+    assert importers == {"servers/execution_api.py": ["remora.verification.execution_gate"]}
 
 
 def test_ws1_reads_no_clock_or_environment():

@@ -10,7 +10,10 @@ verifier, reading evidence a deployment-registered resolver fetched under its
 own capability, can turn a precondition PROVED, and only a fresh composition
 over every cap can reach ACCEPT.
 
-LIBRARY ONLY: nothing in ``servers/`` or ``remora/execution/`` imports this
-package. Wiring it before dispatch is WP5 of the design and waits for the
-IFC, egress and binding work it names.
+Off by default. ``servers/execution_api.py`` builds
+:class:`~remora.verification.execution_gate.Ws1Gate` when ``REMORA_WS1_MODE``
+is ``shadow`` or ``enforce`` and hands it to the execution core as a
+``Ws1GatePort``; ``remora/execution`` never imports this package. Enforce is
+refused unless flow control is on and the deployment names evidence for the
+IFC, egress and read-capability work the design lists (WP5).
 """
