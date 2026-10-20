@@ -7,9 +7,77 @@
   "H_COST",
   "H_EDV"
  ],
+ "calibration_hash": "2f39e4d2bf53c3695f3e56101220e37eb663a2e313ae98a1b297fe6d772bc212",
+ "estimates": {
+  "circuit_in_work_order|circuits": [
+   1,
+   923077
+  ],
+  "customer_in_work_order|customers": [
+   1,
+   833333
+  ],
+  "port_in_work_order|ports": [
+   1,
+   941176
+  ],
+  "recipient_in_work_order|notify": [
+   1,
+   500000
+  ],
+  "ticket_in_work_order|tickets": [
+   1,
+   941176
+  ],
+  "tool_in_work_order|work_orders": [
+   1,
+   981481
+  ],
+  "work_order_is_the_authority|work_orders_by_id": [
+   1,
+   888889
+  ]
+ },
+ "frozen_sha256": {
+  "docs/assurance/ws1_composition_study_v2.md": "48b4df4e7a4cc7b547f6252bc394b43dadbc03094f062855d606731bfc30bb30",
+  "experiments/ws1_composition/isp_study/agents.py": "c078813b8adc1266be593dc01b624a3dca1a2550a3528728c4449b74641ffcd3",
+  "experiments/ws1_composition/isp_study/authority.py": "da026cabf1549028000e1b0bade16c569dca2ce712d068745153c9db23d73aae",
+  "experiments/ws1_composition/isp_study/domain.py": "dda21ea7a018cf792ce73c615342ccf5932f7d46c75346420fcf1bec39b746fe",
+  "experiments/ws1_composition/safe_utility.py": "10ddb0777ca519b2d11cbec72071824b9b5b457782d58e070b4aa192eda4f2f7",
+  "experiments/ws1_composition/study_c/__init__.py": "398309a1bc3025546324d06db55101afe1b76bb95e154bda4b36e5c25adc300f",
+  "experiments/ws1_composition/study_c/agents.py": "f1a57ef4ff47c7038dbacfdeb76ac3bb600e9e21a7d4c0091df6bbb6d88c2623",
+  "experiments/ws1_composition/study_c/attacker.py": "74a25f3140230545275502bc9066941887110219d20997f8596c0df8fc34deb7",
+  "experiments/ws1_composition/study_c/gate_defence.py": "ffdcd9c765aec10642169c6138e8f6be11dbb06e8d20442c18a4987e72d28ef4",
+  "experiments/ws1_composition/study_c/paid.py": "6d0cde50b42590a7271b65451ca2b31ecb1f22925d080bf2e050c60dc24b0a45",
+  "experiments/ws1_composition/study_c/procedure.py": "1f1574db7a073e4d4ad1dc0f358fe428e32d569319fe0f052d34c2290de95183",
+  "experiments/ws1_composition/study_c/runner.py": "82b32e9ebfb38698f35c8198b95e3f3962d7efca1886c1b4ef11bae5f02172ce",
+  "experiments/ws1_composition/study_c/stats.py": "5a9988d532b2bcdeb472663006a0e02d043fcb3f853de3ecdcd1b887d5441f31",
+  "experiments/ws1_composition/study_c/tasks.py": "8a6f69443a5baddd4d0b6b0cdbd49ba6e26f9879397d9e1b8999e8eddfed91fc",
+  "remora/policy/decision_engine.py": "db9e00d4c65e59f7888d15b5f0ff7dc668a067b5c1805b40cd4a26fa8b25346d",
+  "remora/verification/compose.py": "381550281944781a1f26c9530d6b81ec029e03b4daefb0d59172e3757e95af41",
+  "remora/verification/execution_gate.py": "9ccfae9bcbf3a9c74cddac051a722508df83b30117c653bb7c178df8c3d8728b",
+  "remora/verification/planner.py": "d751abfbdee76ba7d074385f4a50db04c406ebbde28f291c7efdfcb087aa66bf"
+ },
  "grader": {
   "fixed_at_commit": "4f3f9a29",
   "path": "experiments/ws1_composition/safe_utility.py"
+ },
+ "holdout": {
+  "cap_usd": 44.49361,
+  "customers": [
+   "C-009",
+   "C-010",
+   "C-011",
+   "C-012",
+   "C-013",
+   "C-014",
+   "C-015",
+   "C-016",
+   "C-017",
+   "C-018",
+   "C-019"
+  ],
+  "path": "data/ws1_composition_v2/holdout_tasks.json"
  },
  "note": "Study C's own ledger is artifacts/ws1/study_c_spend.json; Study B's ledger is not reused.",
  "owner_decisions": {
@@ -23,9 +91,22 @@
  "owner_decisions_pending": [
   "osf_registration"
  ],
+ "pilot_version": 1,
  "plan": "docs/assurance/ws1_composition_study_v2.md",
+ "power_note": "below 0.8 a primary contrast is reported as underpowered",
+ "power_primary": {
+  "H_COST": 1.0,
+  "H_DET": 1.0,
+  "H_EDV": 1.0
+ },
  "schema": "remora-ws1-study-manifest/v1",
  "seed": 20261020,
- "status": "draft_authorised",
- "study": "WS1 composition study v2 (Study C)"
+ "status": "locked_never_run",
+ "study": "WS1 composition study v2 (Study C)",
+ "thresholds_per_arm": {
+  "H0": 0.3,
+  "H_COST": 0.3,
+  "H_DET": 0.3,
+  "H_EDV": 0.4
+ }
 }
