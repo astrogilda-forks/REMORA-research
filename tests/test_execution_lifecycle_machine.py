@@ -865,14 +865,10 @@ def test_r3_surface_ast_mutation_sweep() -> None:
     """PRF-056 (RMR-AUD-013): targeted mutation testing over the R3 review
     queue, execution service, projections and flow-check functions that sit
     outside [tool.mutmut]."""
+    import importlib
     import types
     from datetime import UTC, datetime, timedelta
 
-    import remora.execution.projections as proj_mod
-    import remora.execution.service as svc_mod
-    import remora.flow.check as flow_mod
-    import remora.governance.effect_receipt as er_mod
-    import remora.governance.review_queue as rq_mod
     from remora.enforcement.token import AuthorizationContext
     from remora.flow.label import Integrity, Label
     from remora.flow.spec import parse_flow
@@ -880,6 +876,12 @@ def test_r3_surface_ast_mutation_sweep() -> None:
     from remora.governance.review_queue import Approval
     from remora.governance.tenant_chain import TenantAuditChain
     from remora.policy.report import DecisionAction, DecisionReason
+
+    proj_mod = importlib.import_module("remora.execution.projections")
+    svc_mod = importlib.import_module("remora.execution.service")
+    flow_mod = importlib.import_module("remora.flow.check")
+    er_mod = importlib.import_module("remora.governance.effect_receipt")
+    rq_mod = importlib.import_module("remora.governance.review_queue")
 
     now = datetime(2026, 10, 20, 12, 0, 0, tzinfo=UTC)
 

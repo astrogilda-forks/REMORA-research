@@ -565,78 +565,81 @@ def input_oracle_from_observation(
         or bool(obs.intent_provenance_required and not obs.intent_provenance_resolved)
     )
 
-    floor_fires = (
-        input_hard_prohibition
-        or bool(obs.adversarial_detected)
-        or obs.schema_valid is False
-        or bool(obs.tool_forbidden)
-        or bool(obs.coercion_detected)
-        or bool(obs.blackmail_pattern_detected)
-        or obs.counterfactual_passed is False
-        or bool(obs.evidence_contradictions and obs.evidence_contradictions > 0)
-        or bool(obs.argument_tainted)
-        or (obs.flow_status is not None and obs.flow_status not in ("evaluated", "not_declared"))
-        or (obs.flow_status == "evaluated" and (
+    floor_checks = (
+        input_hard_prohibition,
+        bool(obs.adversarial_detected),
+        obs.schema_valid is False,
+        bool(obs.tool_forbidden),
+        bool(obs.coercion_detected),
+        bool(obs.blackmail_pattern_detected),
+        obs.counterfactual_passed is False,
+        bool(obs.evidence_contradictions and obs.evidence_contradictions > 0),
+        bool(obs.argument_tainted),
+        obs.flow_status is not None and obs.flow_status not in ("evaluated", "not_declared"),
+        obs.flow_status == "evaluated" and (
             bool(obs.flow_confidentiality_violation) or bool(obs.flow_integrity_violation)
-        ))
+        ),
     )
+    floor_fires = any(floor_checks)
 
-    gate_or_floor_blocks_accept = (
-        floor_fires
-        or obs.tool_matches_goal is False
-        or obs.expected_effect_matches is False
-        or bool(obs.distribution_shift_detected)
-        or bool(obs.environment_mismatch_detected)
-        or (tier in ("high", "critical"))
-        or (tier == "unknown" and (action in {"write", "delete"} or env in {"prod", "production", "live"}))
-        or action == "delete"
-        or (obs.rollback_available is False and tier in ("high", "critical"))
-        or (bool(obs.state_transition_uncertain) and tier in ("high", "critical"))
-        or (obs.valid_oracle_count > 0 and obs.valid_oracle_count < 3)
-        or (obs.schema_valid is None and action in {"write", "delete", "production_write", "destructive_write"})
-        or (bool(obs.proposed_tool_name) and not action)
-        or (action not in {"", "read", "write", "delete", "production_write", "destructive_write"})
-        or (
+    gate_checks = (
+        floor_fires,
+        obs.tool_matches_goal is False,
+        obs.expected_effect_matches is False,
+        bool(obs.distribution_shift_detected),
+        bool(obs.environment_mismatch_detected),
+        tier in ("high", "critical"),
+        tier == "unknown" and (action in {"write", "delete"} or env in {"prod", "production", "live"}),
+        action == "delete",
+        obs.rollback_available is False and tier in ("high", "critical"),
+        bool(obs.state_transition_uncertain) and tier in ("high", "critical"),
+        obs.valid_oracle_count > 0 and obs.valid_oracle_count < 3,
+        obs.schema_valid is None and action in {"write", "delete", "production_write", "destructive_write"},
+        bool(obs.proposed_tool_name) and not action,
+        action not in {"", "read", "write", "delete", "production_write", "destructive_write"},
+        bool(
             engine.semantic_authority_floor
-            and bool(obs.proposed_tool_name)
+            and obs.proposed_tool_name
             and (obs.tool_matches_goal is None or obs.expected_effect_matches is None)
-        )
-        or bool(obs.missing_required_arguments)
-        or bool(obs.unvalidated_required_arguments)
-        or obs.argument_values_grounded is False
+        ),
+        bool(obs.missing_required_arguments),
+        bool(obs.unvalidated_required_arguments),
+        obs.argument_values_grounded is False,
     )
+    gate_or_floor_blocks_accept = any(gate_checks)
 
     read_only = action == "read"
-    low_consequence_eligible = (
-        engine.low_consequence_accept
-        and read_only
-        and env not in {"prod", "production", "live"}
-        and not gate_or_floor_blocks_accept
-        and obs.phase != "critical"
-        and not (obs.phase == "disordered" and obs.evidence_action != "answer")
-        and not (obs.trust_score is not None and obs.trust_score < 0.20 and obs.evidence_action != "answer")
-        and obs.arguments_satisfiable is not False
-        and obs.argument_values_supported is not False
+    ordered_high_trust = obs.phase == "ordered" and (obs.trust_score or 0.0) >= 0.72
+    evidence_supported = (
+        obs.evidence_action in ("answer", "evidence_accept")
+        and (obs.evidence_confidence or 0.0) >= 0.70
+        and (obs.phase == "ordered" or (obs.trust_score or 0.0) >= 0.72)
     )
+    low_consequence_checks = (
+        engine.low_consequence_accept,
+        read_only,
+        env not in {"prod", "production", "live"},
+        not gate_or_floor_blocks_accept,
+        not (engine.execution_profile and (ordered_high_trust or evidence_supported)),
+        obs.phase != "critical",
+        not (obs.phase == "disordered" and obs.evidence_action != "answer"),
+        not (obs.trust_score is not None and obs.trust_score < 0.20 and obs.evidence_action != "answer"),
+        obs.arguments_satisfiable is not False,
+        obs.argument_values_supported is not False,
+    )
+    low_consequence_eligible = all(low_consequence_checks)
     probabilistic_eligible = (
         not engine.execution_profile
         and not gate_or_floor_blocks_accept
-        and (
-            (obs.phase == "ordered" and (obs.trust_score or 0.0) >= 0.72)
-            or (
-                obs.evidence_action in ("answer", "evidence_accept")
-                and (obs.evidence_confidence or 0.0) >= 0.70
-                and (obs.phase == "ordered" or (obs.trust_score or 0.0) >= 0.72)
-            )
-        )
+        and (ordered_high_trust or evidence_supported)
     )
-    input_blocks_autonomy = not (low_consequence_eligible or probabilistic_eligible)
+    blocks_autonomy = not (low_consequence_eligible or probabilistic_eligible)
     obligations = tuple(dict.fromkeys(
         obs.missing_required_arguments or obs.unvalidated_required_arguments or ()
     ))
     return {
         "input_hard_prohibition": input_hard_prohibition,
-        "input_blocks_autonomy": input_blocks_autonomy,
+        "input_blocks_autonomy": blocks_autonomy,
         "input_obligations": obligations,
     }
 
