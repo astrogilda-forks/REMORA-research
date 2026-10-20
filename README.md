@@ -4,6 +4,9 @@
 
 [![Paper (PDF)](https://img.shields.io/badge/paper-PDF-b31b1b.svg)](paper/remora_paper.pdf) [![CI: Deterministic Test Suite](https://github.com/darklordVirtual/REMORA-research/actions/workflows/ci.yml/badge.svg)](https://github.com/darklordVirtual/REMORA-research/actions/workflows/ci.yml) [![Quality Gates](https://github.com/darklordVirtual/REMORA-research/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/darklordVirtual/REMORA-research/actions/workflows/quality-gates.yml) [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 
+[![Verified by Probity](https://raw.githubusercontent.com/probityai/agent-evidence/main/assets/verified-by-probity.svg)](https://github.com/probityai/probity)
+Verified by Probity (github.com/probityai/probity): [latest passing run](https://github.com/darklordVirtual/REMORA-research/actions/workflows/probity-invocation-axes-reproduction.yml)
+
 **An AI agent can propose any tool call. REMORA decides whether that exact call may run, and keeps the evidence.**
 
 REMORA is a governance overlay that sits between a tool-using agent and the tools it wants to use. Before a call runs, it checks the call against policy the deployment owns, not the agent, and returns one of four decisions:
