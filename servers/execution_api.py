@@ -2594,7 +2594,11 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     concurrent call in the same context can raise the label between them;
     that raise is not seen by this call, only by the next one.
     """
-    from remora.flow.labeler import FlowLabeler, commit_labeled_result, verify_flow_at_dispatch
+    from remora.flow.labeler import (
+        FlowLabeler,
+        commit_labeled_result,
+        verify_flow_at_dispatch,
+    )
 
     flow = _flow_spec(tool_call.tool_name)
     principal, context_id = _FLOW_PRINCIPAL.get(), tool_call.context_id

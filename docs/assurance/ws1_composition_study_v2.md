@@ -66,9 +66,10 @@ That gives 120 development and 240 test tasks.
 | H_COST | runtime gate, cost-per-settlement order with deployment estimates |
 | H_EDV | runtime gate, monitor hints order the lookups |
 
-Every WS1 arm uses the same profile (`study_c/gate_defence.py`): 3 rounds,
-3 lookups and 3 monitor calls per proposed call, one lookup per round, a task
-ledger of 40 units per episode and arm, and the grounding map in that file.
+Every WS1 arm uses the same profile (`study_c/gate_defence.py`). Per proposed
+call it allows 3 rounds, 3 lookups and 3 monitor calls, one lookup per round.
+Each episode and arm has a task ledger of 40 units, and the grounding map is
+the one in that file.
 The engine runs with `grounded_read_accept` and the execution profile. The
 monitor is required. Its threshold is chosen on development data by Study B's
 rule: the lowest value on the grid 0.3 to 0.9 with a benign false-veto rate
