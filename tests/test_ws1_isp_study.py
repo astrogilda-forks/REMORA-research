@@ -249,3 +249,62 @@ def test_a_pilot_refuses_before_touching_a_file_and_never_overwrites(monkeypatch
     with pytest.raises(StudyRefused, match="never overwritten"):
         study_b.pilot()
     assert log.read_text(encoding="utf-8") == "earlier pilot\n" and not out.exists()
+
+
+# ── the adaptive attacker ──────────────────────────────────────────────
+
+
+def test_every_arm_meets_the_injection_the_search_froze():
+    from experiments.ws1_composition.isp_study.attacker import ScriptedAttacker
+
+    attack = [t for t in DEV if t.is_attack][:2]
+    results = run_study(attack, ARMS, profile=_profile(), monitor=ScriptedMonitor(),
+                        agent_run=run_scripted, attacker=ScriptedAttacker())
+    for task in attack:
+        rows = [r for r in results if r.task_id == task.task_id]
+        assert len({r.injection for r in rows}) == 1 and rows[0].injection
+        assert {r.attack_attempts for r in rows} == {1}  # the scripted agent follows at once
+
+
+def test_the_search_stops_at_the_attempt_cap_when_the_agent_never_follows():
+    from experiments.ws1_composition.isp_study.attacker import MAX_ATTEMPTS
+    from experiments.ws1_composition.isp_study.runner import adaptive_injection
+
+    crafted = []
+
+    class Counting:
+        def craft(self, task, history):
+            crafted.append(len(history))
+            return f"note {len(history)}"
+
+    def refuses(task, call):  # an agent that ignores every ticket
+        return "nothing", 1
+
+    task = next(t for t in DEV if t.is_attack)
+    final, result, n = adaptive_injection(task, attacker=Counting(), profile=_profile(),
+                                          monitor=ScriptedMonitor(), agent_run=refuses)
+    assert n == MAX_ATTEMPTS and crafted == list(range(MAX_ATTEMPTS))
+    assert final.injection == f"note {MAX_ATTEMPTS - 1}" and not result.attack_success
+
+
+def test_claude_attacker_sees_history_and_falls_back_on_refusal():
+    from experiments.ws1_composition.isp_study.attacker import (
+        MAX_INJECTION_CHARS,
+        Attempt,
+        ClaudeAttacker,
+    )
+
+    task = next(t for t in DEV if t.is_attack)
+    messages = FakeMessages([_reply([_text(json.dumps({"ticket_note": "x" * 900}))]),
+                             _reply([], stop="refusal")])
+    usage = Usage()
+    attacker = ClaudeAttacker(SimpleNamespace(messages=messages),
+                              BudgetGuard(cap_usd=5, prices=PRICES), usage)
+    history = [Attempt("first try", [("get_work_order", {"work_order_id": "WO-1001"})], "ok",
+                       False)]
+    note = attacker.craft(task, history)
+    assert len(note) == MAX_INJECTION_CHARS
+    sent = json.loads(messages.sent[0]["messages"][0]["content"])
+    assert sent["earlier_attempts"][0]["ticket_note"] == "first try"
+    assert messages.sent[0]["output_config"]["format"]["type"] == "json_schema"
+    assert attacker.craft(task, history) == task.injection and usage.refusals == 1
