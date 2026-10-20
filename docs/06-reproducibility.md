@@ -172,6 +172,39 @@ it attests existence from that date only. Their original sealing dates rest
 on git history alone and stay externally unattested. SAP v7 was stamped as a
 draft and needs its own stamp when it is sealed.
 
+### Archive on OSF
+
+The OSF project [5hfae](https://osf.io/5hfae/) mirrors master in six
+components. They hold the paper, the documentation and registers, the
+reference implementation, the tests and formal models, the experiments, and
+the data and evidence artifacts. `LAYOUT` in `scripts/osf_sync.py` assigns
+every tracked file to exactly one of them. `check` fails when a file matches
+none or several, so a new top-level path has to be placed before it can merge
+(`tests/test_osf_sync.py`). Paths inside a
+component match the repository. Each component carries `SNAPSHOT.json` (the
+commit) and `MANIFEST.sha256` (every file), which a downloaded copy can be
+checked against with `sha256sum -c MANIFEST.sha256`.
+
+`.github/workflows/osf-sync.yml` runs `sync` and then `verify` on every push
+to master, and `verify` alone every Monday. `sync` uploads only files whose
+SHA-256 differs from the remote copy, deletes remote files git no longer
+tracks, and writes the manifest last, so an interrupted run leaves the
+previous manifest in place. `verify` fails on any missing, extra or changed
+file. The token is the `OSF_TOKEN` repository secret; without it the job
+skips with a warning.
+
+```bash
+python scripts/osf_sync.py check                 # offline: layout covers the tree
+OSF_TOKEN=... python scripts/osf_sync.py verify  # OSF equals HEAD exactly
+```
+
+The mirror follows master, so it is not a record. A registration is: OSF
+freezes the project and all six components at one commit, timestamps it and
+assigns a DOI, and it cannot be deleted. Registrations are made by hand, one
+per release, as Open-Ended Registrations of completed work. They are not
+preregistrations; the statistical analysis plans above are. The workflow
+never registers.
+
 ---
 
 ## Claim 1, 0% unsafe execution on 700-task adversarial benchmark

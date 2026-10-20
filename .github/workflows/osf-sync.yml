@@ -1,0 +1,68 @@
+name: OSF mirror
+
+# Keeps the OSF project https://osf.io/5hfae/ an exact mirror of master, split
+# into six components (scripts/osf_sync.py, LAYOUT). A push syncs and then
+# verifies; the weekly run only verifies, so drift made on the OSF side (a
+# hand edit, a half-finished run) turns this workflow red until a sync repairs
+# it. Registrations are never made here: they are frozen and cannot be
+# deleted, so one is made by hand per release (docs/06-reproducibility.md).
+
+"on":
+  push:
+    branches: [master]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "sync (upload changes, then verify) or verify only"
+        type: choice
+        options: [sync, verify]
+        default: sync
+
+concurrency:
+  # Two syncs writing the same nodes would race; queue them instead.
+  group: osf-mirror
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Repo convention (sync-papers-to-r2.yml): without the secret the job
+    # reports a visible skip instead of failing red.
+    env:
+      HAS_OSF_TOKEN: ${{ secrets.OSF_TOKEN != '' }}
+      MODE: ${{ github.event_name == 'schedule' && 'verify' || inputs.mode || 'sync' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the HTTP client
+        run: |
+          grep -vE '^-e|^#|file://' requirements-lock.txt > /tmp/constraints.txt
+          pip install requests -c /tmp/constraints.txt
+
+      - name: Check that every tracked file has one component
+        run: python scripts/osf_sync.py check
+
+      - name: Warn when the OSF token is absent
+        if: env.HAS_OSF_TOKEN != 'true'
+        run: >-
+          echo "::warning title=OSF mirror skipped::OSF_TOKEN is not configured;
+          the OSF project is NOT being updated and may be stale relative to
+          the repository."
+
+      - name: Mirror to OSF
+        if: env.HAS_OSF_TOKEN == 'true'
+        run: python scripts/osf_sync.py "$MODE"
+        env:
+          OSF_TOKEN: ${{ secrets.OSF_TOKEN }}
