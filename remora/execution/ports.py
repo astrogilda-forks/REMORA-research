@@ -381,4 +381,5 @@ class Ws1GatePort(Protocol):
         base: DecisionReport,
         veto_on_record: bool = False,
         review_attestation: tuple[str, str] | None = None,
+        task_id: str | None = None,
     ) -> Ws1OutcomePort: ...

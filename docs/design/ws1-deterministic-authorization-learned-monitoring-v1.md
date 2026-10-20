@@ -44,7 +44,25 @@ Avvik fra spesifikasjonen:
 - `enforce` nektes ved oppstart uten `REMORA_FLOW_CONTROL=1` og uten at deploymenten navngir evidens for IFC-04b, IFC-06, IFC-11, IFC-12 og IFC-13. Denne evidensen er deploymentens egen påstand; koden sjekker at den er navngitt, ikke at den er sann.
 - Monitoren får aldri argumentverdier. En resolver sender kravets subject (en argumentverdi) til sin registrerte kilde.
 
-Gjenstår: dev-piloten, forseglingen og holdout-kjøringen av Studie B (krever API-nøkkel), OSF-registrering, grant-ruten (venter på IFC-08), en pilot i et ekte miljø, og `enforce` i produksjon (venter på IFC-pakkene). WP0 viser at H-DET og H-EDV ikke kan gjenopprette noe på AgentDojo før intent- og kontraktsdekning finnes (S09, S20). Det arbeidet kommer før en meningsfull WS-UTILITY- eller WS-ATTRIBUTION-studie.
+Gjenstår: holdout-resultatet for Studie B, OSF-registrering, grant-ruten (venter på IFC-08), en pilot i et ekte miljø, og `enforce` i produksjon (venter på IFC-pakkene). WP0 viser at H-DET og H-EDV ikke kan gjenopprette noe på AgentDojo før intent- og kontraktsdekning finnes (S09, S20).
+
+### Reviewfunn ved `966d6ac` (20.10.2026)
+
+Kontrollert mot `966d6acd4c201a76bd9ce417c663c04bae88d269`. Pilot v4-sammendraget gjenskapes eksakt fra rådataene (80 episoder).
+
+| Funn | Status ved `966d6ac` | Nå |
+|---|---|---|
+| `TaskCallLedger` er implementert uten integrasjon i kjørestien | Bekreftet | Integrert, se under |
+| `commit_labeled_result` og `verify_flow_at_dispatch` har ingen kallere i kjørekoden | Bekreftet | Uendret |
+| `H_COST` og `H_AR` finnes i `planner.py`, men er ikke tillatt i `execution_gate.py` | Bekreftet | Uendret |
+| Monitorens usikkerhet begrenser ikke utførelse når alle påkrevde krav er PROVED | Bekreftet (endret etter pilot v2) | Uendret |
+| Fire monotonisitetstilfeller er markert som forventede feil | Bekreftet (tre parametriseringer av ett tilfelle, pluss risikonivå for produksjonsskriving) | Uendret |
+| Studie B angriper den ubeskyttede agenten under angrepssøket | Bekreftet | Uendret i låst Studie B |
+| Lesenytten måles med teksttreff i sluttsvaret | Bekreftet | Uendret i låst Studie B |
+
+**Varig oppgavebudsjett (integrert).** Med `Ws1Deployment.task_ledger` satt reserverer gaten hvert resolver-oppslag og hvert monitorkall i `TaskCallLedger` før det kjøres. Det gjelder ved vurdering og ved hver re-gate (ACCEPT-, review- og async-stien). Budsjettet tilhører tenant og oppgave (`context_id/task_id`). Bindingen omfatter også principal og autoritetskontekst. Et kall uten oppgave nektes, og en annen autoritet kan ikke bruke oppgavens budsjett. Omstart, retries og omformulerte forslag nullstiller ikke forbruket; en re-gate er ny ekstern aktivitet og belastes på nytt. Ved tomt budsjett kjøres ikke oppslaget, og løkken stopper som `task_budget_exhausted`. En operasjon som allerede er reservert innenfor samme forsøk, kjøres ikke igjen og etterlater kravet som UNKNOWN. Garantien er lokal atomisk reservasjon på én vert. Den er ikke nøyaktig én ekstern effekt: en reservasjon hvis oppslag aldri ble fullført, forblir brukt. Akseptansetest gjennom rutene: `tests/test_ws1_task_budget.py`.
+
+`remora/verification/planner.py` er en låst fil i Studie B. Endringen påvirker ikke den forseglede studien, som reproduseres fra forseglingscommiten `6924f0d0`.
 
 ## 0. Beslutningsgrunnlag
 

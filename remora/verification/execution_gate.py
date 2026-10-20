@@ -32,6 +32,7 @@ resolver sends the precondition's subject to its registered source only.
 from __future__ import annotations
 
 import dataclasses
+import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -47,6 +48,9 @@ from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
 from remora.verification.check import CheckedPreconditions, ReviewAttestation, Verifier
 from remora.verification.compose import compose_authorized_decision
 from remora.verification.planner import (
+    RESERVED,
+    Reserve,
+    TaskCallLedger,
     FamilyLedger,
     PlannerMode,
     VerificationBudget,
@@ -99,6 +103,12 @@ class Ws1Deployment:
     budget: VerificationBudget = field(default_factory=VerificationBudget)
     family_ledger: FamilyLedger | None = None
     enforce_dependencies: Mapping[str, str] = field(default_factory=dict)
+    #: Durable task budget (SQLite, single host). When set, every resolver
+    #: lookup and every monitor call is reserved against the call's task before
+    #: it runs, across assessment, every re-gate, retries and restarts; a call
+    #: that names no task is refused. ``task_call_cap`` is units per task.
+    task_ledger: TaskCallLedger | None = None
+    task_call_cap: int = 30
 
     def __post_init__(self) -> None:
         if self.planner_mode not in _RUNTIME_MODES:
@@ -177,6 +187,38 @@ def _review_route(record: CompositionRecord, requirements: Any) -> str:
     return role if isinstance(role, str) and role else ""
 
 
+def _task_reservation(ledger: TaskCallLedger, cap: int, *, tenant: str, principal: str,
+                      task_id: str, context: ProposalContext) -> Reserve | None:
+    """The reserve hook for one evaluation, or None on a binding mismatch.
+
+    The budget belongs to (tenant, task). Its binding adds the principal and
+    the intent authority, so a different authority cannot draw on it. Each
+    evaluation is one attempt with its own operation keys: a re-gate or a
+    retry is new external activity and is charged again; nothing refunds or
+    resets the task's spend. Within an attempt a key reserved twice is a
+    duplicate and does not run twice.
+    """
+    ledger_task = tagged_digest("ledger-task", {"tenant": tenant, "task": task_id})
+    binding = tagged_digest("ledger-binding", {
+        "tenant": tenant, "task": task_id, "principal": principal,
+        "intent_authority_hash": context.intent_authority_hash})
+    try:
+        ledger.ensure(ledger_task, binding, cap)
+    except ValueError:
+        return None
+    attempt = secrets.token_hex(16)
+    request_hash = tagged_digest("ledger-request", {"call_hash": context.call_hash,
+                                                    "tool": context.tool_name})
+
+    def reserve(kind: str, key: str) -> str:
+        operation = tagged_digest("ledger-operation", {
+            "attempt": attempt, "context_hash": context.context_hash, "kind": kind,
+            "key": key})
+        return ledger.reserve_status(ledger_task, binding, operation, request_hash)
+
+    return reserve
+
+
 class Ws1Gate:
     """Builds the context, runs the bounded loop and composes; never raises."""
 
@@ -208,16 +250,18 @@ class Ws1Gate:
                  capability: Mapping[str, Any] | None, flow_digest: str | None,
                  flow_epoch: int | None, attempt_family_id: str | None,
                  base: DecisionReport, veto_on_record: bool = False,
-                 review_attestation: tuple[str, str] | None = None) -> Ws1Outcome:
+                 review_attestation: tuple[str, str] | None = None,
+                 task_id: str | None = None) -> Ws1Outcome:
         """*review_attestation* is ``(approver, approver_role)`` from the stored
-        approval, passed on the review path's re-gate only."""
+        approval, passed on the review path's re-gate only. *task_id* is the
+        server-bound task identity the call is made under (``context_id/task_id``)."""
         try:
             review = (ReviewAttestation(proposal_id, *review_attestation)
                       if review_attestation is not None else None)
             return self._evaluate(proposal_id, tenant, principal, tool_name, arguments,
                                   intent_authority_hash, policy_bundle_hash, toolspec_hash,
                                   capability, flow_digest, flow_epoch, attempt_family_id,
-                                  base, veto_on_record, review)
+                                  base, veto_on_record, review, task_id)
         except Exception as exc:  # a gate fault refuses; its text never reaches the record
             return Ws1Outcome(self.mode, DecisionAction.ABSTAIN, f"error:{type(exc).__name__}")
 
@@ -227,7 +271,7 @@ class Ws1Gate:
                   capability: Mapping[str, Any] | None, flow_digest: str | None,
                   flow_epoch: int | None, attempt_family_id: str | None,
                   base: DecisionReport, veto_on_record: bool,
-                  review: ReviewAttestation | None) -> Ws1Outcome:
+                  review: ReviewAttestation | None, task_id: str | None) -> Ws1Outcome:
         d = self.deployment
         for name, value in (("intent_authority", intent_authority_hash),
                             ("policy_bundle", policy_bundle_hash), ("toolspec", toolspec_hash)):
@@ -249,6 +293,16 @@ class Ws1Gate:
                 and not d.family_ledger.admit(attempt_family_id, context):
             return Ws1Outcome(self.mode, DecisionAction.ABSTAIN,
                               "refused:attempt_family_budget_exhausted")
+        reserve = None
+        if d.task_ledger is not None:
+            if not task_id:
+                return Ws1Outcome(self.mode, DecisionAction.ABSTAIN,
+                                  "refused:task_identity_required")
+            reserve = _task_reservation(d.task_ledger, d.task_call_cap, tenant=tenant,
+                                        principal=principal, task_id=task_id, context=context)
+            if reserve is None:
+                return Ws1Outcome(self.mode, DecisionAction.ABSTAIN,
+                                  "refused:task_binding_mismatch")
         requirements = derive_preconditions(context, args, d.registry)
         monitor_calls = 0
         monitor_veto = veto_on_record
@@ -259,6 +313,8 @@ class Ws1Gate:
                 return None, "no_monitor"
             if monitor_calls >= d.budget.max_monitor_calls:
                 return None, "monitor_budget_exhausted"
+            if reserve is not None and reserve("monitor", str(monitor_calls)) != RESERVED:
+                return None, "task_budget_exhausted"
             monitor_calls += 1
             try:
                 return d.monitor(context, checked), None
@@ -287,7 +343,10 @@ class Ws1Gate:
             context, requirements, registry=d.registry, verifiers=d.verifiers,
             resolvers=d.resolvers, held_capabilities=d.resolve_capabilities(tenant, principal),
             mode=d.planner_mode, budget=d.budget, clock_ms=d.clock_ms,
-            hints_for=hints if d.planner_mode is PlannerMode.H_EDV else None, review=review)
+            hints_for=hints if d.planner_mode is PlannerMode.H_EDV else None, review=review,
+            # Monitor calls are reserved in ask(); the loop reserves lookups.
+            reserve=None if reserve is None else (
+                lambda kind, key: RESERVED if kind == "monitor" else reserve(kind, key)))
         record = compose_authorized_decision(
             base, context, requirements, run.checked, assess(run.checked), d.monitor_profile,
             now_s=d.clock_ms() // 1000, budget_exhausted=run.budget_exhausted,

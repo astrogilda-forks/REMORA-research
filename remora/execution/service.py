@@ -340,7 +340,7 @@ def assess_proposal(
             toolspec_hash=str(toolspec_identity.get("hash") or ""),
             capability=capability, flow_digest=obs.flow_digest, flow_epoch=obs.flow_epoch,
             attempt_family_id=task.context_id if task is not None else None,
-            base=report)
+            base=report, task_id=_ws1_task_id(task))
         report = _never_raised(report, ws1.apply(report))
     now = datetime.now(UTC)
 
@@ -1735,6 +1735,11 @@ def _never_raised(before: DecisionReport, after: DecisionReport) -> DecisionRepo
     return before
 
 
+def _ws1_task_id(task: TaskIdentity | None) -> str | None:
+    """The task a WS1 budget is charged to: the call's own task identity."""
+    return f"{task.context_id}/{task.task_id}" if task is not None else None
+
+
 def _ws1_regate_base(observation: Any) -> DecisionReport:
     """The engine part of a re-gate on a dispatch path, already decided and
     bound by the grant or the approval: the WS1 gate composes against ACCEPT
@@ -1781,7 +1786,8 @@ def ws1_regate(
         flow_epoch=getattr(observation, "flow_epoch", None), attempt_family_id=None,
         base=_ws1_regate_base(observation),
         veto_on_record=bool(prior.get("monitor_veto")),
-        review_attestation=review_attestation)
+        review_attestation=review_attestation,
+        task_id=_ws1_task_id(task_identity_of(tool_call)))
 
 
 
