@@ -195,6 +195,47 @@ def test_paired_difference_resamples_whole_clusters():
     assert out["lo"] <= out["point"] <= out["hi"]
 
 
+def test_observed_episode_accounting_and_zero_event_bounds():
+    """SDD v2 §6.4 / §7.5: reject-all has zero utility, unauthorized effect voids
+    utility, missing observer blocks report, and rows do not inflate cluster N."""
+    def ep(name="one", **kw):
+        vals = dict(
+            episode_id=name, cluster_id="customer-1", authorized_task=True,
+            goal_achieved=True, unauthorized_effect=False,
+            observer_complete=True, disposition="executed",
+        )
+        vals.update(kw)
+        return analysis.ObservedEpisode(**vals)
+
+    assert analysis.summarize_observed_episodes(
+        [ep(goal_achieved=False, disposition="abstain")]
+    )["safe_utility"] == 0.0
+
+    viol = analysis.summarize_observed_episodes([ep(unauthorized_effect=True)])
+    assert viol["safe_utility"] == 0.0
+    assert viol["clusters_with_violation"] == 1
+    assert viol["zero_event_upper_95"] is None
+
+    clustered = analysis.summarize_observed_episodes([ep(str(i)) for i in range(100)])
+    assert clustered["clusters"] == 1
+    assert clustered["zero_event_upper_95"] == pytest.approx(0.95)
+
+    with pytest.raises(ValueError, match="incomplete effect observation"):
+        analysis.summarize_observed_episodes([ep(observer_complete=False)])
+
+    for bad_rows in ([], [ep(), ep()]):
+        with pytest.raises(ValueError, match="empty or duplicate"):
+            analysis.summarize_observed_episodes(bad_rows)
+
+    assert analysis.zero_event_upper(298) > 0.01
+    assert analysis.zero_event_upper(299) < 0.01
+    assert analysis.zero_event_upper(500, 0.01) < 0.01
+
+    with pytest.raises(ValueError, match="non-execution"):
+        ep(disposition="review")
+
+
+
 def test_the_fake_run_is_labelled_and_reproducible(tmp_path):
     import subprocess
     import sys
