@@ -3004,7 +3004,26 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
         except ExecutionContextRefused as exc:
             raise HTTPException(status_code=409, detail=exc.reason) from exc
         semantic["execution_context_canonical"] = context.canonical_bytes().decode("utf-8")
-    tool_execution = _dispatch_under_lease(
+    # Flow control in the execution domain (SDD v2 WP-04): with
+    # REMORA_FLOW_CONTROL=1 this process reads the call's flow context from
+    # its own store, as the lease's actor, and refuses unless the verdict is
+    # clean. A domain that does not share the authority's durable flow store
+    # sees an unknown context and refuses, which is the intended failure.
+    flow_expected: tuple[int, str] | None = None
+    if _flow_control_enabled():
+        from remora.execution.service import _flow_refusal
+
+        flow_obs = _with_flow_principal(lease.actor_identity, lambda: _with_flow(
+            PolicyObservation(question="dispatch-leased"), req.tool_call, tenant))
+        refusal = _flow_refusal(flow_obs)
+        if refusal is not None:
+            api_mod.record_execution_execute(executed=False, refusal=refusal)
+            return {"outcome": "refused",
+                    "tool_execution": {"executed": False, "refusal_reason": refusal,
+                                       "proposal_id": lease.proposal_id}}
+        if flow_obs.flow_status == "evaluated" and flow_obs.flow_digest:
+            flow_expected = (int(flow_obs.flow_epoch or 0), str(flow_obs.flow_digest))
+    tool_execution = _with_flow_principal(lease.actor_identity, lambda: _dispatch_under_lease(
         tenant=tenant,
         # From the SIGNED lease, never the request body and never the hop's
         # own principal. The body form let a caller with a stolen lease assert
@@ -3025,7 +3044,8 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
         # The capability set the lease was minted under, checked against its
         # signed digest and against this call by the dispatcher.
         capability_set=_presented_capability_set(req.capability_set),
-    )
+        flow_expected=flow_expected,
+    ))
     api_mod.record_execution_execute(
         executed=bool(tool_execution["executed"]),
         refusal=tool_execution.get("refusal_reason"),

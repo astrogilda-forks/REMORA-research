@@ -1926,6 +1926,26 @@ def plan_binding_of(tool_call: Any) -> Any:
     return PlanBinding.from_dict(data)
 
 
+def _flow_refusal(obs: Any) -> str | None:
+    """Why the call's current flow verdict refuses it, or None.
+
+    The same states the engine's flow rungs accept pass here: flow control
+    off (no ``flow_status``), a tool outside the strict profile with no flow
+    block (``not_declared``), and a clean evaluated verdict. An unknown
+    context, a missing policy, an unavailable store or a violation refuses.
+    """
+    status = getattr(obs, "flow_status", None)
+    if status is None or status == "not_declared":
+        return None
+    if status != "evaluated":
+        return f"flow_{status}"
+    if getattr(obs, "flow_confidentiality_violation", False):
+        return "flow_confidentiality_violation"
+    if getattr(obs, "flow_integrity_violation", False):
+        return "flow_integrity_violation"
+    return None
+
+
 def _flow_kwargs(obs: Any) -> dict[str, Any]:
     """``flow_expected`` for a dispatch call: the epoch and digest the flow
     check had when this call was last decided (SDD v2 WP-04, AR-018).
@@ -2110,6 +2130,22 @@ def redeem_accept_token(
             "different conditions than the ones presented here",
             str(context_check.reason),
         )
+
+    # The ACCEPT path does not re-decide, so the flow verdict of the call as
+    # it stands now is checked here, before the grant is spent. The review
+    # and worker paths re-decide, and the engine's flow rungs refuse there.
+    flow_refusal = _flow_refusal(obs)
+    if flow_refusal is not None:
+        chain.append(tenant, {
+            "event": "execution_flow_refused",
+            "proposal_id": proposal_id,
+            "actor": principal,
+            "grant_jti": token.jti,
+            "detail": flow_refusal,
+        })
+        raise TokenRefused(
+            "flow refused at redemption: the call's information flow is not "
+            "clean now", flow_refusal)
 
     # Consume exactly once. A refused check here is expiry, audience
     # mismatch, a bad signature, or a replay - all terminal for this token.

@@ -263,6 +263,12 @@ class Ws1Outcome:
     #: engine's decision on the observation with them. None without grounding.
     grounding: tuple[str, ...] = ()
     grounded_report: DecisionReport | None = None
+    #: Lookups this evaluation issued, by resolver, and the cost units charged
+    #: for them under the deployment's estimates (None without estimates).
+    #: The units are declared, not metered; recording both lets a deployment
+    #: reconcile its estimates with what its sources bill.
+    lookups: Mapping[str, int] = field(default_factory=dict)
+    cost_units_charged: int | None = None
 
     @property
     def clean(self) -> bool:
@@ -279,7 +285,9 @@ class Ws1Outcome:
                                  "binding_hash": self.binding_hash,
                                  "stop_reason": self.stop_reason,
                                  "monitor_veto": self.monitor_veto,
-                                 "review_role": self.review_role}
+                                 "review_role": self.review_role,
+                                 "lookups": dict(sorted(self.lookups.items())),
+                                 "cost_units_charged": self.cost_units_charged}
         if self.grounded_report is not None:
             block["grounding"] = list(self.grounding)
             block["grounded_action"] = self.grounded_report.action.value
@@ -493,6 +501,14 @@ class Ws1Gate:
             # Monitor calls are reserved in ask(); the loop reserves lookups.
             reserve=None if reserve is None else (
                 lambda kind, key: RESERVED if kind == "monitor" else reserve(kind, key)))
+        issued = list(run.issued.values())
+        lookups: dict[str, int] = {}
+        for request in issued:
+            lookups[request.resolver_id] = lookups.get(request.resolver_id, 0) + 1
+        call_estimates = d.call_estimates(requirements)
+        charged = (sum(call_estimates[(r.precondition_id, r.resolver_id)].cost_units
+                       for r in issued if (r.precondition_id, r.resolver_id) in call_estimates)
+                   if call_estimates is not None else None)
         specs = d.registry.tools.get(tool_name, ())
         facts = (grounding_facts(d.grounding, specs, requirements, run.checked, args)
                  if redecide is not None and d.grounding else {})
@@ -506,7 +522,8 @@ class Ws1Gate:
         outcome = Ws1Outcome(self.mode, DecisionAction(record.final_action), "evaluated",
                              record=record, stop_reason=run.stop_reason,
                              review_role=_review_route(record, requirements),
-                             grounding=tuple(sorted(facts)), grounded_report=grounded)
+                             grounding=tuple(sorted(facts)), grounded_report=grounded,
+                             lookups=lookups, cost_units_charged=charged)
         if outcome.clean or outcome.review_role:
             binding = tagged_digest("execution-binding", {
                 "context_hash": context.context_hash,

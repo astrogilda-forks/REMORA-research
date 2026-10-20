@@ -97,3 +97,13 @@ def test_h_ar_asks_the_monitor_for_hints_and_h_cost_does_not():
 def test_h_random_stays_a_research_control():
     with pytest.raises(ValueError, match="research control"):
         _deployment(PlannerMode.H_RANDOM)
+
+
+def test_the_audit_records_lookups_and_the_units_charged():
+    """Declared units, not metered ones: the audit gives both, so a deployment
+    can reconcile its estimates with what its sources bill."""
+    outcome, lookups = _evaluate(_deployment())
+    block = outcome.audit_block()
+    assert block["lookups"] == {"assets": lookups} and block["cost_units_charged"] == 3
+    det, _ = _evaluate(fixture.build_ws1_deployment())
+    assert det.audit_block()["cost_units_charged"] is None

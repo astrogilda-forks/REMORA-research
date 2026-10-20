@@ -14,8 +14,10 @@ returned. What these tests pin:
 * the review path and the async worker check flow as the proposer;
 * with flow control off nothing changes.
 
-Not covered: the custody-split execution domain does not re-check flow,
-because it holds no flow store.
+* a flow violation at ACCEPT redemption refuses before the grant is spent.
+
+The execution domain's check (/dispatch-leased) is in
+tests/flow/test_flow_dispatch_leased.py.
 """
 from __future__ import annotations
 
@@ -266,3 +268,20 @@ def test_the_async_worker_checks_flow_as_the_proposer(client, monkeypatch):
     [out] = _mod().dispatch_pending_intents("acme", worker_id="w1")
     execution = out["tool_execution"]
     assert execution["executed"] is True and "flow_commit" in execution
+
+
+def test_a_flow_violation_at_redemption_refuses_before_the_grant_is_spent(client):
+    """The ACCEPT path does not re-decide, so a label raised after the token
+    was issued is checked before consumption: the refusal leaves the grant
+    unspent and no authorization record."""
+    exec_mod = _mod()
+    context_id = _context(client)
+    token, call = _mint(context_id)
+    exec_mod._flow_contexts().raise_label("acme", PRINCIPAL, context_id,
+                                          Label({USER, MODEL}, Integrity.TRUSTED))
+    for _ in range(2):  # the same answer twice: nothing was consumed
+        r = client.post("/v1/execution/execute-accepted",
+                        json={"execution_token": token, "tool_call": call})
+        assert (r.status_code, r.json()["detail"]) == (409, "flow_confidentiality_violation")
+    events = [e.payload["event"] for e in exec_mod._CHAIN.entries("acme")]
+    assert "execution_flow_refused" in events and "execution_authorized" not in events
