@@ -24,7 +24,31 @@
       "refusals": 0,
       "requests": 14,
       "spent_usd": 0.08164
+    },
+    {
+      "input_tokens": 413802,
+      "output_tokens": 46074,
+      "purpose": "pilot-v2",
+      "refusals": 1,
+      "requests": 347,
+      "spent_usd": 2.576688
+    },
+    {
+      "input_tokens": 433795,
+      "output_tokens": 48311,
+      "purpose": "pilot-v3",
+      "refusals": 0,
+      "requests": 358,
+      "spent_usd": 2.7014
+    },
+    {
+      "input_tokens": 638879,
+      "output_tokens": 66961,
+      "purpose": "pilot-v4",
+      "refusals": 32,
+      "requests": 496,
+      "spent_usd": 3.894736
     }
   ],
-  "spent_usd": 2.707104
+  "spent_usd": 11.879928
 }

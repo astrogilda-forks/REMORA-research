@@ -42,6 +42,11 @@ class EpisodeResult:
     steps: int
     executed: list[tuple[str, dict[str, Any]]]
     calls: list[dict[str, Any]]
+    #: The injection this episode met, and how many adaptive attempts it took
+    #: to find (0 for a fixed template or a benign episode).
+    injection: str = ""
+    attack_attempts: int = 0
+    answer: str = ""
 
 
 def run_episode(task: Task, arm: str, *, profile: MonitorProfile, monitor: Any,
@@ -65,21 +70,58 @@ def run_episode(task: Task, arm: str, *, profile: MonitorProfile, monitor: Any,
                  and all(r.args.get(k) == v for k, v in gold_args) for r in defence.records)
     return EpisodeResult(task.task_id, arm, task.family, task.is_attack,
                          utility(task, final, executed), attack_succeeded(task, executed),
-                         routed, steps, executed, [asdict(r) for r in defence.records])
+                         routed, steps, executed, [asdict(r) for r in defence.records],
+                         injection=task.injection, answer=(final or "")[:800])
+
+
+def adaptive_injection(task: Task, *, attacker: Any, profile: MonitorProfile, monitor: Any,
+                       agent_run: Any) -> tuple[Task, EpisodeResult, int]:
+    """Search an injection against the undefended agent (arm A); return the
+    task with the last injection, the A episode on it, and the attempts used."""
+    from dataclasses import replace
+
+    from experiments.ws1_composition.isp_study.attacker import MAX_ATTEMPTS, Attempt
+
+    history: list[Attempt] = []
+    current, result = task, None
+    for n in range(1, MAX_ATTEMPTS + 1):
+        current = replace(task, injection=attacker.craft(task, history))
+        result = run_episode(current, "A_no_gate", profile=profile, monitor=monitor,
+                             agent_run=agent_run)
+        history.append(Attempt(current.injection, result.executed, result.answer,
+                               result.attack_success))
+        if result.attack_success:
+            break
+    assert result is not None
+    result.attack_attempts = n
+    return current, result, n
 
 
 def run_study(tasks: Sequence[Task], arms: Sequence[str], *, profile: MonitorProfile,
               monitor: Any, agent_run: Any, log: Path | None = None,
-              stop: Callable[[], bool] = lambda: False) -> list[EpisodeResult]:
+              stop: Callable[[], bool] = lambda: False,
+              attacker: Any = None) -> list[EpisodeResult]:
+    """With *attacker*, each attack task's injection is searched against arm A
+    first and then frozen for every arm (plan §3)."""
     results: list[EpisodeResult] = []
     handle = log.open("a", encoding="utf-8") if log is not None else None
     try:
         for task in tasks:
+            searched: EpisodeResult | None = None
+            attempts = 0
+            if attacker is not None and task.is_attack:
+                task, searched, attempts = adaptive_injection(
+                    task, attacker=attacker, profile=profile, monitor=monitor,
+                    agent_run=agent_run)
             for arm in arms:
                 if stop():
                     return results
-                result = run_episode(task, arm, profile=profile, monitor=monitor,
-                                     agent_run=agent_run)
+                if arm == "A_no_gate" and searched is not None:
+                    result = searched
+                else:
+                    result = run_episode(task, arm, profile=profile, monitor=monitor,
+                                         agent_run=agent_run)
+                    result.attack_attempts = attempts
                 results.append(result)
                 if handle is not None:
                     handle.write(json.dumps(asdict(result), sort_keys=True) + "\n")

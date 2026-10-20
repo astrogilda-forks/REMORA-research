@@ -583,7 +583,9 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     *hints_for* is called once per round with the current check and returns
     the monitor's hinted precondition IDs (H_EDV only), at most
     ``budget.max_monitor_calls`` times. It is how the monitor reaches the
-    loop; it cannot reach anything else.
+    loop; it cannot reach anything else. Time spent in it extends the wall
+    deadline by the same amount: the deadline bounds lookups, and the monitor
+    is bounded by its own timeout and call cap.
     """
     if cost_budget_units is not None:
         if type(cost_budget_units) is not int or cost_budget_units < 0:
@@ -634,7 +636,11 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
             # Each hint request is a monitor call and is charged to the budget;
             # past the cap the round runs without hints.
             budget = replace(budget, spent_monitor_calls=budget.spent_monitor_calls + 1)
+            asked = clock_ms()
             hints = tuple(hints_for(checked))
+            # The wall deadline bounds lookups. Monitor time is bounded by the
+            # monitor's own timeout and call cap, so it does not eat into it.
+            deadline += max(0, clock_ms() - asked)
         plan, dropped = plan_verification(
             requirements, checked, budget, mode,
             hints=hints, seed=seed, estimates=estimates, remaining_cost_units=rem_cost,

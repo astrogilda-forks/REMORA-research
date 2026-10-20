@@ -36,7 +36,8 @@ Avvik fra spesifikasjonen:
 - Når løkken har stoppet, er et uløst MACHINE-krav ABSTAIN og ikke VERIFY. Ny kode `lookup_did_not_prove` brukes når et oppslag ble gjort uten å bevise kravet.
 - Et REVIEW-predikat navngir nøyaktig én rolle. Under `enforce` blir et kall ESCALATE med den rollen når de eneste WS1-capene er REVIEW-krav av samme rolle. Ved utførelse lukker den lagrede godkjenningen (godkjenner og autentisert rolle) bare REVIEW-krav med eksakt samme rolle for samme forslag. Alle andre WS1-caps er ABSTAIN under `enforce`. GRANT-krav er fortsatt en nekt, fordi grants (IFC-08) ikke er påbegynt.
 - `@intent` som subjekt gjør den server-løste arbeidsordren til subjektet for et predikat; ingen argumentverdi kan sette den.
-- H-EDV-hint teller mot `max_monitor_calls` i selve løkken.
+- H-EDV-hint teller mot `max_monitor_calls` i selve løkken. Tiden i hint-kallet forlenger oppslagsfristen tilsvarende, fordi monitoren har sin egen tidsgrense.
+- Usikkerhet fra en påkrevd monitor (koder uten terskelbrudd) gir cap bare mens et WS1-krav er åpent. Når alle påkrevde krav er PROVED, gir usikkerhet alene ingen cap; terskelbrudd veto-er fortsatt. Dette avviker fra §9. Studie B pilot v2 viste at §9-regelen stoppet alle grunnfestede portoppslag.
 - Monitor-veto fra en hint-runde beholdes gjennom senere vurderinger. Komposisjonen avviser bevis som har utløpt mens monitoren svarte.
 - Review- og async-stien sammenligner bindingen fra den opprinnelige vurderingen med ferskt register, profil, budsjett og planner før godkjenningen forbrukes. En tidligere håndhevet godkjenning avvises også etter overgang til `off` eller `shadow`.
 - Studie B teller sluttvurderingen og feilede modellkall mot samme monitorbudsjett per forslag.

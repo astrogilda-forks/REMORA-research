@@ -194,6 +194,23 @@ def test_hint_requests_are_charged_to_the_monitor_budget():
     assert run.stop_reason == "machine_preconditions_settled"  # ran on in H_DET order
 
 
+def test_monitor_time_does_not_spend_the_lookup_deadline():
+    """A slow hint request (Study B pilot v2: several seconds of Opus) must not
+    push the next lookup past the wall deadline."""
+    clock = Clock(step=10)
+
+    def slow_hints(checked):
+        clock.now += 8_000  # longer than the 5-second wall budget
+        return ()
+
+    ctx, args = context()
+    reqs = derive_preconditions(ctx, args, REGISTRY)
+    run = run_verification(ctx, reqs, registry=REGISTRY, verifiers=VERIFIERS, resolvers=sources(),
+                           held_capabilities=ALL_CAPS, mode=PlannerMode.H_EDV,
+                           budget=VerificationBudget(requests_per_round=1), clock_ms=clock,
+                           hints_for=slow_hints)
+    assert run.stop_reason == "machine_preconditions_settled"
+    assert not [r for _, r in run.refused_requests if r == "resolver_timeout"]
 # ── SDD v2 F-01, F-02 and AR-025 (H_COST) regressions ──────────────────
 
 

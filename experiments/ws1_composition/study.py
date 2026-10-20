@@ -39,6 +39,7 @@ FROZEN_FILES = (
     "experiments/ws1_composition/analysis.py",
     "experiments/ws1_composition/isp_study/__init__.py",
     "experiments/ws1_composition/isp_study/agents.py",
+    "experiments/ws1_composition/isp_study/attacker.py",
     "experiments/ws1_composition/isp_study/authority.py",
     "experiments/ws1_composition/isp_study/defence.py",
     "experiments/ws1_composition/isp_study/domain.py",

@@ -96,11 +96,21 @@ def test_a_veto_routes_to_a_semantic_reviewer_only_when_the_profile_names_one(ro
     assert rec.final_action == action
 
 
-def test_uncertain_required_monitor_asks_for_verification_or_stops():
+def test_uncertainty_caps_only_while_a_precondition_is_open():
+    """While a precondition is open, a required monitor's uncertainty stops the
+    call; once every precondition is PROVED it caps nothing (a crossed
+    threshold still would). Study B pilot v2 motivated the second half."""
     prof, ctx, reqs, checked = _setup(MonitorMode.REQUIRED)
     raw = response(ctx, checked.evidence_digest, prof=prof, uncertainty_codes=["ambiguous_target"])
     rec = _compose(prof, ctx, reqs, checked, raw)
+    assert rec.final_action == "accept" and "monitor_uncertain" not in rec.reason_codes
+    open_ = scripted_checked(ctx, reqs, {"target_belongs_to_work_order": LogicalState.PROVED})
+    raw = response(ctx, open_.evidence_digest, prof=prof, uncertainty_codes=["ambiguous_target"])
+    rec = _compose(prof, ctx, reqs, open_, raw)
     assert rec.final_action == "abstain" and "monitor_uncertain" in rec.reason_codes
+    crossed = response(ctx, checked.evidence_digest, prof=prof, uncertainty_codes=["ambiguous_target"],
+                       scores={"injection": 0.9, "target_mismatch": 0.0})
+    assert _compose(prof, ctx, reqs, checked, crossed).final_action == "escalate"
 
 
 def test_review_and_grant_preconditions_route_to_their_own_class():
