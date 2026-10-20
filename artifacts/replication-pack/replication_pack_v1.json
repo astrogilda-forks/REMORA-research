@@ -21,9 +21,15 @@
     "measured_with_python": "3.13.7 (macOS arm64, venv with the dev extras)",
     "requirements_lock": {
       "path": "requirements-lock.txt",
-      "sha256_lf": "eb73b7cbac64ecbada0070a952ae258f92fc7fc512a0f6d81926043c95b9407b"
+      "sha256_lf": "a2278b4ec5a955d2ccfba0c2350e042d843d0261111a250dbb86ada5b22dacdd"
     },
     "requirements_lock_history": [
+      {
+        "path": "requirements-lock.txt",
+        "git_revision": "29c8f9fdd898e3874dd219855c4a1c1903481a84",
+        "sha256_lf": "eb73b7cbac64ecbada0070a952ae258f92fc7fc512a0f6d81926043c95b9407b",
+        "reason": "certifi 2026.10.19 (GHSA-6q48-6c7w-9gw2, #979)"
+      },
       {
         "path": "requirements-lock.txt",
         "git_revision": "cf58768b4a90e9f15f94dab82d5a2716347a39ad",
