@@ -290,6 +290,15 @@ def test_create_that_meets_its_own_lost_first_attempt_updates_the_existing_file(
     assert method == "PUT" and url.endswith("/providers/osfstorage/abc123?kind=file")
 
 
-def test_mkdir_conflict_returns_the_existing_folder_path() -> None:
-    client = _client([_Response(409, {"data": {"id": "osfstorage/f00/", "type": "files"}})])
+def test_mkdir_conflict_looks_up_the_existing_folder() -> None:
+    listing = {"data": [{"attributes": {"name": "other", "path": "/o/"}},
+                        {"attributes": {"name": "docs", "path": "/f00/"}}], "links": {"next": None}}
+    client = _client([_Response(409, {"message": "already exists", "data": {}}), _Response(200, listing)])
     assert client.mkdir("node", "/", "docs") == "/f00/"
+
+
+def test_file_conflict_without_an_id_is_looked_up_too(monkeypatch) -> None:
+    listing = {"data": [{"attributes": {"name": "a.py", "path": "/x9"}}], "links": {"next": None}}
+    client = _client([_Response(409, {"data": {}}), _Response(200, listing), _Response(200)])
+    client.create("node", "/", "a.py", b"a")
+    assert client.session.calls[-1][1].endswith("/providers/osfstorage/x9?kind=file")

@@ -602,25 +602,29 @@ class OSF:
         return f"{self.files_api}/{node}/providers/osfstorage{path}"
 
     # A create retried after a lost response (429, 5xx) meets its own first
-    # attempt and gets 409. The conflict body names the existing item, so the
-    # retry carries on with it instead of failing the run.
-    @staticmethod
-    def _existing(response: Any, folder: bool) -> str:
-        path = "/" + str(response.json()["data"]["id"]).split("/", 1)[1].strip("/")
-        return path + "/" if folder else path
+    # attempt and gets 409, so the retry carries on with the existing item
+    # instead of failing the run. A file conflict names the item in its body;
+    # a folder conflict does not (``"data": {}``), so it is looked up.
+    def _lookup(self, node: str, parent: str, name: str) -> str:
+        for item in self._list(node, parent):
+            if item["attributes"]["name"] == name:
+                return str(item["attributes"]["path"])
+        raise RuntimeError(f"409 for {name!r} in {parent} but no such item is listed")
 
     def mkdir(self, node: str, parent: str, name: str) -> str:
         r = self._call("PUT", f"{self._wb(node, parent)}?kind=folder&name={quote(name)}",
                        ok=(201, 409))
         if r.status_code == 409:
-            return self._existing(r, folder=True)
+            return self._lookup(node, parent, name)
         return str(r.json()["data"]["attributes"]["path"])
 
     def create(self, node: str, parent: str, name: str, data: bytes) -> None:
         r = self._call("PUT", f"{self._wb(node, parent)}?kind=file&name={quote(name)}",
                        ok=(201, 409), data=data)
         if r.status_code == 409:
-            self.update(node, self._existing(r, folder=False), data)
+            ident = str((r.json().get("data") or {}).get("id", ""))
+            path = "/" + ident.split("/", 1)[1] if "/" in ident else self._lookup(node, parent, name)
+            self.update(node, path, data)
 
     def update(self, node: str, path: str, data: bytes) -> None:
         self._call("PUT", f"{self._wb(node, path)}?kind=file", data=data)
