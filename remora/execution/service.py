@@ -311,23 +311,29 @@ def assess_proposal(
             raise ExecutionContextRefused("execution_context_capture_invalid")
     obs = _bind_execution_context(
         obs, semantic, context, proposal_id=proposal_id, tenant=tenant, principal=principal)
-    report = engine.decide(obs)
-    engine_action = report.action
-    if (prior_loop is not None and prior_loop.action == "escalate"
-            and report.action is DecisionAction.ACCEPT):
-        report = dataclasses.replace(
-            report,
-            action=DecisionAction.ESCALATE,
-            reasons=(*report.reasons, DecisionReason.LOOP_SAFETY_ESCALATE),
-            human_review_required=True,
-        )
     capability = capability_gate(proposal) if capability_gate is not None else None
-    if capability is not None and not capability.get("allowed"):
-        report = dataclasses.replace(
-            report,
-            action=DecisionAction.ABSTAIN,
-            reasons=(*report.reasons, DecisionReason.CAPABILITY_NOT_ALLOWED),
-        )
+
+    def adjusted(report: DecisionReport) -> DecisionReport:
+        """The engine's report under loop safety and the capability set."""
+        if (prior_loop is not None and prior_loop.action == "escalate"
+                and report.action is DecisionAction.ACCEPT):
+            report = dataclasses.replace(
+                report,
+                action=DecisionAction.ESCALATE,
+                reasons=(*report.reasons, DecisionReason.LOOP_SAFETY_ESCALATE),
+                human_review_required=True,
+            )
+        if capability is not None and not capability.get("allowed"):
+            report = dataclasses.replace(
+                report,
+                action=DecisionAction.ABSTAIN,
+                reasons=(*report.reasons, DecisionReason.CAPABILITY_NOT_ALLOWED),
+            )
+        return report
+
+    decided = engine.decide(obs)
+    engine_action = decided.action
+    report = adjusted(decided)
     ws1: Ws1OutcomePort | None = None
     if ws1_gate is not None:
         # Last, so it composes against every other component's decision. It
@@ -340,8 +346,17 @@ def assess_proposal(
             toolspec_hash=str(toolspec_identity.get("hash") or ""),
             capability=capability, flow_digest=obs.flow_digest, flow_epoch=obs.flow_epoch,
             attempt_family_id=task.context_id if task is not None else None,
-            base=report, task_id=_ws1_task_id(task))
-        report = _never_raised(report, ws1.apply(report))
+            base=report, task_id=_ws1_task_id(task),
+            # Grounding from proofs: the ENGINE re-decides on the observation
+            # plus the signals WS1's PROVED evidence established, under the
+            # same loop-safety and capability adjustments. WS1 never raises a
+            # decision itself, and its caps apply to the re-decided report.
+            redecide=lambda facts: adjusted(engine.decide(dataclasses.replace(obs, **facts))))
+        grounded = getattr(ws1, "grounded_report", None)
+        if grounded is not None and ws1.mode == "enforce":
+            report = _never_raised(grounded, ws1.apply(grounded))
+        else:
+            report = _never_raised(report, ws1.apply(report))
     now = datetime.now(UTC)
 
     # Derived from the chain, never from the request: a caller-declared

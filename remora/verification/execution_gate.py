@@ -81,8 +81,59 @@ FLOW_ABSENT = tagged_digest("flow-absent", {"flow_control": "off"})
 _RUNTIME_MODES = (PlannerMode.H0, PlannerMode.H_DET, PlannerMode.H_COST, PlannerMode.H_AR,
                   PlannerMode.H_EDV)
 _COST_MODES = (PlannerMode.H_COST, PlannerMode.H_AR)
+#: The engine's grounding signals a PROVED precondition can establish
+#: (``_GROUNDING_SIGNALS`` in remora/policy/decision_engine.py).
+GROUNDING_FIELDS = ("tool_matches_goal", "expected_effect_matches",
+                    "argument_values_supported", "argument_values_grounded")
+_ARGUMENT_FIELDS = ("argument_values_supported", "argument_values_grounded")
 _HINT_MODES = (PlannerMode.H_EDV, PlannerMode.H_AR)
 _HEX = frozenset("0123456789abcdef")
+
+
+def _aligned(specs: Sequence[PredicateSpec], requirements: RequirementSet
+             ) -> list[tuple[Any, PredicateSpec]] | None:
+    """The call's preconditions paired with the specs they were compiled from,
+    or None when they do not line up one to one."""
+    pres = requirements.preconditions
+    if not requirements.authorizable or len(pres) != len(specs) or any(
+            p.predicate_id != s.predicate_id for p, s in zip(pres, specs, strict=True)):
+        return None
+    return list(zip(pres, specs, strict=True))
+
+
+def _arguments_proved(pairs: list[tuple[Any, PredicateSpec]], checked: CheckedPreconditions,
+                      arguments: Mapping[str, Any]) -> bool:
+    """Every argument is the subject of a required PROVED precondition."""
+    subjects = {s.subject_argument for p, s in pairs
+                if p.required and checked.state(p.precondition_id) is LogicalState.PROVED}
+    return set(arguments) <= subjects - {None, INTENT_SUBJECT}
+
+
+def grounding_facts(grounding: Mapping[str, Sequence[str]], specs: Sequence[PredicateSpec],
+                    requirements: RequirementSet, checked: CheckedPreconditions,
+                    arguments: Mapping[str, Any]) -> dict[str, bool]:
+    """The engine grounding signals this call's PROVED preconditions establish.
+
+    A signal holds when at least one precondition's predicate declares it in
+    the deployment's *grounding* map and every precondition that declares it
+    is required and PROVED. The two argument signals also need every argument
+    to be a PROVED subject, so a free-text argument is never called grounded.
+    Only signals that hold are returned, and only as ``True``: unknown stays
+    unknown. Anything that does not line up with the registry grounds nothing.
+    """
+    pairs = _aligned(specs, requirements)
+    if pairs is None:
+        return {}
+    facts: dict[str, bool] = {}
+    for name in GROUNDING_FIELDS:
+        declaring = [p for p, s in pairs if name in grounding.get(s.predicate_id, ())]
+        if not declaring or not all(p.required and checked.state(p.precondition_id)
+                                    is LogicalState.PROVED for p in declaring):
+            continue
+        if name in _ARGUMENT_FIELDS and not _arguments_proved(pairs, checked, arguments):
+            continue
+        facts[name] = True
+    return facts
 
 
 def settled_uncertainty(specs: Sequence[PredicateSpec], requirements: RequirementSet,
@@ -97,16 +148,14 @@ def settled_uncertainty(specs: Sequence[PredicateSpec], requirements: Requiremen
     (free text, a payload) leaves them open. Anything that does not line up
     with the registry settles nothing.
     """
-    pres = requirements.preconditions
-    if not requirements.authorizable or len(pres) != len(specs) or any(
-            p.predicate_id != s.predicate_id for p, s in zip(pres, specs, strict=True)):
+    pairs = _aligned(specs, requirements)
+    if pairs is None:
         return frozenset()
-    proved = [s.subject_argument for p, s in zip(pres, specs, strict=True)
-              if p.required and checked.state(p.precondition_id) is LogicalState.PROVED]
     settled: set[str] = set()
-    if INTENT_SUBJECT in proved:
+    if any(s.subject_argument == INTENT_SUBJECT and p.required
+           and checked.state(p.precondition_id) is LogicalState.PROVED for p, s in pairs):
         settled |= {"missing_context", "ambiguous_intent"}
-    if set(arguments) <= {a for a in proved if a not in (None, INTENT_SUBJECT)}:
+    if _arguments_proved(pairs, checked, arguments):
         settled |= {"ambiguous_target", "unverified_value"}
     return frozenset(settled)
 
@@ -149,6 +198,12 @@ class Ws1Deployment:
     #: Cost here is estimated, not metered.
     estimates: Mapping[tuple[str, str], LookupEstimate] | None = None
     cost_budget_units: int | None = None
+    #: Grounding from proofs (opt-in): predicate_id to the engine grounding
+    #: signals its PROVED state establishes (``grounding_facts``). With it, an
+    #: assessment re-runs the engine on the observation plus those signals,
+    #: and the WS1 caps then apply to that decision. The engine decides; WS1
+    #: only supplies facts read from the systems of record.
+    grounding: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.planner_mode not in _RUNTIME_MODES:
@@ -164,6 +219,11 @@ class Ws1Deployment:
                         for spec in specs for rid in spec.resolver_ids}
             if not declared <= set(self.estimates):
                 raise ValueError("missing deployment estimate")
+        predicates = {s.predicate_id for specs in self.registry.tools.values() for s in specs}
+        for predicate, signals in self.grounding.items():
+            if predicate not in predicates or not signals \
+                    or set(signals) - set(GROUNDING_FIELDS):
+                raise ValueError(f"invalid grounding for {predicate!r}")
 
     def call_estimates(self, requirements: RequirementSet
                        ) -> dict[tuple[str, str], LookupEstimate] | None:
@@ -183,6 +243,8 @@ class Ws1Deployment:
                     "estimates": sorted([*key, e.cost_units, e.settle_ppm, e.refute_ppm]
                                         for key, e in (self.estimates or {}).items())}
                    if self.planner_mode in _COST_MODES else {}),
+                **({"grounding": {k: sorted(v) for k, v in sorted(self.grounding.items())}}
+                   if self.grounding else {}),
                 "budget": {k: v for k, v in dataclasses.asdict(self.budget).items()
                            if k.startswith(("max_", "requests_", "wall_", "resolver_"))}}
 
@@ -197,6 +259,10 @@ class Ws1Outcome:
     stop_reason: str = ""
     #: The one role whose approval would close every remaining WS1 cap, or "".
     review_role: str = ""
+    #: Grounding from proofs: the signals PROVED evidence established, and the
+    #: engine's decision on the observation with them. None without grounding.
+    grounding: tuple[str, ...] = ()
+    grounded_report: DecisionReport | None = None
 
     @property
     def clean(self) -> bool:
@@ -214,6 +280,9 @@ class Ws1Outcome:
                                  "stop_reason": self.stop_reason,
                                  "monitor_veto": self.monitor_veto,
                                  "review_role": self.review_role}
+        if self.grounded_report is not None:
+            block["grounding"] = list(self.grounding)
+            block["grounded_action"] = self.grounded_report.action.value
         if self.record is not None:
             block["record"] = {**self.record.body(), "record_hash": self.record.record_hash}
         return block
@@ -314,17 +383,22 @@ class Ws1Gate:
                  flow_epoch: int | None, attempt_family_id: str | None,
                  base: DecisionReport, veto_on_record: bool = False,
                  review_attestation: tuple[str, str] | None = None,
-                 task_id: str | None = None) -> Ws1Outcome:
+                 task_id: str | None = None,
+                 redecide: Callable[[Mapping[str, bool]], DecisionReport] | None = None,
+                 ) -> Ws1Outcome:
         """*review_attestation* is ``(approver, approver_role)`` from the stored
         approval, passed on the review path's re-gate only. *task_id* is the
-        server-bound task identity the call is made under (``context_id/task_id``)."""
+        server-bound task identity the call is made under (``context_id/task_id``).
+        *redecide* re-runs the caller's decision on its observation plus the
+        given grounding signals; it is used only when the deployment declares
+        ``grounding`` (assessment, never a re-gate)."""
         try:
             review = (ReviewAttestation(proposal_id, *review_attestation)
                       if review_attestation is not None else None)
             return self._evaluate(proposal_id, tenant, principal, tool_name, arguments,
                                   intent_authority_hash, policy_bundle_hash, toolspec_hash,
                                   capability, flow_digest, flow_epoch, attempt_family_id,
-                                  base, veto_on_record, review, task_id)
+                                  base, veto_on_record, review, task_id, redecide)
         except Exception as exc:  # a gate fault refuses; its text never reaches the record
             return Ws1Outcome(self.mode, DecisionAction.ABSTAIN, f"error:{type(exc).__name__}")
 
@@ -334,7 +408,9 @@ class Ws1Gate:
                   capability: Mapping[str, Any] | None, flow_digest: str | None,
                   flow_epoch: int | None, attempt_family_id: str | None,
                   base: DecisionReport, veto_on_record: bool,
-                  review: ReviewAttestation | None, task_id: str | None) -> Ws1Outcome:
+                  review: ReviewAttestation | None, task_id: str | None,
+                  redecide: Callable[[Mapping[str, bool]], DecisionReport] | None = None,
+                  ) -> Ws1Outcome:
         d = self.deployment
         for name, value in (("intent_authority", intent_authority_hash),
                             ("policy_bundle", policy_bundle_hash), ("toolspec", toolspec_hash)):
@@ -412,15 +488,20 @@ class Ws1Gate:
             # Monitor calls are reserved in ask(); the loop reserves lookups.
             reserve=None if reserve is None else (
                 lambda kind, key: RESERVED if kind == "monitor" else reserve(kind, key)))
+        specs = d.registry.tools.get(tool_name, ())
+        facts = (grounding_facts(d.grounding, specs, requirements, run.checked, args)
+                 if redecide is not None and d.grounding else {})
+        grounded = redecide(facts) if facts and redecide is not None else None
         record = compose_authorized_decision(
-            base, context, requirements, run.checked, assess(run.checked), d.monitor_profile,
+            grounded or base, context, requirements, run.checked, assess(run.checked),
+            d.monitor_profile,
             now_s=d.clock_ms() // 1000, budget_exhausted=run.budget_exhausted,
             monitor_veto_on_record=monitor_veto,
-            uncertainty_settled=settled_uncertainty(
-                d.registry.tools.get(tool_name, ()), requirements, run.checked, args))
+            uncertainty_settled=settled_uncertainty(specs, requirements, run.checked, args))
         outcome = Ws1Outcome(self.mode, DecisionAction(record.final_action), "evaluated",
                              record=record, stop_reason=run.stop_reason,
-                             review_role=_review_route(record, requirements))
+                             review_role=_review_route(record, requirements),
+                             grounding=tuple(sorted(facts)), grounded_report=grounded)
         if outcome.clean or outcome.review_role:
             binding = tagged_digest("execution-binding", {
                 "context_hash": context.context_hash,

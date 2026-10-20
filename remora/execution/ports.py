@@ -29,7 +29,7 @@ own with their own tests.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -382,4 +382,5 @@ class Ws1GatePort(Protocol):
         veto_on_record: bool = False,
         review_attestation: tuple[str, str] | None = None,
         task_id: str | None = None,
+        redecide: Callable[[Mapping[str, bool]], DecisionReport] | None = None,
     ) -> Ws1OutcomePort: ...
