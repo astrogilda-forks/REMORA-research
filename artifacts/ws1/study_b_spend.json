@@ -40,7 +40,15 @@
       "refusals": 0,
       "requests": 358,
       "spent_usd": 2.7014
+    },
+    {
+      "input_tokens": 638879,
+      "output_tokens": 66961,
+      "purpose": "pilot-v4",
+      "refusals": 32,
+      "requests": 496,
+      "spent_usd": 3.894736
     }
   ],
-  "spent_usd": 7.985192
+  "spent_usd": 11.879928
 }
