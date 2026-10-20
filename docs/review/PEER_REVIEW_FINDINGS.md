@@ -771,9 +771,9 @@ conditions?
 | Claim | `bfcl_semantic_bundle_v2.extract_intent` returns SUPPORTED for `cancel_booking` on "Inspect booking B-104 before cancel.", "Tell me if I can cancel booking B-104." and "Review the policy before we cancel booking B-104." PRF-002 checked negation only. |
 | Evidence | All three reproduced at `3746bc5d` (`remora/toolcall/routing/bfcl_semantic_bundle_v2.py:387`). The sealed C-ext4 manifest pins v2 by hash, so it stays unchanged. |
 | Affected claims | CLAIM-019, CLAIM-021 (a validity limit of the semantic arms) |
-| Action | A versioned v3 extractor (`remora/toolcall/routing/bfcl_semantic_bundle_v3.py:132`) keeps context spans, conditionals and questions, and no sealed runner uses it. Remaining: the paper's §81 citation names negation only, and v3 has no sealed run. |
+| Action | A versioned v3 extractor (`remora/toolcall/routing/bfcl_semantic_bundle_v3.py:132`) keeps context spans, conditionals, questions, embedded quotes and reported speech, and no sealed runner uses it. Both paper files cite §81 for negation, conditionals and informational sentences at §10.9. Remaining: v3 has no sealed run. |
 | Owning PR | #938 (`32139442`) |
-| Verification | `tests/test_bfcl_semantic_bundle_v3.py`: `test_v2_supports_the_mutation_on_the_audit_sentences`, `test_v3_a_qualified_mutation_is_never_supported`, `test_v3_the_information_request_is_the_read`, `test_v3_keeps_v2_verdicts_on_unqualified_tasks`, `test_v3_is_wired_into_no_sealed_runner`, `test_dev_comparison_artifact_reproduces`. All pass. The development comparison (`artifacts/posthoc/bfcl_v3_extractor_dev_compare.json`) is exploratory. NEGATIVE_RESULTS.md §81. |
+| Verification | `tests/test_bfcl_semantic_bundle_v3.py`: `test_v2_supports_the_mutation_on_the_audit_sentences`, `test_v3_a_qualified_mutation_is_never_supported`, `test_v3_the_information_request_is_the_read`, `test_v3_quoted_and_reported_mutations_are_never_supported`, `test_v3_quoted_argument_still_supports_plain_mutation`, `test_v3_keeps_v2_verdicts_on_unqualified_tasks`, `test_v3_is_wired_into_no_sealed_runner`, `test_dev_comparison_artifact_reproduces`. All pass. The development comparison (`artifacts/posthoc/bfcl_v3_extractor_dev_compare.json`) is exploratory. NEGATIVE_RESULTS.md §81; paper §10.9 (.md and .tex) names negation, conditionals and informational sentences. |
 | Status | IN_PROGRESS |
 
 ### PRF-053 Worker edge: issuer check, approval hash and review redemption (RMR-AUD-010)
@@ -824,9 +824,9 @@ conditions?
 | Evidence | `pyproject.toml` `[tool.mutmut]`; `docs/assurance/mutation_testing_v1.md:5`. |
 | Affected claims | none |
 | Action | Extend the mutation scope, and add a stateful lifecycle test (Hypothesis `RuleBasedStateMachine`) over assess, approve, expire or invalidate, re-approve, execute and record effect. |
-| Owning PR | not yet opened |
-| Verification | Pending. |
-| Status | OPEN |
+| Owning PR | follow-up PR |
+| Verification | `tests/test_execution_lifecycle_machine.py` (`OrchestratedLifecycleMachine`, `test_sqlite_durable_lifecycle_parity`, `test_r3_surface_ast_mutation_sweep`, registered in `[tool.mutmut] pytest_add_cli_args_test_selection`): runs a Hypothesis `RuleBasedStateMachine` over propose/assess, approve, clock expiry, approver revocation, risk-tier/policy/reason invalidation, tampered payload refusal, outbox intent reservation, concurrent two-worker claim race, crash-to-UNKNOWN and effect verification (`self_attested`, `claimed_only` -> `EFFECT_CLAIMED`, `computed_verified` -> `EFFECT_VERIFIED`), plus SQLite parity and a scoped in-process AST mutation sweep over 9 target functions (`_approval_survives`, `_approval_policy_refusal`, `is_claimed_verdict`, `_fold_state`, `proposal_envelope_refusal`, `approved_context_refusal`, `recipients`, `_authorization_of`, `flow_check`: 131 generated first-order AST mutants across 4 operators, 0 compile/import errors, 131 semantic kills; supplements, and does not replace, the scheduled mutmut sweep). All pass. |
+| Status | RESOLVED |
 
 ### PRF-057 An approved VERIFY survived a new VERIFY reason (follow-up to #936)
 

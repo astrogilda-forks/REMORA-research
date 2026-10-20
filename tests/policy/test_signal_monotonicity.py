@@ -27,16 +27,22 @@ is not a proof.
 """
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from datetime import timedelta
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from remora.policy.composition import NON_APPROVABLE_REASONS, executability
+from remora.governance.review_queue import Approval, ReviewQueue, _approval_survives
+from remora.policy.composition import (
+    GRANT_ONLY_REASONS,
+    NON_APPROVABLE_REASONS,
+    executability,
+)
 from remora.policy.decision_engine import RemoraDecisionEngine
 from remora.policy.observation import PolicyObservation
-from remora.policy.report import DecisionAction, DecisionReason
+from remora.policy.report import DecisionAction, DecisionReason, DecisionReport
 
 A, V, AB, E = (DecisionAction.ACCEPT, DecisionAction.VERIFY,
                DecisionAction.ABSTAIN, DecisionAction.ESCALATE)
@@ -251,3 +257,420 @@ def test_raising_the_risk_tier_never_lowers_a_production_write():
                                target_environment="prod", schema_valid=True)
     high = replace(medium, risk_tier="high")
     assert executability(_decide(high).action) <= executability(_decide(medium).action)
+
+
+# ── Multi-dimensional reference decision model (R1 differential testing) ───
+
+_MEET_RANK = {
+    "forbidden": -1,
+    "epistemic_unrouted": 0,
+    "declassifier_grant": 0,
+    "senior_authority": 0,
+    "ordinary_reviewer": 1,
+    "none": 2,
+}
+
+
+@dataclass(frozen=True)
+class DecisionSemantics:
+    """Explicit six-dimension reference projection of a policy decision.
+
+    Separates:
+    1. ``authorized_now``: whether execution is authorized immediately;
+    2. ``hard_prohibition``: whether an unwaivable prohibition fired;
+    3. ``epistemic_gap``: whether facts/evidence are missing;
+    4. ``verification_obligations``: concrete arguments/facts to resolve;
+    5. ``required_authority``: authority needed to proceed;
+    6. ``invalidation_triggers``: conditions that void a prior approval.
+    """
+
+    authorized_now: bool
+    hard_prohibition: bool
+    epistemic_gap: bool
+    verification_obligations: tuple[str, ...]
+    required_authority: str
+    invalidation_triggers: frozenset[str]
+
+
+def project_semantics(report: DecisionReport) -> DecisionSemantics:
+    reasons = set(report.reasons)
+    hard_prohibition = (
+        report.action is AB and bool(reasons & NON_APPROVABLE_REASONS)
+    )
+    obligations = (
+        tuple(report.resolution_plan.target_arguments)
+        if report.resolution_plan is not None else ()
+    )
+    epistemic_gap = (
+        bool(obligations)
+        or (report.action is AB and bool(
+            reasons & (_EPISTEMIC_ABSTAIN | {DecisionReason.NO_RESOLVER_AVAILABLE})
+        ))
+    )
+    if hard_prohibition:
+        authority = "forbidden"
+    elif reasons & GRANT_ONLY_REASONS:
+        authority = "declassifier_grant"
+    elif report.action is A:
+        authority = "none"
+    elif report.action is AB:
+        authority = "epistemic_unrouted"
+    elif report.action is E:
+        authority = "senior_authority"
+    else:
+        authority = "ordinary_reviewer"
+
+    triggers = frozenset({
+        "payload_or_envelope_change",
+        "context_or_actor_change",
+        "risk_tier_change",
+        "approval_policy_change",
+        "fresh_abstain",
+        "grant_only_reason",
+        "any_new_reason",
+    })
+    return DecisionSemantics(
+        authorized_now=(report.action is A and not (reasons & GRANT_ONLY_REASONS)),
+        hard_prohibition=hard_prohibition,
+        epistemic_gap=epistemic_gap,
+        verification_obligations=obligations,
+        required_authority=authority,
+        invalidation_triggers=triggers,
+    )
+
+
+def ref_approval_survives(
+    approved_action: DecisionAction,
+    approved_reasons: tuple[str, ...],
+    fresh_report: DecisionReport,
+) -> bool:
+    """Reference specification for when a human approval survives re-evaluation."""
+    sem = project_semantics(fresh_report)
+    if sem.hard_prohibition or fresh_report.action is AB:
+        return False
+    if sem.required_authority == "declassifier_grant":
+        return False
+    fresh_reasons = {r.value for r in fresh_report.reasons}
+    if approved_action is V:
+        if fresh_report.action is A:
+            return True
+        if fresh_report.action is V:
+            return fresh_reasons <= set(approved_reasons)
+        return False
+    if approved_action is E:
+        if fresh_report.action in (A, V, E):
+            return fresh_reasons <= set(approved_reasons)
+    return False
+
+
+@settings(max_examples=500, deadline=None)
+@given(
+    _base,
+    st.sampled_from(["cross_tenant", "intent_unresolved"]),
+    st.sampled_from([None, 0.5, 0.99]),
+    st.sampled_from([None, "ordered", "critical"]),
+    st.sampled_from(range(len(_ENGINES))),
+)
+def test_ref_model_hard_prohibition_never_lifted_by_confidence_or_review(
+    base: PolicyObservation,
+    prohibition: str,
+    trust: float | None,
+    phase: str | None,
+    which: int,
+) -> None:
+    """Property 1: A hard prohibition cannot be lifted by model confidence or review."""
+    engine = _ENGINES[which]
+    obs = replace(base, trust_score=trust, phase=phase, **_FLOOR_SIGNALS[prohibition])
+    report = engine.decide(obs)
+    sem = project_semantics(report)
+    assert not sem.authorized_now
+    assert sem.hard_prohibition
+    assert sem.required_authority == "forbidden"
+    queue = ReviewQueue(engine=engine)
+    with pytest.raises(ValueError, match="only VERIFY and ESCALATE"):
+        queue.enqueue(obs, report.action, reasons=[r.value for r in report.reasons])
+
+
+@settings(max_examples=500, deadline=None)
+@given(
+    _base,
+    st.lists(st.sampled_from(sorted(_SIGNALS)), min_size=1, max_size=3, unique=True),
+    st.sampled_from(range(len(_ENGINES))),
+)
+def test_ref_model_risk_signal_never_creates_execution_authority(
+    base: PolicyObservation,
+    added_signals: list[str],
+    which: int,
+) -> None:
+    """Property 2: A new risk signal never creates autonomous execution authority,
+    and on non-epistemic base calls never raises the meet rank."""
+    engine = _ENGINES[which]
+    before_report = engine.decide(base)
+    after_report = engine.decide(_apply(base, added_signals, _SIGNALS))
+    before_sem = project_semantics(before_report)
+    after_sem = project_semantics(after_report)
+    if not before_sem.authorized_now:
+        assert not after_sem.authorized_now
+    if before_sem.hard_prohibition:
+        assert after_sem.hard_prohibition
+        assert after_sem.required_authority == "forbidden"
+    if not _epistemic(before_report):
+        assert (
+            _MEET_RANK[after_sem.required_authority]
+            <= _MEET_RANK[before_sem.required_authority]
+        )
+
+
+def test_ref_model_verification_satisfies_only_documented_obligations() -> None:
+    """Property 4: Resolving a verification obligation removes only that obligation
+    and re-evaluates all remaining gates rather than automatically granting ACCEPT."""
+    engine = RemoraDecisionEngine(low_consequence_accept=True, semantic_authority_floor=True)
+    unresolved = PolicyObservation(
+        question="read customer record",
+        risk_tier="low",
+        action_type="read",
+        target_environment="staging",
+        proposed_tool_name="get_customer",
+        schema_valid=True,
+        tool_matches_goal=True,
+        expected_effect_matches=True,
+        missing_required_arguments=("customer_id", "region_id"),
+        argument_resolver_tools=("lookup_customer",),
+        arguments_satisfiable=True,
+    )
+    r1 = engine.decide(unresolved)
+    s1 = project_semantics(r1)
+    assert r1.action is V
+    assert s1.verification_obligations == ("customer_id", "region_id")
+    assert not s1.authorized_now
+
+    # Resolving only customer_id leaves region_id obligated -> still VERIFY
+    partial = replace(unresolved, missing_required_arguments=("region_id",))
+    r2 = engine.decide(partial)
+    s2 = project_semantics(r2)
+    assert r2.action is V
+    assert s2.verification_obligations == ("region_id",)
+
+    # Resolving all obligations when another gate fires (e.g. tainted argument or write)
+    # re-evaluates all gates and never auto-accepts
+    resolved_but_tainted = replace(
+        unresolved, missing_required_arguments=(), argument_tainted=True
+    )
+    r3 = engine.decide(resolved_but_tainted)
+    s3 = project_semantics(r3)
+    assert r3.action is V
+    assert s3.verification_obligations == ()
+    assert not s3.authorized_now
+
+    # Resolving all obligations on a clean low-consequence read with semantic fit -> ACCEPT
+    resolved_clean = replace(unresolved, missing_required_arguments=())
+    r4 = engine.decide(resolved_clean)
+    s4 = project_semantics(r4)
+    assert r4.action is A
+    assert s4.authorized_now
+
+
+@settings(max_examples=500, deadline=None)
+@given(
+    st.sampled_from([V, E]),
+    st.lists(
+        st.sampled_from([
+            DecisionReason.EVIDENCE_INSUFFICIENT,
+            DecisionReason.TAINTED_ARGUMENT_VERIFY,
+            DecisionReason.DISTRIBUTION_SHIFT,
+            DecisionReason.ROLLBACK_UNAVAILABLE,
+            DecisionReason.MALFORMED_CALL_BLOCKED,
+        ]),
+        min_size=1,
+        max_size=3,
+        unique=True,
+    ),
+    st.sampled_from([A, V, E, AB]),
+    st.lists(
+        st.sampled_from([
+            DecisionReason.EVIDENCE_INSUFFICIENT,
+            DecisionReason.TAINTED_ARGUMENT_VERIFY,
+            DecisionReason.DISTRIBUTION_SHIFT,
+            DecisionReason.ROLLBACK_UNAVAILABLE,
+            DecisionReason.MALFORMED_CALL_BLOCKED,
+            DecisionReason.FLOW_CONFIDENTIALITY_VIOLATION,
+            DecisionReason.CROSS_TENANT_ARGUMENT_BLOCKED,
+        ]),
+        min_size=1,
+        max_size=3,
+        unique=True,
+    ),
+)
+def test_ref_model_differential_approval_survival(
+    approved_action: DecisionAction,
+    approved_reasons_enum: list[DecisionReason],
+    fresh_action: DecisionAction,
+    fresh_reasons_enum: list[DecisionReason],
+) -> None:
+    """Property 5 (R1 differential test): ReviewQueue._approval_survives matches
+    the reference specification across all combinations of actions and reasons."""
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    approved_reasons = tuple(sorted({r.value for r in approved_reasons_enum}))
+    approval = Approval(
+        item_id="item-1",
+        approved_action=approved_action,
+        approver="reviewer-1",
+        issued_at=now,
+        expires_at=now + timedelta(minutes=10),
+        tool_call_hash="h" * 64,
+        observation_hash="o" * 64,
+        approved_reasons=approved_reasons,
+    )
+    fresh_report = DecisionReport(
+        action=fresh_action,
+        reasons=tuple(fresh_reasons_enum),
+        risk_estimate=0.5,
+        confidence=0.5,
+        coverage_policy="test",
+        evidence_required=False,
+        human_review_required=fresh_action in (V, E),
+        audit_root=None,
+        explanation="test",
+        raw_observation=PolicyObservation(question="q"),
+    )
+    assert _approval_survives(fresh_report, approval) == ref_approval_survives(
+        approved_action, approved_reasons, fresh_report
+    )
+
+
+def input_oracle_from_observation(
+    obs: PolicyObservation,
+    engine: RemoraDecisionEngine,
+) -> dict[str, object]:
+    """Input-driven reference oracle (SDD v2 AR-005 / R7).
+
+    Derives expected safety constraints directly from the input ``obs`` and
+    ``engine`` flags without reading ``DecisionReport.reasons``:
+    - ``input_hard_prohibition``: whether cross-tenant scope or unresolved
+      required intent provenance forbids execution and review;
+    - ``input_blocks_autonomy``: whether any input floor/gate/profile signal
+      forbids autonomous ACCEPT;
+    - ``input_obligations``: concrete missing or unvalidated required arguments.
+    """
+    tier = (obs.risk_tier or "").strip().lower()
+    if tier not in {"low", "medium", "high", "critical"}:
+        tier = "unknown"
+    action = (obs.action_type or "").strip().lower()
+    env = (obs.target_environment or "").strip().lower()
+
+    input_hard_prohibition = (
+        obs.argument_scope_valid is False
+        or bool(obs.intent_provenance_required and not obs.intent_provenance_resolved)
+    )
+
+    floor_checks = (
+        input_hard_prohibition,
+        bool(obs.adversarial_detected),
+        obs.schema_valid is False,
+        bool(obs.tool_forbidden),
+        bool(obs.coercion_detected),
+        bool(obs.blackmail_pattern_detected),
+        obs.counterfactual_passed is False,
+        bool(obs.evidence_contradictions and obs.evidence_contradictions > 0),
+        bool(obs.argument_tainted),
+        obs.flow_status is not None and obs.flow_status not in ("evaluated", "not_declared"),
+        obs.flow_status == "evaluated" and (
+            bool(obs.flow_confidentiality_violation) or bool(obs.flow_integrity_violation)
+        ),
+    )
+    floor_fires = any(floor_checks)
+
+    gate_checks = (
+        floor_fires,
+        obs.tool_matches_goal is False,
+        obs.expected_effect_matches is False,
+        bool(obs.distribution_shift_detected),
+        bool(obs.environment_mismatch_detected),
+        tier in ("high", "critical"),
+        tier == "unknown" and (action in {"write", "delete"} or env in {"prod", "production", "live"}),
+        action == "delete",
+        obs.rollback_available is False and tier in ("high", "critical"),
+        bool(obs.state_transition_uncertain) and tier in ("high", "critical"),
+        obs.valid_oracle_count > 0 and obs.valid_oracle_count < 3,
+        obs.schema_valid is None and action in {"write", "delete", "production_write", "destructive_write"},
+        bool(obs.proposed_tool_name) and not action,
+        action not in {"", "read", "write", "delete", "production_write", "destructive_write"},
+        bool(
+            engine.semantic_authority_floor
+            and obs.proposed_tool_name
+            and (obs.tool_matches_goal is None or obs.expected_effect_matches is None)
+        ),
+        bool(obs.missing_required_arguments),
+        bool(obs.unvalidated_required_arguments),
+        obs.argument_values_grounded is False,
+    )
+    gate_or_floor_blocks_accept = any(gate_checks)
+
+    read_only = action == "read"
+    ordered_high_trust = obs.phase == "ordered" and (obs.trust_score or 0.0) >= 0.72
+    evidence_supported = (
+        obs.evidence_action in ("answer", "evidence_accept")
+        and (obs.evidence_confidence or 0.0) >= 0.70
+        and (obs.phase == "ordered" or (obs.trust_score or 0.0) >= 0.72)
+    )
+    low_consequence_checks = (
+        engine.low_consequence_accept,
+        read_only,
+        env not in {"prod", "production", "live"},
+        not gate_or_floor_blocks_accept,
+        not (engine.execution_profile and (ordered_high_trust or evidence_supported)),
+        obs.phase != "critical",
+        not (obs.phase == "disordered" and obs.evidence_action != "answer"),
+        not (obs.trust_score is not None and obs.trust_score < 0.20 and obs.evidence_action != "answer"),
+        obs.arguments_satisfiable is not False,
+        obs.argument_values_supported is not False,
+    )
+    low_consequence_eligible = all(low_consequence_checks)
+    probabilistic_eligible = (
+        not engine.execution_profile
+        and not gate_or_floor_blocks_accept
+        and (ordered_high_trust or evidence_supported)
+    )
+    obligations = tuple(dict.fromkeys(
+        obs.missing_required_arguments or obs.unvalidated_required_arguments or ()
+    ))
+    return {
+        "input_hard_prohibition": input_hard_prohibition,
+        "input_blocks_autonomy": not (low_consequence_eligible or probabilistic_eligible),
+        "input_obligations": obligations,
+    }
+
+
+@settings(max_examples=800, deadline=None)
+@given(
+    _base,
+    st.lists(st.sampled_from(sorted(_SIGNALS)), max_size=2, unique=True),
+    st.sampled_from(range(len(_ENGINES))),
+)
+def test_input_driven_oracle_matches_engine_decision(
+    base: PolicyObservation,
+    signals: list[str],
+    which: int,
+) -> None:
+    """SDD v2 AR-005 / R7: input-derived specification from PolicyObservation
+    agrees with RemoraDecisionEngine.decide without reading report.reasons."""
+    engine = _ENGINES[which]
+    obs = _apply(base, signals, _SIGNALS)
+    spec = input_oracle_from_observation(obs, engine)
+    report = engine.decide(obs)
+    sem = project_semantics(report)
+
+    assert sem.hard_prohibition == spec["input_hard_prohibition"], (obs, report)
+    if spec["input_hard_prohibition"]:
+        assert report.action is AB
+        assert sem.required_authority == "forbidden"
+    if spec["input_blocks_autonomy"]:
+        assert report.action is not A
+        assert not sem.authorized_now
+    else:
+        assert report.action is A
+        assert sem.authorized_now
+
+
