@@ -3196,7 +3196,7 @@ documents:
   claims: []
 - id: DOC-403
   path: docs/assurance/ws1_composition_study_v2.md
-  status: draft
+  status: proposal
   topic: docs_assurance_ws1_composition_study_v2_md
   code_synced: verified
   verdict: current
