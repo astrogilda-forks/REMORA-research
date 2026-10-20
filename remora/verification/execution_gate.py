@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import dataclasses
 import secrets
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -58,13 +58,15 @@ from remora.verification.planner import (
     run_verification,
 )
 from remora.verification.preconditions import (
+    INTENT_SUBJECT,
+    LogicalState,
     ProposalContext,
     RequirementSet,
     derive_preconditions,
     tagged_digest,
 )
 from remora.verification.records import CompositionRecord
-from remora.verification.registry import PreconditionRegistry
+from remora.verification.registry import PredicateSpec, PreconditionRegistry
 from remora.verification.resolvers import Resolver
 
 __all__ = ["ENFORCE_DEPENDENCIES", "WS1_MODES", "Ws1Deployment", "Ws1Gate", "Ws1Outcome"]
@@ -81,6 +83,32 @@ _RUNTIME_MODES = (PlannerMode.H0, PlannerMode.H_DET, PlannerMode.H_COST, Planner
 _COST_MODES = (PlannerMode.H_COST, PlannerMode.H_AR)
 _HINT_MODES = (PlannerMode.H_EDV, PlannerMode.H_AR)
 _HEX = frozenset("0123456789abcdef")
+
+
+def settled_uncertainty(specs: Sequence[PredicateSpec], requirements: RequirementSet,
+                        checked: CheckedPreconditions,
+                        arguments: Mapping[str, Any]) -> frozenset[str]:
+    """The monitor uncertainty codes this call's PROVED evidence settles.
+
+    ``missing_context`` and ``ambiguous_intent`` are settled by a PROVED
+    precondition on the server-resolved intent authority. ``ambiguous_target``
+    and ``unverified_value`` are settled only when every argument is the
+    subject of a PROVED precondition; an argument no precondition is about
+    (free text, a payload) leaves them open. Anything that does not line up
+    with the registry settles nothing.
+    """
+    pres = requirements.preconditions
+    if not requirements.authorizable or len(pres) != len(specs) or any(
+            p.predicate_id != s.predicate_id for p, s in zip(pres, specs, strict=True)):
+        return frozenset()
+    proved = [s.subject_argument for p, s in zip(pres, specs, strict=True)
+              if p.required and checked.state(p.precondition_id) is LogicalState.PROVED]
+    settled: set[str] = set()
+    if INTENT_SUBJECT in proved:
+        settled |= {"missing_context", "ambiguous_intent"}
+    if set(arguments) <= {a for a in proved if a not in (None, INTENT_SUBJECT)}:
+        settled |= {"ambiguous_target", "unverified_value"}
+    return frozenset(settled)
 
 
 def _as_digest(name: str, value: str) -> str:
@@ -387,7 +415,9 @@ class Ws1Gate:
         record = compose_authorized_decision(
             base, context, requirements, run.checked, assess(run.checked), d.monitor_profile,
             now_s=d.clock_ms() // 1000, budget_exhausted=run.budget_exhausted,
-            monitor_veto_on_record=monitor_veto)
+            monitor_veto_on_record=monitor_veto,
+            uncertainty_settled=settled_uncertainty(
+                d.registry.tools.get(tool_name, ()), requirements, run.checked, args))
         outcome = Ws1Outcome(self.mode, DecisionAction(record.final_action), "evaluated",
                              record=record, stop_reason=run.stop_reason,
                              review_role=_review_route(record, requirements))
