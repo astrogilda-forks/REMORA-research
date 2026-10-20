@@ -475,6 +475,11 @@ class Ws1Gate:
             return assessment
 
         def hints(checked: CheckedPreconditions) -> tuple[str, ...]:
+            # The last monitor call is kept for the final assessment. A hint
+            # request that spent it turned a required monitor's final answer
+            # into monitor_budget_exhausted, an outage that refuses the call.
+            if d.monitor is None or monitor_calls >= d.budget.max_monitor_calls - 1:
+                return ()
             a = assess(checked)
             return a.hint_precondition_ids if a is not None else ()
 

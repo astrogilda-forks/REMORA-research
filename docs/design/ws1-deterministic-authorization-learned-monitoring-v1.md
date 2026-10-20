@@ -70,6 +70,8 @@ Kontrollert mot `966d6acd4c201a76bd9ce417c663c04bae88d269`. Pilot v4-sammendrage
 
 **Grunnlag fra bevis (opt-in).** Til nå kunne WS1 bare senke en beslutning på kjørestien. Bevisene fra oppslagene nådde aldri motoren, så en lesing motoren avsto fra eller sendte til review, ble der. Studie B målte gjenoppretting gjennom en kobling som bare fantes i studiekoden (`isp_study/defence.py`); se NEGATIVE_RESULTS §94. Med `Ws1Deployment.grounding` oppgir deploymenten hvilke av motorens grunnlagssignaler hvert predikat etablerer når det er PROVED. Ved vurdering kjører motoren på nytt med observasjonen pluss disse signalene, under samme loop-safety- og kapabilitetsjusteringer. WS1 hever aldri selv, og WS1-capsene gjelder den nye beslutningen. Argumentsignalene krever at hvert argument er et PROVED subjekt. I shadow endres ingenting, men revisjonsposten viser hva grunnlaget ville gitt. Test gjennom ruten og den ekte dispatcheren: `tests/test_ws1_grounding.py`.
 
+**Siste monitorkall er reservert.** Under H_EDV belastes hint-kall samme tak som den endelige vurderingen. Med like mange runder som taket brukte hintene opp alle kall, og en påkrevd monitor ga da `monitor_budget_exhausted` og avviste et kall der alle krav var PROVED. Nå hopper hint-forespørselen over når bare ett kall gjenstår. En veto fra et hint-kall er fortsatt klebrig innenfor en vurdering; det er en bevisst egenskap. Test: `tests/verification/test_ws1_monitor_budget.py`.
+
 `remora/verification/planner.py` er en låst fil i Studie B. Endringen påvirker ikke den forseglede studien, som reproduseres fra forseglingscommiten `6924f0d0`.
 
 ## 0. Beslutningsgrunnlag
