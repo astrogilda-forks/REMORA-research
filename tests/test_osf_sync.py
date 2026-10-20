@@ -256,3 +256,40 @@ def test_root_page_states_rights_participants_and_corrections() -> None:
     readme = osf.build_plans(_snapshot({}))[0].wiki
     for heading in ("## Rights, data and corrections", "**Human participants.**", "**Corrections.**"):
         assert heading in readme
+
+
+class _Response:
+    def __init__(self, status: int, body: dict | None = None) -> None:
+        self.status_code, self._body, self.headers, self.text = status, body or {}, {}, ""
+
+    def json(self) -> dict:
+        return self._body
+
+
+class _Session:
+    def __init__(self, responses: list[_Response]) -> None:
+        self.responses, self.calls, self.headers = responses, [], {}
+
+    def request(self, method: str, url: str, **kw) -> _Response:
+        self.calls.append((method, url))
+        return self.responses.pop(0)
+
+
+def _client(responses: list[_Response]):
+    client = osf.OSF.__new__(osf.OSF)
+    client.session = _Session(responses)
+    return client
+
+
+def test_create_that_meets_its_own_lost_first_attempt_updates_the_existing_file(monkeypatch) -> None:
+    monkeypatch.setattr(osf.time, "sleep", lambda s: None)
+    conflict = _Response(409, {"data": {"id": "osfstorage/abc123", "type": "files"}})
+    client = _client([_Response(503), conflict, _Response(200)])
+    client.create("node", "/dir/", "a.py", b"a")
+    method, url = client.session.calls[-1]
+    assert method == "PUT" and url.endswith("/providers/osfstorage/abc123?kind=file")
+
+
+def test_mkdir_conflict_returns_the_existing_folder_path() -> None:
+    client = _client([_Response(409, {"data": {"id": "osfstorage/f00/", "type": "files"}})])
+    assert client.mkdir("node", "/", "docs") == "/f00/"
