@@ -477,7 +477,8 @@ Business Source License 1.1. The code is source-available, not open source;
 see `LICENSE` and `legal/` in the Documentation component. Cite with
 `CITATION.cff`.
 
-Research lead: Stian Skogbrott, independent researcher.
+Research lead: Stian Skogbrott, independent researcher. The work has no
+external funding.
 """
 
 

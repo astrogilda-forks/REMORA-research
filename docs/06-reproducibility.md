@@ -183,7 +183,10 @@ none or several, so a new top-level path has to be placed before it can merge
 (`tests/test_osf_sync.py`). Paths inside a
 component match the repository. Each component carries `SNAPSHOT.json` (the
 commit) and `MANIFEST.sha256` (every file), which a downloaded copy can be
-checked against with `sha256sum -c MANIFEST.sha256`.
+checked against with `sha256sum -c MANIFEST.sha256`. The OSF pages are
+generated from the repository's records: the paper's abstract, the claim
+register, the dataset manifests and the analysis plans. A result therefore
+reads on OSF exactly as the register states it.
 
 `.github/workflows/osf-sync.yml` runs `sync` and then `verify` on every push
 to master, and `verify` alone every Monday. `sync` uploads only files whose
