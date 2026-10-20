@@ -7,7 +7,10 @@ below binds until the sealing commit. Study B
 not changed by this plan.
 
 Harness: `experiments/ws1_composition/study_c/` and
-`scripts/run_ws1_study_c.py` (`--fake` today; paid steps refuse). Grader:
+`scripts/run_ws1_study_c.py` (`--fake`, `--pilot`, `--seal`, `--holdout`).
+The paid steps (`study_c/paid.py`) refuse until the owner's decisions are in
+the manifest; `tests/test_ws1_study_c_paid.py` drives them end to end with a
+fake client. Grader:
 `experiments/ws1_composition/safe_utility.py`, fixed at commit `4f3f9a29`
 before any Study C data existed.
 
@@ -142,8 +145,10 @@ All on development data, before sealing:
    `analysis.bootstrap_power` on the pilot's differences. Below 0.8 a contrast
    is reported as underpowered, and a miss is not read as no effect.
 
-The paid runner is not written yet. It is built and tested against a
-recorded client before the first paid call.
+The pilot spends at most a quarter of the owner's budget. H_COST's estimates
+come from H_DET's development lookups (`paid.fit_estimates`). The per-arm
+thresholds come from `paid.choose_thresholds`. The seal freezes the files
+listed in `paid.FROZEN_C`, and the holdout refuses when one changed.
 
 ## 8. Owner decisions
 

@@ -1,12 +1,9 @@
 # SPDX-License-Identifier: BUSL-1.1
-"""Study C procedure (plan §7-9): the free run, and the refusal before any paid one.
+"""Study C procedure (plan §7-9): the free run. The paid steps are in ``paid.py``.
 
-Only ``fake`` runs today. It uses the scripted agent and monitor, the
-mutation attacker and the development split, and costs nothing. Every paid
-step refuses until the manifest records the owner's budget and model
-decisions. The paid runner is not written yet: it is built and tested
-against a recorded client before the first paid call, not before the budget
-exists.
+``fake`` uses the scripted agent and monitor, the mutation attacker and the
+development split, and costs nothing. Every paid step refuses until the
+manifest records the owner's budget and model decisions.
 """
 from __future__ import annotations
 
@@ -55,12 +52,3 @@ def fake(*, n_boot: int = 2_000) -> dict[str, Any]:
             "summary": summarize_c(results, n_boot=n_boot)}
     FAKE_OUT.write_text(json.dumps(body, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return body
-
-
-def require_paid_authorisation() -> dict[str, Any]:
-    manifest = json.loads(MANIFEST_C.read_text(encoding="utf-8"))
-    decided = manifest.get("owner_decisions", {})
-    missing = [k for k in ("paid_budget_usd", "models") if not decided.get(k)]
-    if missing:
-        raise StudyCRefused(f"owner decisions missing: {', '.join(missing)}")
-    raise StudyCRefused("the paid Study C runner is not written yet (plan §7)")

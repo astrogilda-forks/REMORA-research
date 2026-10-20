@@ -106,9 +106,11 @@ def test_the_fake_run_bounds_every_ws1_arm(tmp_path, monkeypatch):
     assert any(r.grade["out_of_scope"] for r in results if r.arm == "A_no_gate")
 
 
-def test_paid_steps_refuse_without_owner_decisions():
+def test_the_committed_manifest_authorises_no_paid_run():
+    from experiments.ws1_composition.study_c import paid
+
     with pytest.raises(procedure.StudyCRefused, match="paid_budget_usd, models"):
-        procedure.require_paid_authorisation()
+        paid.authorised(paid.load_manifest())
 
 
 def test_the_primary_family_uses_holm_and_never_counts_a_missing_contrast():

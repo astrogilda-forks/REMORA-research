@@ -15,5 +15,6 @@ its own world seed, wordings, manifest and plan
 * the injection search runs against the defended arm, with the defence's
   refusals fed back to the attacker.
 
-Nothing here calls a model unless a paid run is authorised in the manifest.
+Nothing here calls a model unless the manifest records the owner's budget
+and models (``study_c/paid.py``).
 """

@@ -107,6 +107,11 @@ class GateRecord:
     resolver_calls: int
     monitor_veto: bool
     latency_ms: float
+    #: The highest score among every monitor answer for this call, hint
+    #: requests included: what a per-arm threshold is chosen on (plan §4).
+    monitor_max_score: float | None = None
+    #: (predicate, final state, looked up) per precondition, to fit H_COST.
+    preconditions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -128,6 +133,7 @@ class GateDefence:
         self.ledger = TaskCallLedger(Path(self._ledger_dir.name) / "ledger.db")
         self.resolvers = resolvers_for(self.world)
         self._call: tuple[str, dict[str, Any]] = ("", {})
+        self._max_score: float | None = None
 
     def observe_output(self, name: str, output: str) -> None:
         if name == "read_ticket":
@@ -142,6 +148,9 @@ class GateDefence:
                     if checked.state(p.precondition_id) is LogicalState.UNKNOWN}
         out = self.monitor.score(request=self.task.request, untrusted=tuple(self.untrusted),
                                  call_name=name, call_args=args, open_predicates=sorted(open_ids))
+        scores = [float(v) for v in out.get("scores", {}).values()]
+        if scores:
+            self._max_score = max(self._max_score or 0.0, *scores)
         body = {"schema": MONITOR_RESPONSE_SCHEMA, "model_id": self.profile.model_id,
                 "question_set_hash": self.profile.question_set_hash,
                 "calibration_hash": self.profile.calibration_hash,
@@ -186,7 +195,7 @@ class GateDefence:
             action_type="read" if read else "write", target_environment="staging",
             schema_valid=True, intent_authority_present=True, intent_resolution_status="resolved")
         report = ENGINE.decide(obs)
-        self._call = (name, dict(args))
+        self._call, self._max_score = (name, dict(args)), None
         before = sum(r.calls for r in self.resolvers.values())
         spec = next(t for t in TOOL_SPECS if t["name"] == name)
         outcome = self._gate().evaluate(
@@ -196,7 +205,7 @@ class GateDefence:
             policy_bundle_hash=digest("study-c-policy-v1"), toolspec_hash=digest(spec),
             capability=None, flow_digest=None, flow_epoch=0, attempt_family_id=None,
             base=report, task_id=f"{self.task.task_id}/{self.arm}",
-            redecide=lambda facts: ENGINE.decide(dataclasses.replace(obs, **facts)))
+            redecide=lambda facts: ENGINE.decide(dataclasses.replace(obs, **dict[str, Any](facts))))
         grounded = outcome.grounded_report
         final = (_never_raised(grounded, outcome.apply(grounded)) if grounded is not None
                  else _never_raised(report, outcome.apply(report)))
@@ -207,6 +216,12 @@ class GateDefence:
                      [r.value for r in final.reasons], list(outcome.grounding),
                      outcome.stop_reason, sum(r.calls for r in self.resolvers.values()) - before,
                      outcome.monitor_veto, start, routed)
+        self.records[-1].monitor_max_score = self._max_score
+        if outcome.record is not None:
+            self.records[-1].preconditions = [
+                {"predicate": r["precondition_id"].split(":")[0], "state": r["logical_state"],
+                 "looked_up": bool(r["evidence_refs"])}
+                for r in outcome.record.all_precondition_results]
         return executed
 
     def _record(self, name: str, args: dict[str, Any], executed: bool, final: str, status: str,

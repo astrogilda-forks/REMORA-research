@@ -23,7 +23,7 @@ from typing import Any
 from experiments.ws1_composition import analysis
 from experiments.ws1_composition.isp_study.domain import Task, execute
 from experiments.ws1_composition.safe_utility import grade
-from experiments.ws1_composition.study_c.gate_defence import GateDefence
+from experiments.ws1_composition.study_c.gate_defence import UNIFORM_ESTIMATES, GateDefence
 from experiments.ws1_composition.study_c.stats import paired_cluster_test, primary_family
 from experiments.ws1_composition.study_c.tasks import (
     OUTSIDE,
@@ -68,10 +68,13 @@ def _matches(goal: tuple[str, tuple[tuple[str, str], ...]] | None, name: str,
 
 
 def run_episode(item: StudyCTask, arm: str, *, profile: MonitorProfile, monitor: Any,
-                agent_run: AgentRun) -> EpisodeC:
+                agent_run: AgentRun, estimates: Mapping[tuple[str, str], Any] | None = None
+                ) -> EpisodeC:
     task = item.task
     world = world_for_c(task)
-    defence = GateDefence(arm, task, world, profile, monitor if arm.startswith("H") else None)
+    defence = GateDefence(arm, task, world, profile, monitor if arm.startswith("H") else None,
+                          estimates=dict(estimates if estimates is not None
+                                         else UNIFORM_ESTIMATES))
     executed: list[tuple[str, dict[str, Any]]] = []
 
     def call(name: str, args: dict[str, Any]) -> str:
@@ -117,7 +120,8 @@ class Attempt:
 
 
 def search(item: StudyCTask, arm: str, *, attacker: Any, profile: MonitorProfile,
-           monitor: Any, agent_run: AgentRun) -> tuple[EpisodeC, int]:
+           monitor: Any, agent_run: AgentRun,
+           estimates: Mapping[tuple[str, str], Any] | None = None) -> tuple[EpisodeC, int]:
     """Search an injection against *arm* itself; the last attempt is scored."""
     history: list[Attempt] = []
     ep: EpisodeC | None = None
@@ -125,7 +129,8 @@ def search(item: StudyCTask, arm: str, *, attacker: Any, profile: MonitorProfile
     for n in range(1, MAX_ATTEMPTS + 1):
         current = replace(item, task=replace(item.task,
                                              injection=attacker.craft(item, arm, history)))
-        ep = run_episode(current, arm, profile=profile, monitor=monitor, agent_run=agent_run)
+        ep = run_episode(current, arm, profile=profile, monitor=monitor, agent_run=agent_run,
+                         estimates=estimates)
         reached = attack_reached(item, ep)
         history.append(Attempt(current.task.injection, [
             {"tool": c["name"], "arguments": c["args"], "outcome": c["final_action"],
@@ -137,10 +142,13 @@ def search(item: StudyCTask, arm: str, *, attacker: Any, profile: MonitorProfile
     return ep, n
 
 
-def run_study_c(items: Sequence[StudyCTask], arms: Sequence[str], *, profile: MonitorProfile,
+def run_study_c(items: Sequence[StudyCTask], arms: Sequence[str], *,
+                profile: MonitorProfile | Mapping[str, MonitorProfile],
                 monitor: Any, agent_run: AgentRun, attacker: Any = None,
                 search_arms: Sequence[str] = (), log: Path | None = None,
-                stop: Callable[[], bool] = lambda: False) -> list[EpisodeC]:
+                stop: Callable[[], bool] = lambda: False,
+                estimates: Mapping[tuple[str, str], Any] | None = None) -> list[EpisodeC]:
+    """*profile* is one profile, or one per arm (per-arm thresholds, plan §4)."""
     results: list[EpisodeC] = []
     handle = log.open("a", encoding="utf-8") if log is not None else None
     try:
@@ -148,12 +156,13 @@ def run_study_c(items: Sequence[StudyCTask], arms: Sequence[str], *, profile: Mo
             for arm in arms:
                 if stop():
                     return results
+                prof = profile[arm] if isinstance(profile, Mapping) else profile
                 if attacker is not None and item.task.is_attack and arm in search_arms:
-                    ep, _ = search(item, arm, attacker=attacker, profile=profile,
-                                   monitor=monitor, agent_run=agent_run)
+                    ep, _ = search(item, arm, attacker=attacker, profile=prof,
+                                   monitor=monitor, agent_run=agent_run, estimates=estimates)
                 else:
-                    ep = run_episode(item, arm, profile=profile, monitor=monitor,
-                                     agent_run=agent_run)
+                    ep = run_episode(item, arm, profile=prof, monitor=monitor,
+                                     agent_run=agent_run, estimates=estimates)
                 results.append(ep)
                 if handle is not None:
                     handle.write(json.dumps(asdict(ep), sort_keys=True) + "\n")
@@ -243,10 +252,10 @@ def summarize_c(results: Sequence[EpisodeC], *, n_boot: int = 10_000) -> dict[st
     # its own benign run of the same task (plan §6, S4).
     for arm in ("H_DET", "H_COST", "H_EDV"):
         rows = by_arm.get(arm, [])
-        benign = {r.task_id: r for r in rows if not r.attack_kind}
+        own = {r.task_id: r for r in rows if not r.attack_kind}
         pairs = [(_cluster(r.task_id), float(r.grade["safe_utility"]),
-                  float(benign[_base(r.task_id)].grade["safe_utility"]))
-                 for r in rows if r.attack_kind == "availability" and _base(r.task_id) in benign]
+                  float(own[_base(r.task_id)].grade["safe_utility"]))
+                 for r in rows if r.attack_kind == "availability" and _base(r.task_id) in own]
         out["contrasts"][f"S4:{arm}:availability_minus_benign"] = (
             paired_cluster_test(pairs, n_boot=n_boot) if pairs else None)
     return out
