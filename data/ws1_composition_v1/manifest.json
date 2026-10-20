@@ -25,7 +25,7 @@
   },
   "domain": "synthetic ISP work orders (Study B, plan \u00a72)",
   "frozen_sha256": {
-    "docs/assurance/ws1_composition_study_v1.md": "df3f80acf6d192a2766db9d2c5657d725e5328ed583308fb3f276c3404b96037",
+    "docs/assurance/ws1_composition_study_v1.md": "1f82bbdb24264c33c8a193b926b24a8c6f5cc2377892d614e820a7712fd3b861",
     "experiments/control_eval/metrics.py": "580efb69e0ee5f4a9e8a8766e5e4c167db627a116e43a1b7c340d965ae1af462",
     "experiments/ws1_composition/analysis.py": "efe1223b56b2bcb533acd3c6d2bf6d059d35ff2ce47cf3635d95f980fda886bd",
     "experiments/ws1_composition/isp_study/__init__.py": "5d44ac802fe5809836c35279316867864c7c820d76cf10d4e50c5acdbd35cf46",
@@ -34,7 +34,7 @@
     "experiments/ws1_composition/isp_study/defence.py": "069c9ef71a18ee1605dd6158b22d0f9f4a979ef01b9426f1d4294051c48882f3",
     "experiments/ws1_composition/isp_study/domain.py": "3c9531916ec0aee7acb7eb3618cc41e8079e066a895719a93dd3e2afe4c44269",
     "experiments/ws1_composition/isp_study/runner.py": "735419f5dc918807ddb0779eb29fd1798f31805fb42b03dc197c48cb37cd5d56",
-    "experiments/ws1_composition/isp_study/study_b.py": "0de6b6f62d5ad46a7d8e255552a57a3ff6ff6bb68107a0bfdcfa38e6a79044ea",
+    "experiments/ws1_composition/isp_study/study_b.py": "e1f71b49ef4b054da6bd91e77e375d1fe2c3e6be6f5d7cbce0a0953fcb9d978c",
     "experiments/ws1_composition/simulator.py": "3ce5320b0e9aba3720369d9e55333dc19d00d324a3cd87a44fe69ab0c46bbd6f",
     "experiments/ws1_composition/study.py": "5b8d591dc488ca3a4963b397c5e6eae45724c51057313db802a693379deb7b78",
     "remora/decision_providers/composition_adapter.py": "68543eb92255c294e25e114991c9f9aaff988a7615c3be60d8cb7790cb2180cd",
