@@ -1069,6 +1069,7 @@ def execute_approved_item(
         proposal_id=str(proposal_id or item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
+        **_flow_kwargs(fresh_obs),
     )
 
     # FT-02: settle with what actually happened - derived, never assumed.
@@ -1641,6 +1642,7 @@ def dispatch_pending_intent(
         proposal_id=str(proposal_id or row.item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
+        **_flow_kwargs(fresh_obs),
     )
 
     outcome = classify_outcome(tool_execution)
@@ -1909,6 +1911,18 @@ def plan_binding_of(tool_call: Any) -> Any:
     return PlanBinding.from_dict(data)
 
 
+def _flow_kwargs(obs: Any) -> dict[str, Any]:
+    """``flow_expected`` for a dispatch call: the epoch and digest the flow
+    check had when this call was last decided (SDD v2 WP-04, AR-018).
+
+    Omitted unless the flow check evaluated, so a dispatcher binding that
+    predates the parameter keeps working where flow control is off.
+    """
+    if getattr(obs, "flow_status", None) != "evaluated" or not getattr(obs, "flow_digest", None):
+        return {}
+    return {"flow_expected": (int(obs.flow_epoch or 0), str(obs.flow_digest))}
+
+
 def _task_kwargs(tool_call: Any) -> dict[str, Any]:
     """``task_identity`` and ``plan`` for a dispatch call, each omitted when
     the call carries none, so a dispatcher binding that predates the
@@ -2163,6 +2177,7 @@ def redeem_accept_token(
         grant_jti=token.jti,
         report_lease=True,
         **_task_kwargs(tool_call),
+        **_flow_kwargs(obs),
     )
 
     # Same structural classification as the review path: a dispatch that began

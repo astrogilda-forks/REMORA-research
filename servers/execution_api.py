@@ -2579,6 +2579,47 @@ from remora.observability.otel import get_remora_tracer
 _EXEC_TRACER = get_remora_tracer(service_name="remora-execution")
 
 
+def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[int, str],
+                      proposal_id: str) -> tuple[str | None, Any]:
+    """Re-check the flow decision right before dispatch, and bind the result commit.
+
+    SDD v2 WP-04 (AR-017, AR-018). ``expected`` is the epoch and digest the
+    flow check had when the call was decided. If the context's label moved
+    since, or the check now differs, the call is refused before a lease is
+    minted. Otherwise the returned commit labels the raw result, persists the
+    handles it mints and raises the context label, and only then hands back
+    the rendered result. A failed commit withholds the result.
+
+    Residual: the check and the dispatch are not one transaction. A
+    concurrent call in the same context can raise the label between them;
+    that raise is not seen by this call, only by the next one.
+    """
+    from remora.flow.labeler import FlowLabeler, commit_labeled_result, verify_flow_at_dispatch
+
+    flow = _flow_spec(tool_call.tool_name)
+    principal, context_id = _FLOW_PRINCIPAL.get(), tool_call.context_id
+    if flow is None or not principal or not context_id:
+        return "flow_state_unavailable", None
+    contexts, handles = _flow_contexts(), _flow_handles()
+    ok, reason, _resolved = verify_flow_at_dispatch(
+        contexts=contexts, handles=handles, tenant_id=tenant, principal=principal,
+        context_id=context_id, flow=flow, arguments=tool_call.arguments,
+        expected_epoch=expected[0], expected_digest=expected[1])
+    if not ok:
+        return reason, None
+
+    def commit(raw: Any) -> tuple[Any, dict[str, Any]]:
+        done = commit_labeled_result(
+            FlowLabeler(), flow, contexts=contexts, handles=handles, tenant_id=tenant,
+            principal=principal, context_id=context_id, proposal_id=proposal_id,
+            arguments=tool_call.arguments, raw_result=raw)
+        return done.rendered_result, {"raw_result_sha256": done.raw_result_sha256,
+                                      "epoch": done.new_epoch,
+                                      "minted_handles": len(done.minted_handle_ids)}
+
+    return None, commit
+
+
 def _dispatch_under_lease(
     *,
     tenant: str,
@@ -2595,6 +2636,7 @@ def _dispatch_under_lease(
     plan: Any = None,
     capability_set: Any = None,
     report_lease: bool = False,
+    flow_expected: tuple[int, str] | None = None,
 ) -> dict[str, Any]:
     """Governed dispatch (see remora.execution.dispatch); binds this module's
     dispatcher and current policy bundle hash. Shared by /execute,
@@ -2627,6 +2669,13 @@ def _dispatch_under_lease(
             if refusal is not None:
                 return {"executed": False, "refusal_reason": refusal.value,
                         "proposal_id": proposal_id}
+    result_commit = None
+    if flow_expected is not None:
+        flow_refusal, result_commit = _flow_at_dispatch(tenant, tool_call, flow_expected,
+                                                        proposal_id)
+        if flow_refusal is not None:
+            return {"executed": False, "refusal_reason": flow_refusal,
+                    "proposal_id": proposal_id}
     resolved_effect = None
     resolver = _effect_resolver() if presented_lease is None else None
     if resolver is not None:
@@ -2675,6 +2724,7 @@ def _dispatch_under_lease(
             surface_digest=surface,
             capability_set=capability_set,
             report_lease=report_lease,
+            result_commit=result_commit,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):

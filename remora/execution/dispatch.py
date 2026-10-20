@@ -14,6 +14,7 @@ happened instead of implying execution.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -66,6 +67,7 @@ def dispatch_under_lease(
     capability_set: EffectiveCapabilitySet | None = None,
     surface_digest: str = "",
     report_lease: bool = False,
+    result_commit: Callable[[Any], tuple[Any, dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -105,6 +107,11 @@ def dispatch_under_lease(
     dispatcher returned: its nonce is spent by then, and the caller records
     it as evidence. A presented lease, a forwarded one and a refusal before
     dispatch are never reported.
+
+    ``result_commit`` (SDD v2 WP-04, AR-017) runs on the raw result of an
+    executed call before anything is returned. It returns what the caller may
+    see and an audit block. When it raises, the call still counts as executed,
+    and the result is withheld: no preview and no envelope are returned.
     """
     tool_execution: dict[str, Any] = {"executed": False}
     if not gate_allowed:
@@ -171,11 +178,21 @@ def dispatch_under_lease(
     # process IS the executor, so forwarding it again would be a loop.
     if will_forward:
         try:
-            return remote_dispatch(
+            forwarded = remote_dispatch(
                 lease=lease, tenant=tenant, principal=principal,
                 tool_call=tool_call, capability_set=capability_set, plan=plan,
                 execution_context=_execution_context(semantic),
             )
+            if result_commit is None or not forwarded.get("executed"):
+                return forwarded
+            envelope = forwarded.pop("result_envelope", None) or {}
+            raw = forwarded.pop("result", None)
+            if envelope.get("truncated", True):
+                # Labels are computed over the whole result. A preview is
+                # not the whole result, so nothing of it is returned.
+                forwarded["result_withheld"] = "flow_result_truncated"
+                return forwarded
+            return _committed(forwarded, raw, result_commit, tenant, tool_call, proposal_id)
         except RemoteDispatchUnavailable as exc:
             # No verdict. Reported as unknown rather than as a refusal: the
             # request may have been received, the nonce spent and the effect
@@ -291,11 +308,41 @@ def dispatch_under_lease(
         # full result even when the preview is truncated, so an oversized
         # or hostile tool output cannot inflate the audit chain or the
         # response while still being provable in replay.
+        if result_commit is not None:
+            return _committed(tool_execution, dres.result, result_commit, tenant, tool_call,
+                              proposal_id)
         captured = capture_tool_result(dres.result)
         tool_execution["result"] = captured.preview
         tool_execution["result_envelope"] = captured.to_dict()
     else:
         tool_execution["refusal_reason"] = dres.refusal_reason
+    return tool_execution
+
+
+def _committed(tool_execution: dict[str, Any], raw: Any,
+               result_commit: Callable[[Any], tuple[Any, dict[str, Any]]], tenant: str,
+               tool_call: ToolCallPort, proposal_id: str) -> dict[str, Any]:
+    """Return an executed call's result only after ``result_commit`` succeeded.
+
+    On failure the effect has happened and the result is withheld. The
+    exception is not chained or logged with its message: a store error can
+    carry the raw result it failed to persist.
+    """
+    try:
+        shown, audit = result_commit(raw)
+    except Exception as exc:
+        reason = str(getattr(exc, "reason_code", "") or "result_commit_failed")
+        governance_event(
+            "dispatch.result_commit_failed", level=logging.ERROR,
+            tenant_id=tenant, tool_name=tool_call.tool_name,
+            proposal_id=proposal_id, detail=reason,
+        )
+        tool_execution["result_withheld"] = reason
+        return tool_execution
+    captured = capture_tool_result(shown)
+    tool_execution["result"] = captured.preview
+    tool_execution["result_envelope"] = captured.to_dict()
+    tool_execution["flow_commit"] = dict(audit)
     return tool_execution
 
 
