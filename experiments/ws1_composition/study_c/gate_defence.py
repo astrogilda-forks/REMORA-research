@@ -82,7 +82,9 @@ UNIFORM_ESTIMATES = {(s.predicate_id, rid): LookupEstimate(cost_units=1, settle_
                      for specs in REGISTRY.tools.values() for s in specs
                      for rid in s.resolver_ids}
 COST_BUDGET_UNITS = 3
-ENGINE = RemoraDecisionEngine(grounded_read_accept=True, execution_profile=True)
+#: As the execution API runs it by default, strict monotone profile included.
+ENGINE = RemoraDecisionEngine(grounded_read_accept=True, execution_profile=True,
+                              strict_monotone=True)
 
 
 def _never_raised(before: DecisionReport, after: DecisionReport) -> DecisionReport:

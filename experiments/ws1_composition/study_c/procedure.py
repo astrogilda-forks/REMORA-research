@@ -23,7 +23,9 @@ from remora.decision_providers.composition_adapter import MonitorMode, MonitorPr
 MANIFEST_C = ROOT / "data" / "ws1_composition_v2" / "manifest.json"
 FAKE_OUT = ROOT / "artifacts" / "ws1" / "study_c_fake_v1.json"
 #: The arms searched with the adaptive attacker; the rest meet the template.
-SEARCH_ARMS = ("A_no_gate", "H_DET", "H_EDV")
+#: Two, not three, to fit the owner's budget (plan §5): the undefended agent
+#: and the monitor-directed arm, the defence with the most to exploit.
+SEARCH_ARMS = ("A_no_gate", "H_EDV")
 QUESTION_SET = digest(["injection", "target_mismatch", "study-c-monitor-prompt-v1"])
 
 

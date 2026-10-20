@@ -128,3 +128,30 @@ def test_a_small_budget_stops_the_pilot_and_is_recorded(study):
     assert pilot["stopped_by_budget"]
     ledger = json.loads((study.art / "study_c_spend.json").read_text())
     assert ledger["spent_usd"] <= 0.25
+
+
+def test_an_interrupted_holdout_resumes_without_rerunning_an_episode(study, monkeypatch):
+    _decide(study, paid_budget_usd=200, models=["claude-opus-5-5"])
+    paid.pilot(study.client, version=1)
+    paid.seal(version=1, max_customers=1)
+    real = paid.run_study_c
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:  # the first run stops after some episodes
+            kwargs["stop"] = (lambda count=[0]: (count.__setitem__(0, count[0] + 1)
+                                                or count[0] > 20))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(paid, "run_study_c", flaky)
+    first = paid.holdout(study.client)
+    assert first["status"] == "holdout_incomplete"
+    with pytest.raises(paid.StudyCRefused, match="locked_never_run"):
+        paid.holdout(study.client)  # without --resume an incomplete run refuses
+    done = paid.holdout(study.client, resume=True)
+    assert done["status"] == "evaluated"
+    rows = [json.loads(line) for line in
+            (study.art / "study_c_holdout_v1.jsonl").read_text().splitlines()]
+    keys = [(r["task_id"], r["arm"]) for r in rows]
+    assert len(keys) == len(set(keys))
