@@ -681,5 +681,36 @@ def test_cost_budget_applies_to_every_planner_and_whole_round(mode):
     assert 2 * run.budget.spent_calls <= 3
 
 
+@pytest.mark.parametrize("age_s", [0, 60])
+def test_bounded_adapters_use_wall_evidence_time_and_monotonic_deadlines(age_s):
+    ctx, args = context()
+    reqs = derive_preconditions(ctx, args, REGISTRY)
+    srcs = sources()
+    adapters = {}
+    for rid in ("inventory", "crm"):
+        spec = REGISTRY.resolvers[rid]
+
+        def transport(req, tenant, _timeout, source=srcs[rid]):
+            # Pure in-memory fixture: no network transport is involved.
+            payload = source.fetch(req, tenant, NOW_S).payload
+            return TransportResponse("https://source.invalid", tenant, "v1", payload)
+
+        adapters[rid] = BoundedResolverAdapter(
+            ResolverAdapterContract(rid, spec.source_id, frozenset({"https://source.invalid"}),
+                                    spec.capability_id),
+            transport, mono_clock_ms=lambda: 100_000, wall_clock_s=lambda: NOW_S,
+            ttl_s=60,
+        )
+    run = run_verification(
+        ctx, reqs, registry=REGISTRY, verifiers=VERIFIERS, resolvers=adapters,
+        held_capabilities=ALL_CAPS, mode=PlannerMode.H_DET, budget=VerificationBudget(),
+        clock_ms=lambda: 100_000, wall_clock_s=lambda: NOW_S + age_s,
+    )
+    expected = LogicalState.PROVED if age_s == 0 else LogicalState.UNKNOWN
+    assert all(run.checked.state(p.precondition_id) is expected for p in reqs.preconditions)
+    assert all(ev.acquired_at == NOW_S for ev in run.evidence)
+    assert run.budget.spent_calls == 2
+
+
 
 

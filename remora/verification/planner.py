@@ -561,6 +561,7 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                      resolvers: Mapping[str, Resolver], held_capabilities: frozenset[str],
                      mode: PlannerMode, budget: VerificationBudget,
                      clock_ms: Callable[[], int],
+                     wall_clock_s: Callable[[], int] | None = None,
                      hints_for: Callable[[CheckedPreconditions], Sequence[str]] | None = None,
                      seed: int = 0,
                      estimates: Mapping[tuple[str, str], LookupEstimate] | None = None,
@@ -574,6 +575,11 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     passes no ``verifiable`` IDs: whatever is still UNKNOWN is a stop, not a
     pending VERIFY.
 
+    With ``wall_clock_s``, ``clock_ms`` is the monotonic deadline clock and
+    must share a domain with deployed adapters. Evidence timestamps and TTL
+    checks use epoch seconds from ``wall_clock_s``. Without it, the legacy
+    epoch-millisecond clock supplies both, preserving existing deployments.
+
     *hints_for* is called once per round with the current check and returns
     the monitor's hinted precondition IDs (H_EDV only), at most
     ``budget.max_monitor_calls`` times. It is how the monitor reaches the
@@ -585,6 +591,7 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
         if estimates is None:
             raise ValueError("cost budget requires deployment estimates")
     start = clock_ms()
+    wall_now = wall_clock_s or (lambda: clock_ms() // 1000)
     deadline = start + budget.wall_deadline_ms
     rem_cost = cost_budget_units
     evidence_list, issued_map = list(evidence), dict(issued or {})
@@ -594,7 +601,7 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     def check(revision: int) -> CheckedPreconditions:
         return check_preconditions(context, requirements, evidence_list, issued=issued_map,
                                    registry=registry, verifiers=verifiers,
-                                   now_s=clock_ms() // 1000, evidence_revision=revision,
+                                   now_s=wall_now(), evidence_revision=revision,
                                    review=review)
 
     revision = 0
@@ -665,7 +672,7 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
             )
             try:
                 item = run_request(request, context, registry=registry, resolvers=resolvers,
-                                   held_capabilities=held_capabilities, now_s=clock_ms() // 1000)
+                                   held_capabilities=held_capabilities, now_s=wall_now())
             except ResolverRefused as refusal:
                 if refusal.attempted:
                     spent += 1
