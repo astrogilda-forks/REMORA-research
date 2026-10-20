@@ -633,13 +633,12 @@ def input_oracle_from_observation(
         and not gate_or_floor_blocks_accept
         and (ordered_high_trust or evidence_supported)
     )
-    blocks_autonomy = not (low_consequence_eligible or probabilistic_eligible)
     obligations = tuple(dict.fromkeys(
         obs.missing_required_arguments or obs.unvalidated_required_arguments or ()
     ))
     return {
         "input_hard_prohibition": input_hard_prohibition,
-        "input_blocks_autonomy": blocks_autonomy,
+        "input_blocks_autonomy": not (low_consequence_eligible or probabilistic_eligible),
         "input_obligations": obligations,
     }
 

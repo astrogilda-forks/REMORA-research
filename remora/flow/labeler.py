@@ -321,6 +321,7 @@ def commit_labeled_result(
     from remora.flow.observe import _lineage
 
     failed = False
+    updated: Any = None
     try:
         state = contexts.load(tenant_id, principal, context_id)
         lineage = _lineage(lambda cid: contexts.load(tenant_id, principal, cid), state)
@@ -354,7 +355,7 @@ def commit_labeled_result(
         failed = True
     # Raise outside the handler: neither cause nor implicit exception context
     # may retain a store exception containing raw tool data.
-    if failed:
+    if failed or updated is None:
         raise FlowCommitFailed("flow_result_commit_failed") from None
     return CommittedFlowResult(
         rendered_result=labeled.rendered,
