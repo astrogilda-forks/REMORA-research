@@ -30,7 +30,11 @@ jobs:
     # 30, not 20 (2026-10-05): master run 37363291699 reached 99% of the
     # coverage suite before the job limit cancelled it; leave time for the
     # remaining tests and downstream quality gates.
-    timeout-minutes: 30
+    # 45, not 30 (2026-10-20): #958 passed 11808 tests (27:50) and the
+    # package coverage floors, then was cancelled during documentation gates
+    # at the job limit (run 39338734083). Leave room for setup, the Postgres
+    # coverage pass and downstream gates after the main suite.
+    timeout-minutes: 45
 
     # Real Postgres alongside the coverage run (2026-08-26, external review):
     # the Postgres adapters in enforcement/gate.py and enforcement/outbox.py
