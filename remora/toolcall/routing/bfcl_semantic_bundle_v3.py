@@ -87,10 +87,22 @@ _INTERROGATIVE = re.compile(
     r"|(?:am\s+i|are\s+we)\s+(?:able|allowed|permitted)"
     r"|is\s+it\s+(?:possible|allowed|ok|okay)"
     r"|how\s+(?:do|can|would|should)\s+(?:i|we)"
+    r"|(?:why|when)\s+(?:did|does|do|was|is|would|should)"
     r"|what\s+happens\s+if"
     r"|find\s+out\s+(?:if|whether)"
     r")\b"
 )
+#: Frames that attribute a following mutation to reported speech or past failure.
+_REPORTED = re.compile(
+    r"\b(?:"
+    r"(?:customer|user|client|caller|sender|agent|ticket|email|message|error|log|note|report|system)\s+"
+    r"(?:says|said|states|stated|reports|reported|claims|claimed|mentions|mentioned|wrote|asks|asked)"
+    r"|(?:he|she|they)\s+(?:said|stated|reported|claimed|mentioned|wrote|might|would)"
+    r"|(?:failed|unable|refused)\s+to"
+    r")\b"
+)
+#: Embedded quoted spans (`"..."` or `'...'`, excluding apostrophe contractions).
+_QUOTED_SPAN = re.compile(r'"[^"\n]+"|(?<!\w)\'[^\'\n]+\'(?!\w)')
 #: Read cues for extraction that the frozen EFFECT_VOCABULARY cannot ground.
 _UNGROUNDABLE_READ = frozenset({"inspect", "examine", "investigate"})
 #: Words of preceding context quoted into an action span.
@@ -106,12 +118,28 @@ def _clause_start(lowered: str, start: int) -> int:
     return breaks[-1] if breaks else 0
 
 
-def _qualified(lowered: str, start: int) -> bool:
-    """Is the keyword at *start* conditional or asked about, not requested?"""
+def _quoted_mention(task: str, start: int, end: int) -> bool:
+    """True when the keyword at *[start:end]* sits inside an embedded quote."""
+    stripped = task.strip()
+    lead = len(task) - len(task.lstrip())
+    trail = lead + len(stripped)
+    for m in _QUOTED_SPAN.finditer(task):
+        if m.start() <= start and end <= m.end():
+            if m.start() > lead or m.end() < trail:
+                return True
+    return False
+
+
+def _qualified(lowered: str, start: int, end: int | None = None) -> bool:
+    """Is the keyword at *start* conditional, reported, quoted or asked about?"""
+    if end is not None and _quoted_mention(lowered, start, end):
+        return True
     clause = lowered[_clause_start(lowered, start):start]
     if any(w in _CONDITIONAL for w in _WORD.findall(clause)[-_CONDITIONAL_REACH:]):
         return True
-    return _INTERROGATIVE.search(clause) is not None
+    if _INTERROGATIVE.search(clause) is not None:
+        return True
+    return _REPORTED.search(clause) is not None
 
 
 def _context_span(task: str, lowered: str, start: int, end: int) -> str:
@@ -152,7 +180,7 @@ def extract_intent(task: str, lexicon: Mapping[str, str] | set[str],
             for m in re.finditer(rf"\b{re.escape(kw)}\b", lowered):
                 if _negated(lowered, m.start()):
                     continue
-                if family != "read" and _qualified(lowered, m.start()):
+                if family != "read" and _qualified(lowered, m.start(), m.end()):
                     qualified_mutation = True
                     continue
                 hit = (m.start(), m.end())

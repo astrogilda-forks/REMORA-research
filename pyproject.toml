@@ -416,6 +416,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_execute_accepted_toolspec.py",
     "tests/test_execution_context_binding.py",
     "tests/test_execution_lease.py",
+    "tests/test_execution_lifecycle_machine.py",
     "tests/test_fail_closed_hardening.py",
     "tests/test_federation_report_selection.py",
     "tests/test_forwarding_authority_dispatcher.py",

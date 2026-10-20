@@ -1659,8 +1659,8 @@ Four caveats bound what it measures. The deterministic intent extractor is the
 cost carrier: legitimate read autonomy fell to 26.6\% (25/94), far below
 the 75\% co-primary bar, so the pre-registered joint hypothesis was not
 supported. The denominator counts reads under the frozen bundle's own
-classification; over all 487 gold calls arm F accepted 25 (5.1\%). The extractor also ignores negation: ``do not cancel''
-supports a cancel call (NEGATIVE\_RESULTS.md \S81). Its heuristic grammar
+classification; over all 487 gold calls arm F accepted 25 (5.1\%). The extractor also ignores negation and conditionals: ``do not cancel'' and ``before cancel''
+support a cancel call (NEGATIVE\_RESULTS.md \S81). Its heuristic grammar
 was designed with spent C-ext2 material visible (SAP v5 \S12, deviation 2). The property
 the accept arm establishes is \emph{semantically authorized read}, that the
 call is licensed by a declared contract and a re-derived intent, not that it
@@ -1687,7 +1687,8 @@ irrelevance \textsc{abstain} and unobtainable \textsc{abstain}. Only
 gold-call acceptance, obtainable \textsc{verify} and the paired gain over
 the frozen bundle separate the arms. Bundle v2 without receipts accepted
 84/291, so the receipts add 3 of the 87. The revised extractor handles
-negation.
+negation, though conditional and informational sentences still support a
+mutation (NEGATIVE\_RESULTS.md \S81).
 
 The gain is narrower than that headline. A descriptive split computed after
 the run puts 76 of the revised bundle's 87 accepts on the 255 gold calls

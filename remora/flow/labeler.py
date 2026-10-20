@@ -56,7 +56,16 @@ from remora.flow.label import (
 from remora.flow.render import handle_ref
 from remora.flow.spec import FieldRule, FlowSpec
 
-__all__ = ["FlowLabeler", "FlowLabelingError", "LabeledResult", "LabelingContext"]
+__all__ = [
+    "CommittedFlowResult",
+    "FlowCommitFailed",
+    "FlowLabeler",
+    "FlowLabelingError",
+    "LabeledResult",
+    "LabelingContext",
+    "commit_labeled_result",
+    "verify_flow_at_dispatch",
+]
 
 #: Type tag of a handle whose field declares no type.
 UNDECLARED_TYPE = "value"
@@ -263,3 +272,145 @@ class FlowLabeler:
         rendered = render(raw_result, ())
         return LabeledResult(rendered=rendered, raise_label=join_all(raised),
                              handles=tuple(minted))
+
+
+class FlowCommitFailed(RuntimeError):
+    """Persisting handles or raising the context label failed (SDD v2 AR-017).
+
+    Never carries raw tool output or rendered values in its message or
+    attributes so an exception, log or stream cannot leak uncommitted data.
+    """
+
+    def __init__(self, reason_code: str = "flow_result_commit_failed") -> None:
+        super().__init__(reason_code)
+        self.reason_code = reason_code
+
+
+@dataclass(frozen=True)
+class CommittedFlowResult:
+    """Agent-facing rendered result separated from raw attestation digest (SDD v2 AR-017)."""
+
+    rendered_result: Any
+    raw_result_sha256: str
+    new_epoch: int
+    new_label: Label
+    minted_handle_ids: tuple[str, ...]
+
+
+def commit_labeled_result(
+    labeler: FlowLabeler,
+    flow: FlowSpec,
+    *,
+    contexts: Any,
+    handles: Any,
+    tenant_id: str,
+    principal: str,
+    context_id: str,
+    proposal_id: str,
+    arguments: Mapping[str, Any],
+    raw_result: Any,
+    source_metadata: Mapping[str, Mapping[str, Iterable[str]]] | None = None,
+) -> CommittedFlowResult:
+    """Compute labels, persist handles and context raise BEFORE returning
+    ``rendered_result`` to the agent (SDD v2 WP-04 / AR-017, IFC-04b).
+
+    If persistence fails, raises :class:`FlowCommitFailed` with no raw or
+    rendered payload attached.
+    """
+    import hashlib
+    from remora.flow.observe import _lineage
+
+    failed = False
+    updated: Any = None
+    try:
+        state = contexts.load(tenant_id, principal, context_id)
+        lineage = _lineage(lambda cid: contexts.load(tenant_id, principal, cid), state)
+        if handles is not None:
+            res = handles.resolve(tenant_id, lineage, arguments, context_label=state.label)
+            resolved_args, arg_labels = res.args, res.value_labels
+        else:
+            resolved_args, arg_labels = dict(arguments), {}
+        ctx = LabelingContext(
+            tenant_id=tenant_id,
+            context_id=context_id,
+            user_principal=state.user_principal,
+            model_principal=state.model_principal,
+            processors=state.processors,
+            proposal_id=proposal_id,
+        )
+        labeled = labeler.label_result(
+            flow,
+            ctx,
+            resolved_args=resolved_args,
+            arg_labels=arg_labels,
+            raw_result=raw_result,
+            source_metadata=source_metadata,
+        )
+        raw_bytes = json.dumps(raw_result, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        raw_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        if handles is not None and labeled.handles:
+            handles.put_all(labeled.handles)
+        updated = contexts.raise_label(tenant_id, principal, context_id, labeled.raise_label)
+    except Exception:
+        failed = True
+    # Raise outside the handler: neither cause nor implicit exception context
+    # may retain a store exception containing raw tool data.
+    if failed or updated is None:
+        raise FlowCommitFailed("flow_result_commit_failed") from None
+    return CommittedFlowResult(
+        rendered_result=labeled.rendered,
+        raw_result_sha256=raw_sha256,
+        new_epoch=updated.epoch,
+        new_label=updated.label,
+        minted_handle_ids=tuple(h.handle_id for h in labeled.handles),
+    )
+
+
+def verify_flow_at_dispatch(
+    *,
+    contexts: Any,
+    handles: Any | None,
+    tenant_id: str,
+    principal: str,
+    context_id: str,
+    flow: FlowSpec,
+    arguments: Mapping[str, Any],
+    expected_epoch: int,
+    expected_digest: str,
+    resource_acl: Callable[[str], Iterable[str]] | None = None,
+) -> tuple[bool, str, dict[str, Any]]:
+    """Re-verify ``flow_epoch``, ``flow_digest`` and resolved arguments right
+    before dispatch (SDD v2 WP-04 / AR-018, IFC-06).
+    """
+    from remora.flow.check import flow_check
+    from remora.flow.observe import _lineage
+
+    try:
+        state = contexts.load(tenant_id, principal, context_id)
+        lineage = _lineage(lambda cid: contexts.load(tenant_id, principal, cid), state)
+    except Exception:
+        return False, "flow_state_unavailable", {}
+    if state.epoch != expected_epoch:
+        return False, "flow_epoch_changed", {}
+    if handles is not None:
+        try:
+            res = handles.resolve(tenant_id, lineage, arguments, context_label=state.label)
+            resolved_args, value_labels = res.args, res.value_labels
+        except Exception:
+            return False, "flow_handle_invalid", {}
+    else:
+        resolved_args, value_labels = dict(arguments), {}
+    verdict = flow_check(
+        flow,
+        context_label=state.label,
+        value_labels=value_labels,
+        resolved_args=resolved_args,
+        epoch=state.epoch,
+        resource_acl=resource_acl,
+    )
+    if verdict.digest != expected_digest:
+        return False, "flow_digest_changed", {}
+    if not verdict.clean:
+        return False, "flow_violation_at_dispatch", {}
+    return True, "ok", resolved_args
+
