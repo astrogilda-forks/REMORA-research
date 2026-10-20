@@ -1,0 +1,13 @@
+{
+ "schema": "remora-ws1-study-manifest/v1",
+ "study": "WS1 composition study v2 (Study C)",
+ "plan": "docs/assurance/ws1_composition_study_v2.md",
+ "status": "draft_unauthorised",
+ "seed": 20261020,
+ "arms": ["A_no_gate", "B_refuse_all", "H0", "H_DET", "H_COST", "H_EDV"],
+ "grader": {"path": "experiments/ws1_composition/safe_utility.py",
+            "fixed_at_commit": "4f3f9a29"},
+ "owner_decisions": {},
+ "owner_decisions_pending": ["paid_budget_usd", "models", "osf_registration"],
+ "note": "No paid run before the owner records a budget and the models. Study B's 50 USD cap and ledger are Study B's and are not reused."
+}
