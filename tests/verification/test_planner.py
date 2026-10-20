@@ -23,7 +23,7 @@ from remora.verification.planner import (
     diagnose_refusal_causes,
     plan_verification,
     run_verification,
-    verify_recovery_bundle,
+    check_recovery_bundle_consistency,
 )
 from remora.verification.preconditions import LogicalState, derive_preconditions
 from remora.verification.resolvers import (
@@ -539,10 +539,9 @@ def test_h_ar_bounded_lookahead_and_multi_cause_diagnostics():
     )
 
 
-def test_independent_recovery_bundle_verifier_and_tamper_suite():
-    """SDD v2 WP-07 (AR-029..032): independent recovery bundle verification
-    passes on a complete bundle and fails when any single binding, role,
-    source_version, observation, digest byte or observer field is tampered."""
+def test_self_reported_recovery_bundle_consistency_and_tamper_suite():
+    """Self-reported consistency only: these unsigned fixture bytes establish no
+    authority, signature authenticity or independent effect verification."""
     import copy
     import hashlib
 
@@ -606,17 +605,17 @@ def test_independent_recovery_bundle_verifier_and_tamper_suite():
         },
     }
 
-    ok, problems = verify_recovery_bundle(valid_bundle)
+    ok, problems = check_recovery_bundle_consistency(valid_bundle)
     assert ok and problems == ()
 
-    # Single-change tamper suite (AR-032)
+    # Single-change internal-consistency checks; not independent verification.
     def tamper(mutator):
         b = copy.deepcopy(valid_bundle)
         mutator(b)
-        return verify_recovery_bundle(b)
+        return check_recovery_bundle_consistency(b)
 
     tampers = [
-        ("grant_signature_digest_mismatch", lambda b: b.__setitem__("signed_grant_bytes", grant_bytes + b"x")),
+        ("grant_bytes_digest_mismatch", lambda b: b.__setitem__("signed_grant_bytes", grant_bytes + b"x")),
         ("context_hash_mismatch", lambda b: b["requirements"].__setitem__("context_hash", "0" * 64)),
         ("requirements_hash_mismatch", lambda b: b["requirements"].__setitem__("requirements_hash", "0" * 64)),
         ("requirements_not_authorizable", lambda b: b["requirements"].__setitem__("authorizable", False)),
@@ -637,6 +636,49 @@ def test_independent_recovery_bundle_verifier_and_tamper_suite():
         is_ok, probs = tamper(fn)
         assert not is_ok, f"tamper {expected_problem} was not caught"
         assert expected_problem in probs, (expected_problem, probs)
+
+
+@pytest.mark.parametrize("mode", [PlannerMode.H_DET, PlannerMode.H_COST])
+@pytest.mark.parametrize("call_cap,cost_cap", [(1, 10), (3, 5)])
+def test_post_transport_refusal_consumes_call_and_cost_budget(mode, call_cap, cost_cap):
+    ctx, args = context()
+    reqs = derive_preconditions(ctx, args, REGISTRY)
+    adapters = {}
+    for rid, spec in REGISTRY.resolvers.items():
+        adapters[rid] = BoundedResolverAdapter(
+            ResolverAdapterContract(rid, spec.source_id, frozenset({"https://source.invalid"}),
+                                    spec.capability_id),
+            lambda _req, tenant, _timeout: TransportResponse(
+                "https://source.invalid", tenant, "wrong-version", b"{}"),
+            mono_clock_ms=lambda: NOW_MS, wall_clock_s=lambda: NOW_S,
+        )
+    estimates = {(p.precondition_id, rid): LookupEstimate(5, 1_000_000)
+                 for p in reqs.preconditions for rid in p.resolver_ids}
+    run = run_verification(
+        ctx, reqs, registry=REGISTRY, verifiers=VERIFIERS, resolvers=adapters,
+        held_capabilities=ALL_CAPS, mode=mode,
+        budget=VerificationBudget(max_rounds=3, max_resolver_calls=call_cap, requests_per_round=1),
+        clock_ms=lambda: NOW_MS, estimates=estimates, cost_budget_units=cost_cap,
+    )
+    assert sum(len(a.calls) for a in adapters.values()) == 1
+    assert run.budget.spent_calls == 1
+
+
+@pytest.mark.parametrize("mode", list(PlannerMode))
+def test_cost_budget_applies_to_every_planner_and_whole_round(mode):
+    ctx, args = context()
+    reqs = derive_preconditions(ctx, args, REGISTRY)
+    estimates = {(p.precondition_id, rid): LookupEstimate(2, 1_000_000)
+                 for p in reqs.preconditions for rid in p.resolver_ids}
+    srcs = sources()
+    run = run_verification(
+        ctx, reqs, registry=REGISTRY, verifiers=VERIFIERS, resolvers=srcs,
+        held_capabilities=ALL_CAPS, mode=mode,
+        budget=VerificationBudget(max_rounds=3, max_resolver_calls=3, requests_per_round=2),
+        clock_ms=lambda: NOW_MS, estimates=estimates, cost_budget_units=3,
+    )
+    assert 2 * sum(len(s.calls) for s in srcs.values()) <= 3
+    assert 2 * run.budget.spent_calls <= 3
 
 
 

@@ -1,7 +1,7 @@
 name: Probity invocation axes (reproduction)
 
 # REMORA re-runs Probity's separately maintained invocation_axes reader, pinned
-# to a commit, and pairs it with REMORA's own effect-evidence-v1 reference
+# by version and hash in ci/agent-evidence-vectors/requirements.txt, and pairs it with REMORA's own effect-evidence-v1 reference
 # verifier at the frozen revision. The corpus pins one MCP tools/call and judges
 # a decision capture package and an execution bundle on three separate claims:
 # package integrity, request and decision correspondence, and observed effect.
@@ -19,19 +19,23 @@ name: Probity invocation axes (reproduction)
 # artifacts/interop, advances no lifecycle, creates no REMORA authority and
 # never feeds a policy decision.
 #
-# Deterministic: no secrets; network only for the pinned checkout. The reader
-# uses the Python standard library only, so nothing is installed.
+# Deterministic: no secrets; network only for the pinned checkout and the
+# hash-pinned install. The reader uses the Python standard library only, so the
+# one package installed is the reader itself. Dependabot opens a pull request
+# for each release, and the paths filter runs this job on it.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/probity-invocation-axes-reproduction.yml"
+      - "ci/agent-evidence-vectors/**"
       - "artifacts/interop/effect-evidence-v2/**"
   push:
     branches: [master]
     paths:
       - ".github/workflows/probity-invocation-axes-reproduction.yml"
+      - "ci/agent-evidence-vectors/**"
       - "artifacts/interop/effect-evidence-v1/**"
       - "artifacts/interop/effect-evidence-v2/**"
   workflow_dispatch:
@@ -44,16 +48,15 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  READER_REPOSITORY: probityai/agent-evidence-vectors
-  READER_COMMIT: d2bdacc7e7a4b6af15c513f622a32367cba962b1
+  READER_REQUIREMENTS: ci/agent-evidence-vectors/requirements.txt
   # REMORA revision effect-evidence-v1 was frozen at (#728).
   FROZEN_REVISION: fe324dd734734d9227aa894330ac52c2bb916b94
   # Bundles REMORA's verifier alone reads as EFFECT_VERIFIED while the reader's
   # observed_effect is not ESTABLISHED, with the reader's reason for each.
-  # The corpus shape at READER_COMMIT. The pairing skips a case without a
+  # The corpus shape at the pinned release. The pairing skips a case without a
   # bundle, so the split alone would stay green if bundles went missing.
-  EXPECTED_CASES: "23"
-  EXPECTED_BUNDLES: "22"
+  EXPECTED_CASES: "25"
+  EXPECTED_BUNDLES: "24"
   EXPECTED_WITHOUT_BUNDLE: "no_execution_bundle"
   EXPECTED_SPLIT: >-
     bundle_for_other_call=bundle_bound_to_other_call
@@ -86,18 +89,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Checkout pinned Probity reader
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          repository: ${{ env.READER_REPOSITORY }}
-          ref: ${{ env.READER_COMMIT }}
-          path: probity-readers
-          persist-credentials: false
+          python-version: ${{ matrix.python }}
+
+      - name: Install the pinned Probity reader (version and hash)
+        run: |
+          set -euo pipefail
+          python -m pip install --no-deps --require-hashes -r "$READER_REQUIREMENTS"
+          corpus="$(python -c 'import pathlib, agent_evidence_vectors.invocation_axes as m; print(pathlib.Path(m.__file__).parent / "corpus")')"
+          echo "READER_CORPUS=$corpus" >> "$GITHUB_ENV"
+          echo "READER_VERSION=$(python -c 'from importlib.metadata import version; print(version("agent-evidence-vectors"))')" >> "$GITHUB_ENV"
 
       - name: Assert every pin
         run: |
           set -euo pipefail
-          test "$(git -C probity-readers rev-parse HEAD)" = "$READER_COMMIT"
+          grep -q "^agent-evidence-vectors==$READER_VERSION " "$READER_REQUIREMENTS"
           git cat-file -e "$FROZEN_REVISION^{commit}"
           git merge-base --is-ancestor "$FROZEN_REVISION" HEAD
           mkdir -p ci-artifacts/probity-invocation-axes-reproduction
@@ -105,28 +113,20 @@ jobs:
           class=REPRODUCTION (adds no state, no authority, no lifecycle change)
           remora_head=$(git rev-parse HEAD)
           remora_frozen_revision=$FROZEN_REVISION
-          reader_repository=$READER_REPOSITORY
-          reader_commit=$READER_COMMIT
+          reader_requirement=agent-evidence-vectors==$READER_VERSION
           python=${{ matrix.python }}
           run=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EOF
           cat ci-artifacts/probity-invocation-axes-reproduction/PINS.txt
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: ${{ matrix.python }}
-
       - name: Run Probity's invocation_axes reader
         # The reader checks every corpus member against its manifest, judges
         # all cases without reading their expected answers, and exits 1 if
         # any case differs.
-        working-directory: probity-readers/packaging
         run: |
           set -euo pipefail
           python -m agent_evidence_vectors.invocation_axes.run \
             --output "$GITHUB_WORKSPACE/ci-artifacts/probity-invocation-axes-reproduction/reader" \
-            --implementation-revision "$READER_COMMIT" \
             2>&1 | tee "$GITHUB_WORKSPACE/ci-artifacts/probity-invocation-axes-reproduction/reader.log"
 
       - name: Pair each execution bundle with REMORA's effect-evidence-v1 verifier
@@ -145,7 +145,7 @@ jobs:
           fixtures = json.loads(subprocess.run(["git", "show", f"{frozen}:{package}/fixtures.json"], capture_output=True, check=True).stdout)
           control = [c["id"] for c in fixtures["cases"]
                      if remora.evaluate(c) != {k: c["expected"][k] for k in ("effect_status", "highest_established_state")}]
-          corpus = Path("probity-readers/packaging/agent_evidence_vectors/invocation_axes/corpus/cases.json")
+          corpus = Path(os.environ["READER_CORPUS"]) / "cases.json"
           case_list = json.loads(corpus.read_text(encoding="utf-8"))["cases"]
           cases = {c["id"]: c for c in case_list}
           report = json.loads((out / "reader/report.json").read_text(encoding="utf-8"))
@@ -216,7 +216,7 @@ jobs:
           fixtures = json.loads((package / "fixtures.json").read_text(encoding="utf-8"))
           control = [c["id"] for c in fixtures["cases"]
                      if v2.evaluate(c) != {k: c["expected"][k] for k in v2.OUTCOME_KEYS}]
-          corpus = Path("probity-readers/packaging/agent_evidence_vectors/invocation_axes/corpus/cases.json")
+          corpus = Path(os.environ["READER_CORPUS"]) / "cases.json"
           cases = {c["id"]: c for c in json.loads(corpus.read_text(encoding="utf-8"))["cases"]}
           report = json.loads((out / "reader/report.json").read_text(encoding="utf-8"))
           executor = {"proposed_by": "agent", "executed_by": "tool", "control_domain": "executor-domain"}

@@ -65,7 +65,7 @@ __all__ = [
     "open_candidates",
     "plan_verification",
     "run_verification",
-    "verify_recovery_bundle",
+    "check_recovery_bundle_consistency",
 ]
 
 
@@ -527,6 +527,13 @@ def plan_verification(requirements: RequirementSet, checked: CheckedPrecondition
         if len(take) >= min(budget.requests_per_round, budget.calls_left):
             break
         if pid not in {p for p, _ in take}:
+            if remaining_cost_units is not None:
+                if estimates is None or (pid, rid) not in estimates:
+                    raise ValueError("missing deployment estimate")
+                cost = estimates[(pid, rid)].cost_units
+                if cost > remaining_cost_units:
+                    continue
+                remaining_cost_units -= cost
             take.append((pid, rid))
     return take, rejected
 
@@ -572,6 +579,11 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     ``budget.max_monitor_calls`` times. It is how the monitor reaches the
     loop; it cannot reach anything else.
     """
+    if cost_budget_units is not None:
+        if type(cost_budget_units) is not int or cost_budget_units < 0:
+            raise ValueError("invalid cost budget")
+        if estimates is None:
+            raise ValueError("cost budget requires deployment estimates")
     start = clock_ms()
     deadline = start + budget.wall_deadline_ms
     rem_cost = cost_budget_units
@@ -655,6 +667,10 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                 item = run_request(request, context, registry=registry, resolvers=resolvers,
                                    held_capabilities=held_capabilities, now_s=clock_ms() // 1000)
             except ResolverRefused as refusal:
+                if refusal.attempted:
+                    spent += 1
+                    if rem_cost is not None:
+                        rem_cost -= step_cost
                 refused.append((request.request_id, str(refusal)))
                 continue
             except Exception as exc:  # a failed lookup is spent and recorded
@@ -740,13 +756,15 @@ def diagnose_refusal_causes(
     return tuple(causes)
 
 
-def verify_recovery_bundle(bundle: Mapping[str, Any]) -> tuple[bool, tuple[str, ...]]:
-    """Independent checker for a recovery bundle (SDD v2 WP-07 / AR-029..032).
+def check_recovery_bundle_consistency(bundle: Mapping[str, Any]) -> tuple[bool, tuple[str, ...]]:
+    """Check internal consistency of an UNTRUSTED, self-reported bundle.
 
-    Verifies signatures/digests, context and requirement bindings, every
-    required precondition's evidence freshness/tenant/source_version/role, and
-    the independent observer's delta and side-effect report without trusting
-    any stored ``final_action`` field.
+    A True result means only that supplied fields agree. Hashes, key IDs,
+    evidence conclusions, roles and observer reports all come from the same
+    caller. No signature is verified, no trusted binding is established and
+    no predicate or effect observation is independently reproduced. Never use
+    this result to authorize, issue a grant or claim WP-07 / AR-029..032.
+    The independent recovery verifier remains unimplemented.
     """
     problems: list[str] = []
     required_top = (
@@ -778,7 +796,7 @@ def verify_recovery_bundle(bundle: Mapping[str, Any]) -> tuple[bool, tuple[str, 
     else:
         actual_sha = hashlib.sha256(grant_bytes).hexdigest()
         if actual_sha != bundle["expected_grant_sha256"]:
-            problems.append("grant_signature_digest_mismatch")
+            problems.append("grant_bytes_digest_mismatch")
 
     reqs = bundle["requirements"]
     if not isinstance(reqs, Mapping):

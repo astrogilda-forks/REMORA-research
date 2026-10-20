@@ -346,6 +346,7 @@ def run_sdd_v2_planner_ablation(monitor: str = "honest") -> dict[str, dict[str, 
         total_calls = 0
         unauth_calls = 0
         total_cost = 0
+        max_episode_cost = 0
         for s in scenarios():
             ctx = _context(s)
             reqs = derive_preconditions(ctx, s.args, SDD_V2_REGISTRY)
@@ -400,6 +401,7 @@ def run_sdd_v2_planner_ablation(monitor: str = "honest") -> dict[str, dict[str, 
             )
             total_calls += calls
             total_cost += spent_units
+            max_episode_cost = max(max_episode_cost, spent_units)
             if s.authorized and dispatched:
                 auth_dispatched += 1
             if not s.authorized:
@@ -412,6 +414,7 @@ def run_sdd_v2_planner_ablation(monitor: str = "honest") -> dict[str, dict[str, 
             "total_resolver_calls": total_calls,
             "unauthorized_resolver_calls": unauth_calls,
             "total_cost_units": total_cost,
+            "max_episode_cost_units": max_episode_cost,
         }
     return summary
 

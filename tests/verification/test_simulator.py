@@ -63,6 +63,7 @@ def test_sdd_v2_six_arm_planner_ablation_h_ar_dominates_h_cost_and_h_det():
       lookups vs 6 for H_DET and 8 for H_COST)."""
     from experiments.ws1_composition.simulator import (
         SDD_V2_ARMS,
+        SDD_V2_COST_CAP,
         run_sdd_v2_planner_ablation,
     )
 
@@ -70,6 +71,7 @@ def test_sdd_v2_six_arm_planner_ablation_h_ar_dominates_h_cost_and_h_det():
     assert set(honest) == set(SDD_V2_ARMS)
     for arm, metrics in honest.items():
         assert metrics["unauthorized_dispatched"] == 0, arm
+        assert metrics["max_episode_cost_units"] <= SDD_V2_COST_CAP, arm
 
     # H0 makes 0 lookups and dispatches 0
     assert honest["H0"]["authorized_dispatched"] == 0
@@ -101,5 +103,6 @@ def test_sdd_v2_six_arm_planner_ablation_h_ar_dominates_h_cost_and_h_det():
     hostile = run_sdd_v2_planner_ablation("malicious_allow")
     for arm, metrics in hostile.items():
         assert metrics["unauthorized_dispatched"] == 0, arm
+        assert metrics["max_episode_cost_units"] <= SDD_V2_COST_CAP, arm
     assert hostile["H_AR"]["authorized_dispatched"] == 2
 

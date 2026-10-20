@@ -6,6 +6,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ### SDD v2 planner bounds, stateful lifecycle machine and v3 extractor guards
 
+- Review corrections charge rejected resolver attempts to call and cost
+  budgets, apply the same cost cap to every ablation arm, and redact commit
+  faults without retaining the original exception chain. Preflight
+  authorization refusals remain unspent.
+
 - `remora/verification/planner.py` validates `VerificationBudget` consumption
   counters (`spent_calls`, `spent_monitor_calls`, `rounds`) within `[0, limit]`,
   checks the wall deadline before each lookup inside a round with a closed
@@ -16,14 +21,17 @@ This file lists externally relevant changes by release. Fine-grained development
   `refute_ppm` and monitor hints, and multi-round `cost_budget_units` tracking
   in `run_verification`; AR-026..028), durable SQLite task reservation reference
   (`TaskCallLedger`, AR-013..016), multi-cause refusal diagnostic
-  (`diagnose_refusal_causes`, AR-023) and independent recovery-bundle verifier
-  (`verify_recovery_bundle`, AR-029..032). `experiments/ws1_composition/simulator.py`
+  (`diagnose_refusal_causes`, AR-023) and untrusted recovery-bundle consistency checker
+  (`check_recovery_bundle_consistency`). Independent recovery verification
+  (WP-07 / AR-029..032) remains unimplemented. `experiments/ws1_composition/simulator.py`
   adds `run_sdd_v2_planner_ablation` comparing `H0`, `H_DET`, `H_RANDOM`,
   `H_COST`, `H_EDV` and `H_AR`.
 - `remora/verification/resolvers.py` adds `ResolverAdapterContract`,
   `TransportResponse` and `BoundedResolverAdapter` (separate monotonic and wall
   clocks, destination allowlist, redirect/raw-URL refusal, byte limit, tenant
-  filter and source-version pin; AR-010..012).
+  filter and source-version pin; AR-010..012). A trusted transport must
+  enforce egress, bounded reads and timeouts during I/O; the adapter checks
+  returned responses and does not sandbox an arbitrary transport.
 - `remora/flow/labeler.py` adds `commit_labeled_result` (commit-before-return
   persistence of handles and context label raise with redacted `FlowCommitFailed`
   on fault; AR-017 / IFC-04b) and `verify_flow_at_dispatch` (`flow_epoch`,

@@ -34,7 +34,15 @@ __all__ = [
 
 
 class ResolverRefused(RuntimeError):
-    """The lookup was not run. Carries the reason code."""
+    """A refused lookup, with whether the deployed resolver was entered.
+
+    Preflight authorization refusals are unspent; every resolver attempt,
+    including rejected responses, consumes the call and estimated cost budget.
+    """
+
+    def __init__(self, reason: str, *, attempted: bool = False) -> None:
+        super().__init__(reason)
+        self.attempted = attempted
 
 
 class Resolver(Protocol):
@@ -57,7 +65,10 @@ def run_request(request: VerificationRequest, context: ProposalContext, *,
     resolver = resolvers.get(request.resolver_id)
     if resolver is None or resolver.resolver_id != request.resolver_id:
         raise ResolverRefused("resolver_not_deployed")
-    return resolver.fetch(request, context.tenant_id, now_s)
+    try:
+        return resolver.fetch(request, context.tenant_id, now_s)
+    except ResolverRefused as refusal:
+        raise ResolverRefused(str(refusal), attempted=True) from refusal
 
 
 @dataclass
@@ -134,8 +145,14 @@ class TransportResponse:
 
 @dataclass
 class BoundedResolverAdapter:
-    """Enforces separate monotonic/wall clocks, destination allowlist, redirect
-    refusal, byte limits, tenant filter and source-version pin (SDD v2 AR-010..012)."""
+    """Validate returned responses using separate monotonic/wall clocks.
+
+    The deployment's trusted transport must enforce allowlisted destinations,
+    no redirects, bounded reads and connect/read/total timeouts BEFORE and
+    DURING I/O. This adapter only supplies the total timeout and validates the
+    returned metadata and bytes; it cannot undo an outbound request or bound
+    an arbitrary blocking callable. It is not a network sandbox.
+    """
 
     contract: ResolverAdapterContract
     transport: Callable[[VerificationRequest, str, int], TransportResponse]

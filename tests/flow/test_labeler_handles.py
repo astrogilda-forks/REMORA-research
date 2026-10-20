@@ -717,6 +717,28 @@ def test_the_default_ttl_is_one_hour():
     assert [h.expires_at for h in result.handles] == [3600.0]
 
 
+@pytest.mark.parametrize("fault", [
+    RuntimeError("secret_store_fault"),
+    UnicodeDecodeError("utf8", b"secret_store_fault", 0, 1, "secret fault"),
+])
+def test_commit_fault_has_no_original_exception_chain(fault):
+    from remora.flow.labeler import FlowCommitFailed, commit_labeled_result
+
+    class BrokenStore:
+        def load(self, *_args):
+            raise fault
+
+    with pytest.raises(FlowCommitFailed) as caught:
+        commit_labeled_result(
+            FlowLabeler(), INBOX, contexts=BrokenStore(), handles=None,
+            tenant_id="acme", principal="agent-1", context_id="ctx_a",
+            proposal_id="proposal", arguments={}, raw_result="secret output",
+        )
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert caught.value.args == ("flow_result_commit_failed",)
+
+
 def test_a_container_handle_carries_its_own_label_too():
     """Structure is data: a narrow container over public children stays narrow."""
     narrow = {"readers": {"static": [USER]}, "return_mode": "BY_HANDLE"}
