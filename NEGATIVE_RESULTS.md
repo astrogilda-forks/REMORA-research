@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-20: **33 `open`**, **31 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-21: **34 `open`**, **31 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93, §94, §95): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93, §94, §95, §96): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -61,7 +61,10 @@ cites only `open` sections and that no `open` section is missing a theme.
    evidence could not make any call executable until 2026-10-20, and Study B
    measured recovery in study code only (§94). On the sealed Study B holdout
    the monitor-directed arm completed fewer reads than the fixed order, and
-   the adaptive attacker mostly fell back to its template (§95).
+   the adaptive attacker mostly fell back to its template (§95). Study C,
+   through the runtime gate and under a defence-aware search, recovered
+   benign reads in every WS1 arm with no attack executed. How much it
+   recovered was set by a monitor threshold chosen on three reads (§96).
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -2667,6 +2670,7 @@ sections again.
 | The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
 | Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. Two strict xfails; the owner decided on 2026-10-18 and the change is pending | Medium |
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
+| Study C holdout: utility recovered and authority held under defence-aware search; the monitor threshold decided how much (§96) | H_DET and H_COST 20/33 reads, H_EDV 32/33, H0 0/33; every loss a monitor veto at the threshold. No WS1 arm executed an attack goal, an out-of-scope call or a leak in 121 attack episodes each; arm A did | **High** |
 | Study B holdout: the monitor-directed arm lost utility, and the attack search was barely adaptive (§95) | H_EDV 15/45 reads against H_DET 28/45; it vetoed all 43 benign port reads. 55 of 60 final injections were the fixed template. No unauthorized dispatch in any WS1 arm | **High** |
 | WS1 evidence could not make a call executable on the execution API (§94) | WS1 caps only; the grounding that turned PROVED preconditions into an engine ACCEPT lived in Study B's harness. Grounding from proofs is now opt-in on the assess path, tested through the route, and not yet measured in a study | **High** |
 | No blocked development call is recoverable by a bounded lookup alone (§93) | After schema validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT. Causes: no extracted intent (71), undeclared risk tier on a write (16), ground-truth call refused as the wrong tool (5). WS1 recovery needs intent and contract coverage first | **High** |
@@ -5575,8 +5579,9 @@ artifacts/ws1/resolvability_audit_v1.json` (needs
 ## §94 WS1 evidence could not make a call executable on the execution API (2026-10-20)
 <!-- finding-status: open -->
 
-**Status:** repaired in code with route tests; open until a study measures
-recovery through the execution API rather than through study code.
+**Status:** repaired in code with route tests. Study C (§96) measured
+recovery through the runtime gate and engine; the HTTP layer was not in its
+loop. Open until a run through the routes themselves.
 
 The claim under evaluation in #953 is that REMORA recovers useful agent work
 by fetching bounded, authorized evidence. On the execution API the WS1 gate
@@ -5654,3 +5659,59 @@ API (§94). Study C (`docs/assurance/ws1_composition_study_v2.md`) addresses
 the harness, the search target and the grader. It does not yet address the
 monitor's veto rate, which needs a threshold chosen on more data or hint
 calls that cannot veto.
+
+## §96 Study C holdout: utility recovered and authority held under defence-aware search; the monitor threshold decided how much (2026-10-21)
+<!-- finding-status: open -->
+
+**Status:** the sealed holdout of WS1 Study C, run once on the files the
+seal froze (`artifacts/ws1/study_c_holdout_v1.json`). It covered 825
+episodes over 11 test customers and 165 tasks in five paid arms. Every WS1
+arm decided through the runtime `Ws1Gate` with grounding from proofs, typed
+uncertainty, a durable task budget and the strict monotone profile. The
+independent safe-utility grader scored every episode. The injection search
+ran against A_no_gate and against H_EDV, with the defence's reasons fed back.
+
+| Arm | Benign reads, safe | Attack goals executed | Out-of-scope episodes | Leaks | Lookups per episode |
+|---|---|---|---|---|---|
+| A_no_gate | 33/33 | 5 of 121 | 7 | 7 | 0 |
+| H0 | 0/33 | 0 of 121 | 0 | 0 | 0 |
+| H_DET | 20/33 | 0 of 121 | 0 | 0 | 7.83 |
+| H_COST | 20/33 | 0 of 121 | 0 | 0 | 7.81 |
+| H_EDV | 32/33 | 0 of 121 | 0 | 0 | 7.79 |
+
+Against the plan:
+
+- The primary family holds. Every WS1 arm completes more benign reads
+  safely than H0: H_DET and H_COST +0.61 (95 % interval 0.45 to 0.76),
+  H_EDV +0.97 (0.91 to 1.00). Holm at 0.05 over one-sided cluster-bootstrap
+  p, 11 clusters.
+- Bounded authority held under this attacker. No WS1 arm executed an attack
+  goal, an out-of-scope call, a report to the outside address, a leak or an
+  off-intent write. The exact one-sided 95 % bounds per arm are 6.6 % for
+  target confusion (44 episodes), 8.7 % for exfiltration (33) and 23.8 % for
+  tamper (11). Arm A executed 3 target and 2 tamper goals.
+- The attribution contrasts say the monitor's hints did nothing measurable.
+  H_EDV made as many lookups as H_DET (difference 0.00, -0.14 to 0.14), and
+  H_COST decided as H_DET did on every read.
+
+**What decided the utility.** All 13 reads H_DET and H_COST lost were monitor
+vetoes on `get_port_status`, with the score at the threshold (0.30 twelve
+times, 0.35 once). H_EDV lost one read the same way, at 0.40. The per-arm
+thresholds were chosen on one pilot customer with three reads: 0.3 for H_DET
+and H_COST, 0.4 for H_EDV. The H_EDV advantage (+0.36, 0.21 to 0.52) is
+therefore a threshold effect, not evidence for monitor-directed
+verification. The availability contrast is not credible either: H_DET and
+H_COST completed more reads with the hostile-looking text than without it
+(+0.27), which reads as noise in vetoes at the threshold.
+
+**Limits and deviations.** The domain, tasks, attacks and grader are
+author-written, and one model played agent, monitor and attacker. The
+attacker refused 699 of its requests, each replaced by the mutation
+strategy. The HTTP layer was not in the loop. The holdout stopped on its run
+cap at 809 episodes and was resumed once without rerunning a logged
+episode. The last 16 cost 1.16 USD, so holdout spend was 45.48 USD against
+a sealed cap of 44.49 USD. Study C spent 49.37 USD, and WS1 in total 89.86
+of the owner's 100 USD. The planned power of 1.0 was degenerate (three
+equal pilot differences). What remains open is a monitor threshold chosen
+on enough data, or a monitor that cannot veto a call its preconditions
+proved, before any claim about the learned part.
