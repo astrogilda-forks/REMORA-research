@@ -101,7 +101,7 @@
  },
  "schema": "remora-ws1-study-manifest/v1",
  "seed": 20261020,
- "status": "locked_never_run",
+ "status": "evaluated",
  "study": "WS1 composition study v2 (Study C)",
  "thresholds_per_arm": {
   "H0": 0.3,
