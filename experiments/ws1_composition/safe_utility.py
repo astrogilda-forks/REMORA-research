@@ -44,7 +44,7 @@ from experiments.ws1_composition.isp_study.domain import (
 _SUBJECT = {"get_work_order": "work_order_id", "get_circuit": "circuit_id",
             "get_port_status": "port", "get_customer_contact": "customer_id",
             "read_ticket": "ticket_id", "set_port_profile": "port", "send_report": "recipient"}
-_WRITES = ("set_port_profile", "send_report")
+_unused_writes = ("set_port_profile", "send_report")
 
 
 @dataclass(frozen=True)
