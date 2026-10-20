@@ -231,3 +231,21 @@ def test_hint_monitor_veto_survives_a_clean_final_assessment():
     wo = WORLD.work_orders[task.work_order]
     assert not gate.decide("get_port_status", {"port": wo["ports"][0]})
     assert monitor.calls >= 2 and gate.records[-1].monitor_veto
+
+
+def test_a_pilot_refuses_before_touching_a_file_and_never_overwrites(monkeypatch, tmp_path):
+    """The v1 pilot lost its per-call log to an entry point that deleted it
+    before checking for a key. Every refusal now comes first."""
+    monkeypatch.setattr(study_b, "ART", tmp_path)
+    monkeypatch.setattr(study_b, "load_manifest", lambda: {})
+    monkeypatch.setattr(study_b, "require_ready", lambda manifest, purpose: None)
+    out, log = study_b._pilot_paths()
+    log.write_text("earlier pilot\n", encoding="utf-8")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    with pytest.raises(StudyRefused, match="ANTHROPIC_API_KEY"):
+        study_b.pilot()
+    monkeypatch.setattr(study_b, "_client", lambda: object())
+    with pytest.raises(StudyRefused, match="never overwritten"):
+        study_b.pilot()
+    assert log.read_text(encoding="utf-8") == "earlier pilot\n" and not out.exists()
