@@ -156,6 +156,13 @@ class FamilyLedger:
         return True
 
 
+#: TaskCallLedger.reserve_status outcomes.
+RESERVED, DUPLICATE, EXHAUSTED, CLOSED = "reserved", "duplicate", "exhausted", "closed"
+#: ``reserve(kind, key) -> status``: the hook run_verification calls before
+#: every external activity it starts.
+Reserve = Callable[[str, str], str]
+
+
 def _bounded_id(value: str) -> None:
     if not isinstance(value, str) or not value or len(value) > 256:
         raise ValueError("invalid bounded identifier")
@@ -220,6 +227,38 @@ class TaskCallLedger:
         request_hash: str,
         units: int = 1,
     ) -> bool:
+        """True only when this call made a new reservation."""
+        return self.reserve_status(task_id, binding, operation_id, request_hash,
+                                   units) == RESERVED
+
+    def ensure(self, task_id: str, binding: str, cap: int) -> None:
+        """Create the task's budget, or check that the existing one has this binding."""
+        _bounded_id(task_id)
+        _bounded_id(binding)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT binding FROM task_budget WHERE task_id=?",
+                               (task_id,)).fetchone()
+            if row is None:
+                if type(cap) is not int or not 0 <= cap <= 1_000_000:
+                    raise ValueError("invalid cap")
+                conn.execute("INSERT INTO task_budget(task_id,binding,cap) VALUES(?,?,?)",
+                             (task_id, binding, cap))
+            elif row[0] != binding:
+                raise ValueError("unknown task or binding mismatch")
+
+    def reserve_status(
+        self,
+        task_id: str,
+        binding: str,
+        operation_id: str,
+        request_hash: str,
+        units: int = 1,
+    ) -> str:
+        """``reserved``: new reservation, the call may run. ``duplicate``: this
+        operation was reserved before (a replay after a crash or a retry under
+        the same key); it must not run again. ``exhausted`` or ``closed``: no
+        budget; nothing may run."""
         for value in (task_id, binding, operation_id, request_hash):
             _bounded_id(value)
         if type(units) is not int or not 1 <= units <= 1_000_000:
@@ -238,19 +277,21 @@ class TaskCallLedger:
             if prior is not None:
                 if prior != (request_hash, units):
                     raise ValueError("idempotency key reused for a different request")
-                return False
+                return DUPLICATE
             changed = conn.execute(
                 "UPDATE task_budget SET spent=spent+? "
                 "WHERE task_id=? AND closed=0 AND spent+?<=cap",
                 (units, task_id, units),
             ).rowcount
             if changed != 1:
-                return False
+                closed = conn.execute("SELECT closed FROM task_budget WHERE task_id=?",
+                                      (task_id,)).fetchone()[0]
+                return CLOSED if closed else EXHAUSTED
             conn.execute(
                 "INSERT INTO reservation VALUES(?,?,?,?)",
                 (task_id, operation_id, request_hash, units),
             )
-            return True
+            return RESERVED
 
     def close(self, task_id: str, binding: str) -> None:
         with self._connect() as conn:
@@ -553,7 +594,8 @@ class VerificationRun:
     @property
     def budget_exhausted(self) -> bool:
         return self.stop_reason in ("round_budget_exhausted", "verification_budget_exhausted",
-                                    "cost_budget_exhausted", "deadline")
+                                    "cost_budget_exhausted", "deadline",
+                                    "task_budget_exhausted")
 
 
 def run_verification(context: ProposalContext, requirements: RequirementSet, *,
@@ -568,8 +610,16 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                      cost_budget_units: int | None = None,
                      evidence: Sequence[ResolverEvidence] = (),
                      issued: Mapping[str, VerificationRequest] | None = None,
-                     review: ReviewAttestation | None = None) -> VerificationRun:
+                     review: ReviewAttestation | None = None,
+                     reserve: Reserve | None = None) -> VerificationRun:
     """Check, then look up and re-check until a stop condition holds.
+
+    With *reserve*, every resolver lookup and every hint request is reserved
+    first (kind ``lookup`` or ``monitor``, keyed by its request). A lookup
+    that is not ``reserved`` does not run: ``duplicate`` (reserved before,
+    e.g. before a crash) leaves its precondition UNKNOWN rather than repeat
+    it, and ``exhausted`` or ``closed`` stops the loop as
+    ``task_budget_exhausted``. A hint request that is not reserved is skipped.
 
     The loop has stopped when this returns, so a composition over the result
     passes no ``verifiable`` IDs: whatever is still UNKNOWN is a stop, not a
@@ -632,7 +682,10 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
             return done("deadline")
         hints: Sequence[str] = ()
         if mode in (PlannerMode.H_EDV, PlannerMode.H_AR) and hints_for is not None \
-                and budget.spent_monitor_calls < budget.max_monitor_calls:
+                and budget.spent_monitor_calls < budget.max_monitor_calls \
+                and (reserve is None
+                     or reserve("monitor", f"hint:{revision}:{budget.spent_monitor_calls}")
+                     == RESERVED):
             # Each hint request is a monitor call and is charged to the budget;
             # past the cap the round runs without hints.
             budget = replace(budget, spent_monitor_calls=budget.spent_monitor_calls + 1)
@@ -670,6 +723,14 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                 precondition_id=pid, resolver_id=rid, subject_ref=pre.subject_ref,
                 deadline_ms=min(deadline, clock_ms() + budget.resolver_timeout_ms),
                 budget_ref=context.proposal_id)
+            if reserve is not None:
+                status = reserve("lookup", request.request_id)
+                if status == DUPLICATE:
+                    refused.append((request.request_id, "reserved_before_not_repeated"))
+                    continue
+                if status != RESERVED:
+                    budget = replace(budget, spent_calls=spent, dedup_keys=frozenset(keys))
+                    return done("task_budget_exhausted")
             issued_map[request.request_id] = request
             step_cost = (
                 estimates[(pid, rid)].cost_units

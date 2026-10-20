@@ -30,6 +30,7 @@ rather than assumed away.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -720,11 +721,14 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
     payload (pre-#82 or synchronous-path rows) are skipped — the
     reconciler, not the worker, owns their fate.
     """
+    from functools import partial
+
     from remora.execution.service import dispatch_pending_intent
 
     results: list[dict[str, Any]] = []
     for row in _outbox().pending(tenant):
-        result = dispatch_pending_intent(
+        result = _with_flow_principal(_proposer_of_item(tenant, row.item_id), partial(
+            dispatch_pending_intent,
             row,
             tenant=tenant,
             principal=f"worker:{worker_id}",
@@ -749,7 +753,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             approval_policy=_approval_policy_for(tenant),
             ws1_gate=_ws1_gate(),
             ws1_capability=_ws1_capability(tenant),
-        )
+        ))
         if result is not None:
             results.append(result)
     return results
@@ -1131,6 +1135,34 @@ _FLOW_HANDLES: Any = None
 _FLOW_PRINCIPAL: _contextvars.ContextVar[str | None] = (
     _contextvars.ContextVar("remora_flow_principal", default=None)
 )
+
+
+def _proposer_of_item(tenant: str, item_id: str) -> str | None:
+    """The actor of the proposal a review item belongs to, or None."""
+    from remora.execution.service import _assessed_payload
+
+    try:
+        _toolspec_hash, proposal_id = _assessed_record(tenant, item_id)
+        actor = (_assessed_payload(_CHAIN, tenant, proposal_id) or {}).get("actor")
+    except Exception:
+        return None
+    return str(actor) if actor else None
+
+
+def _with_flow_principal(principal: str | None, run: Callable[[], Any]) -> Any:
+    """Run *run* with the flow principal set to *principal*.
+
+    Flow contexts belong to the agent that proposed the call. On the review
+    path the reviewer executes, and in the async worker nobody is
+    authenticated, so the observation and the dispatch-time flow check read
+    the proposer's context, not the executor's. Before this the context was
+    unknown there and no flow check ran at dispatch.
+    """
+    token = _FLOW_PRINCIPAL.set(principal)
+    try:
+        return run()
+    finally:
+        _FLOW_PRINCIPAL.reset(token)
 
 
 def _flow_handles() -> Any:
@@ -2579,6 +2611,52 @@ from remora.observability.otel import get_remora_tracer
 _EXEC_TRACER = get_remora_tracer(service_name="remora-execution")
 
 
+def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[int, str],
+                      proposal_id: str) -> tuple[str | None, Any]:
+    """Re-check the flow decision right before dispatch, and bind the result commit.
+
+    SDD v2 WP-04 (AR-017, AR-018). ``expected`` is the epoch and digest the
+    flow check had when the call was decided. If the context's label moved
+    since, or the check now differs, the call is refused before a lease is
+    minted. Otherwise the returned commit labels the raw result, persists the
+    handles it mints and raises the context label, and only then hands back
+    the rendered result. A failed commit withholds the result.
+
+    The check and the dispatch are not one transaction. A concurrent call in
+    the same context can raise the label between them. The commit then finds
+    another epoch and withholds the result: the effect has happened, and
+    nothing it returned reaches the agent under the stale decision.
+    """
+    from remora.flow.labeler import (
+        FlowLabeler,
+        commit_labeled_result,
+        verify_flow_at_dispatch,
+    )
+
+    flow = _flow_spec(tool_call.tool_name)
+    principal, context_id = _FLOW_PRINCIPAL.get(), tool_call.context_id
+    if flow is None or not principal or not context_id:
+        return "flow_state_unavailable", None
+    contexts, handles = _flow_contexts(), _flow_handles()
+    ok, reason, _resolved = verify_flow_at_dispatch(
+        contexts=contexts, handles=handles, tenant_id=tenant, principal=principal,
+        context_id=context_id, flow=flow, arguments=tool_call.arguments,
+        expected_epoch=expected[0], expected_digest=expected[1])
+    if not ok:
+        return reason, None
+
+    def commit(raw: Any) -> tuple[Any, dict[str, Any]]:
+        done = commit_labeled_result(
+            FlowLabeler(), flow, contexts=contexts, handles=handles, tenant_id=tenant,
+            principal=principal, context_id=context_id, proposal_id=proposal_id,
+            arguments=tool_call.arguments, raw_result=raw, expected_epoch=expected[0])
+        return done.rendered_result, {"raw_result_sha256": done.raw_result_sha256,
+                                      "epoch": done.new_epoch,
+                                      "minted_handles": len(done.minted_handle_ids)}
+
+    return None, commit
+
+
 def _dispatch_under_lease(
     *,
     tenant: str,
@@ -2595,6 +2673,7 @@ def _dispatch_under_lease(
     plan: Any = None,
     capability_set: Any = None,
     report_lease: bool = False,
+    flow_expected: tuple[int, str] | None = None,
 ) -> dict[str, Any]:
     """Governed dispatch (see remora.execution.dispatch); binds this module's
     dispatcher and current policy bundle hash. Shared by /execute,
@@ -2627,6 +2706,13 @@ def _dispatch_under_lease(
             if refusal is not None:
                 return {"executed": False, "refusal_reason": refusal.value,
                         "proposal_id": proposal_id}
+    result_commit = None
+    if flow_expected is not None:
+        flow_refusal, result_commit = _flow_at_dispatch(tenant, tool_call, flow_expected,
+                                                        proposal_id)
+        if flow_refusal is not None:
+            return {"executed": False, "refusal_reason": flow_refusal,
+                    "proposal_id": proposal_id}
     resolved_effect = None
     resolver = _effect_resolver() if presented_lease is None else None
     if resolver is not None:
@@ -2675,6 +2761,7 @@ def _dispatch_under_lease(
             surface_digest=surface,
             capability_set=capability_set,
             report_lease=report_lease,
+            result_commit=result_commit,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):
@@ -2723,7 +2810,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
     # Orchestration lives in remora.execution.service (issue #241, slice 8);
     # this route binds the module's ambient state and maps domain errors.
     try:
-        response = _execute_approved_item(
+        response = _with_flow_principal(_proposer_of_item(tenant, req.item_id), lambda: _execute_approved_item(
             tenant=tenant, principal=principal, item_id=req.item_id,
             tool_call=req.tool_call,
             transaction=db_transaction_state, item_tenant=_ITEM_TENANT,
@@ -2747,7 +2834,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             approval_policy=_approval_policy_for(tenant),
             ws1_gate=_ws1_gate(),
             ws1_capability=_ws1_capability(tenant),
-        )
+        ))
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ToolSpecChanged as exc:
@@ -2917,7 +3004,26 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
         except ExecutionContextRefused as exc:
             raise HTTPException(status_code=409, detail=exc.reason) from exc
         semantic["execution_context_canonical"] = context.canonical_bytes().decode("utf-8")
-    tool_execution = _dispatch_under_lease(
+    # Flow control in the execution domain (SDD v2 WP-04): with
+    # REMORA_FLOW_CONTROL=1 this process reads the call's flow context from
+    # its own store, as the lease's actor, and refuses unless the verdict is
+    # clean. A domain that does not share the authority's durable flow store
+    # sees an unknown context and refuses, which is the intended failure.
+    flow_expected: tuple[int, str] | None = None
+    if _flow_control_enabled():
+        from remora.execution.service import _flow_refusal
+
+        flow_obs = _with_flow_principal(lease.actor_identity, lambda: _with_flow(
+            PolicyObservation(question="dispatch-leased"), req.tool_call, tenant))
+        refusal = _flow_refusal(flow_obs)
+        if refusal is not None:
+            api_mod.record_execution_execute(executed=False, refusal=refusal)
+            return {"outcome": "refused",
+                    "tool_execution": {"executed": False, "refusal_reason": refusal,
+                                       "proposal_id": lease.proposal_id}}
+        if flow_obs.flow_status == "evaluated" and flow_obs.flow_digest:
+            flow_expected = (int(flow_obs.flow_epoch or 0), str(flow_obs.flow_digest))
+    tool_execution = _with_flow_principal(lease.actor_identity, lambda: _dispatch_under_lease(
         tenant=tenant,
         # From the SIGNED lease, never the request body and never the hop's
         # own principal. The body form let a caller with a stolen lease assert
@@ -2938,7 +3044,8 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
         # The capability set the lease was minted under, checked against its
         # signed digest and against this call by the dispatcher.
         capability_set=_presented_capability_set(req.capability_set),
-    )
+        flow_expected=flow_expected,
+    ))
     api_mod.record_execution_execute(
         executed=bool(tool_execution["executed"]),
         refusal=tool_execution.get("refusal_reason"),

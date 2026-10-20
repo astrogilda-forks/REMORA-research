@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-19: **31 `open`**, **31 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-20: **32 `open`**, **31 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93, §94): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -57,7 +57,9 @@ cites only `open` sections and that no `open` section is missing a theme.
    No bounded lookup recovers any of them. With the arguments
    schema-valid, every call still lacks an intent match or a declared risk
    tier (§93). Evidence-directed verification (#953) has nothing to recover
-   until contract and intent coverage exist.
+   until contract and intent coverage exist. On the execution API, WS1
+   evidence could not make any call executable until 2026-10-20, and Study B
+   measured recovery in study code only (§94).
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -2663,6 +2665,7 @@ sections again.
 | The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
 | Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. Two strict xfails; the owner decided on 2026-10-18 and the change is pending | Medium |
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
+| WS1 evidence could not make a call executable on the execution API (§94) | WS1 caps only; the grounding that turned PROVED preconditions into an engine ACCEPT lived in Study B's harness. Grounding from proofs is now opt-in on the assess path, tested through the route, and not yet measured in a study | **High** |
 | No blocked development call is recoverable by a bounded lookup alone (§93) | After schema validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT. Causes: no extracted intent (71), undeclared risk tier on a write (16), ground-truth call refused as the wrong tool (5). WS1 recovery needs intent and contract coverage first | **High** |
 | Peer-review re-analysis widens the zero-count bounds (§83) | Clustered by tool, C-ext3 arm F 0/500 bounds at 3.5 % and C-ext4 0/295 at 5.42 %. Only 4 of the 295 C-ext4 wrong calls name a tool the task offered, so confusion between two tools of one task is barely tested | Medium |
 
@@ -5546,3 +5549,33 @@ and offline contract coverage (WS1 SDD S09, S20), measured against this
 audit. Reproduce with `python scripts/ws1_resolvability_audit.py --out
 artifacts/ws1/resolvability_audit_v1.json` (needs
 `experiments/control_eval/requirements.txt`).
+
+## §94 WS1 evidence could not make a call executable on the execution API (2026-10-20)
+<!-- finding-status: open -->
+
+**Status:** repaired in code with route tests; open until a study measures
+recovery through the execution API rather than through study code.
+
+The claim under evaluation in #953 is that REMORA recovers useful agent work
+by fetching bounded, authorized evidence. On the execution API the WS1 gate
+could only lower a decision (`Ws1Outcome.apply`, `_never_raised`). Its
+lookups proved preconditions, and nothing carried those proofs to the
+engine. A read the engine abstained on, or sent to review, for lack of
+grounding stayed there however much WS1 proved.
+
+Study B measured recovery anyway. Its harness (`isp_study/defence.py`)
+builds a fresh observation whose grounding fields come from PROVED
+preconditions and decides it with `grounded_read_accept`. That coupling
+existed only in study code. Study B's utility figures therefore describe
+the composition rule, not the execution API, and are to be read that way.
+
+The repair is opt-in. `Ws1Deployment.grounding` declares which engine
+grounding signals each predicate's PROVED state establishes. At assessment
+the engine re-decides on the observation plus those signals, under the same
+loop-safety and capability adjustments. WS1 caps then apply to that
+decision, and the two argument signals need every argument to be a PROVED
+subject. Shadow mode changes nothing and records what grounding would do.
+`tests/test_ws1_grounding.py` shows, through `/v1/execution/assess` and the
+real dispatcher, a read that is VERIFY without grounding become ACCEPT with
+it and execute. It also shows an unproved or refuted precondition grounding
+nothing and a monitor veto still capping the call.

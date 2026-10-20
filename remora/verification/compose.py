@@ -118,7 +118,9 @@ def _precondition_caps(requirements: RequirementSet, checked: CheckedPreconditio
 
 def _monitor_cap(outcome: AssessmentOutcome, assessment: MonitorAssessment | None,
                  profile: MonitorProfile, veto_on_record: bool,
-                 verification_open: bool, all_proved: bool) -> tuple[tuple[Cap, str] | None, bool]:
+                 verification_open: bool, all_proved: bool,
+                 uncertainty_settled: frozenset[str] | None = None,
+                 ) -> tuple[tuple[Cap, str] | None, bool]:
     """The monitor's cap and whether it is (or stays) a veto.
 
     Uncertainty (codes without a crossed threshold) asks for context. While a
@@ -127,6 +129,11 @@ def _monitor_cap(outcome: AssessmentOutcome, assessment: MonitorAssessment | Non
     registered verifier there is nothing left to look up, and uncertainty
     alone caps nothing; a crossed threshold still does (Study B pilot v2,
     where the WS1 SDD §9 rule blocked every grounded read).
+
+    With *uncertainty_settled* the second half is typed: once every required
+    precondition is PROVED, only the codes the evidence settles are dropped.
+    A code it does not settle still caps the call: ESCALATE to the semantic
+    review role when the profile names one, ABSTAIN otherwise.
     """
     if profile.mode is MonitorMode.SHADOW:
         return None, False
@@ -136,10 +143,13 @@ def _monitor_cap(outcome: AssessmentOutcome, assessment: MonitorAssessment | Non
     if outcome is AssessmentOutcome.ASSESSED and assessment is not None:
         if assessment.crossed:
             return (Cap("monitor", veto_action, _MON), "monitor_risk_over_threshold"), True
-        if assessment.uncertainty_codes and profile.mode is MonitorMode.REQUIRED \
-                and not all_proved:
-            action = V if verification_open else AB
-            return (Cap("monitor", action, _MON), "monitor_uncertain"), False
+        if assessment.uncertainty_codes and profile.mode is MonitorMode.REQUIRED:
+            if not all_proved:
+                action = V if verification_open else AB
+                return (Cap("monitor", action, _MON), "monitor_uncertain"), False
+            if uncertainty_settled is not None \
+                    and set(assessment.uncertainty_codes) - uncertainty_settled:
+                return (Cap("monitor", veto_action, _MON), "monitor_uncertain_unsettled"), False
         return None, False
     if profile.mode is MonitorMode.REQUIRED:
         if outcome is AssessmentOutcome.OUT_OF_SCOPE and verification_open:
@@ -161,9 +171,12 @@ def compose_authorized_decision(
     budget_exhausted: bool = False,
     monitor_veto_on_record: bool = False,
     parent_record_hash: str | None = None,
+    uncertainty_settled: frozenset[str] | None = None,
 ) -> CompositionRecord:
     """One fresh composition over every cap. *verifiable* names the MACHINE
-    preconditions that still have an untried registered resolver and budget."""
+    preconditions that still have an untried registered resolver and budget.
+    *uncertainty_settled* names the monitor uncertainty codes the PROVED
+    evidence settles; ``None`` keeps the untyped rule (see ``_monitor_cap``)."""
     base_reason = base.reasons[-1] if base.reasons else DecisionReason.DEFAULT_SAFE_ABSTAIN
     base_approvable = not set(base.reasons) & NON_APPROVABLE_REASONS
     caps: list[tuple[Cap, str]] = [(Cap("engine", base.action, base_reason,
@@ -182,7 +195,8 @@ def compose_authorized_decision(
         for p in requirements.preconditions if p.required)
     outcome, monitor_reason = monitor_usable(assessment, profile, context, checked, now_s)
     monitor, veto = _monitor_cap(outcome, assessment, profile, monitor_veto_on_record,
-                                 verification_open=bool(verifiable), all_proved=proved_all)
+                                 verification_open=bool(verifiable), all_proved=proved_all,
+                                 uncertainty_settled=uncertainty_settled)
     if monitor is not None:
         caps.append(monitor)
 

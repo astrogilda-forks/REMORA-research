@@ -3194,6 +3194,19 @@ documents:
   last_reviewed: '2026-10-19'
   validates_against: []
   claims: []
+- id: DOC-403
+  path: docs/assurance/ws1_composition_study_v2.md
+  status: proposal
+  topic: docs_assurance_ws1_composition_study_v2_md
+  code_synced: verified
+  verdict: current
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - researchers
+  last_reviewed: '2026-10-20'
+  validates_against: []
+  claims: []
 topics:
 - provenance_README_md
 - provenance_prior-art-review-2026-10-04_md
@@ -3525,3 +3538,4 @@ topics:
 - docs_design_compositional-authority-preservation-v1_md
 - docs_design_ws1-deterministic-authorization-learned-monitoring-v1_md
 - docs_assurance_ws1_composition_study_v1_md
+- docs_assurance_ws1_composition_study_v2_md

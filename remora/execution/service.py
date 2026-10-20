@@ -311,23 +311,29 @@ def assess_proposal(
             raise ExecutionContextRefused("execution_context_capture_invalid")
     obs = _bind_execution_context(
         obs, semantic, context, proposal_id=proposal_id, tenant=tenant, principal=principal)
-    report = engine.decide(obs)
-    engine_action = report.action
-    if (prior_loop is not None and prior_loop.action == "escalate"
-            and report.action is DecisionAction.ACCEPT):
-        report = dataclasses.replace(
-            report,
-            action=DecisionAction.ESCALATE,
-            reasons=(*report.reasons, DecisionReason.LOOP_SAFETY_ESCALATE),
-            human_review_required=True,
-        )
     capability = capability_gate(proposal) if capability_gate is not None else None
-    if capability is not None and not capability.get("allowed"):
-        report = dataclasses.replace(
-            report,
-            action=DecisionAction.ABSTAIN,
-            reasons=(*report.reasons, DecisionReason.CAPABILITY_NOT_ALLOWED),
-        )
+
+    def adjusted(report: DecisionReport) -> DecisionReport:
+        """The engine's report under loop safety and the capability set."""
+        if (prior_loop is not None and prior_loop.action == "escalate"
+                and report.action is DecisionAction.ACCEPT):
+            report = dataclasses.replace(
+                report,
+                action=DecisionAction.ESCALATE,
+                reasons=(*report.reasons, DecisionReason.LOOP_SAFETY_ESCALATE),
+                human_review_required=True,
+            )
+        if capability is not None and not capability.get("allowed"):
+            report = dataclasses.replace(
+                report,
+                action=DecisionAction.ABSTAIN,
+                reasons=(*report.reasons, DecisionReason.CAPABILITY_NOT_ALLOWED),
+            )
+        return report
+
+    decided = engine.decide(obs)
+    engine_action = decided.action
+    report = adjusted(decided)
     ws1: Ws1OutcomePort | None = None
     if ws1_gate is not None:
         # Last, so it composes against every other component's decision. It
@@ -340,8 +346,17 @@ def assess_proposal(
             toolspec_hash=str(toolspec_identity.get("hash") or ""),
             capability=capability, flow_digest=obs.flow_digest, flow_epoch=obs.flow_epoch,
             attempt_family_id=task.context_id if task is not None else None,
-            base=report)
-        report = _never_raised(report, ws1.apply(report))
+            base=report, task_id=_ws1_task_id(task),
+            # Grounding from proofs: the ENGINE re-decides on the observation
+            # plus the signals WS1's PROVED evidence established, under the
+            # same loop-safety and capability adjustments. WS1 never raises a
+            # decision itself, and its caps apply to the re-decided report.
+            redecide=lambda facts: adjusted(engine.decide(dataclasses.replace(obs, **facts))))
+        grounded = getattr(ws1, "grounded_report", None)
+        if grounded is not None and ws1.mode == "enforce":
+            report = _never_raised(grounded, ws1.apply(grounded))
+        else:
+            report = _never_raised(report, ws1.apply(report))
     now = datetime.now(UTC)
 
     # Derived from the chain, never from the request: a caller-declared
@@ -1069,6 +1084,7 @@ def execute_approved_item(
         proposal_id=str(proposal_id or item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
+        **_flow_kwargs(fresh_obs),
     )
 
     # FT-02: settle with what actually happened - derived, never assumed.
@@ -1641,6 +1657,7 @@ def dispatch_pending_intent(
         proposal_id=str(proposal_id or row.item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
+        **_flow_kwargs(fresh_obs),
     )
 
     outcome = classify_outcome(tool_execution)
@@ -1735,6 +1752,11 @@ def _never_raised(before: DecisionReport, after: DecisionReport) -> DecisionRepo
     return before
 
 
+def _ws1_task_id(task: TaskIdentity | None) -> str | None:
+    """The task a WS1 budget is charged to: the call's own task identity."""
+    return f"{task.context_id}/{task.task_id}" if task is not None else None
+
+
 def _ws1_regate_base(observation: Any) -> DecisionReport:
     """The engine part of a re-gate on a dispatch path, already decided and
     bound by the grant or the approval: the WS1 gate composes against ACCEPT
@@ -1781,7 +1803,8 @@ def ws1_regate(
         flow_epoch=getattr(observation, "flow_epoch", None), attempt_family_id=None,
         base=_ws1_regate_base(observation),
         veto_on_record=bool(prior.get("monitor_veto")),
-        review_attestation=review_attestation)
+        review_attestation=review_attestation,
+        task_id=_ws1_task_id(task_identity_of(tool_call)))
 
 
 
@@ -1901,6 +1924,38 @@ def plan_binding_of(tool_call: Any) -> Any:
 
     data = raw.model_dump() if hasattr(raw, "model_dump") else raw
     return PlanBinding.from_dict(data)
+
+
+def _flow_refusal(obs: Any) -> str | None:
+    """Why the call's current flow verdict refuses it, or None.
+
+    The same states the engine's flow rungs accept pass here: flow control
+    off (no ``flow_status``), a tool outside the strict profile with no flow
+    block (``not_declared``), and a clean evaluated verdict. An unknown
+    context, a missing policy, an unavailable store or a violation refuses.
+    """
+    status = getattr(obs, "flow_status", None)
+    if status is None or status == "not_declared":
+        return None
+    if status != "evaluated":
+        return f"flow_{status}"
+    if getattr(obs, "flow_confidentiality_violation", False):
+        return "flow_confidentiality_violation"
+    if getattr(obs, "flow_integrity_violation", False):
+        return "flow_integrity_violation"
+    return None
+
+
+def _flow_kwargs(obs: Any) -> dict[str, Any]:
+    """``flow_expected`` for a dispatch call: the epoch and digest the flow
+    check had when this call was last decided (SDD v2 WP-04, AR-018).
+
+    Omitted unless the flow check evaluated, so a dispatcher binding that
+    predates the parameter keeps working where flow control is off.
+    """
+    if getattr(obs, "flow_status", None) != "evaluated" or not getattr(obs, "flow_digest", None):
+        return {}
+    return {"flow_expected": (int(obs.flow_epoch or 0), str(obs.flow_digest))}
 
 
 def _task_kwargs(tool_call: Any) -> dict[str, Any]:
@@ -2076,6 +2131,22 @@ def redeem_accept_token(
             str(context_check.reason),
         )
 
+    # The ACCEPT path does not re-decide, so the flow verdict of the call as
+    # it stands now is checked here, before the grant is spent. The review
+    # and worker paths re-decide, and the engine's flow rungs refuse there.
+    flow_refusal = _flow_refusal(obs)
+    if flow_refusal is not None:
+        chain.append(tenant, {
+            "event": "execution_flow_refused",
+            "proposal_id": proposal_id,
+            "actor": principal,
+            "grant_jti": token.jti,
+            "detail": flow_refusal,
+        })
+        raise TokenRefused(
+            "flow refused at redemption: the call's information flow is not "
+            "clean now", flow_refusal)
+
     # Consume exactly once. A refused check here is expiry, audience
     # mismatch, a bad signature, or a replay - all terminal for this token.
     gate_result = gate.check(
@@ -2157,6 +2228,7 @@ def redeem_accept_token(
         grant_jti=token.jti,
         report_lease=True,
         **_task_kwargs(tool_call),
+        **_flow_kwargs(obs),
     )
 
     # Same structural classification as the review path: a dispatch that began
