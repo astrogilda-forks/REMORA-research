@@ -32,7 +32,15 @@
       "refusals": 1,
       "requests": 347,
       "spent_usd": 2.576688
+    },
+    {
+      "input_tokens": 433795,
+      "output_tokens": 48311,
+      "purpose": "pilot-v3",
+      "refusals": 0,
+      "requests": 358,
+      "spent_usd": 2.7014
     }
   ],
-  "spent_usd": 5.283792
+  "spent_usd": 7.985192
 }
