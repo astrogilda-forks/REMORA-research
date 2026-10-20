@@ -48,7 +48,23 @@
       "refusals": 32,
       "requests": 496,
       "spent_usd": 3.894736
+    },
+    {
+      "input_tokens": 3499769,
+      "output_tokens": 375653,
+      "purpose": "holdout",
+      "refusals": 214,
+      "requests": 2738,
+      "spent_usd": 21.512136
+    },
+    {
+      "input_tokens": 1155517,
+      "output_tokens": 123643,
+      "purpose": "holdout-resume",
+      "refusals": 73,
+      "requests": 908,
+      "spent_usd": 7.094928
     }
   ],
-  "spent_usd": 11.879928
+  "spent_usd": 40.486992
 }

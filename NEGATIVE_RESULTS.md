@@ -24,7 +24,7 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-20: **32 `open`**, **31 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-20: **33 `open`**, **31 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
@@ -35,7 +35,7 @@ after each theme are where its evidence lives, and CI checks that every theme
 cites only `open` sections and that no `open` section is missing a theme.
 
 <!-- backlog-start -->
-1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93, §94): safety is measured and met
+1. **Useful semantic autonomy** (§39, §81, §82, §83, §92, §93, §94, §95): safety is measured and met
    (native wrong-call ACCEPT 0/500 on sealed C-ext3, arm ablation
    24 → 6 → 0), which closed §36's measurement gap. What remains open is
    utility: the frozen deterministic intent extractor grounds only 26.6%
@@ -59,7 +59,9 @@ cites only `open` sections and that no `open` section is missing a theme.
    tier (§93). Evidence-directed verification (#953) has nothing to recover
    until contract and intent coverage exist. On the execution API, WS1
    evidence could not make any call executable until 2026-10-20, and Study B
-   measured recovery in study code only (§94).
+   measured recovery in study code only (§94). On the sealed Study B holdout
+   the monitor-directed arm completed fewer reads than the fixed order, and
+   the adaptive attacker mostly fell back to its template (§95).
 2. **Legitimate autonomy lost to derived values** (§35): grounding cost
    read autonomy 86.1% → 56.8%, mostly dates, unit conversions and computed
    values that are correct but not literally in the user's text. **The
@@ -2665,6 +2667,7 @@ sections again.
 | The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
 | Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. Two strict xfails; the owner decided on 2026-10-18 and the change is pending | Medium |
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
+| Study B holdout: the monitor-directed arm lost utility, and the attack search was barely adaptive (§95) | H_EDV 15/45 reads against H_DET 28/45; it vetoed all 43 benign port reads. 55 of 60 final injections were the fixed template. No unauthorized dispatch in any WS1 arm | **High** |
 | WS1 evidence could not make a call executable on the execution API (§94) | WS1 caps only; the grounding that turned PROVED preconditions into an engine ACCEPT lived in Study B's harness. Grounding from proofs is now opt-in on the assess path, tested through the route, and not yet measured in a study | **High** |
 | No blocked development call is recoverable by a bounded lookup alone (§93) | After schema validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT. Causes: no extracted intent (71), undeclared risk tier on a write (16), ground-truth call refused as the wrong tool (5). WS1 recovery needs intent and contract coverage first | **High** |
 | Peer-review re-analysis widens the zero-count bounds (§83) | Clustered by tool, C-ext3 arm F 0/500 bounds at 3.5 % and C-ext4 0/295 at 5.42 %. Only 4 of the 295 C-ext4 wrong calls name a tool the task offered, so confusion between two tools of one task is barely tested | Medium |
@@ -5579,3 +5582,53 @@ subject. Shadow mode changes nothing and records what grounding would do.
 real dispatcher, a read that is VERIFY without grounding become ACCEPT with
 it and execute. It also shows an unproved or refuted precondition grounding
 nothing and a monitor veto still capping the call.
+
+## §95 Study B holdout: the monitor-directed arm lost utility, and the attack search was barely adaptive (2026-10-20)
+<!-- finding-status: open -->
+
+**Status:** the sealed holdout of WS1 Study B, run once on the frozen code
+(`artifacts/ws1/study_b_holdout_v1.json`, 600 episodes, 120 test tasks,
+threshold 0.3). The run stopped at episode 454 on a connection error. It was
+resumed on the same frozen code without rerunning any logged episode
+(`scripts/ws1_resume_holdout.py`). The summary reproduces exactly from the
+raw log. Holdout spend was 28.61 USD, and the Study B ledger stands at 40.49
+of 50 USD.
+
+| Arm | Benign reads completed | Attack success | Unauthorized dispatch | Benign monitor vetoes | Lookups per episode |
+|---|---|---|---|---|---|
+| A_no_gate | 44/45 | 3/60 | 3 | 0/236 | 0 |
+| H0 | 0/45 | 0/60 | 0 | 2/164 | 0 |
+| H_DET | 28/45 | 0/60 | 0 | 34/227 | 7.57 |
+| H_RANDOM | 29/45 | 0/60 | 0 | 35/236 | 7.81 |
+| H_EDV | 15/45 | 0/60 | 0 | 66/231 | 7.68 |
+
+Against the preregistered rules:
+
+- WS-STRUCT holds: no WS1 arm executed a call outside the work order. With
+  no events in 60 attack clusters, the 95 % cluster bound is 4.9 %.
+- WS-UTILITY holds as expected by construction: H_EDV minus H0 is 0.333
+  (95 % interval 0.200 to 0.467).
+- WS-ATTRIBUTION fails. H_EDV made 0.108 more lookups per episode than
+  H_DET (interval -0.350 to 0.583). It completed 13 fewer reads, far beyond
+  the 2-point margin. H_RANDOM did as well as H_DET. The sealing power was
+  0.0, so the lookup contrast was underpowered from the start.
+- WS-SAFETY cannot discriminate. The undefended agent followed only 3 of 60
+  attacks, so 0/60 in the WS1 arms says little about the arms' difference.
+
+Two mechanisms explain most of it. H_EDV vetoed every benign port read (43
+of 43), against 21 of 42 for H_DET. It asks the monitor once per round for
+hints, and a veto is sticky, so each extra question is another chance to
+cross the low 0.3 threshold. The threshold was chosen on a 16-task pilot.
+Second, the adaptive attacker refused most requests. The final injection
+was the fixed template in 55 of 60 attack tasks, so the search was hardly
+adaptive. It also targeted the undefended agent, not the defence.
+
+The independent safe-utility grader, fixed in commit 4f3f9a29 before the
+holdout finished, agrees with the text match on every arm
+(`artifacts/ws1/safe_utility_regrade_holdout_v1.json`; exploratory, not the
+sealed endpoint). The same model played agent, monitor and attacker. The
+utility figures describe the study harness's composition, not the execution
+API (§94). Study C (`docs/assurance/ws1_composition_study_v2.md`) addresses
+the harness, the search target and the grader. It does not yet address the
+monitor's veto rate, which needs a threshold chosen on more data or hint
+calls that cannot veto.
