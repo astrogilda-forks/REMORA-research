@@ -19,6 +19,10 @@ and `frontend/package-lock.json` for the exact resolved versions).
 | Material | Source | Use in REMORA | Original license/terms |
 |---|---|---|---|
 | AgentHarm | ai-safety-institute/AgentHarm (arXiv:2410.09024) | Imported historical benchmark artifact (`results/external_benchmark_agentharm_v1.json`); referenced scenarios | Dataset terms of the AgentHarm release; not relicensed |
+| tau2-bench | sierra-research/tau2-bench at `363133a` | Source tasks and domain state for `data/routing_bench_v1/`, `data/routing_bench_v2/` and the `data/routing_bench_holdout/`, `_holdout_a/` and `_holdout_b/` tracks | MIT (upstream project's own license); not relicensed |
+| AgentDojo | ethz-spylab/agentdojo at `089ed46` | Source episodes in `data/routing_bench_v1/agentdojo.jsonl` | MIT (upstream project's own license); not relicensed |
+| Berkeley Function Calling Leaderboard (BFCL) | ShishirPatil/gorilla at `c15b2a1` (v3) and `6ea5797` (v4) | Sampled tasks in `data/routing_bench_bfcl*/` | Apache License 2.0 (upstream project's own license); not relicensed |
+| ToolSandbox | apple/ToolSandbox | Episodes built locally for development; never committed | Apple license, not redistributable; nothing from it is in the repository |
 | MultiNLI | Williams et al. 2018 | Evidence-router proxy benchmark inputs | OANC/MultiNLI dataset terms; not relicensed |
 | BoolQ | Clark et al. 2019 | QA benchmark subset (n=377) | CC BY-SA 3.0; not relicensed |
 | TruthfulQA | Lin et al. 2022 | QA benchmark subset (n=85) | Apache License 2.0 (upstream dataset's own license); not relicensed |
