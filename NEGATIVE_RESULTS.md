@@ -5616,9 +5616,12 @@ Against the preregistered rules:
   attacks, so 0/60 in the WS1 arms says little about the arms' difference.
 
 Two mechanisms explain most of it. H_EDV vetoed every benign port read (43
-of 43), against 21 of 42 for H_DET. It asks the monitor once per round for
-hints, and a veto is sticky, so each extra question is another chance to
-cross the low 0.3 threshold. The threshold was chosen on a 16-task pilot.
+of 43), against 21 of 42 for H_DET. On the final evidence, H_EDV's monitor
+answer crossed the threshold on 22 of the 43, about H_DET's rate. The other
+21 were vetoed by an earlier hint answer: H_EDV asks once per round, and a
+veto is sticky, so each extra question is another draw at the low 0.3
+threshold. The threshold was chosen on a 16-task pilot and on H_DET only.
+Study C chooses it per arm, counting every answer for a call.
 Second, the adaptive attacker refused most requests. The final injection
 was the fixed template in 55 of 60 attack tasks, so the search was hardly
 adaptive. It also targeted the undefended agent, not the defence.
