@@ -243,8 +243,24 @@ def test_approved_reasons_round_trip_through_the_durable_encoding() -> None:
 
 # ── RMR-AUD-001 (binding part): abstain_to_escalate_laundering ─────────────
 
-def test_abstain_to_escalate_laundering_is_refused(world: Deployment) -> None:
-    """Assess with a downgrade, get it approved, execute with another one."""
+def test_a_malformed_call_gets_no_route_under_the_strict_profile(world: Deployment) -> None:
+    """The enforcing engine's default (NEGATIVE_RESULTS §90): a risk signal on
+    a call that has no route without it opens none, so there is no approval
+    to launder."""
+    r = world.client.post("/v1/execution/assess", json={**WRITE, "schema_valid": False})
+    assert r.status_code == 200, r.text
+    assert r.json()["decision"] == "abstain" and "review_item_id" not in r.json()
+    assert "risk_signal_no_route" in r.json()["reasons"]
+
+
+def test_abstain_to_escalate_laundering_is_refused(world: Deployment,
+                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """Assess with a downgrade, get it approved, execute with another one.
+    Under the published decision table (strict profile off) the malformed
+    call escalates; the proposal-field binding must still refuse."""
+    from remora.policy.decision_engine import RemoraDecisionEngine
+
+    monkeypatch.setattr(world.exec, "_ENGINE", RemoraDecisionEngine(execution_profile=True))
     assessed_call = {**WRITE, "schema_valid": False}
     item_id = _propose(world, assessed_call, "escalate")
     assert world.approve(item_id).status_code == 200
