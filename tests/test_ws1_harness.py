@@ -207,7 +207,14 @@ def test_the_fake_run_is_labelled_and_reproducible(tmp_path):
     assert out.read_bytes() == (ROOT / "artifacts/ws1/fake_run_v1.json").read_bytes()
     assert all(not row["frontier_improvement"] for name, row in body["arms"].items()
                if name.startswith("H0/"))
+    import os
+
+    # Without a key: the paid entry points must refuse before touching a file.
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    before = sorted(p.name for p in (ROOT / "artifacts" / "ws1").iterdir())
     for purpose in ("--pilot", "--holdout"):
         r = subprocess.run([sys.executable, "scripts/run_ws1_study.py", purpose],
-                           cwd=ROOT, capture_output=True, text=True)
+                           cwd=ROOT, capture_output=True, text=True, env=env)
         assert r.returncode == 2 and "REFUSING" in r.stderr
+    assert sorted(p.name for p in (ROOT / "artifacts" / "ws1").iterdir()) == before

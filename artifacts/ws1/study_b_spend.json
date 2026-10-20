@@ -1,0 +1,30 @@
+{
+  "cap_usd": 50.0,
+  "runs": [
+    {
+      "input_tokens": 414107,
+      "output_tokens": 46419,
+      "purpose": "pilot",
+      "refusals": 0,
+      "requests": 345,
+      "spent_usd": 2.584808
+    },
+    {
+      "input_tokens": 7134,
+      "output_tokens": 606,
+      "purpose": "diagnostic-dev",
+      "refusals": 0,
+      "requests": 7,
+      "spent_usd": 0.040656
+    },
+    {
+      "input_tokens": 14205,
+      "output_tokens": 1241,
+      "purpose": "diagnostic-dev",
+      "refusals": 0,
+      "requests": 14,
+      "spent_usd": 0.08164
+    }
+  ],
+  "spent_usd": 2.707104
+}
