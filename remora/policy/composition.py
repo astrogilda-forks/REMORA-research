@@ -68,6 +68,8 @@ EXTERNAL_CAP_REASONS: Final = frozenset({
 NON_APPROVABLE_REASONS: Final = frozenset({
     DecisionReason.CROSS_TENANT_ARGUMENT_BLOCKED,
     DecisionReason.INTENT_PROVENANCE_REQUIRED,
+    # Emitted only by the opt-in strict_monotone profile (RMR-AUD-001).
+    DecisionReason.RISK_SIGNAL_NO_ROUTE,
 })
 
 #: Escalations a reviewer's approval does not cover. A payload that may not

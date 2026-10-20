@@ -88,3 +88,12 @@ def test_assess_identity_does_not_depend_on_the_execution_engine() -> None:
         surface=api.SURFACE_ASSESS,
     )
     assert before == after
+
+
+def test_strict_monotone_changes_the_identity_only_when_on() -> None:
+    """Added after identities were published: off keeps every reported hash."""
+    off = api.engine_mode_identity(RemoraDecisionEngine(execution_profile=True))
+    assert "strict_monotone" not in off
+    on = api.engine_mode_identity(
+        RemoraDecisionEngine(execution_profile=True, strict_monotone=True))
+    assert on == {**off, "strict_monotone": True}

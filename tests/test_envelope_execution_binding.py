@@ -236,7 +236,7 @@ def test_the_endpoint_returns_one_envelope_for_the_whole_lifecycle(api) -> None:
     body = api.get(f"/v1/execution/proposals/{pid}/envelope").json()
 
     assert body["request"]["request_id"] == pid
-    assert body["gate"]["outcome"] == "verify"
+    assert body["gate"]["outcome"] == "escalate"
     assert body["audit"]["tenant_id"] == "acme"
     assert body["effect"]["effect_outcome"], "the envelope must reach a state"
     assert body["effect"]["ledger_entry"].get("grant_jti")

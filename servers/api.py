@@ -1256,7 +1256,13 @@ ENGINE_IDENTITY_FLAGS: tuple[str, ...] = (
     # same call differently.
     "execution_profile",
     "semantic_authority_floor",
+    # Stricter only, but it changes which decisions are reachable: a
+    # deployment that turns it on must report another policy identity.
+    "strict_monotone",
 )
+#: Flags added after identities were published. Hashed only when on, so a
+#: deployment that leaves them off keeps the identity it already reported.
+_IDENTITY_FLAGS_HASHED_WHEN_ON: frozenset[str] = frozenset({"strict_monotone"})
 
 
 def engine_mode_identity(engine: Any) -> dict[str, bool]:
@@ -1267,7 +1273,8 @@ def engine_mode_identity(engine: Any) -> dict[str, bool]:
     freeze a stable, wrong hash.
     """
     state = vars(engine)
-    return {name: bool(state[name]) for name in ENGINE_IDENTITY_FLAGS}
+    return {name: bool(state[name]) for name in ENGINE_IDENTITY_FLAGS
+            if name not in _IDENTITY_FLAGS_HASHED_WHEN_ON or state[name]}
 
 
 def _execution_engine_mode_flags() -> dict[str, bool]:

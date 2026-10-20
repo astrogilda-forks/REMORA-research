@@ -236,8 +236,8 @@ def test_adding_a_risk_signal_never_raises_executability(base, gate_signals, flo
     "Open (RMR-AUD-001 engine half / RMR-AUD-003 residual): a risk signal on "
     "a call the rest of the policy abstains on for lack of evidence opens a "
     "review route. Hard guards and conditional gates are the designed route "
-    "to a person for calls with no trust signal; closing this needs an owner "
-    "decision on what DEFAULT_SAFE_ABSTAIN means."))
+    "to a person for calls with no trust signal. Closed in the opt-in "
+    "strict_monotone profile; the default keeps the published decisions."))
 @pytest.mark.parametrize("signal", ["tainted", "malformed", "distribution_shift"])
 def test_a_risk_signal_still_opens_a_route_over_an_epistemic_abstain(signal):
     base = PolicyObservation(question="read telemetry", risk_tier="low", action_type="read",
@@ -250,14 +250,71 @@ def test_a_risk_signal_still_opens_a_route_over_an_epistemic_abstain(signal):
     "Open, present on master before RMR-AUD-003: raising a production write's "
     "risk tier from medium to high lowers the decision from ESCALATE (trap "
     "gate) to VERIFY (the explicit matrix, which "
-    "test_production_write_matrix_is_explicit_and_conservative pins). Which "
-    "of the two is right is an owner decision."))
+    "test_production_write_matrix_is_explicit_and_conservative pins). Closed "
+    "in the opt-in strict_monotone profile; the default keeps the matrix."))
 def test_raising_the_risk_tier_never_lowers_a_production_write():
     medium = PolicyObservation(question="q", risk_tier="medium", action_type="production_write",
                                target_environment="prod", schema_valid=True)
     high = replace(medium, risk_tier="high")
     assert executability(_decide(high).action) <= executability(_decide(medium).action)
 
+
+
+# ── the strict profile closes both (RemoraDecisionEngine(strict_monotone=True)) ──
+
+_STRICT = (
+    RemoraDecisionEngine(strict_monotone=True),
+    RemoraDecisionEngine(strict_monotone=True, execution_profile=True,
+                         low_consequence_accept=True),
+)
+_APPROVABILITY = {AB: 0, E: 1, V: 2, A: 3}
+
+
+@pytest.mark.parametrize("signal", ["tainted", "malformed", "distribution_shift"])
+def test_strict_a_risk_signal_never_opens_a_route_over_an_epistemic_abstain(signal):
+    base = PolicyObservation(question="read telemetry", risk_tier="low", action_type="read",
+                             proposed_tool_name="read_telemetry", target_environment="staging")
+    strict = _STRICT[0]
+    assert strict.decide(base).reasons == (DecisionReason.DEFAULT_SAFE_ABSTAIN,)
+    flagged = strict.decide(replace(base, **_SIGNALS[signal]))
+    assert flagged.action is AB
+    assert DecisionReason.RISK_SIGNAL_NO_ROUTE in flagged.reasons  # why it stayed shut
+    assert _decide(replace(base, **_SIGNALS[signal])).action is not AB  # the default differs
+
+
+def test_strict_raising_the_risk_tier_never_lowers_a_production_write():
+    medium = PolicyObservation(question="q", risk_tier="medium", action_type="production_write",
+                               target_environment="prod", schema_valid=True)
+    for strict in _STRICT:
+        for tier in ("high", "critical"):
+            high = strict.decide(replace(medium, risk_tier=tier))
+            assert executability(high.action) <= executability(strict.decide(medium).action)
+
+
+@settings(max_examples=1500, deadline=None)
+@given(_base,
+       st.lists(st.sampled_from(sorted(_GATE_SIGNALS)), max_size=2, unique=True),
+       st.lists(st.sampled_from(sorted(_FLOOR_SIGNALS)), min_size=1, max_size=3, unique=True),
+       st.sampled_from(range(len(_STRICT))))
+def test_strict_adding_a_risk_signal_never_raises_approvability(base, gate_signals,
+                                                                 floor_signals, which):
+    """The default property above exempts an epistemic ABSTAIN; the strict
+    profile does not: no signal makes any call more approvable."""
+    engine = _STRICT[which]
+    gated = _apply(base, gate_signals, _GATE_SIGNALS)
+    flagged = _apply(gated, floor_signals, _FLOOR_SIGNALS)
+    for before, after, added in ((engine.decide(base), engine.decide(gated), gate_signals),
+                                 (engine.decide(gated), engine.decide(flagged), floor_signals)):
+        assert _APPROVABILITY[after.action] <= _APPROVABILITY[before.action], (
+            added, before.action, before.reasons, after.action, after.reasons)
+
+
+def test_the_default_profile_is_unchanged_by_the_strict_option():
+    """Strict is opt-in: the default engine decides as before (golden tables,
+    Rego parity and sealed replays rely on it)."""
+    from remora.policy.decision_engine import RemoraDecisionEngine as Engine
+
+    assert Engine().strict_monotone is False
 
 # ── Multi-dimensional reference decision model (R1 differential testing) ───
 

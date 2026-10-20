@@ -45,6 +45,9 @@ class DecisionReason(str, Enum):
     TEMPERATURE_ACCEPT = "temperature_accept"
     GAINABILITY_ROUTE = "gainability_route"
     DEFAULT_SAFE_ABSTAIN = "default_safe_abstain"
+    # strict_monotone only: a risk signal may not open an approval route the
+    # same call without it did not have.
+    RISK_SIGNAL_NO_ROUTE = "risk_signal_no_route"
     LOW_CONSEQUENCE_ACCEPT = "low_consequence_accept"
     # A read whose every grounding signal is positively confirmed under a
     # signed intent authority. Strictly stronger than LOW_CONSEQUENCE_ACCEPT,

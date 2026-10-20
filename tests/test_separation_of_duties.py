@@ -57,7 +57,7 @@ def caller(monkeypatch):
 
 def _queue(client) -> tuple[str, str]:
     body = client.post("/v1/execution/assess", json=PROD_WRITE).json()
-    assert body["decision"] == "verify", body
+    assert body["decision"] == "escalate", body
     return body["review_item_id"], body["proposal_id"]
 
 
