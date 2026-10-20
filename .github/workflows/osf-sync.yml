@@ -46,10 +46,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install the HTTP client
+      - name: Install the HTTP client and YAML parser
         run: |
           grep -vE '^-e|^#|file://' requirements-lock.txt > /tmp/constraints.txt
-          pip install requests -c /tmp/constraints.txt
+          pip install requests pyyaml -c /tmp/constraints.txt
 
       - name: Check that every tracked file has one component
         run: python scripts/osf_sync.py check

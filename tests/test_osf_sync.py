@@ -193,3 +193,66 @@ def test_verify_reports_missing_changed_and_extra() -> None:
 def test_remote_modes_refuse_to_run_without_a_token(monkeypatch) -> None:
     monkeypatch.delenv("OSF_TOKEN", raising=False)
     assert osf.main(["verify"]) == 2
+
+
+PAPER = """# Title
+
+## Abstract
+
+First paragraph.
+
+<!-- claim:CLAIM-001 far_pct n -->
+**Result.** Second paragraph.
+
+**Keywords:** a, b
+
+## 1. Introduction
+
+Body.
+"""
+
+REGISTER = """claims:
+  - id: CLAIM-002
+    title: "Superseded thing"
+    status: superseded
+    evidence_level: internal_benchmark
+  - id: CLAIM-001
+    title: "Active | piped"
+    status: active
+    evidence_level: externally_benchmarked
+    blindness: blind
+"""
+
+
+def test_abstract_drops_claim_anchors_keywords_and_later_sections() -> None:
+    text = osf.abstract(_snapshot({"paper/remora_paper.md": PAPER.encode()}))
+    assert text.startswith("First paragraph.") and "**Result.** Second paragraph." in text
+    assert "<!--" not in text and "Keywords" not in text and "Body." not in text
+
+
+def test_claims_table_comes_from_the_register_active_first() -> None:
+    table = osf.claims_table(_snapshot({osf.CLAIM_REGISTER: REGISTER.encode()}))
+    assert table.startswith("2 claims, 1 active.")
+    rows = [ln for ln in table.splitlines() if ln.startswith("| CLAIM-")]
+    assert rows[0].startswith(r"| CLAIM-001 | Active \| piped | active | externally_benchmarked | blind |")
+    assert rows[1].endswith("| superseded | internal_benchmark | not stated |")
+
+
+def test_datasets_table_reads_status_size_and_upstream_licence() -> None:
+    manifest = {"status": "evaluated", "n_episodes": 12,
+                "upstream": {"repo": "https://github.com/ShishirPatil/gorilla", "license": "Apache-2.0"}}
+    table = osf.datasets_table(_snapshot({"data/track/manifest.json": json.dumps(manifest).encode()}))
+    assert "| `data/track/` | evaluated | 12 | gorilla (Apache-2.0) |" in table
+
+
+def test_strict_build_refuses_a_research_map_entry_that_is_not_tracked() -> None:
+    snap = _snapshot({})
+    assert "docs/06-reproducibility.md" in osf.missing_research_paths(snap)
+    with pytest.raises(osf.LayoutError, match="RESEARCH_MAP"):
+        osf.build_plans(snap, strict=True)
+
+
+def test_root_page_states_rights_participants_and_corrections() -> None:
+    readme = osf.build_plans(_snapshot({}))[0].wiki
+    for heading in ("## Rights, data and corrections", "**Human participants.**", "**Corrections.**"):
+        assert heading in readme

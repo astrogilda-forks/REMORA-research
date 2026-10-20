@@ -183,6 +183,190 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+# ------------------------------------------------------- research documentation
+#
+# The OSF pages describe the research from the repository's own records rather
+# than restating it: the paper's abstract, the claim register, the dataset
+# manifests and the analysis plans. A result therefore appears on OSF only as
+# the register states it, and changes there when the register changes.
+
+# Where each part of the research record lives. ``check`` fails if a path is
+# missing, so the map cannot point at a moved or deleted document.
+RESEARCH_MAP: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Problem, contribution and results", ("paper/remora_paper.pdf", "paper/remora_paper.md")),
+    ("Research questions and work packages", ("docs/13-research-frontier-roadmap.md",)),
+    ("System design (the object of study)", ("ARCHITECTURE.md", "docs/01-architecture.md")),
+    ("Threat model", ("docs/08-security.md", "docs/assurance/threat_model_v1.md")),
+    ("Experiments and benchmark tables", ("docs/03-experiments.md",)),
+    ("Analysis plans, fixed before data", ("docs/assurance/",)),
+    ("Claims and the evidence each resolves to", ("docs/assurance/claim_register_v1.yaml",
+                                                  "docs/evidence/claim_evidence_matrix.md")),
+    ("Negative results and falsified hypotheses", ("NEGATIVE_RESULTS.md",
+                                                   "docs/04-negative-results-detail.md")),
+    ("Rules for stating a claim", ("docs/05-claim-hygiene.md",)),
+    ("Reproducing the results", ("docs/06-reproducibility.md",)),
+    ("Related work", ("docs/09-related-work.md",)),
+    ("Open review objections", ("docs/review/PEER_REVIEW_FINDINGS.md",)),
+    ("AI-assisted development", ("docs/AI_USE.md",)),
+    ("Licensing and third-party material", ("LICENSE", "legal/THIRD_PARTY_NOTICES.md")),
+)
+CLAIM_REGISTER = "docs/assurance/claim_register_v1.yaml"
+PAPER_MD = "paper/remora_paper.md"
+
+
+def _text(snap: Snapshot, path: str) -> str | None:
+    data = snap.files.get(path)
+    return data.decode("utf-8") if data is not None else None
+
+
+def _first_heading(text: str) -> str:
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return ""
+
+
+def _cell(value: Any) -> str:
+    return " ".join(str(value).split()).replace("|", "\\|")
+
+
+def _exists(snap: Snapshot, path: str) -> bool:
+    return path in snap.files or any(p.startswith(path) for p in snap.files if path.endswith("/"))
+
+
+def missing_research_paths(snap: Snapshot) -> list[str]:
+    return [p for _, paths in RESEARCH_MAP for p in paths if not _exists(snap, p)]
+
+
+def abstract(snap: Snapshot) -> str:
+    """The paper's abstract paragraphs, without claim anchors or the keyword list."""
+    text = _text(snap, PAPER_MD)
+    if text is None or "\n## Abstract\n" not in text:
+        return ""
+    body = text.split("\n## Abstract\n", 1)[1].split("\n## ", 1)[0]
+    body = body.split("**Keywords:**", 1)[0]
+    lines = [ln for ln in body.splitlines() if not ln.strip().startswith("<!--")]
+    return "\n".join(lines).strip()
+
+
+def claims_table(snap: Snapshot) -> str:
+    text = _text(snap, CLAIM_REGISTER)
+    if text is None:
+        return ""
+    import yaml
+
+    claims = yaml.safe_load(text).get("claims", [])
+    order = {"active": 0, "superseded": 1}
+    rows = sorted(claims, key=lambda c: (order.get(c.get("status"), 2), c["id"]))
+    lines = ["| Claim | Result | Status | Evidence level | Measurement |", "|---|---|---|---|---|"]
+    for c in rows:
+        lines.append(f"| {c['id']} | {_cell(c.get('title', ''))} | {c.get('status', '')} | "
+                     f"{c.get('evidence_level', '')} | {c.get('blindness') or 'not stated'} |")
+    active = sum(1 for c in claims if c.get("status") == "active")
+    return (f"{len(claims)} claims, {active} active. A superseded claim stays listed with what "
+            f"replaced it. \"blind\" means evaluated once on a sealed set against targets fixed "
+            f"beforehand; \"development\" means measured on data the system had seen.\n\n"
+            + "\n".join(lines))
+
+
+def datasets_table(snap: Snapshot) -> str:
+    rows = []
+    for path in sorted(p for p in snap.files if p.startswith("data/") and p.endswith("/manifest.json")
+                       and p.count("/") == 2):
+        try:
+            m = json.loads(snap.files[path])
+        except ValueError:
+            continue
+        name = path.split("/")[1]
+        n = m.get("n_episodes", "")
+        if not n and isinstance(m.get("files"), dict):
+            n = sum(f.get("n_episodes", 0) for f in m["files"].values() if isinstance(f, dict)) or ""
+        plan = m.get("sap_ref") or m.get("plan") or m.get("sap") or ""
+        up = m.get("upstream") if isinstance(m.get("upstream"), dict) else {}
+        source = f"{up['repo'].rsplit('/', 1)[-1]} ({up.get('license', '')})" if up.get("repo") else ""
+        if not source and isinstance(m.get("sources"), dict):
+            source = ", ".join(f"{k} ({v.get('license', '')})" for k, v in m["sources"].items()
+                               if isinstance(v, dict) and v.get("redistributable", True))
+        rows.append(f"| `data/{name}/` | {_cell(m.get('status', ''))} | {n} | {_cell(source)} | "
+                    f"{_cell(plan)} |")
+    packs = []
+    for path in sorted(p for p in snap.files if p.startswith("datasets/") and p.endswith("/README.md")
+                       and p.count("/") == 2):
+        packs.append(f"| `{path.rsplit('/', 1)[0]}/` | {_cell(_first_heading(_text(snap, path) or ''))} |")
+    out = []
+    if rows:
+        out += ["Benchmark tracks. `evaluated` means the sealed set has been run once and is spent; "
+                "a spent set is never reused as a blind set.", "",
+                "| Track | Status | Episodes | Upstream source (licence) | Plan |", "|---|---|---|---|---|",
+                *rows, ""]
+    if packs:
+        out += ["Evidence packs.", "", "| Pack | Title |", "|---|---|", *packs, ""]
+    return "\n".join(out).strip()
+
+
+def plans_table(snap: Snapshot) -> str:
+    paths = sorted(p for p in snap.files if p.startswith("docs/assurance/")
+                   and (p.rsplit("/", 1)[-1].startswith("statistical_analysis_plan")
+                        or p.rsplit("/", 1)[-1].startswith("ws1_composition_study_v"))
+                   and p.endswith(".md"))
+    if not paths:
+        return ""
+    rows = [f"| `{p}` | {_cell(_first_heading(_text(snap, p) or ''))} |" for p in paths]
+    return ("Each plan fixed its hypotheses, targets and analysis before the data it governs were "
+            "generated or unsealed. Its heading states whether it is in force, executed, superseded "
+            "or a draft.\n\n| Plan | Title |\n|---|---|\n" + "\n".join(rows))
+
+
+def verification_summary(snap: Snapshot) -> str:
+    tests = sum(1 for p in snap.files if p.startswith("tests/") and p.rsplit("/", 1)[-1].startswith("test_")
+                and p.endswith(".py"))
+    flows = sorted(p.rsplit("/", 1)[-1] for p in snap.files if p.startswith(".github/workflows/"))
+    if not tests and not flows:
+        return ""
+    return (f"{tests} pytest modules under `tests/`. CI workflows in `.github/workflows/`: "
+            + ", ".join(f"`{f}`" for f in flows) + ". A passing internal test is not external "
+            "verification; which properties are established, and how, is in the capability "
+            "register in the Documentation component.")
+
+
+def _section(title: str, body: str) -> str:
+    return f"\n## {title}\n\n{body}\n" if body else ""
+
+
+def component_extra(key: str, snap: Snapshot) -> str:
+    if key == "paper":
+        return _section("Abstract", abstract(snap))
+    if key == "data":
+        return (_section("Datasets", datasets_table(snap))
+                + _section("Sources and rights", SOURCES_NOTE))
+    if key == "experiments":
+        return _section("Analysis plans", plans_table(snap) + (
+            "\n\nThe plans are stored in the Documentation component." if plans_table(snap) else ""))
+    if key == "verification":
+        return _section("What is tested", verification_summary(snap))
+    if key == "docs":
+        return _section("Assurance registers", registers_list(snap))
+    return ""
+
+
+def registers_list(snap: Snapshot) -> str:
+    regs = sorted(p for p in snap.files if p.startswith("docs/assurance/") and p.count("/") == 2
+                  and p.endswith((".yaml", ".yml")))
+    if not regs:
+        return ""
+    return ("The machine-readable registers. When a document disagrees with one of them, the "
+            "register wins. The claims are summarised on the project page.\n\n"
+            + "\n".join(f"- `{p}`" for p in regs))
+
+
+SOURCES_NOTE = (
+    "Data here is either sampled from the upstream benchmarks named in the table, under their own "
+    "licences, or generated in this repository. Third-party material is not relicensed; "
+    "`legal/THIRD_PARTY_NOTICES.md` (Documentation component) lists every source and its terms. "
+    "Sources that may not be redistributed (ToolSandbox) are built locally and never committed. "
+    "Stored model outputs are subject to the providers' terms.")
+
+
 def _component_readme(c: Component, snap: Snapshot, paths: list[str], size: int) -> str:
     tree = f"{GITHUB}/tree/{snap.commit}"
     start = "\n".join(f"- [`{s}`]({tree}/{s.rstrip('/')})" for s in c.start)
@@ -190,7 +374,7 @@ def _component_readme(c: Component, snap: Snapshot, paths: list[str], size: int)
     return f"""# REMORA: {c.title}
 
 {c.summary}
-
+{component_extra(c.key, snap)}
 This component mirrors the repository at commit
 [`{snap.commit[:8]}`]({GITHUB}/commit/{snap.commit}) ({snap.commit_date[:10]}). Paths match
 the repository, so a file here at `x/y.py` is `x/y.py` in git. The mirror is
@@ -218,15 +402,42 @@ See `LICENSE` and `legal/` in the Documentation component.
 """
 
 
+def _research_map(snap: Snapshot, rows: list[tuple[Component, int]]) -> str:
+    def where(path: str) -> str:
+        key = next((c.key for c, _ in rows if c.owns(path) or
+                    any(f.startswith(path) and c.owns(f) for f in snap.files if path.endswith("/"))),
+                   None)
+        comp = next((c for c, _ in rows if c.key == key), None)
+        return f"[`{path}`](https://osf.io/{comp.node}/)" if comp else f"`{path}`"
+
+    lines = ["| Part of the record | Where |", "|---|---|"]
+    for label, paths in RESEARCH_MAP:
+        present = [p for p in paths if _exists(snap, p)]
+        if present:
+            lines.append(f"| {label} | {', '.join(where(p) for p in present)} |")
+    return "\n".join(lines)
+
+
 def _root_readme(snap: Snapshot, rows: list[tuple[Component, int]]) -> str:
     table = "\n".join(
         f"| [{c.title}](https://osf.io/{c.node}/) | {c.summary} | {n:,} |" for c, n in rows)
     total = sum(n for _, n in rows)
+    summary = abstract(snap)
     return f"""# REMORA: Verifiable Authority for Autonomous AI Agents
 
 An AI agent can propose any tool call. REMORA decides whether that exact call
 may run (ACCEPT, VERIFY, ABSTAIN or ESCALATE), enforces the decision at the
 point of execution, and keeps the evidence.
+{_section("Abstract", summary + chr(10) * 2 + "From the paper; each result cites its entry in the claim register." if summary else "")}
+## The research record
+
+{_research_map(snap, rows)}
+
+When documents disagree, the machine-readable registers under
+`docs/assurance/` win. A module in the Reference implementation is not
+necessarily on the enforcing path; the capability register says what is wired.
+{_section("Claims", claims_table(snap))}
+## This project
 
 This OSF project mirrors the REMORA-research repository at commit
 [`{snap.commit[:8]}`]({GITHUB}/commit/{snap.commit}) ({snap.commit_date[:10]}), split
@@ -248,28 +459,17 @@ Each component has its own README, a `SNAPSHOT.json` naming the commit, and a
 repository, so the six components together reproduce the tree at that commit
 ({total:,} files).
 
-## Reading order
-
-1. `README.md` and `DEVELOPER_OVERVIEW.md` (Documentation): what REMORA is and
-   the shortest technical path through it.
-2. `paper/remora_paper.pdf` (Paper).
-3. `docs/assurance/claim_register_v1.yaml` (Documentation): every claim and the
-   committed evidence it resolves to in the Data component.
-4. `NEGATIVE_RESULTS.md` (Documentation): results that did not hold, kept on
-   purpose.
-5. `docs/06-reproducibility.md` (Documentation): how to rerun the tests and
-   benchmarks, and how this mirror is kept.
-
-When documents disagree, the machine-readable registers under
-`docs/assurance/` win. A module in the Reference implementation is not
-necessarily on the enforcing path; the capability register says what is wired.
-
 ## Registrations
 
 Registrations of this project are Open-Ended Registrations of a completed
 snapshot, one per release. They are not preregistrations: the analyses in them
 were run before they were registered. The repository's own pre-registration
-record is the set of statistical analysis plans under `docs/assurance/`.
+record is the set of analysis plans under `docs/assurance/`, listed in the
+Experiments component.
+
+## Rights, data and corrections
+
+{RIGHTS_NOTE}
 
 ## Licence and citation
 
@@ -281,8 +481,28 @@ Research lead: Stian Skogbrott, independent researcher.
 """
 
 
-def build_plans(snap: Snapshot) -> list[Plan]:
+# Stated on the project page because OSF's terms make the depositor answer for
+# rights, licence restrictions and the accuracy of deposited data.
+RIGHTS_NOTE = """\
+- **Rights.** The original material is the author's and is licensed under
+  BUSL-1.1. Third-party datasets, schemas and fixtures stay under their own
+  licences and are listed with their terms in `legal/THIRD_PARTY_NOTICES.md`.
+  Material that may not be redistributed is not in the repository.
+- **Human participants.** No dataset here was collected from human
+  participants. The data are sampled from public benchmarks, generated in the
+  repository, or are outputs of the models named in the result artifacts.
+- **Corrections.** Errors are corrected in git, and this mirror follows within
+  one CI run. A result that is revised is not removed: the claim register marks
+  it superseded and names its replacement, and `NEGATIVE_RESULTS.md` keeps
+  what did not hold. Registrations stay as they were registered.
+- **Copies.** The GitHub repository is the primary copy and this project a
+  verified mirror of it; neither is the only copy."""
+
+
+def build_plans(snap: Snapshot, strict: bool = False) -> list[Plan]:
     by_key = assign(sorted(snap.files))
+    if strict and (gone := missing_research_paths(snap)):
+        raise LayoutError("RESEARCH_MAP names paths that are not tracked:\n  " + "\n  ".join(gone))
     plans, rows = [], []
     for c in LAYOUT:
         paths = by_key[c.key]
@@ -498,7 +718,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         snap = read_snapshot(args.commit)
-        plans = build_plans(snap)
+        plans = build_plans(snap, strict=True)
     except LayoutError as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
