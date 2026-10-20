@@ -310,20 +310,28 @@ def commit_labeled_result(
     arguments: Mapping[str, Any],
     raw_result: Any,
     source_metadata: Mapping[str, Mapping[str, Iterable[str]]] | None = None,
+    expected_epoch: int | None = None,
 ) -> CommittedFlowResult:
     """Compute labels, persist handles and context raise BEFORE returning
     ``rendered_result`` to the agent (SDD v2 WP-04 / AR-017, IFC-04b).
 
     If persistence fails, raises :class:`FlowCommitFailed` with no raw or
-    rendered payload attached.
+    rendered payload attached. With *expected_epoch* (the epoch the dispatch
+    check passed on), a context whose label moved in between is refused as
+    ``flow_epoch_changed_during_dispatch``: the call ran, and its result is
+    not released under a flow decision made on a stale label.
     """
     import hashlib
     from remora.flow.observe import _lineage
 
     failed = False
+    moved = False
     updated: Any = None
     try:
         state = contexts.load(tenant_id, principal, context_id)
+        if expected_epoch is not None and state.epoch != expected_epoch:
+            moved = True
+            raise FlowCommitFailed("flow_epoch_changed_during_dispatch")
         lineage = _lineage(lambda cid: contexts.load(tenant_id, principal, cid), state)
         if handles is not None:
             res = handles.resolve(tenant_id, lineage, arguments, context_label=state.label)
@@ -355,6 +363,8 @@ def commit_labeled_result(
         failed = True
     # Raise outside the handler: neither cause nor implicit exception context
     # may retain a store exception containing raw tool data.
+    if moved:
+        raise FlowCommitFailed("flow_epoch_changed_during_dispatch") from None
     if failed or updated is None:
         raise FlowCommitFailed("flow_result_commit_failed") from None
     return CommittedFlowResult(

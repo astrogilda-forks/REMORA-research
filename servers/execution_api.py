@@ -30,6 +30,7 @@ rather than assumed away.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -720,11 +721,14 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
     payload (pre-#82 or synchronous-path rows) are skipped — the
     reconciler, not the worker, owns their fate.
     """
+    from functools import partial
+
     from remora.execution.service import dispatch_pending_intent
 
     results: list[dict[str, Any]] = []
     for row in _outbox().pending(tenant):
-        result = dispatch_pending_intent(
+        result = _with_flow_principal(_proposer_of_item(tenant, row.item_id), partial(
+            dispatch_pending_intent,
             row,
             tenant=tenant,
             principal=f"worker:{worker_id}",
@@ -749,7 +753,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             approval_policy=_approval_policy_for(tenant),
             ws1_gate=_ws1_gate(),
             ws1_capability=_ws1_capability(tenant),
-        )
+        ))
         if result is not None:
             results.append(result)
     return results
@@ -1131,6 +1135,34 @@ _FLOW_HANDLES: Any = None
 _FLOW_PRINCIPAL: _contextvars.ContextVar[str | None] = (
     _contextvars.ContextVar("remora_flow_principal", default=None)
 )
+
+
+def _proposer_of_item(tenant: str, item_id: str) -> str | None:
+    """The actor of the proposal a review item belongs to, or None."""
+    from remora.execution.service import _assessed_payload
+
+    try:
+        _toolspec_hash, proposal_id = _assessed_record(tenant, item_id)
+        actor = (_assessed_payload(_CHAIN, tenant, proposal_id) or {}).get("actor")
+    except Exception:
+        return None
+    return str(actor) if actor else None
+
+
+def _with_flow_principal(principal: str | None, run: Callable[[], Any]) -> Any:
+    """Run *run* with the flow principal set to *principal*.
+
+    Flow contexts belong to the agent that proposed the call. On the review
+    path the reviewer executes, and in the async worker nobody is
+    authenticated, so the observation and the dispatch-time flow check read
+    the proposer's context, not the executor's. Before this the context was
+    unknown there and no flow check ran at dispatch.
+    """
+    token = _FLOW_PRINCIPAL.set(principal)
+    try:
+        return run()
+    finally:
+        _FLOW_PRINCIPAL.reset(token)
 
 
 def _flow_handles() -> Any:
@@ -2590,9 +2622,10 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     handles it mints and raises the context label, and only then hands back
     the rendered result. A failed commit withholds the result.
 
-    Residual: the check and the dispatch are not one transaction. A
-    concurrent call in the same context can raise the label between them;
-    that raise is not seen by this call, only by the next one.
+    The check and the dispatch are not one transaction. A concurrent call in
+    the same context can raise the label between them. The commit then finds
+    another epoch and withholds the result: the effect has happened, and
+    nothing it returned reaches the agent under the stale decision.
     """
     from remora.flow.labeler import (
         FlowLabeler,
@@ -2616,7 +2649,7 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
         done = commit_labeled_result(
             FlowLabeler(), flow, contexts=contexts, handles=handles, tenant_id=tenant,
             principal=principal, context_id=context_id, proposal_id=proposal_id,
-            arguments=tool_call.arguments, raw_result=raw)
+            arguments=tool_call.arguments, raw_result=raw, expected_epoch=expected[0])
         return done.rendered_result, {"raw_result_sha256": done.raw_result_sha256,
                                       "epoch": done.new_epoch,
                                       "minted_handles": len(done.minted_handle_ids)}
@@ -2777,7 +2810,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
     # Orchestration lives in remora.execution.service (issue #241, slice 8);
     # this route binds the module's ambient state and maps domain errors.
     try:
-        response = _execute_approved_item(
+        response = _with_flow_principal(_proposer_of_item(tenant, req.item_id), lambda: _execute_approved_item(
             tenant=tenant, principal=principal, item_id=req.item_id,
             tool_call=req.tool_call,
             transaction=db_transaction_state, item_tenant=_ITEM_TENANT,
@@ -2801,7 +2834,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             approval_policy=_approval_policy_for(tenant),
             ws1_gate=_ws1_gate(),
             ws1_capability=_ws1_capability(tenant),
-        )
+        ))
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ToolSpecChanged as exc:

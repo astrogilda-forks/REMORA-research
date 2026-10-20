@@ -10,11 +10,12 @@ returned. What these tests pin:
 * a clean call executes and reports the commit (raw digest, new epoch);
 * a label raised after the decision refuses before the dispatcher runs;
 * a commit that fails withholds the result, and the call counts as executed;
+* a label raised while the tool runs withholds the result as well;
+* the review path and the async worker check flow as the proposer;
 * with flow control off nothing changes.
 
-Not covered here: the check and the dispatch are not one transaction (see
-``servers.execution_api._flow_at_dispatch``), and the custody-split
-execution domain does not re-check flow, because it holds no flow store.
+Not covered: the custody-split execution domain does not re-check flow,
+because it holds no flow store.
 """
 from __future__ import annotations
 
@@ -198,3 +199,70 @@ def test_a_forwarded_preview_is_not_committed_as_the_result(monkeypatch):
         if truncated:
             assert out["result_withheld"] == "flow_result_truncated" and committed == []
     assert committed == [{"a": 1}]
+
+
+def test_a_label_raised_during_dispatch_withholds_the_result(client, monkeypatch):
+    """The race the dispatch check cannot see: another call in the same
+    context raises the label while this one runs. The commit finds a new
+    epoch, so the effect counts and its result is not released."""
+    exec_mod = _mod()
+    context_id = _context(client)
+    real = exec_mod._local_dispatcher
+
+    class Racing:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def dispatch(self, *args, **kwargs):
+            exec_mod._flow_contexts().raise_label("acme", PRINCIPAL, context_id,
+                                                  Label({USER, MODEL}, Integrity.TRUSTED))
+            return self.inner.dispatch(*args, **kwargs)
+
+    monkeypatch.setattr(exec_mod, "_local_dispatcher", lambda lease: Racing(real(lease)))
+    execution = _redeem(client, *_mint(context_id))
+    assert execution["executed"] is True
+    assert execution["result_withheld"] == "flow_epoch_changed_during_dispatch"
+    assert "result" not in execution
+
+
+STORE_FLOW = parse_flow({
+    "provider": "tcb", "arguments": {"artifact_id": {"kind": "text"}, "content": {"kind": "text"}},
+    "sources": {"default_integrity": "TRUSTED"},
+    "sink": {"recipients": {"static": ["ext://artifact-store.example"]},
+             "payload_args": ["content"]}})
+
+
+def _reviewed(client, monkeypatch):
+    """A write in a flow context, assessed into review by the proposer and
+    approved by another principal. Returns the item and the call."""
+    import servers.api as api_mod
+    from tests.test_toolspec_execution_wiring import CALL as WRITE_CALL
+
+    monkeypatch.setattr(_mod(), "_flow_spec",
+                        lambda tool: {"read_telemetry": FLOW, "store_artifact": STORE_FLOW}.get(tool))
+    call = dict(WRITE_CALL, context_id=_context(client), task_id="task-1")
+    item = client.post("/v1/execution/assess", json=call).json()["review_item_id"]
+    monkeypatch.setattr(api_mod, "_authenticated_principal", lambda request: "reviewer-2")
+    assert client.post("/v1/execution/approve", json={"item_id": item}).status_code == 200
+    monkeypatch.setattr(api_mod, "_authenticated_principal", lambda request: PRINCIPAL)
+    return item, call
+
+
+def test_the_review_path_checks_flow_and_commits_labels(client, monkeypatch):
+    item, call = _reviewed(client, monkeypatch)
+    r = client.post("/v1/execution/execute", json={"item_id": item, "tool_call": call})
+    assert r.status_code == 200, r.text
+    execution = r.json()["tool_execution"]
+    assert execution["executed"] is True and "flow_commit" in execution
+
+
+def test_the_async_worker_checks_flow_as_the_proposer(client, monkeypatch):
+    """The worker has no authenticated principal. It reads the proposer's
+    flow context, so the dispatch-time check and the label commit run."""
+    item, call = _reviewed(client, monkeypatch)
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    r = client.post("/v1/execution/execute", json={"item_id": item, "tool_call": call})
+    assert r.status_code == 202, r.text
+    [out] = _mod().dispatch_pending_intents("acme", worker_id="w1")
+    execution = out["tool_execution"]
+    assert execution["executed"] is True and "flow_commit" in execution
