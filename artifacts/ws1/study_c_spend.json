@@ -1,0 +1,13 @@
+{
+ "runs": [
+  {
+   "input_tokens": 665897,
+   "output_tokens": 61470,
+   "purpose": "pilot-v1",
+   "refusals": 63,
+   "requests": 566,
+   "spent_usd": 3.892988
+  }
+ ],
+ "spent_usd": 3.892988
+}
