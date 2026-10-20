@@ -170,8 +170,8 @@ def test_the_domain_check_catches_a_weakened_composition(monkeypatch, weakening)
             (Cap(c.source, E if c.action is AB else c.action, c.reason), code)
             for c, code in real_pre(*a)))
     elif weakening == "clean_reading_clears_veto":
-        def lifted(outcome, assessment, prof, veto, verification_open):
-            cap, is_veto = real_mon(outcome, assessment, prof, veto, verification_open)
+        def lifted(outcome, assessment, prof, veto, verification_open, **kw):
+            cap, is_veto = real_mon(outcome, assessment, prof, veto, verification_open, **kw)
             if assessment is not None and assessment.reason == "clean":
                 return None, False
             return cap, is_veto

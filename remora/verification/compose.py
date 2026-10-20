@@ -118,8 +118,16 @@ def _precondition_caps(requirements: RequirementSet, checked: CheckedPreconditio
 
 def _monitor_cap(outcome: AssessmentOutcome, assessment: MonitorAssessment | None,
                  profile: MonitorProfile, veto_on_record: bool,
-                 verification_open: bool) -> tuple[tuple[Cap, str] | None, bool]:
-    """The monitor's cap and whether it is (or stays) a veto."""
+                 verification_open: bool, all_proved: bool) -> tuple[tuple[Cap, str] | None, bool]:
+    """The monitor's cap and whether it is (or stays) a veto.
+
+    Uncertainty (codes without a crossed threshold) asks for context. While a
+    precondition is open it caps the call: VERIFY if a lookup can still run,
+    ABSTAIN if not. Once every required precondition is PROVED by a
+    registered verifier there is nothing left to look up, and uncertainty
+    alone caps nothing; a crossed threshold still does (Study B pilot v2,
+    where the WS1 SDD §9 rule blocked every grounded read).
+    """
     if profile.mode is MonitorMode.SHADOW:
         return None, False
     veto_action = E if profile.semantic_review_role else AB
@@ -128,7 +136,8 @@ def _monitor_cap(outcome: AssessmentOutcome, assessment: MonitorAssessment | Non
     if outcome is AssessmentOutcome.ASSESSED and assessment is not None:
         if assessment.crossed:
             return (Cap("monitor", veto_action, _MON), "monitor_risk_over_threshold"), True
-        if assessment.uncertainty_codes and profile.mode is MonitorMode.REQUIRED:
+        if assessment.uncertainty_codes and profile.mode is MonitorMode.REQUIRED \
+                and not all_proved:
             action = V if verification_open else AB
             return (Cap("monitor", action, _MON), "monitor_uncertain"), False
         return None, False
@@ -168,18 +177,18 @@ def compose_authorized_decision(
         caps.append((Cap("freshness", AB, _PRE, approvable=False), "evidence_expired"))
     caps.extend(_precondition_caps(requirements, checked, verifiable, budget_exhausted))
 
+    proved_all = requirements.authorizable and all(
+        checked.state(p.precondition_id) is LogicalState.PROVED
+        for p in requirements.preconditions if p.required)
     outcome, monitor_reason = monitor_usable(assessment, profile, context, checked, now_s)
     monitor, veto = _monitor_cap(outcome, assessment, profile, monitor_veto_on_record,
-                                 verification_open=bool(verifiable))
+                                 verification_open=bool(verifiable), all_proved=proved_all)
     if monitor is not None:
         caps.append(monitor)
 
     final = meet(cap for cap, _ in caps)
     final_action = final.action
     codes = [code for cap, code in caps if code != "engine"]
-    proved_all = requirements.authorizable and all(
-        checked.state(p.precondition_id) is LogicalState.PROVED
-        for p in requirements.preconditions if p.required)
     if final_action is A and not (proved_all and base.action is A):
         final_action, final = AB, Cap("ceiling", AB, _PRE, approvable=False)
         codes.append("authority_ceiling")

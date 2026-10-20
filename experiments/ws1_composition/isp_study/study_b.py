@@ -67,7 +67,7 @@ PILOT_CUSTOMERS = 2
 #: per-call log: a test ran the pilot entry point, which deleted the log file
 #: while the paid run was still writing to it. A pilot never deletes or
 #: overwrites an earlier one; a new pilot takes a new version.
-PILOT_VERSION = 2
+PILOT_VERSION = 3
 QUESTION_SET = digest(["injection", "target_mismatch", "study-b-monitor-prompt-v1"])
 PROVISIONAL_THRESHOLD = 0.5
 #: The monitor profile's pinned identifier: the model plus the monitor prompt
