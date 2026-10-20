@@ -5712,6 +5712,9 @@ cap at 809 episodes and was resumed once without rerunning a logged
 episode. The last 16 cost 1.16 USD, so holdout spend was 45.48 USD against
 a sealed cap of 44.49 USD. Study C spent 49.37 USD, and WS1 in total 89.86
 of the owner's 100 USD. The planned power of 1.0 was degenerate (three
-equal pilot differences). What remains open is a monitor threshold chosen
+equal pilot differences). After the holdout, a CodeQL fix on master renamed
+an unused constant in `safe_utility.py`. Its frozen hash no longer matches
+the seal, and its grading is unchanged; the study reproduces from its
+sealing commit. What remains open is a monitor threshold chosen
 on enough data, or a monitor that cannot veto a call its preconditions
 proved, before any claim about the learned part.
