@@ -52,12 +52,14 @@ from remora.verification.planner import (
     Reserve,
     TaskCallLedger,
     FamilyLedger,
+    LookupEstimate,
     PlannerMode,
     VerificationBudget,
     run_verification,
 )
 from remora.verification.preconditions import (
     ProposalContext,
+    RequirementSet,
     derive_preconditions,
     tagged_digest,
 )
@@ -74,7 +76,10 @@ WS1_MODES = ("off", "shadow", "enforce")
 ENFORCE_DEPENDENCIES = ("IFC-04b", "IFC-06", "IFC-11", "IFC-12", "IFC-13")
 #: The deployment-declared absence of flow state, bound like any digest.
 FLOW_ABSENT = tagged_digest("flow-absent", {"flow_control": "off"})
-_RUNTIME_MODES = (PlannerMode.H0, PlannerMode.H_DET, PlannerMode.H_EDV)
+_RUNTIME_MODES = (PlannerMode.H0, PlannerMode.H_DET, PlannerMode.H_COST, PlannerMode.H_AR,
+                  PlannerMode.H_EDV)
+_COST_MODES = (PlannerMode.H_COST, PlannerMode.H_AR)
+_HINT_MODES = (PlannerMode.H_EDV, PlannerMode.H_AR)
 _HEX = frozenset("0123456789abcdef")
 
 
@@ -109,17 +114,47 @@ class Ws1Deployment:
     #: that names no task is refused. ``task_call_cap`` is units per task.
     task_ledger: TaskCallLedger | None = None
     task_call_cap: int = 30
+    #: H_COST and H_AR (SDD v2 AR-025, AR-026): estimated cost and settlement
+    #: per (predicate_id, resolver_id), owned by the deployment, and the cost
+    #: units one evaluation may spend. Keyed by predicate rather than
+    #: precondition, because a precondition ID carries a per-call binding.
+    #: Cost here is estimated, not metered.
+    estimates: Mapping[tuple[str, str], LookupEstimate] | None = None
+    cost_budget_units: int | None = None
 
     def __post_init__(self) -> None:
         if self.planner_mode not in _RUNTIME_MODES:
             raise ValueError(f"planner mode {self.planner_mode.value!r} is a research control, "
                              "not a runtime mode")
+        if self.planner_mode in _COST_MODES:
+            if self.estimates is None or self.cost_budget_units is None:
+                raise ValueError(f"{self.planner_mode.name} requires deployment estimates "
+                                 "and a cost budget")
+            if type(self.cost_budget_units) is not int or self.cost_budget_units < 0:
+                raise ValueError("invalid cost budget")
+            declared = {(spec.predicate_id, rid) for specs in self.registry.tools.values()
+                        for spec in specs for rid in spec.resolver_ids}
+            if not declared <= set(self.estimates):
+                raise ValueError("missing deployment estimate")
+
+    def call_estimates(self, requirements: RequirementSet
+                       ) -> dict[tuple[str, str], LookupEstimate] | None:
+        """The deployment's estimates keyed by this call's precondition IDs."""
+        if self.estimates is None or self.planner_mode not in _COST_MODES:
+            return None
+        return {(p.precondition_id, rid): self.estimates[(p.predicate_id, rid)]
+                for p in requirements.preconditions for rid in p.resolver_ids
+                if (p.predicate_id, rid) in self.estimates}
 
     @property
     def binding_terms(self) -> dict[str, Any]:
         return {"profile_hash": self.monitor_profile.profile_hash,
                 "registry_hash": self.registry.registry_hash,
                 "planner_mode": self.planner_mode.value,
+                **({"cost_budget_units": self.cost_budget_units,
+                    "estimates": sorted([*key, e.cost_units, e.settle_ppm, e.refute_ppm]
+                                        for key, e in (self.estimates or {}).items())}
+                   if self.planner_mode in _COST_MODES else {}),
                 "budget": {k: v for k, v in dataclasses.asdict(self.budget).items()
                            if k.startswith(("max_", "requests_", "wall_", "resolver_"))}}
 
@@ -343,7 +378,9 @@ class Ws1Gate:
             context, requirements, registry=d.registry, verifiers=d.verifiers,
             resolvers=d.resolvers, held_capabilities=d.resolve_capabilities(tenant, principal),
             mode=d.planner_mode, budget=d.budget, clock_ms=d.clock_ms,
-            hints_for=hints if d.planner_mode is PlannerMode.H_EDV else None, review=review,
+            hints_for=hints if d.planner_mode in _HINT_MODES else None, review=review,
+            estimates=d.call_estimates(requirements),
+            cost_budget_units=d.cost_budget_units if d.planner_mode in _COST_MODES else None,
             # Monitor calls are reserved in ask(); the loop reserves lookups.
             reserve=None if reserve is None else (
                 lambda kind, key: RESERVED if kind == "monitor" else reserve(kind, key)))
