@@ -11,11 +11,15 @@ This file lists externally relevant changes by release. Fine-grained development
   checks the wall deadline before each lookup inside a round with a closed
   timeout boundary (`>=`), and adds the deterministic cost-per-settlement
   baseline (`LookupEstimate`, `choose_next_by_cost`, `PlannerMode.H_COST`),
-  bounded lookahead planner (`choose_next_lookahead`, `PlannerMode.H_AR`,
-  AR-026), durable SQLite task reservation reference (`TaskCallLedger`,
-  AR-013..016), multi-cause refusal diagnostic (`diagnose_refusal_causes`,
-  AR-023) and independent recovery-bundle verifier (`verify_recovery_bundle`,
-  AR-029..032).
+  bounded lookahead planner (`choose_next_lookahead`, `PlannerMode.H_AR` with
+  joint AND-feasibility pruning, Bellman expected-cost minimization over
+  `refute_ppm` and monitor hints, and multi-round `cost_budget_units` tracking
+  in `run_verification`; AR-026..028), durable SQLite task reservation reference
+  (`TaskCallLedger`, AR-013..016), multi-cause refusal diagnostic
+  (`diagnose_refusal_causes`, AR-023) and independent recovery-bundle verifier
+  (`verify_recovery_bundle`, AR-029..032). `experiments/ws1_composition/simulator.py`
+  adds `run_sdd_v2_planner_ablation` comparing `H0`, `H_DET`, `H_RANDOM`,
+  `H_COST`, `H_EDV` and `H_AR`.
 - `remora/verification/resolvers.py` adds `ResolverAdapterContract`,
   `TransportResponse` and `BoundedResolverAdapter` (separate monotonic and wall
   clocks, destination allowlist, redirect/raw-URL refusal, byte limit, tenant

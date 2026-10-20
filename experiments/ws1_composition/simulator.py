@@ -35,7 +35,12 @@ from remora.policy.decision_engine import RemoraDecisionEngine
 from remora.policy.observation import PolicyObservation, canonical_tool_call_hash
 from remora.verification.check import CheckedPreconditions
 from remora.verification.compose import compose_authorized_decision
-from remora.verification.planner import PlannerMode, VerificationBudget, run_verification
+from remora.verification.planner import (
+    LookupEstimate,
+    PlannerMode,
+    VerificationBudget,
+    run_verification,
+)
 from remora.verification.preconditions import (
     LogicalState,
     ProposalContext,
@@ -101,7 +106,7 @@ class AclVerifier:
         return (LogicalState.PROVED, "reader") if ok else (LogicalState.REFUTED, "not_reader")
 
 
-VERIFIERS = {"record": RecordVerifier(), "acl": AclVerifier()}
+VERIFIERS: dict[str, Any] = {"record": RecordVerifier(), "acl": AclVerifier()}
 
 
 def _sources() -> dict[str, InMemorySource]:
@@ -271,6 +276,145 @@ def summarize(outcomes: Sequence[Outcome]) -> dict[str, Any]:
                 "resolver_calls": sum(o.resolver_calls for o in rows),
             }
     return out
+
+
+SDD_V2_ARMS = ("H0", "H_DET", "H_RANDOM", "H_COST", "H_EDV", "H_AR")
+SDD_V2_COST_CAP = 11
+
+SDD_V2_REGISTRY = PreconditionRegistry(
+    tools={
+        "set_port_profile": (
+            PredicateSpec(
+                "port_in_work_order", M, "record",
+                ("inventory", "inventory_deep"), "port",
+            ),
+            PredicateSpec("customer_in_work_order", M, "record", ("crm",), "customer"),
+            PredicateSpec("circuit_in_work_order", M, "record", ("circuits",), "circuit"),
+        ),
+        "send_report": (PredicateSpec("recipient_may_read", M, "acl", ("acl",), "recipient"),),
+        "reboot_cpe": (PredicateSpec("cpe_registered", M, "record"),),
+    },
+    resolvers={
+        "inventory": ResolverSpec(
+            "inventory", "inventory-db", frozenset({"port_in_work_order"}), "resolve:inventory"
+        ),
+        "inventory_deep": ResolverSpec(
+            "inventory_deep", "inventory-deep-db", frozenset({"port_in_work_order"}),
+            "resolve:inventory",
+        ),
+        "crm": ResolverSpec("crm", "crm-db", frozenset({"customer_in_work_order"}), "resolve:crm"),
+        "circuits": ResolverSpec(
+            "circuits", "circuit-db", frozenset({"circuit_in_work_order"}), "resolve:circuits"
+        ),
+        "acl": ResolverSpec("acl", "acl-service", frozenset({"recipient_may_read"}), "resolve:acl"),
+    },
+)
+
+
+def _sdd_v2_estimates(reqs: Any) -> dict[tuple[str, str], LookupEstimate]:
+    table = {
+        ("port_in_work_order", "inventory"): LookupEstimate(4, 600_000, refute_ppm=250_000),
+        ("port_in_work_order", "inventory_deep"): LookupEstimate(6, 990_000, refute_ppm=250_000),
+        ("customer_in_work_order", "crm"): LookupEstimate(5, 750_000, refute_ppm=100_000),
+        ("circuit_in_work_order", "circuits"): LookupEstimate(2, 950_000, refute_ppm=300_000),
+        ("recipient_may_read", "acl"): LookupEstimate(2, 950_000, refute_ppm=400_000),
+    }
+    out: dict[tuple[str, str], LookupEstimate] = {}
+    for pre in reqs.preconditions:
+        for rid in pre.resolver_ids:
+            if (pre.predicate_id, rid) in table:
+                out[(pre.precondition_id, rid)] = table[(pre.predicate_id, rid)]
+    return out
+
+
+def run_sdd_v2_planner_ablation(monitor: str = "honest") -> dict[str, dict[str, Any]]:
+    """Compare H0, H_DET, H_RANDOM, H_COST, H_EDV and H_AR under a shared
+    1-lookup-per-round, 3-round, 11-unit cost budget (SDD v2 WP-06 / AR-028)."""
+    engine = RemoraDecisionEngine()
+    mode_map = {
+        "H0": PlannerMode.H0,
+        "H_DET": PlannerMode.H_DET,
+        "H_RANDOM": PlannerMode.H_RANDOM,
+        "H_COST": PlannerMode.H_COST,
+        "H_EDV": PlannerMode.H_EDV,
+        "H_AR": PlannerMode.H_AR,
+    }
+    summary: dict[str, dict[str, Any]] = {}
+    for arm in SDD_V2_ARMS:
+        auth_dispatched = 0
+        unauth_dispatched = 0
+        total_calls = 0
+        unauth_calls = 0
+        total_cost = 0
+        for s in scenarios():
+            ctx = _context(s)
+            reqs = derive_preconditions(ctx, s.args, SDD_V2_REGISTRY)
+            base_srcs = _sources()
+            srcs = {
+                **base_srcs,
+                "inventory_deep": InMemorySource(
+                    "inventory_deep", "inventory-deep-db", base_srcs["inventory"].records
+                ),
+            }
+            ests = _sdd_v2_estimates(reqs)
+            clock = iter(range(_NOW_MS, _NOW_MS + 10_000_000, 25))
+
+            def hints_for(checked: CheckedPreconditions, _s: Scenario = s, _ctx: ProposalContext = ctx, _reqs: Any = reqs) -> Sequence[str]:
+                raw = _monitor_raw(monitor, _s, _ctx, checked, _reqs)
+                a = assess_monitor_response(
+                    raw, profile=PROFILE, context_hash=_ctx.context_hash,
+                    evidence_digest=checked.evidence_digest,
+                    input_digest=checked.evidence_digest,
+                    now_s=_NOW_MS // 1000, error="timeout",
+                )
+                return a.hint_precondition_ids
+
+            budget = VerificationBudget(max_rounds=3, max_resolver_calls=3, requests_per_round=1)
+            run = run_verification(
+                ctx, reqs, registry=SDD_V2_REGISTRY, verifiers=VERIFIERS, resolvers=srcs,
+                held_capabilities=HELD, mode=mode_map[arm], budget=budget,
+                clock_ms=lambda: next(clock), hints_for=hints_for, seed=SEED,
+                estimates=ests, cost_budget_units=SDD_V2_COST_CAP,
+            )
+            now_s = next(clock) // 1000
+            raw = _monitor_raw(monitor, s, ctx, run.checked, reqs)
+            assessment = assess_monitor_response(
+                raw, profile=PROFILE, context_hash=ctx.context_hash,
+                evidence_digest=run.checked.evidence_digest,
+                input_digest=run.checked.evidence_digest, now_s=now_s, error="timeout",
+            )
+            base = engine.decide(PolicyObservation(
+                question=f"{s.tool} for WO-17", risk_tier="low",
+                action_type="read", phase="ordered", trust_score=0.92,
+            ))
+            rec = compose_authorized_decision(
+                base, ctx, reqs, run.checked, assessment, PROFILE,
+                now_s=now_s, budget_exhausted=run.budget_exhausted,
+            )
+            dispatched = rec.final_action == "accept"
+            calls = sum(len(x.calls) for x in srcs.values())
+            spent_units = sum(
+                ests[(req.precondition_id, req.resolver_id)].cost_units
+                for req in run.issued.values()
+                if (req.precondition_id, req.resolver_id) in ests
+            )
+            total_calls += calls
+            total_cost += spent_units
+            if s.authorized and dispatched:
+                auth_dispatched += 1
+            if not s.authorized:
+                unauth_calls += calls
+                if dispatched:
+                    unauth_dispatched += 1
+        summary[arm] = {
+            "authorized_dispatched": auth_dispatched,
+            "unauthorized_dispatched": unauth_dispatched,
+            "total_resolver_calls": total_calls,
+            "unauthorized_resolver_calls": unauth_calls,
+            "total_cost_units": total_cost,
+        }
+    return summary
+
 
 
 if __name__ == "__main__":  # pragma: no cover

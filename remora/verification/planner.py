@@ -80,16 +80,19 @@ class PlannerMode(StrEnum):
 
 @dataclass(frozen=True)
 class LookupEstimate:
-    """Server-owned development estimate for a (precondition_id, resolver_id) pair (AR-025)."""
+    """Server-owned development estimate for a (precondition_id, resolver_id) pair (AR-025/026)."""
 
     cost_units: int
     settle_ppm: int
+    refute_ppm: int = 0
 
     def __post_init__(self) -> None:
         if type(self.cost_units) is not int or self.cost_units <= 0:
             raise ValueError("cost_units must be a positive integer")
         if type(self.settle_ppm) is not int or not 1 <= self.settle_ppm <= 1_000_000:
             raise ValueError("settle_ppm must be an integer in [1, 1000000]")
+        if type(self.refute_ppm) is not int or not 0 <= self.refute_ppm <= self.settle_ppm:
+            raise ValueError("refute_ppm must be an integer in [0, settle_ppm]")
 
 
 @dataclass(frozen=True)
@@ -347,17 +350,23 @@ def choose_next_lookahead(
     estimates: Mapping[tuple[str, str], LookupEstimate],
     *,
     remaining_cost_units: int,
+    hints: Sequence[str] = (),
     max_candidates: int = 64,
     max_depth: int = 3,
     beam_width: int = 16,
     cpu_deadline_ms: float = 50.0,
     mono_ns: Callable[[], int] | None = None,
 ) -> tuple[tuple[str, str], ...]:
-    """Bounded lookahead over which required MACHINE facts can be settled within
-    budget (SDD v2 WP-06 / AR-026).
+    """Bounded Bellman/beam lookahead over required MACHINE preconditions (SDD v2 WP-06 / AR-026).
 
-    Never mutates ``checked``: modelled transitions are planning hypotheses only.
-    Aborts expansion on the hard CPU deadline and returns the best prefix found.
+    1. Joint AND-feasibility pruning: discards any candidate step whose cost
+       leaves less than the minimum cost required to cover the remaining open
+       required MACHINE preconditions within ``remaining_cost_units``.
+    2. Bellman expected-cost minimization: among jointly feasible plans, ranks
+       sequences by ``expected_cost / joint_settlement_probability``, where
+       each step's survival probability accounts for early refutation stop
+       (``refute_ppm`` plus bounded monitor hint priority on open preconditions).
+    3. Never mutates ``checked``: modelled transitions are planning hypotheses only.
     """
     if type(remaining_cost_units) is not int or remaining_cost_units < 0:
         raise ValueError("invalid remaining cost")
@@ -391,24 +400,47 @@ def choose_next_lookahead(
     need_count = len(open_pids)
     step_limit = min(max_depth, budget.calls_left)
     if step_limit < need_count:
-        # Cannot settle all required open MACHINE preconditions within call budget
         return ()
+
+    # Minimum cost to attempt each open precondition (for exact lookahead pruning)
+    min_cost_for_pid: dict[str, int] = {}
+    for pid, rid in candidates:
+        c_val = estimates[(pid, rid)].cost_units
+        if pid not in min_cost_for_pid or c_val < min_cost_for_pid[pid]:
+            min_cost_for_pid[pid] = c_val
+
+    if sum(min_cost_for_pid.values()) > remaining_cost_units:
+        return ()
+
+    hint_rank = {
+        h: idx for idx, h in enumerate(dict.fromkeys(h for h in hints if h in min_cost_for_pid))
+    }
+
+    def _eff_refute_ppm(cand: tuple[str, str]) -> int:
+        est = estimates[cand]
+        base_ref = est.refute_ppm
+        if cand[0] in hint_rank:
+            # A valid monitor hint raises the expected early-stop weight for ordering
+            # among feasible plans (Simon-Kadane p_refute / cost ordering), never authority.
+            boost = max(600_000 - hint_rank[cand[0]] * 100_000, 100_000)
+            return min(950_000, base_ref + boost)
+        return base_ref
 
     clock = mono_ns or time.monotonic_ns
     start_ns = clock()
     deadline_ns = start_ns + int(cpu_deadline_ms * 1_000_000)
 
-    # Beam state: (sequence of (pid, rid), settled_pids frozenset, spent_cost, joint_prob_ppm)
-    beam: list[tuple[tuple[tuple[str, str], ...], frozenset[str], int, int]] = [
-        ((), frozenset(), 0, 1_000_000)
+    # Beam state: (seq, settled_pids, total_cost, joint_settle_ppm, survival_ppm, expected_cost_ppm)
+    beam: list[tuple[tuple[tuple[str, str], ...], frozenset[str], int, int, int, int]] = [
+        ((), frozenset(), 0, 1_000_000, 1_000_000, 0)
     ]
-    completed_plans: list[tuple[tuple[tuple[str, str], ...], int, int]] = []
+    completed_plans: list[tuple[tuple[tuple[str, str], ...], int, int, int]] = []
 
     for _depth in range(step_limit):
         if clock() >= deadline_ns:
             break
-        next_beam: list[tuple[tuple[tuple[str, str], ...], frozenset[str], int, int]] = []
-        for seq, settled, cost_so_far, prob_ppm in beam:
+        next_beam: list[tuple[tuple[tuple[str, str], ...], frozenset[str], int, int, int, int]] = []
+        for seq, settled, cost_so_far, settle_ppm, survival_ppm, exp_cost_ppm in beam:
             if clock() >= deadline_ns:
                 break
             for cand in candidates:
@@ -417,31 +449,38 @@ def choose_next_lookahead(
                     continue
                 est = estimates[cand]
                 new_cost = cost_so_far + est.cost_units
-                if new_cost > remaining_cost_units:
+                new_settled = settled | {pid}
+                # Joint feasibility lookahead bound: remaining open preconditions must fit
+                rem_min_cost = sum(
+                    mc for p_other, mc in min_cost_for_pid.items() if p_other not in new_settled
+                )
+                if new_cost + rem_min_cost > remaining_cost_units:
                     continue
                 new_seq = (*seq, cand)
-                new_settled = settled | {pid}
-                new_prob = max(1, (prob_ppm * est.settle_ppm) // 1_000_000)
+                new_settle = max(1, (settle_ppm * est.settle_ppm) // 1_000_000)
+                new_exp_cost = exp_cost_ppm + survival_ppm * est.cost_units
+                ref_ppm = _eff_refute_ppm(cand)
+                new_survival = max(1, (survival_ppm * (1_000_000 - ref_ppm)) // 1_000_000)
                 if len(new_settled) == need_count:
-                    completed_plans.append((new_seq, new_cost, new_prob))
+                    completed_plans.append((new_seq, new_cost, new_settle, new_exp_cost))
                 else:
-                    next_beam.append((new_seq, new_settled, new_cost, new_prob))
+                    next_beam.append((
+                        new_seq, new_settled, new_cost, new_settle, new_survival, new_exp_cost
+                    ))
         if not next_beam:
             break
-        next_beam.sort(key=lambda item: (Fraction(item[2], item[3]), item[0]))
+        next_beam.sort(key=lambda item: (Fraction(item[5], item[3]), item[2], item[0]))
         beam = next_beam[:beam_width]
 
     if completed_plans:
-        # Rank complete plans by lowest cost per joint settlement probability, then first step's cost/settle
         completed_plans.sort(key=lambda item: (
-            Fraction(item[1], item[2]),
-            Fraction(estimates[item[0][0]].cost_units, estimates[item[0][0]].settle_ppm),
+            Fraction(item[3], item[2]),  # expected_cost_ppm / joint_settle_ppm
+            Fraction(item[1], item[2]),  # worst_case_cost / joint_settle_ppm
             item[0],
         ))
         best_seq = completed_plans[0][0]
         return best_seq[: min(budget.calls_left, budget.requests_per_round)]
 
-    # Fallback if CPU deadline interrupted before full depth
     return choose_next_by_cost(
         requirements, checked, budget, estimates,
         remaining_cost_units=remaining_cost_units,
@@ -457,7 +496,9 @@ def plan_verification(requirements: RequirementSet, checked: CheckedPrecondition
     """The next round's (precondition, resolver) pairs, and the hints that were dropped."""
     candidates = open_candidates(requirements, checked, budget)
     open_ids = {pid for pid, _ in candidates}
-    rejected = tuple(h for h in hints if h not in open_ids) if mode is PlannerMode.H_EDV else tuple(hints)
+    rejected = tuple(h for h in hints if h not in open_ids) if mode in (
+        PlannerMode.H_EDV, PlannerMode.H_AR
+    ) else tuple(hints)
     if mode is PlannerMode.H0 or not requirements.authorizable:
         return [], rejected
     if mode is PlannerMode.H_COST:
@@ -473,6 +514,7 @@ def plan_verification(requirements: RequirementSet, checked: CheckedPrecondition
         return list(choose_next_lookahead(
             requirements, checked, budget, estimates,
             remaining_cost_units=remaining_cost_units,
+            hints=hints,
         )), rejected
     if mode is PlannerMode.H_EDV:
         priority = {h: i for i, h in enumerate(dict.fromkeys(h for h in hints if h in open_ids))}
@@ -504,7 +546,7 @@ class VerificationRun:
     @property
     def budget_exhausted(self) -> bool:
         return self.stop_reason in ("round_budget_exhausted", "verification_budget_exhausted",
-                                    "deadline")
+                                    "cost_budget_exhausted", "deadline")
 
 
 def run_verification(context: ProposalContext, requirements: RequirementSet, *,
@@ -514,6 +556,8 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                      clock_ms: Callable[[], int],
                      hints_for: Callable[[CheckedPreconditions], Sequence[str]] | None = None,
                      seed: int = 0,
+                     estimates: Mapping[tuple[str, str], LookupEstimate] | None = None,
+                     cost_budget_units: int | None = None,
                      evidence: Sequence[ResolverEvidence] = (),
                      issued: Mapping[str, VerificationRequest] | None = None,
                      review: ReviewAttestation | None = None) -> VerificationRun:
@@ -530,6 +574,7 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
     """
     start = clock_ms()
     deadline = start + budget.wall_deadline_ms
+    rem_cost = cost_budget_units
     evidence_list, issued_map = list(evidence), dict(issued or {})
     refused: list[tuple[str, str]] = []
     rejected_hints: list[str] = []
@@ -565,16 +610,24 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
         if clock_ms() >= deadline:
             return done("deadline")
         hints: Sequence[str] = ()
-        if mode is PlannerMode.H_EDV and hints_for is not None \
+        if mode in (PlannerMode.H_EDV, PlannerMode.H_AR) and hints_for is not None \
                 and budget.spent_monitor_calls < budget.max_monitor_calls:
             # Each hint request is a monitor call and is charged to the budget;
-            # past the cap the round runs in H_DET order.
+            # past the cap the round runs without hints.
             budget = replace(budget, spent_monitor_calls=budget.spent_monitor_calls + 1)
             hints = tuple(hints_for(checked))
-        plan, dropped = plan_verification(requirements, checked, budget, mode,
-                                          hints=hints, seed=seed)
+        plan, dropped = plan_verification(
+            requirements, checked, budget, mode,
+            hints=hints, seed=seed, estimates=estimates, remaining_cost_units=rem_cost,
+        )
         rejected_hints.extend(h for h in dropped if h not in rejected_hints)
         if not plan:
+            if (
+                mode in (PlannerMode.H_COST, PlannerMode.H_AR)
+                and rem_cost is not None
+                and open_candidates(requirements, checked, budget)
+            ):
+                return done("cost_budget_exhausted")
             return done("no_candidate" if mode is not PlannerMode.H0 else "no_verification_in_h0")
         spent, keys = budget.spent_calls, set(budget.dedup_keys)
         for pid, rid in plan:
@@ -593,6 +646,11 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                 deadline_ms=min(deadline, clock_ms() + budget.resolver_timeout_ms),
                 budget_ref=context.proposal_id)
             issued_map[request.request_id] = request
+            step_cost = (
+                estimates[(pid, rid)].cost_units
+                if estimates is not None and (pid, rid) in estimates
+                else 0
+            )
             try:
                 item = run_request(request, context, registry=registry, resolvers=resolvers,
                                    held_capabilities=held_capabilities, now_s=clock_ms() // 1000)
@@ -601,9 +659,13 @@ def run_verification(context: ProposalContext, requirements: RequirementSet, *,
                 continue
             except Exception as exc:  # a failed lookup is spent and recorded
                 spent += 1
+                if rem_cost is not None:
+                    rem_cost = max(0, rem_cost - step_cost)
                 refused.append((request.request_id, f"resolver_error:{type(exc).__name__}"))
                 continue
             spent += 1
+            if rem_cost is not None:
+                rem_cost = max(0, rem_cost - step_cost)
             if clock_ms() >= request.deadline_ms:
                 refused.append((request.request_id, "resolver_timeout"))
                 continue
