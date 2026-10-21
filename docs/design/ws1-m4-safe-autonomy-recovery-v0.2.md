@@ -476,7 +476,7 @@ M4.4 completion requires a third party reproducing results from locked public/ap
 
 | Work item | Priority | Depends on | Concrete evidence / review gate |
 |---|---|---|---|
-| M4.1a Identify trust/clock/state topology | P0 | none | Architecture ADR: same-db transactional domains and backend matrix; threat model. |
+| M4.1a Identify trust/clock/state topology | P0 | none | Architecture ADR ([proposed](../architecture/ADR-ws1-m4-admission-topology.md)): same-db transactional domains and backend matrix; threat model. |
 | M4.1b Versioned receipt and epoch writer | P0 | a | Authenticated receipts and revocation serialization tests. |
 | M4.1c Atomic admission/outbox port | P0 | a,b | Real Postgres transaction, deterministic interleavings, T01–T13. |
 | M4.1d Executor permit and UNKNOWN recovery | P0 | c | T14–T20, explicit external fencing claim ceiling. |
