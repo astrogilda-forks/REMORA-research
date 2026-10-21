@@ -151,7 +151,7 @@ class DurableNonceStore:
             import sqlite3
             return sqlite3.connect(self._db_path)
         from remora.persistence import d1_connection
-        return d1_connection.connect()
+        return d1_connection.connect(self._state_endpoint or None)
 
     def _placeholder(self) -> str:
         return "%s" if self._dsn else "?"
