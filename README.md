@@ -49,10 +49,13 @@ agent alone:         cannot reach ACCEPT  (proposal + model signals, within 4 ch
 
 The research question: can authorization that is enforced outside the agent and bound to the exact call stop the calls an agent should not make while keeping it useful? The short answers, with the details and limits further down:
 
-1. **Blocking is the easy half.** On a public function-calling benchmark (BFCL v4), two sealed runs accepted none of the wrong calls. On its own, though, REMORA let only about 3 in 10 correct calls through. Staying useful is the open problem.
+1. **Safety is only half the result.** Sealed BFCL v4 routing accepted no native wrong calls but accepted only 29.9% of correct calls. A newer ISP Study C now measures how bounded authorised evidence retrieval can restore useful work in a different, synthetic task environment.
 2. **A floor is not a judge.** On AgentHarm, a deterministic gate blocked every harmful and every harmless request alike. An LLM monitor on its own told most harmful/harmless pairs apart, and the gate on top erased that signal (NEGATIVE_RESULTS §80). How a deterministic floor and a learned monitor should combine is now a main research question.
 3. **We publish what fails.** That includes an uncertainty signal falsified on fresh data, label leakage in one of our own benchmarks, and the [peer-review objections](docs/review/PEER_REVIEW_FINDINGS.md) that are still open.
-4. **Not yet tested.** An agent actively trying to get past the gate. That is the next experiment ([plan](docs/13-research-frontier-roadmap.md)).
+4. **Adaptive attack search is now partially tested.** Study C includes defence-aware attacks against the ungated agent and H_EDV, but not all WS1 arms. This is not an independent external red-team evaluation (NEGATIVE_RESULTS §96).
+
+## Sealed WS1 Study C: recovering safe, useful autonomy
+**Study C evaluated 825 episodes on 11 held-out synthetic ISP customers.** With fixed/cost-ordered authorised lookups, the gate safely completed **20/33 legitimate reads**. Monitor-hint ordering completed **32/33**. Without lookups it completed **0/33** (Holm-corrected one-sided p < 0.001). The ungated control completed 33/33 reads. It also executed **5/121 attack goals**, with seven out-of-work-order and seven leakage episodes. No WS1 arm exhibited these events. **H_EDV's additional gain has not been attributed to learned hints.** Its monitor threshold was 0.4 rather than 0.3, with nearly equal lookup counts. Only A and H_EDV faced adaptive search; the authored synthetic evaluation excluded the HTTP path, the attacker refused 699 model requests, OSF registration remained pending, and the sealed holdout cap overran by USD 0.99. [Full summary](artifacts/ws1/study_c_holdout_v1.json) · [raw episodes](artifacts/ws1/study_c_holdout_v1.jsonl) · [protocol](docs/assurance/ws1_composition_study_v2.md) · [limitations §96](NEGATIVE_RESULTS.md) · [paper](paper/remora_paper.pdf).
 
 ## Where to go next
 
