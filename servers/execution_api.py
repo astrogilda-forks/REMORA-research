@@ -230,6 +230,13 @@ def _engine_from_env() -> RemoraDecisionEngine:
     return RemoraDecisionEngine(
         low_consequence_accept=_on(_env.environ.get("REMORA_LOW_CONSEQUENCE_ACCEPT", "")),
         grounded_read_accept=_on(_env.environ.get("REMORA_GROUNDED_READ_ACCEPT", "")),
+        # ON by default on the enforcing surface, stricter only: no risk
+        # signal and no higher production-write tier makes a call more
+        # approvable (RMR-AUD-001/003; NEGATIVE_RESULTS §90). The library
+        # default stays off so sealed replays reproduce. REMORA_STRICT_MONOTONE=0
+        # restores the published decision table here.
+        strict_monotone=_env.environ.get("REMORA_STRICT_MONOTONE", "1").strip().lower()
+        not in {"0", "false", "no", "off"},
         # Issue #35: the enforcing surface runs the execution profile — a
         # probabilistic signal (conformal/temperature/evidence/ordered-trust)
         # can STRUCTURALLY never produce ACCEPT here, independent of what a

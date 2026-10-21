@@ -5435,7 +5435,9 @@ tests need esbuild and run only in CI. Tests:
 ## §90 Policy decisions were not monotone in risk signals (2026-10-18)
 <!-- finding-status: open -->
 
-**Status:** partly fixed (#944); two cases remain, pinned as strict xfails.
+**Status:** fixed on the execution API (2026-10-20, strict profile on by
+default); the library default keeps both cases, pinned as strict xfails, so
+sealed replays reproduce.
 
 Adding a risk signal could make a decision more executable or more
 approvable (R3, PRF-046). At `3746bc5d`:
@@ -5461,6 +5463,23 @@ medium to high risk lowers ESCALATE to VERIFY. The owner decided on
 proposal-field binding the abstain-to-execution exploit is closed; the open
 part is that a reviewer can be offered a call the policy would not route to
 anyone.
+
+**Strict profile (2026-10-20).** `RemoraDecisionEngine(strict_monotone=True)`
+takes the least approvable of the call's decision and the decisions with any
+subset of its active risk signals removed, each in every non-risk form.
+For a high or critical production write it also takes the decision at
+medium tier. A refusal that came from removing signals carries
+`risk_signal_no_route`, a reason no review lifts. The execution API runs it
+by default; `REMORA_STRICT_MONOTONE=0` restores the published table there.
+A general closure over every tier was tried and rejected. It failed 53
+tests in the affected files, committed-artifact replays among them, and
+turned a lower tier's missing route into a refusal. With the strict profile, a high-risk production write now
+escalates, as a medium one does. On 1,500 generated observations per run,
+over six seeds, no added signal made a decision more approvable. As the
+library default, the same rule failed 158 tests. Among them were the golden
+tables, the Rego parity and four replays of committed evidence (the C-ext4
+replay, the peer-review post-hoc analysis, the learning ablation and the
+AROMER arena). The library default therefore stays as published.
 
 ## §91 The flow check passed an empty recipient list (2026-10-18)
 <!-- finding-status: accepted -->

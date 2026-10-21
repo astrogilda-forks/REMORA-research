@@ -271,7 +271,7 @@ def test_approval_required_after_lookup_executes_exactly_once(client) -> None:
 
     # The re-entered call enters the real review path.
     assessed = client.post("/v1/execution/assess", json=PROD_UPDATE).json()
-    assert assessed["decision"] == "verify"
+    assert assessed["decision"] == "escalate"
     assert "execution_token" not in assessed
     item_id = assessed["review_item_id"]
     assert _executor_calls() == 0                      # proposed, not approved

@@ -183,7 +183,7 @@ def test_request_false_still_downgrades(client) -> None:
 def test_full_verify_approve_execute_flow_with_one_time_grant(client) -> None:
     # 1. Assess: production write -> VERIFY -> queued.
     r = client.post("/v1/execution/assess", json=PROD_WRITE)
-    assert r.json()["decision"] == "verify"
+    assert r.json()["decision"] == "escalate"
     item_id = r.json()["review_item_id"]
     # 2. Approve (authenticated principal recorded, not client-declared).
     r = client.post("/v1/execution/approve",
@@ -730,7 +730,7 @@ def test_revoked_approver_invalidates_the_pending_execution(client, monkeypatch)
     import servers.api as api_mod
 
     r = client.post("/v1/execution/assess", json=PROD_WRITE)
-    assert r.json()["decision"] == "verify"
+    assert r.json()["decision"] == "escalate"
     item_id = r.json()["review_item_id"]
     r = client.post("/v1/execution/approve",
                     json={"item_id": item_id, "approval_ttl_seconds": 900})

@@ -14,11 +14,12 @@ Design goals
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import logging
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from remora.credal import (
     MINIMAX_ESCALATE_THRESHOLD,
@@ -464,6 +465,62 @@ def _is_grounded_read(obs: PolicyObservation) -> bool:
     return True
 
 
+#: The risk tiers in order; a call is decided no more approvably than at a lower tier.
+_TIER_ORDER: tuple[str, ...] = ("low", "medium", "high", "critical")
+#: Approvability on the execution path: an ABSTAIN has no route, an ESCALATE
+#: one a higher authority can use, a VERIFY one an ordinary reviewer can use.
+_APPROVABILITY: dict[DecisionAction, int] = {
+    DecisionAction.ABSTAIN: 0, DecisionAction.ESCALATE: 1,
+    DecisionAction.VERIFY: 2, DecisionAction.ACCEPT: 3}
+#: Each risk signal and every way to remove it: the field values a call
+#: without the signal may carry (unknown, or the positive confirmation).
+_RISK_NEUTRAL: dict[str, tuple[dict[str, Any], ...]] = {
+    "adversarial": ({"adversarial_detected": False},),
+    "malformed": ({"schema_valid": None}, {"schema_valid": True}),
+    "forbidden": ({"tool_forbidden": False},),
+    "cross_tenant": ({"argument_scope_valid": None}, {"argument_scope_valid": True}),
+    "intent_unresolved": ({"intent_provenance_required": False},
+                          {"intent_provenance_resolved": True}),
+    "coercion": ({"coercion_detected": False},),
+    "blackmail": ({"blackmail_pattern_detected": False},),
+    "counterfactual_failed": ({"counterfactual_passed": None}, {"counterfactual_passed": True}),
+    "contradiction": ({"evidence_contradictions": 0, "contradiction_cycles": 0},),
+    "tainted": ({"argument_tainted": False, "untrusted_controlled_arguments": ()},),
+    "no_rollback": ({"rollback_available": None}, {"rollback_available": True}),
+    "uncertain_transition": ({"state_transition_uncertain": False},),
+    "env_mismatch": ({"environment_mismatch_detected": False},),
+    "distribution_shift": ({"distribution_shift_detected": False},),
+    "goal_mismatch": ({"tool_matches_goal": None}, {"tool_matches_goal": True}),
+    "effect_contradicted": ({"expected_effect_matches": None},
+                            {"expected_effect_matches": True}),
+}
+_MAX_ACTIVE_SIGNALS = 8
+
+
+def _active_risk_signals(obs: PolicyObservation) -> frozenset[str]:
+    """The risk signals this observation carries (keys of ``_RISK_NEUTRAL``)."""
+    checks = {
+        "adversarial": obs.adversarial_detected is True,
+        "malformed": obs.schema_valid is False,
+        "forbidden": obs.tool_forbidden is True,
+        "cross_tenant": obs.argument_scope_valid is False,
+        "intent_unresolved": (obs.intent_provenance_required is True
+                              and obs.intent_provenance_resolved is not True),
+        "coercion": obs.coercion_detected is True,
+        "blackmail": obs.blackmail_pattern_detected is True,
+        "counterfactual_failed": obs.counterfactual_passed is False,
+        "contradiction": bool(obs.evidence_contradictions) or bool(obs.contradiction_cycles),
+        "tainted": obs.argument_tainted is True or bool(obs.untrusted_controlled_arguments),
+        "no_rollback": obs.rollback_available is False,
+        "uncertain_transition": obs.state_transition_uncertain is True,
+        "env_mismatch": obs.environment_mismatch_detected is True,
+        "distribution_shift": obs.distribution_shift_detected is True,
+        "goal_mismatch": obs.tool_matches_goal is False,
+        "effect_contradicted": obs.expected_effect_matches is False,
+    }
+    return frozenset(name for name, on in checks.items() if on)
+
+
 def _normalize_observation(obs: PolicyObservation) -> PolicyObservation:
     """Return a copy of *obs* with context fields normalised for fail-closed handling.
 
@@ -849,7 +906,13 @@ class RemoraDecisionEngine:
         execution_profile: bool = False,
         semantic_authority_floor: bool = False,
         verify_invariants: bool = True,
+        strict_monotone: bool = False,
     ) -> None:
+        # Opt-in, and only ever stricter: no risk signal and no higher risk
+        # tier may make a call more approvable (``_decide_monotone``). Off by
+        # default because it changes the published decision tables, the
+        # Rego parity and sealed replays; RMR-AUD-001/003 record the default.
+        self.strict_monotone = strict_monotone
         # ON by default and deliberately not an "opt-in ACCEPT path" flag:
         # it can only ever make a decision stricter. Every decision is checked
         # against CORE_INVARIANTS at the single build choke point, and a
@@ -1042,6 +1105,75 @@ class RemoraDecisionEngine:
         for cap in caps:
             if cap.reason not in EXTERNAL_CAP_REASONS:
                 raise ValueError(f"an external cap carries a cap reason, not {cap.reason!r}")
+        report = self._decide_monotone(obs, tuple(caps), _skip_hard_floor)
+        norm = _normalize_observation(obs)
+        # Internal reports are candidates, not decisions. Emit only after
+        # composition and invariant enforcement have selected the final report.
+        governance_event(
+            "decision.made",
+            action=report.action.value,
+            reasons=[r.value for r in report.reasons],
+            source=report.source_of_decision,
+            risk_tier=norm.risk_tier,
+            action_type=norm.action_type,
+            target_environment=norm.target_environment,
+            human_review_required=report.human_review_required,
+        )
+        return report
+
+    def _decide_monotone(self, obs: PolicyObservation, caps: tuple[Cap, ...],
+                         skip_floor: bool) -> DecisionReport:
+        """The composed decision, closed under removing risk when the engine
+        runs with ``strict_monotone`` (RMR-AUD-001/003).
+
+        Adding a risk signal, or raising a production write's risk tier, must
+        never make a call more approvable (``ABSTAIN < ESCALATE < VERIFY <
+        ACCEPT``). The default did not guarantee it: a signal on a call that
+        abstained opened a review route, and a high-tier production write got
+        VERIFY where a medium one escalated. Strict takes the least approvable
+        of this observation's decision, the decisions with any subset of its
+        active risk signals removed, and, for a production write, the decision
+        at medium tier. A refusal that came from removing signals carries
+        ``RISK_SIGNAL_NO_ROUTE``, a reason no review lifts. More than
+        ``_MAX_ACTIVE_SIGNALS`` active signals refuse outright. The tier rule
+        is limited to production writes on purpose: at other tiers a lower
+        tier's ABSTAIN means no route, not more safety.
+        """
+        report = self._decide_composed(obs, caps, skip_floor)
+        if not self.strict_monotone:
+            return report
+        norm = _normalize_observation(obs)
+        active = sorted(_active_risk_signals(obs))
+        if len(active) > _MAX_ACTIVE_SIGNALS:
+            return self._build(DecisionAction.ABSTAIN,
+                               [*report.reasons, DecisionReason.RISK_SIGNAL_NO_ROUTE], norm,
+                               raw_obs=obs)
+        candidates: list[tuple[DecisionReport, bool]] = []
+        for n in range(1, len(active) + 1):
+            for removed in itertools.combinations(active, n):
+                for ways in itertools.product(*(_RISK_NEUTRAL[name] for name in removed)):
+                    calm = obs
+                    for fields in ways:
+                        calm = replace(calm, **fields)
+                    candidates.append((self._decide_composed(calm, caps, skip_floor), True))
+        if self._is_production_write(obs) \
+                and _normalize_risk_tier(obs.risk_tier) in ("high", "critical"):
+            candidates.append((self._decide_composed(replace(obs, risk_tier="medium"), caps,
+                                                     skip_floor), False))
+        strictest, from_signals = report, False
+        for candidate, signals in candidates:
+            if _APPROVABILITY[candidate.action] < _APPROVABILITY[strictest.action]:
+                strictest, from_signals = candidate, signals
+        if strictest is report:
+            return report
+        extra = [r for r in strictest.reasons if r not in report.reasons]
+        if from_signals and strictest.action is DecisionAction.ABSTAIN:
+            extra.append(DecisionReason.RISK_SIGNAL_NO_ROUTE)
+        return self._build(strictest.action, [*report.reasons, *extra], norm, raw_obs=obs)
+
+    def _decide_composed(self, obs: PolicyObservation, caps: tuple[Cap, ...],
+                         _skip_hard_floor: bool) -> DecisionReport:
+        """One observation's cascade, floor, gates and caps, met (§3.9)."""
         report = self._decide_cascade(obs, _skip_hard_floor=_skip_hard_floor)
         norm = _normalize_observation(obs)
         components: list[Cap] = [Cap("cascade", report.action, report.reasons[-1])
@@ -1059,18 +1191,6 @@ class RemoraDecisionEngine:
         if rank(binding) < rank(components[0]):
             report = self._build(binding.action, [*report.reasons, binding.reason], norm,
                                  credal=credal, raw_obs=obs)
-        # Internal reports are candidates, not decisions. Emit only after
-        # composition and invariant enforcement have selected the final report.
-        governance_event(
-            "decision.made",
-            action=report.action.value,
-            reasons=[r.value for r in report.reasons],
-            source=report.source_of_decision,
-            risk_tier=norm.risk_tier,
-            action_type=norm.action_type,
-            target_environment=norm.target_environment,
-            human_review_required=report.human_review_required,
-        )
         return report
 
     def _conditional_cap(
