@@ -5756,3 +5756,19 @@ the monitor's measured effect was lost utility. The monitor did not separate
 attack calls from benign ones at the scores observed. With four attack
 attempts this says nothing about the monitor in general. It does say the
 utility gap between the arms is the threshold, not the planner.
+
+**Reading notes from an external review (2026-10-22).** A review of
+`265abfbe` raised two points about how the sealed files are read. Neither
+changes a sealed number.
+
+- `artifacts/ws1/study_c_holdout_v1.json` has a top-level `spent_usd` of
+  1.159064. That is the resumed run's last 16 episodes, not the study's
+  spend. The per-segment and total spend is `artifacts/ws1/study_c_spend.json`
+  (holdout 45.48 USD, study 49.37 USD), as stated under Limits above.
+- The one-sided p-values are the share of cluster-bootstrap means at or
+  below zero (`experiments/ws1_composition/study_c/stats.py`). That is a
+  percentile bootstrap, not a test calibrated under the null, and with 11
+  clusters it can understate p. The recovery itself does not rest on it:
+  H0 completed 0 of 33 reads and every WS1 arm at least 20. A future study
+  should prespecify a null-calibrated cluster test, such as a sign-flip
+  permutation over clusters.
