@@ -24,7 +24,7 @@ from remora.enforcement.lease import (
     ToolExecutionStateUnknown,
 )
 from remora.enforcement.lease_signing import SigningUnavailable
-from remora.enforcement.outbox import ExecutionOutbox, OutboxRow
+from remora.enforcement.outbox import ExecutionOutbox, OutboxRow, UnbackedExecutionOutbox
 from remora.enforcement.result_envelope import capture_tool_result
 from remora.execution.ports import ToolCallPort, ToolDispatcherPort
 from remora.execution.remote_dispatch import (
@@ -457,7 +457,11 @@ def record_dispatch_intent(
     """
     # Only the durable adapters can join a transaction; the in-process base
     # class refuses enlistment by design rather than faking the guarantee.
-    if connection is not None and type(outbox) is not ExecutionOutbox:
+    # UnbackedExecutionOutbox is that same in-process store under another
+    # name: a D1 review transaction publishes its connection, and enlisting
+    # would reach the base class's NotImplementedError.
+    if connection is not None and type(outbox) not in (
+            ExecutionOutbox, UnbackedExecutionOutbox):
         return outbox.record_intent_enlisted(
             connection,
             proposal_id=proposal_id,
