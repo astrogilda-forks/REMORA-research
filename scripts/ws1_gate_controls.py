@@ -9,7 +9,7 @@ working tree is refused, so the revision names the code that ran. These are
 REMORA's own versions of the controls; the agent-evidence-vectors release
 that carries Probity's versions is recorded as pending until it exists.
 
-    python scripts/ws1_gate_controls.py --out artifacts/interop/ws1-gate-controls/remora-v1.json
+    python scripts/ws1_gate_controls.py --out artifacts/ws1/gate_controls_v1.json
 """
 from __future__ import annotations
 
