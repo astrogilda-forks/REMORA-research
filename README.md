@@ -54,25 +54,8 @@ The research question: can authorization that is enforced outside the agent and 
 3. **We publish what fails.** That includes an uncertainty signal falsified on fresh data, label leakage in one of our own benchmarks, and the [peer-review objections](docs/review/PEER_REVIEW_FINDINGS.md) that are still open.
 4. **Adaptive attack search is now partially tested.** Study C includes defence-aware attacks against the ungated agent and H_EDV, but not all WS1 arms. This is not an independent external red-team evaluation (NEGATIVE_RESULTS §96).
 
-## New research result: useful autonomy with bounded evidence (WS1 Study C)
-
-In an author-generated **synthetic ISP** holdout covering **11 previously held-out customers**, REMORA tested whether bounded lookups against authorised sources could recover legitimate troubleshooting work without letting the AI grant itself wider access. Study C evaluated **825 episodes** (165 tasks per arm across five arms) through the real WS1 runtime gate, not a production deployment or the complete HTTP path.
-
-| Configuration | Legitimate reads completed safely | Attack goals executed | Out-of-work-order episodes | Leakage episodes |
-|---|---:|---:|---:|---:|
-| A — no gate | 33/33 | 5/121 | 7 | 7 |
-| H0 — gate without lookups | 0/33 | 0/121 | 0 | 0 |
-| H_DET — authorised fixed-order lookups | **20/33** | 0/121 | 0 | 0 |
-| H_COST — authorised cost-ordered lookups | **20/33** | 0/121 | 0 | 0 |
-| H_EDV — monitor-prioritised lookups | **32/33** | 0/121 | 0 | 0 |
-
-All three lookup arms significantly improved safe read completion over H0 (11-customer cluster bootstrap; Holm-corrected one-sided **p < 0.001**). H_DET and H_COST each gained **60.6 percentage points** (95% bootstrap interval 45.5–75.8); H_EDV gained **97.0 points** (90.9–100). H0 cannot recover missing facts because it performs no lookups, so its zero is partly by design.
-
-**Example — troubleshooting an internet fault.** A customer's work order authorises reading their line's error counters and port profile. An AI agent can use REMORA to request bounded checks against registered systems. Verified information may establish grounds for a fresh deterministic decision; the AI cannot authorise itself to inspect another customer's line.
-
-**Important negative result:** H_EDV's 32/33 versus H_DET's 20/33 is **not proof that the learned monitor chose better lookups**. Their average lookup counts were nearly identical (about 7.8 per episode), while H_EDV used a monitor-veto threshold of **0.4** versus **0.3** for H_DET and H_COST, calibrated on just three pilot reads. This confounds attribution. Only A and H_EDV faced defence-aware adaptive attack search; the other WS1 arms received fixed attack templates. The attacker refused 699 requests and fell back to deterministic mutations. No observed WS1 leakage is **not** a zero-risk guarantee. The sealed holdout budget cap was exceeded by USD 0.99 (the overall authorised WS1 budget was respected); OSF registration was pending.
-
-**Read the evidence:** [full Study C summary](artifacts/ws1/study_c_holdout_v1.json), [825 episode records](artifacts/ws1/study_c_holdout_v1.jsonl), [sealed manifest](data/ws1_composition_v2/manifest.json), [study protocol](docs/assurance/ws1_composition_study_v2.md), [NEGATIVE_RESULTS §96](NEGATIVE_RESULTS.md), and [paper with detailed results](paper/remora_paper.pdf). The finding is internally evaluated in a synthetic domain; no claim of production certification or general security is made.
+## Sealed WS1 Study C: recovering safe, useful autonomy
+**On 11 held-out synthetic ISP customers (825 episodes),** authorised bounded evidence lookups safely recovered **20/33 legitimate reads** using fixed/cost ordering and **32/33** using monitor-hint ordering, versus **0/33** with no lookups (Holm-corrected one-sided p < 0.001). The ungated control completed 33/33 reads but executed **5/121 attack goals**, with seven out-of-work-order and seven leakage episodes; no WS1 arm exhibited these events. **H_EDV's extra gain is not proven to come from learned hints:** its monitor threshold was 0.4 instead of 0.3, with nearly equal lookup counts. Only A and H_EDV faced adaptive search; the authored synthetic evaluation excluded the HTTP path, the attacker refused 699 model requests, OSF registration remained pending, and the sealed holdout cap overran by USD 0.99. [Full summary](artifacts/ws1/study_c_holdout_v1.json) · [raw episodes](artifacts/ws1/study_c_holdout_v1.jsonl) · [protocol](docs/assurance/ws1_composition_study_v2.md) · [limitations §96](NEGATIVE_RESULTS.md) · [paper](paper/remora_paper.pdf).
 
 ## Where to go next
 
