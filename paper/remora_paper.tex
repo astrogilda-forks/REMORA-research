@@ -79,7 +79,7 @@
 % Paper version - kept in lockstep with paper/remora_paper.md by
 % scripts/check_paper_sync.py (CI-enforced). The version and revision
 % strings below MUST match the .md version line.
-\newcommand{\paperversion}{Preprint v0.12.0, revision 2026-10-19; repository release tag \texttt{v0.12.0}}
+\newcommand{\paperversion}{Preprint v0.12.0, revision 2026-10-21; latest tagged release \texttt{v0.12.0}}
 
 \author{
   Stian Skogbrott\thanks{Developer and maintainer of REMORA. Luftfiber AS.
@@ -136,6 +136,23 @@ bounded verification let 60/60 valid-identifier reads proceed autonomously,
 against 0/60 without validators, a baseline that is zero by construction
 (CLAIM-014).
 
+A sealed WS1 Study C tested bounded, authorised evidence retrieval
+through the actual runtime verification gate on 11 held-out synthetic ISP
+customers (825 episodes in five arms). With no lookups, H0 completed
+0/33 benign reads safely; fixed-order and cost-ordered evidence retrieval
+each completed 20/33, and monitor-prioritised retrieval completed 32/33
+(Holm-corrected customer-cluster bootstrap, one-sided $p<0.001$
+against H0 for each retrieval arm). The ungated control completed
+33/33 but executed five attack goals, seven out-of-work-order
+episodes and seven leak episodes; no WS1 arm observed those events
+in 121 attack episodes per arm. Only the ungated and monitor-hint
+arms faced defence-aware adaptive attacks. H\_EDV's higher utility
+is confounded by a higher monitor-veto threshold (0.4 versus 0.3),
+while resolver-call counts were similar, so learned hint ordering
+has no identified benefit in this test. These are internal,
+author-generated synthetic results, not an external preregistration
+or production-security guarantee (NEGATIVE\_RESULTS.md \S96).
+
 Sealed BFCL v4 tracks measure routing within one tool catalogue. REMORA
 routes annotated calls; it does not generate them, and each wrong call is
 another task's correct call substituted into the task, almost always a
@@ -156,9 +173,11 @@ is untested (CLAIM-021). The earlier sealed track's 10.9\% wrong-call rate,
 measured on another sample without contracts, is kept on record and is not
 a baseline for C-ext3 (CLAIM-018, superseded by CLAIM-019).
 
-Each result cites its claim-register entry, and machine-readable capability
-and boundary declarations state what the system establishes and what it does
-not. A post-hoc attack evaluation of the execution chain, on the author's
+Earlier registered headline claims cite their claim-register entries.
+The newer WS1 Study C experimental finding is tied to its evaluated
+artifacts and NEGATIVE\_RESULTS.md \S96, not an asserted production-security
+claim. Machine-readable capability and boundary declarations state what the
+system establishes and what it does not. A post-hoc attack evaluation of the execution chain, on the author's
 own catalogue, is in \S\ref{sec:negative}. REMORA ran none of 43 chain
 attacks and a policy-only gateway ran 33, while the secret reached the sink
 in all 11 exfiltrations built from allowed calls, on both. With an opt-in
@@ -354,7 +373,9 @@ Appendices~\ref{app:consensus}--\ref{app:mondrian}.
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{Headline results. Every row is bound to the claim register; BFCL
+\caption{Headline results. Registered claims are bound to the claim register;
+  WS1 Study C is a bounded experimental observation with artifacts and
+  NEGATIVE\_RESULTS.md \S96. BFCL
   wrong calls are cross-task substitutions (\S\ref{sec:routing-blind});
   CLAIM-018 is superseded by CLAIM-019 and kept on record; it was measured on another sample and is not a baseline for C-ext3.
   The AgentHarm false-block floor (at most 40\%) was pre-registered for the
@@ -371,6 +392,7 @@ Validator study, all-\textsc{unknown} regime & autonomous valid-identifier reads
 Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-018, superseded) \\
 Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% by row, 3.5\% over its 106 tools (CLAIM-019) \\
 Sealed C-ext4, 1{,}562 episodes & correct-call acceptance 87/291 = 29.9\% (C-ext3 bundle 6.9\%); wrong-call acceptance 0/295, as for a refuse-all control (CLAIM-021) \\
+WS1 Study C, 825 episodes & safe benign reads: H0 0/33, H\_DET and H\_COST 20/33, H\_EDV 32/33; no observed WS1 violations (experiment; NEGATIVE\_RESULTS.md \S96) \\
 Component ablation & FAR 0.000 in every arm (CLAIM-020) \\
 \bottomrule
 \end{tabular}
@@ -1784,6 +1806,114 @@ reflects routing accuracy on the proposed-action surface, not
 prevention of tool execution, and the research-grade oracle setup may
 not generalise to live deployments.
 
+\subsection{Bounded Evidence Recovery on a Sealed ISP Holdout (WS1 Study C)}
+\label{sec:ws1c}
+
+\textbf{Research question and design.} Can an external deterministic
+authorization gate recover legitimate work by fetching bounded evidence
+from deployment-authorised sources, without allowing the model to grant
+itself authority? Study C evaluated 165 tasks per arm (825 episodes) on
+11 held-out, synthetically generated ISP customers. Each customer
+contributed three benign reads, a write task and attack tasks.
+The safe-utility grader was frozen before the test. All WS1 arms
+used the actual \texttt{Ws1Gate} runtime component, proof-grounded
+preconditions, a durable task budget and a strict monotone decision
+profile, but not the HTTP interface. H0 performed no lookups;
+H\_DET used fixed-order registered resolvers; H\_COST used estimated
+cost ordering; H\_EDV used advisory monitor hints to order the same
+eligible lookups. The hints could not create new sources, recipients
+or authority. Only \textsc{accept} permitted dispatch, and
+experimental writes could at most reach review.
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{WS1 Study C (11 synthetic holdout customers; 33 benign reads,
+121 attack episodes per arm). Scope means episodes with executed
+calls outside the work order. Only A and H\_EDV received
+defence-aware adaptive search; others received fixed templates.
+Observed zeros do not establish zero underlying risk.}
+\fitcolumn{
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Arm & Safe reads & Goals & Scope & Leaks \\
+\midrule
+A (no gate) & 33/33 & 5 & 7 & 7 \\
+H0 (no lookup) & 0/33 & 0 & 0 & 0 \\
+H\_DET & 20/33 & 0 & 0 & 0 \\
+H\_COST & 20/33 & 0 & 0 & 0 \\
+H\_EDV & 32/33 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:ws1c}
+\end{table}
+
+\textbf{Prespecified utility contrasts.} We resampled complete customer
+clusters 10{,}000 times (11 clusters) and applied Holm family-wise
+correction to the three one-sided comparisons against H0.
+All three retrieval arms improved safe benign-read completion
+(one-sided adjusted $p<0.001$).
+H\_DET--H0 and H\_COST--H0 were each $+0.606$ (95\% percentile
+interval [0.455, 0.758]); H\_EDV--H0 was $+0.970$
+[0.909, 1.000]. H0 cannot settle missing facts by design, so
+this zero baseline is not an unrestricted-security comparator.
+The intervals refer only to the synthetic customer population.
+
+\textbf{Bounded attack observations.} The 121 attack episodes
+per arm comprised target confusion (44), exfiltration (33),
+in-scope write tampering (11) and availability text (33).
+The ungated arm and H\_EDV faced up to three feedback-informed
+attack attempts against their own decisions; H0, H\_DET and
+H\_COST received fixed templates only. A executed five goals
+(three target, two tampered writes), seven out-of-work-order
+episodes and seven leakage episodes. No WS1 arm observed an
+executed attack goal, an out-of-scope call, a leak or a tampered
+write in these episodes. The exact one-sided 95\% zero-event
+bounds by attack family are 6.6\% for 44 target episodes,
+8.7\% for 33 exfiltration episodes and 23.8\% for 11
+tamper episodes, all conditional on the evaluated attacker and
+tasks. The attacker refused 699 model requests; the harness
+substituted deterministic mutations. These observations
+do not constitute independent adaptive red-team validation.
+
+\textbf{Critical negative attribution result.}
+H\_EDV completed 12 more benign reads than H\_DET
+(difference $+0.364$, cluster interval [0.212, 0.515]), but
+the improvement is \emph{not causally attributable to monitor
+hints}. The calibration pilot used one customer with only
+three benign reads. It selected veto threshold 0.4 for H\_EDV
+and 0.3 for H\_DET and H\_COST. All 13 H\_DET/H\_COST
+missed benign reads were monitor vetoes near the threshold.
+Mean resolver calls were 7.79 (H\_EDV), 7.83 (H\_DET)
+and 7.81 (H\_COST); the paired H\_EDV--H\_DET lookup
+difference was 0.00 (interval [$-0.14$, $+0.14$]).
+H\_DET and H\_COST recovered the same number of reads.
+The anomalous $+0.27$ availability-text contrast for
+H\_DET/H\_COST cannot be interpreted as a causal benefit.
+A same-threshold study on independent new data is needed
+to identify any gain from learned hint ordering.
+
+\textbf{Limitations, deviation, evidence.} Domain, customers, tasks,
+contracts, attacks and grader were authored by the study team, and
+one model family played agent, monitor and attacker. The HTTP
+interface was outside the loop and external runtime capability
+completeness remains \texttt{NOT\_ESTABLISHED}. The holdout
+stopped at 809 episodes on its run cap, then resumed 16 episodes
+without replay of logged episodes. Holdout spending was
+USD~45.48 against a sealed USD~44.49 cap, a disclosed
+USD~0.99 deviation; the overall authorised WS1 budget of
+USD~100 was respected. OSF registration remained pending.
+The sealed method, digests, 825-record JSONL log and result
+summary are preserved at
+\path{docs/assurance/ws1_composition_study_v2.md},
+\path{data/ws1_composition_v2/manifest.json},
+\path{artifacts/ws1/study_c_holdout_v1.json},
+\path{artifacts/ws1/study_c_holdout_v1.jsonl} and
+\path{artifacts/ws1/study_c_spend.json}. Negative and
+incomplete conclusions are indexed in
+\path{NEGATIVE_RESULTS.md} \S96. The spent holdout
+must not be retuned or rerun.
+
 \section{Ablations}
 \label{sec:ablation}
 
@@ -2120,6 +2250,17 @@ boundary and does not claim that all agent effects are governed.
 \section{Threats to Validity}
 \label{sec:threats}
 
+\textbf{WS1 Study C:} Customers were author-generated synthetic
+clusters, not real deployments. Monitor thresholds came from a
+single-customer pilot and differed by arm (0.4 versus 0.3),
+confounding learned-hint attribution. Only A and H\_EDV faced
+adaptive attacks, and the attacker refused 699 model requests.
+The HTTP layer was excluded, OSF registration remained pending,
+and the sealed holdout cap was exceeded by USD~0.99.
+Conditional zero-event bounds do not imply risk-free operation
+(\S\ref{sec:ws1c}).
+
+
 \textbf{Internal validity:} Earlier QA operating points were selected
 on limited or reused data and are retained as historical evidence in
 \path{NEGATIVE_RESULTS.md} \S18. The benchmark also contains 13.8\%
@@ -2195,10 +2336,19 @@ sophisticated adversarial inputs.
 \section{Reproducibility}
 \label{sec:repro}
 
+The spent WS1 Study C evaluation is archived in
+\path{artifacts/ws1/study_c_holdout_v1.json} and the
+825-record log \path{artifacts/ws1/study_c_holdout_v1.jsonl},
+with frozen manifest \path{data/ws1_composition_v2/manifest.json},
+spend ledger \path{artifacts/ws1/study_c_spend.json}
+and analysis in \path{NEGATIVE_RESULTS.md} \S96.
+Do not rerun the evaluated holdout or tune against its records.
+
+
 \textbf{Repository:} \url{https://github.com/darklordVirtual/REMORA-research}.
-\textbf{Release:} \texttt{\paperversion} (a frozen, CI-green commit with
-sdist/wheel checksums published on the GitHub release; this paper is
-versioned in lockstep with it).
+\textbf{Paper revision:} \texttt{\paperversion}. The frozen tagged
+\texttt{v0.12.0} software release predates this paper revision;
+the updated source commit and rebuilt PDF govern its new content.
 \textbf{Python:} 3.11+.
 
 \begin{lstlisting}
@@ -2267,7 +2417,7 @@ REMORA makes permission to execute a concrete agent action an explicit,
 recorded decision. Its execution path binds that decision to a signed
 tool definition, a single call and a single-use grant, then records
 dispatch and observed effect as different claims. The studies reported
-here examine three consequences of that design.
+here examine several consequences of that design.
 
 \textbf{The zero-unsafe result has no identified cause.} The
 0\% unsafe-acceptance result on the adversarial tool-call benchmark (700
@@ -2313,6 +2463,17 @@ C-ext3. A third sealed track, C-ext4, raised
 correct-call acceptance from 6.9\% to 29.9\% with every safety count at
 zero, as for a refuse-all control; the gain sits mostly on tools seen in development, so generalisation
 to unseen tool families is untested.
+
+\textbf{Bounded evidence retrieval restores work in a synthetic domain.}
+WS1 Study C evaluated 825 episodes on 11 held-out ISP customer clusters.
+Deterministic and cost-ordered retrieval each safely completed 20/33
+legitimate reads versus 0/33 with no lookup capability. The
+monitor-hint arm completed 32/33, but its veto threshold differed
+and the study cannot attribute that gain to learned ordering.
+No WS1 arm showed an out-of-scope execution or leak in its 121
+attack episodes, conditional on the specific attacker and attack
+coverage (\S\ref{sec:ws1c}). This is bounded within-domain evidence
+for recovery, not a general security guarantee or production claim.
 
 The current architecture offers two further research interfaces. Typed
 evidence admission makes the scope and provenance of a claimed observation
