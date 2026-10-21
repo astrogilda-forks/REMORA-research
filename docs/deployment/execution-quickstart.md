@@ -421,6 +421,17 @@ record, the read capabilities each principal holds, the monitor profile and an
 injected clock. `tests/verification/ws1_deployment_fixture.py` is a minimal
 example. Keep the pilot to one tenant and a few named tools.
 
+Without a `grounding` map WS1 can only lower a decision: a read the engine
+sends to VERIFY for lack of grounding stays there, however much the lookups
+prove (NEGATIVE_RESULTS §94). `grounding` declares, per predicate, which
+engine grounding signals its PROVED state establishes; the engine then
+re-decides with them and WS1 caps still apply. Set `task_ledger` so lookups
+and monitor calls are reserved per task and survive restarts and retries.
+The cost planner modes (`H_COST`, `H_AR`) need `estimates` for every declared
+lookup and a `cost_budget_units` cap, or the deployment is refused. The
+enforcing engine on `/v1/execution` runs the strict monotone profile by
+default (`REMORA_STRICT_MONOTONE=0` opts out; NEGATIVE_RESULTS §90).
+
 Read back what enforce would have changed:
 
 ```bash

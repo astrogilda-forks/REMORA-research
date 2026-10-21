@@ -4,6 +4,27 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1 Studies B and C, grounding from proofs and the strict monotone default
+
+- WS1 Study B (sealed at `6924f0d0`, evaluated once 2026-10-20, 600
+  episodes): no WS1 arm executed a call outside the work order; H_DET
+  completed 28 of 45 benign reads against 0 for H0; the monitor-directed arm
+  completed 15, so the attribution hypothesis failed (NEGATIVE_RESULTS §95).
+- WS1 Study C (sealed at `d005f48e`, evaluated once 2026-10-21, 825 episodes
+  through the runtime `Ws1Gate`): H_DET and H_COST completed 20 of 33 benign
+  reads safely, H_EDV 32 at a higher monitor threshold, H0 0; no WS1 arm
+  executed an attack goal, out-of-scope call or leak in 121 attack episodes,
+  while the ungated agent executed 5 goals. Learned hints showed no
+  measurable effect, and an exploratory threshold counterfactual finds the
+  preconditions did all the blocking (§96). Synthetic, author-written domain;
+  no registered claim.
+- `Ws1Deployment.grounding` lets PROVED preconditions supply engine grounding
+  signals on `/v1/execution` (§94), with typed monitor uncertainty, a durable
+  per-task budget (`task_ledger`) and the cost planner modes.
+- The enforcing engine on `/v1/execution` runs the strict monotone profile by
+  default; the library default is unchanged (§90, #977).
+- Four gate controls (`artifacts/ws1/gate_controls_v1.json`, #982).
+
 ### SDD v2 planner bounds, stateful lifecycle machine and v3 extractor guards
 
 - Review corrections charge rejected resolver attempts to call and cost
