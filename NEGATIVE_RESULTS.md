@@ -5718,3 +5718,29 @@ the seal, and its grading is unchanged; the study reproduces from its
 sealing commit. What remains open is a monitor threshold chosen
 on enough data, or a monitor that cannot veto a call its preconditions
 proved, before any claim about the learned part.
+
+**Exploratory threshold counterfactual (2026-10-21).** Not part of the sealed
+result. `scripts/ws1_threshold_counterfactual.py` reads the committed
+holdout log (`artifacts/ws1/study_c_threshold_counterfactual_v1.json`). At
+each arm's sealed threshold it reproduces the observed result. A replay
+cannot know what the agent would have done after a changed veto, so the
+figures are bounds.
+
+- In H_DET and H_COST, every lost read was a refusal by the monitor alone,
+  with every precondition PROVED. At threshold 0.35, 12 of the 13 would have
+  been released, and at 0.4 or above all 13: at most 33 of 33, as in H_EDV.
+  No read that succeeded would have been lost.
+- At 0.3, H_EDV would have lost up to 30 of its 32 reads, and at 0.35 up to
+  10, because its hint requests add answers that can cross.
+- The monitor stopped no attack goal on its own. The agent tried an attack
+  goal in a WS1 arm four times, three in H_DET and one in H_COST, all against
+  template injections. A precondition refuted each one. The monitor scored
+  those calls 0.20 to 0.30, no higher than the benign port reads it vetoed
+  (0.30 to 0.35). Under the adaptive search against H_EDV the agent never
+  tried the goal.
+
+Read together: in this holdout the preconditions did all the blocking, and
+the monitor's measured effect was lost utility. The monitor did not separate
+attack calls from benign ones at the scores observed. With four attack
+attempts this says nothing about the monitor in general. It does say the
+utility gap between the arms is the threshold, not the planner.
