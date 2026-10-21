@@ -2,7 +2,7 @@
 
 **Stian Skogbrott** (Luftfiber AS) · [https://github.com/darklordVirtual/REMORA-research](https://github.com/darklordVirtual/REMORA-research)
 
-*Paper version v0.12.0 · revision 2026-10-21 · latest tagged repository release v0.12.0 (tag predates this paper revision).*
+*Paper version v0.12.0 · revision 2026-10-21 · repository release tag `v0.12.0` (historical release; the tag predates this paper revision).*
 
 <!-- PAPER_SYNC: this version + revision line is the single authority for the
      paper's version stamp. scripts/check_paper_sync.py requires the SAME
