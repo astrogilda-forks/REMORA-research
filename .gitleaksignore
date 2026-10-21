@@ -12,3 +12,10 @@
 4dc11644b61604fea5f463dca0e9ae2a2b5bf5bb:experiments/routing_baselines/pins.py:generic-api-key:39
 4dc11644b61604fea5f463dca0e9ae2a2b5bf5bb:experiments/routing_baselines/pins.py:generic-api-key:40
 4dc11644b61604fea5f463dca0e9ae2a2b5bf5bb:experiments/routing_baselines/pins.py:generic-api-key:41
+#
+# scripts/execution_chain_attack_eval.py at d3d690eb, line 96: the planted
+# exfiltration canary SECRET that the attack evaluation hides in record
+# cust-secret and then checks never reaches a sink tool. It is a made-up value
+# with a live-key prefix on purpose, so it is not quoted here. The scheduled
+# full-history scan has failed on it since 2026-10-19.
+d3d690ebbdfb8b689e8ee4dd4ecba72bb069699b:scripts/execution_chain_attack_eval.py:generic-api-key:96
