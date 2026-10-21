@@ -21,9 +21,15 @@
     "measured_with_python": "3.13.7 (macOS arm64, venv with the dev extras)",
     "requirements_lock": {
       "path": "requirements-lock.txt",
-      "sha256_lf": "a2278b4ec5a955d2ccfba0c2350e042d843d0261111a250dbb86ada5b22dacdd"
+      "sha256_lf": "caeb43477758b79996ebe9f1702d21750d09e26ae9e44badcaf163ad03c7bddd"
     },
     "requirements_lock_history": [
+      {
+        "path": "requirements-lock.txt",
+        "git_revision": "07bb67f6f0ae4377885a37c1eb6465be859fdacf",
+        "sha256_lf": "a2278b4ec5a955d2ccfba0c2350e042d843d0261111a250dbb86ada5b22dacdd",
+        "reason": "batch Dependabot bumps 2026-10-21: aiohttp 3.14.5, pillow 13.0.0, yarl 1.25.1, transformers 5.20.1, fastapi 0.143.3, pydantic-settings 2.16.0 (#980, #969, #963, #962)"
+      },
       {
         "path": "requirements-lock.txt",
         "git_revision": "29c8f9fdd898e3874dd219855c4a1c1903481a84",
