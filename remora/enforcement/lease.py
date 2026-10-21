@@ -1349,6 +1349,7 @@ class GovernedToolDispatcher:
         plan: PlanBinding | None = None,
         capability_set: EffectiveCapabilitySet | None = None,
         execution_context: ExecutionContextV1 | None = None,
+        invocation_arguments: Any = None,
     ) -> DispatchResult:
         """Execute ``tool_name`` iff the lease covers this exact call.
 
@@ -1360,6 +1361,16 @@ class GovernedToolDispatcher:
         ``task_identity`` is the task the call is made under, from the
         orchestration context rather than the lease; the lease is checked
         against it. See ``ExecutionLease.verify``.
+
+        ``invocation_arguments`` are the arguments the tool receives when they
+        differ from the wire form the lease binds: flow handles that the
+        execution domain resolved to their values (IFC-06). The lease and the
+        final-hop hash are checked over ``arguments``, which is what was
+        approved. The capability, effect and procedure checks run over both
+        forms, so a handle cannot carry a value the wire form would not be
+        allowed to name. The caller derives them from its own trusted store,
+        never from the request. ``None`` means the tool receives
+        ``arguments``.
         """
         if lease is None:
             governance_event(
@@ -1385,6 +1396,8 @@ class GovernedToolDispatcher:
         # a window in which the executed call is not the verified one.
         try:
             arguments = copy.deepcopy(arguments)
+            invocation = (arguments if invocation_arguments is None
+                          else copy.deepcopy(invocation_arguments))
         except Exception:
             governance_event(
                 "dispatch.refused", level=logging.WARNING,
@@ -1543,7 +1556,14 @@ class GovernedToolDispatcher:
             or self._effect_refusal(lease, tool_name, arguments, target_environment or "")
             or self._plan_refusal(lease, plan)
             or self._procedure_refusal(lease, tool_name, arguments)
-            or self._surface_refusal(lease))
+            or self._surface_refusal(lease)
+            or (None if invocation is arguments else (
+                self._capability_refusal(lease, tool_name, tenant_id,
+                                         target_environment or "", capability_set, now,
+                                         invocation)
+                or self._effect_refusal(lease, tool_name, invocation,
+                                        target_environment or "")
+                or self._procedure_refusal(lease, tool_name, invocation))))
         if runtime_refusal is not None:
             governance_event(
                 "dispatch.refused", level=logging.WARNING,
@@ -1708,7 +1728,7 @@ class GovernedToolDispatcher:
             return graph.summary(), graph
 
         try:
-            res = fn(arguments, mediator) if mediator is not None else fn(arguments)
+            res = fn(invocation, mediator) if mediator is not None else fn(invocation)
             nested_effects, effect_graph = _nested()
             self._record_outcome(lease, tool_name, recorder_seq, "executed")
             governance_event(

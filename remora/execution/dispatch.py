@@ -68,6 +68,7 @@ def dispatch_under_lease(
     surface_digest: str = "",
     report_lease: bool = False,
     result_commit: Callable[[Any], tuple[Any, dict[str, Any]]] | None = None,
+    invocation_arguments: Any = None,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -112,6 +113,12 @@ def dispatch_under_lease(
     executed call before anything is returned. It returns what the caller may
     see and an audit block. When it raises, the call still counts as executed,
     and the result is withheld: no preview and no envelope are returned.
+
+    ``invocation_arguments`` (IFC-06) are the call's flow handles resolved to
+    their values by this execution domain. The lease binds
+    ``tool_call.arguments``; the local dispatcher checks both forms and the
+    tool receives these. A forwarded call ignores them: the executing domain
+    resolves the handles in its own store.
     """
     tool_execution: dict[str, Any] = {"executed": False}
     if not gate_allowed:
@@ -230,6 +237,8 @@ def dispatch_under_lease(
         task_kwargs["plan"] = plan
     if capability_set is not None:
         task_kwargs["capability_set"] = capability_set
+    if invocation_arguments is not None:
+        task_kwargs["invocation_arguments"] = invocation_arguments
     context = _execution_context(semantic)
     if context is not None:
         task_kwargs["execution_context"] = context

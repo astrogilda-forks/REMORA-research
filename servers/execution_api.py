@@ -2619,7 +2619,7 @@ _EXEC_TRACER = get_remora_tracer(service_name="remora-execution")
 
 
 def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[int, str],
-                      proposal_id: str) -> tuple[str | None, Any]:
+                      proposal_id: str) -> tuple[str | None, Any, dict[str, Any] | None]:
     """Re-check the flow decision right before dispatch, and bind the result commit.
 
     SDD v2 WP-04 (AR-017, AR-018). ``expected`` is the epoch and digest the
@@ -2627,7 +2627,9 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     since, or the check now differs, the call is refused before a lease is
     minted. Otherwise the returned commit labels the raw result, persists the
     handles it mints and raises the context label, and only then hands back
-    the rendered result. A failed commit withholds the result.
+    the rendered result. A failed commit withholds the result. The third
+    value is the call's arguments with every handle resolved to its value,
+    which is what the tool receives (IFC-06).
 
     The check and the dispatch are not one transaction. A concurrent call in
     the same context can raise the label between them. The commit then finds
@@ -2643,14 +2645,14 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     flow = _flow_spec(tool_call.tool_name)
     principal, context_id = _FLOW_PRINCIPAL.get(), tool_call.context_id
     if flow is None or not principal or not context_id:
-        return "flow_state_unavailable", None
+        return "flow_state_unavailable", None, None
     contexts, handles = _flow_contexts(), _flow_handles()
-    ok, reason, _resolved = verify_flow_at_dispatch(
+    ok, reason, resolved = verify_flow_at_dispatch(
         contexts=contexts, handles=handles, tenant_id=tenant, principal=principal,
         context_id=context_id, flow=flow, arguments=tool_call.arguments,
         expected_epoch=expected[0], expected_digest=expected[1])
     if not ok:
-        return reason, None
+        return reason, None, None
 
     def commit(raw: Any) -> tuple[Any, dict[str, Any]]:
         done = commit_labeled_result(
@@ -2661,7 +2663,7 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
                                       "epoch": done.new_epoch,
                                       "minted_handles": len(done.minted_handle_ids)}
 
-    return None, commit
+    return None, commit, resolved
 
 
 def _dispatch_under_lease(
@@ -2714,9 +2716,10 @@ def _dispatch_under_lease(
                 return {"executed": False, "refusal_reason": refusal.value,
                         "proposal_id": proposal_id}
     result_commit = None
+    resolved_arguments: dict[str, Any] | None = None
     if flow_expected is not None:
-        flow_refusal, result_commit = _flow_at_dispatch(tenant, tool_call, flow_expected,
-                                                        proposal_id)
+        flow_refusal, result_commit, resolved_arguments = _flow_at_dispatch(
+            tenant, tool_call, flow_expected, proposal_id)
         if flow_refusal is not None:
             return {"executed": False, "refusal_reason": flow_refusal,
                     "proposal_id": proposal_id}
@@ -2769,6 +2772,11 @@ def _dispatch_under_lease(
             capability_set=capability_set,
             report_lease=report_lease,
             result_commit=result_commit,
+            # The tool gets the values the flow check judged; the lease binds
+            # the handle form the approver saw (IFC-06).
+            invocation_arguments=(
+                resolved_arguments if resolved_arguments not in (None, tool_call.arguments)
+                else None),
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):
