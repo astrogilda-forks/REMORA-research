@@ -1173,9 +1173,10 @@ def _with_flow_principal(principal: str | None, run: Callable[[], Any]) -> Any:
 
 
 def _flow_handles() -> Any:
-    """The handle store. Nothing mints handles before IFC-04b, so any handle a
-    call presents is unknown and refused (F2); per-process, which fails the
-    same way after a restart."""
+    """The handle store. Handles are minted when an executed call's result is
+    labelled and committed (_flow_at_dispatch). The store is per-process: a
+    restart or another worker does not know a handle, and a call that names
+    one is refused as flow_handle_invalid (F2)."""
     global _FLOW_HANDLES
     if _FLOW_HANDLES is None:
         with _LAZY_INIT_LOCK:
