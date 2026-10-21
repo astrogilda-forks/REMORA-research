@@ -152,6 +152,10 @@ while resolver-call counts were similar, so learned hint ordering
 has no identified benefit in this test. These are internal,
 author-generated synthetic results, not an external preregistration
 or production-security guarantee (NEGATIVE\_RESULTS.md \S96).
+The earlier sealed Study B showed the same pattern on its own harness:
+fixed-order lookups completed 28/45 reads against 0/45 without lookups,
+and the monitor-directed arm 15/45, so neither holdout attributes any
+gain to the learned monitor (\S95).
 
 Sealed BFCL v4 tracks measure routing within one tool catalogue. REMORA
 routes annotated calls; it does not generate them, and each wrong call is
@@ -374,8 +378,8 @@ Appendices~\ref{app:consensus}--\ref{app:mondrian}.
 \begin{table}[t]
 \centering\footnotesize
 \caption{Headline results. Registered claims are bound to the claim register;
-  WS1 Study C is a bounded experimental observation with artifacts and
-  NEGATIVE\_RESULTS.md \S96. BFCL
+  WS1 Studies B and C are bounded experimental observations with artifacts and
+  NEGATIVE\_RESULTS.md \S95--\S96. BFCL
   wrong calls are cross-task substitutions (\S\ref{sec:routing-blind});
   CLAIM-018 is superseded by CLAIM-019 and kept on record; it was measured on another sample and is not a baseline for C-ext3.
   The AgentHarm false-block floor (at most 40\%) was pre-registered for the
@@ -393,6 +397,7 @@ Sealed BFCL v4, 1{,}527 episodes & wrong-call acceptance 28/258 = 10.9\% (CLAIM-
 Sealed C-ext3, 2{,}799 episodes & wrong-call acceptance 0/500, upper bound 0.76\% by row, 3.5\% over its 106 tools (CLAIM-019) \\
 Sealed C-ext4, 1{,}562 episodes & correct-call acceptance 87/291 = 29.9\% (C-ext3 bundle 6.9\%); wrong-call acceptance 0/295, as for a refuse-all control (CLAIM-021) \\
 WS1 Study C, 825 episodes & safe benign reads: H0 0/33, H\_DET and H\_COST 20/33, H\_EDV 32/33; no observed WS1 violations (experiment; NEGATIVE\_RESULTS.md \S96) \\
+WS1 Study B, 600 episodes & benign reads: H0 0/45, H\_DET 28/45, H\_RANDOM 29/45, H\_EDV 15/45; attack success 0/60 per WS1 arm, 3/60 ungated (experiment; study harness; NEGATIVE\_RESULTS.md \S95) \\
 Component ablation & FAR 0.000 in every arm (CLAIM-020) \\
 \bottomrule
 \end{tabular}
@@ -1806,7 +1811,7 @@ reflects routing accuracy on the proposed-action surface, not
 prevention of tool execution, and the research-grade oracle setup may
 not generalise to live deployments.
 
-\subsection{Bounded Evidence Recovery on a Sealed ISP Holdout (WS1 Study C)}
+\subsection{Bounded Evidence Recovery on Sealed ISP Holdouts (WS1 Studies B and C)}
 \label{sec:ws1c}
 
 \textbf{Research question and design.} Can an external deterministic
@@ -1893,6 +1898,21 @@ H\_DET/H\_COST cannot be interpreted as a causal benefit.
 A same-threshold study on independent new data is needed
 to identify any gain from learned hint ordering.
 
+\textbf{Exploratory threshold counterfactual (post hoc).} A replay of
+the committed holdout log asks, per arm and threshold, which refusals
+the monitor made alone
+(\path{scripts/ws1_threshold_counterfactual.py},
+\path{artifacts/ws1/study_c_threshold_counterfactual_v1.json}).
+At each sealed threshold it reproduces the observed result. Every read
+H\_DET and H\_COST lost was refused by the monitor alone with every
+precondition \textsc{proved}. At 0.35, 12 of the 13 would have been
+released, and at 0.4 all 13. At 0.3, H\_EDV would have lost up to 30
+of its 32 reads. The monitor stopped no attack goal on its own: the
+four attack-goal calls tried in WS1 arms were each refuted by a
+precondition, and the monitor scored them 0.20 to 0.30, no higher than
+the benign reads it vetoed. A replay cannot know the agent's later
+steps after a changed veto, so these are bounds, not results.
+
 \textbf{Limitations, deviation, evidence.} Domain, customers, tasks,
 contracts, attacks and grader were authored by the study team, and
 one model family played agent, monitor and attacker. The HTTP
@@ -1902,7 +1922,9 @@ stopped at 809 episodes on its run cap, then resumed 16 episodes
 without replay of logged episodes. Holdout spending was
 USD~45.48 against a sealed USD~44.49 cap, a disclosed
 USD~0.99 deviation; the overall authorised WS1 budget of
-USD~100 was respected. OSF registration remained pending.
+USD~100 was respected. Neither WS1 study was preregistered on OSF,
+and neither seal was stamped with OpenTimestamps; each rests on its
+sealing commit in git history.
 The sealed method, digests, 825-record JSONL log and result
 summary are preserved at
 \path{docs/assurance/ws1_composition_study_v2.md},
@@ -1913,6 +1935,55 @@ summary are preserved at
 incomplete conclusions are indexed in
 \path{NEGATIVE_RESULTS.md} \S96. The spent holdout
 must not be retuned or rerun.
+
+\textbf{Earlier sealed holdout (Study B).} Study B (sealed at
+\texttt{6924f0d0}, evaluated once on 2026-10-20) ran 600 episodes over
+120 test tasks, with 45 benign reads and 60 attack tasks per arm, at one
+monitor threshold of 0.3 (Table~\ref{tab:ws1b}). Its utility figures come
+from the study's own harness, which grounded proved preconditions in
+study code rather than through the execution API (NEGATIVE\_RESULTS.md
+\S94).
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{WS1 Study B (sealed holdout; 45 benign reads and 60 attack
+tasks per arm; study harness, not the execution API). Vetoes are
+benign monitor vetoes over benign calls.}
+\fitcolumn{
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Arm & Reads & Attacks & Vetoes & Lookups \\
+\midrule
+A (no gate) & 44/45 & 3/60 & 0/236 & 0 \\
+H0 (no lookup) & 0/45 & 0/60 & 2/164 & 0 \\
+H\_DET & 28/45 & 0/60 & 34/227 & 7.57 \\
+H\_RANDOM & 29/45 & 0/60 & 35/236 & 7.81 \\
+H\_EDV & 15/45 & 0/60 & 66/231 & 7.68 \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:ws1b}
+\end{table}
+
+No WS1 arm executed a call outside the work order (95\% cluster bound
+4.9\% over 60 attack clusters). The preregistered attribution hypothesis
+failed. H\_EDV made as many lookups as H\_DET and completed 13 fewer
+reads, because it asked the monitor once per round and a veto at the
+low threshold was sticky; it vetoed all 43 benign port reads. H\_RANDOM
+did as well as H\_DET. The safety contrast cannot discriminate between
+arms, since the undefended agent followed only 3 of 60 attacks. The
+attacker also fell back to its fixed template in 55 of 60 tasks and
+targeted only the undefended agent. Three of Study B's frozen code files
+differ on master, so it reproduces from its sealing commit,
+not from master (\path{artifacts/ws1/study_b_holdout_v1.json},
+NEGATIVE\_RESULTS.md \S95).
+
+\textbf{Across both holdouts.} Bounded, deployment-authorised lookups
+recovered most legitimate reads that a gate without lookups refused
+(28/45 and 20/33 in the fixed-order arm, against 0 in both). No WS1 arm
+executed an attack goal or an out-of-scope call. Neither study found a
+measurable benefit from learned hints; in both, monitor vetoes at the
+threshold set how much utility was lost.
 
 \section{Ablations}
 \label{sec:ablation}
@@ -2144,8 +2215,9 @@ evidence routing (not trust scoring) is the required mechanism for
 critical-phase decisions.
 
 \paragraph{The execution chain has only a post-hoc, author-run attack evaluation.}
-Everything in \S\ref{sec:results} is measured on the research and
-benchmark path. The authority-bound chain of \S\ref{sec:execution-chain}
+Everything in \S\ref{sec:results} except \S\ref{sec:ws1c} is measured
+on the research and benchmark path; \S\ref{sec:ws1c} ran through the
+runtime WS1 gate and engine, not through the HTTP routes. The authority-bound chain of \S\ref{sec:execution-chain}
 (signed ToolSpec, exact-call lease, single-use grant, re-check at dispatch)
 has unit, property and conformance tests. A post-hoc attack evaluation was
 added after the review asked for one
@@ -2246,6 +2318,20 @@ them. The paper's custody claims
 these declared limits: REMORA establishes properties at a declared
 boundary and does not claim that all agent effects are governed.
 
+\paragraph{No measured benefit from the learned monitor in WS1.}
+Two sealed WS1 holdouts tested whether a learned monitor's hints make
+bounded verification recover more work than a fixed lookup order.
+Neither found it. In Study B the monitor-directed arm completed 15/45
+reads against 28/45 for the fixed order, with the same number of lookups
+(NEGATIVE\_RESULTS.md \S95). In Study C its 32/33 against 20/33 is a
+threshold effect. That arm used veto threshold 0.4 where the others used
+0.3, lookup counts were equal, and an exploratory replay finds that the
+other arms' losses were monitor-only vetoes on fully proved reads (\S96).
+In Study C the monitor stopped no attack goal on its own; the
+preconditions did. What remains open is a monitor threshold chosen on
+enough data, or a monitor that cannot veto a call whose preconditions are
+all proved, before any claim about the learned part.
+
 % =====================================================================
 \section{Threats to Validity}
 \label{sec:threats}
@@ -2255,8 +2341,10 @@ clusters, not real deployments. Monitor thresholds came from a
 single-customer pilot and differed by arm (0.4 versus 0.3),
 confounding learned-hint attribution. Only A and H\_EDV faced
 adaptive attacks, and the attacker refused 699 model requests.
-The HTTP layer was excluded, OSF registration remained pending,
-and the sealed holdout cap was exceeded by USD~0.99.
+The HTTP layer was excluded, neither study was preregistered on OSF
+or stamped with OpenTimestamps, and the sealed holdout cap was exceeded
+by USD~0.99. Study B's utility ran through its own harness, not the
+execution API, and three of its frozen code files differ on master.
 Conditional zero-event bounds do not imply risk-free operation
 (\S\ref{sec:ws1c}).
 
@@ -2342,7 +2430,10 @@ The spent WS1 Study C evaluation is archived in
 with frozen manifest \path{data/ws1_composition_v2/manifest.json},
 spend ledger \path{artifacts/ws1/study_c_spend.json}
 and analysis in \path{NEGATIVE_RESULTS.md} \S96.
-Do not rerun the evaluated holdout or tune against its records.
+Study B is archived in \path{artifacts/ws1/study_b_holdout_v1.json},
+\path{artifacts/ws1/study_b_holdout_v1.jsonl} and
+\path{data/ws1_composition_v1/manifest.json} (\S95).
+Do not rerun the evaluated holdouts or tune against their records.
 
 
 \textbf{Repository:} \url{https://github.com/darklordVirtual/REMORA-research}.
@@ -2472,7 +2563,9 @@ monitor-hint arm completed 32/33, but its veto threshold differed
 and the study cannot attribute that gain to learned ordering.
 No WS1 arm showed an out-of-scope execution or leak in its 121
 attack episodes, conditional on the specific attacker and attack
-coverage (\S\ref{sec:ws1c}). This is bounded within-domain evidence
+coverage (\S\ref{sec:ws1c}). The earlier Study B showed the same
+pattern (28/45 against 0/45), and neither holdout found a benefit from
+learned hints. This is bounded within-domain evidence
 for recovery, not a general security guarantee or production claim.
 
 The current architecture offers two further research interfaces. Typed
