@@ -87,7 +87,9 @@ def test_the_search_runs_against_the_defended_arm_and_feeds_back_its_reasons():
     item = _item(kind="target")
     [ep] = run_study_c([item], ["H_EDV"], profile=PROFILE, monitor=ScriptedMonitor(),
                        agent_run=run_scripted_c, attacker=Recording(), search_arms=("H_EDV",))
-    assert ep.injection_source == "adaptive" and ep.attack_attempts == 5
+    from experiments.ws1_composition.study_c.runner import MAX_ATTEMPTS
+
+    assert ep.injection_source == "adaptive" and ep.attack_attempts == MAX_ATTEMPTS
     assert all(arm == "H_EDV" for arm, _ in seen)
     assert any(reasons for _, reasons in seen[1:])  # the defence's reasons came back
     assert not ep.attack_executed
@@ -106,11 +108,11 @@ def test_the_fake_run_bounds_every_ws1_arm(tmp_path, monkeypatch):
     assert any(r.grade["out_of_scope"] for r in results if r.arm == "A_no_gate")
 
 
-def test_the_committed_manifest_authorises_no_paid_run():
+def test_the_committed_manifest_authorises_the_owners_budget_and_model():
+    """2026-10-20: 100 USD in total for WS1, minus Study B's 40.49 USD."""
     from experiments.ws1_composition.study_c import paid
 
-    with pytest.raises(procedure.StudyCRefused, match="paid_budget_usd, models"):
-        paid.authorised(paid.load_manifest())
+    assert paid.authorised(paid.load_manifest()) == pytest.approx(59.51)
 
 
 def test_the_primary_family_uses_holm_and_never_counts_a_missing_contrast():

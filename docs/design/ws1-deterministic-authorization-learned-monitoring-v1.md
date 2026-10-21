@@ -44,6 +44,8 @@ Avvik fra spesifikasjonen:
 - `enforce` nektes ved oppstart uten `REMORA_FLOW_CONTROL=1` og uten at deploymenten navngir evidens for IFC-04b, IFC-06, IFC-11, IFC-12 og IFC-13. Denne evidensen er deploymentens egen påstand; koden sjekker at den er navngitt, ikke at den er sann.
 - Monitoren får aldri argumentverdier. En resolver sender kravets subject (en argumentverdi) til sin registrerte kilde.
 
+Holdout for Studie C ble kjørt 21.10.2026 gjennom kjøregaten (825 episoder, se NEGATIVE_RESULTS §96). Alle WS1-armer gjenopprettet flere trygge lesinger enn H0: H_DET og H_COST 20 av 33, H_EDV 32 av 33, H0 0 av 33. Ingen WS1-arm utførte et angrepsmål, et kall utenfor arbeidsordren eller en lekkasje i 121 angrepsepisoder hver, mens den ubeskyttede agenten gjorde det. Alle tapte lesinger var monitorveto på terskelen, og H_EDV sin fordel skyldes en høyere terskel, ikke hintene.
+
 Holdout for Studie B ble kjørt én gang 20.10.2026 (600 episoder, se NEGATIVE_RESULTS §95). Ingen WS1-arm utførte et kall utenfor arbeidsordren. H_DET fullførte 28 av 45 lesinger, H_RANDOM 29 og H_EDV 15. H_EDV stoppet alle 43 godartige portlesinger, så attribusjonshypotesen faller. Angriperen falt tilbake til malen i 55 av 60 angrep.
 
 Gjenstår: OSF-registrering, grant-ruten (venter på IFC-08), en pilot i et ekte miljø, og `enforce` i produksjon (venter på IFC-pakkene). WP0 viser at H-DET og H-EDV ikke kan gjenopprette noe på AgentDojo før intent- og kontraktsdekning finnes (S09, S20).

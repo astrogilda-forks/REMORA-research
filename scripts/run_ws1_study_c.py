@@ -7,6 +7,7 @@
     python scripts/run_ws1_study_c.py --pilot 1       # paid: needs the owner's budget and models
     python scripts/run_ws1_study_c.py --seal 1        # free: from pilot 1, locks the manifest
     python scripts/run_ws1_study_c.py --holdout       # paid, once
+    python scripts/run_ws1_study_c.py --holdout --resume   # after an interruption
 
 Paid steps read ANTHROPIC_API_KEY from the environment and refuse before any
 request when the manifest lacks ``owner_decisions.paid_budget_usd`` or
@@ -32,6 +33,8 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--pilot", type=int, metavar="VERSION")
     mode.add_argument("--seal", type=int, metavar="PILOT_VERSION")
     mode.add_argument("--holdout", action="store_true")
+    parser.add_argument("--resume", action="store_true",
+                        help="with --holdout: continue an interrupted holdout")
     args = parser.parse_args(argv)
     if args.fake:
         body = procedure.fake()
@@ -49,13 +52,19 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({k: out[k] for k in ("status", "holdout", "thresholds_per_arm",
                                                   "power_primary")}, indent=1))
             return 0
-        from experiments.ws1_composition.isp_study.study_b import _client
+        import os
 
-        client = _client()
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise procedure.StudyCRefused("set ANTHROPIC_API_KEY before a paid run")
+        import anthropic
+
+        # The SDK retries connection errors and 5xx with backoff; Study B's
+        # holdout stopped once on a single connection error.
+        client = anthropic.Anthropic(max_retries=8)
         if args.pilot is not None:
             out = paid.pilot(client, version=args.pilot)
         else:
-            out = paid.holdout(client)
+            out = paid.holdout(client, resume=args.resume)
         print(json.dumps({k: out.get(k) for k in ("episodes", "spent_usd", "stopped_by_budget",
                                                   "status")}, indent=1))
         return 0

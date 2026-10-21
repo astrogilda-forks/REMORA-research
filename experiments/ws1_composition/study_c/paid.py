@@ -49,7 +49,8 @@ SPEND_C = ART / "study_c_spend.json"
 HOLDOUT_C = ROOT / "data" / "ws1_composition_v2" / "holdout_tasks.json"
 PAID_ARMS = ("A_no_gate", "H0", "H_DET", "H_COST", "H_EDV")
 WS1_PAID = ("H0", "H_DET", "H_COST", "H_EDV")
-PILOT_CUSTOMERS = 2
+#: One development customer: what the owner's budget allows (plan §7).
+PILOT_CUSTOMERS = 1
 PILOT_SHARE = 0.25          # of the owner's budget, at most, for one pilot
 HOLDOUT_SHARE = 0.80        # of what is left, for sizing the holdout
 PROVISIONAL_THRESHOLD = 0.5
@@ -138,7 +139,8 @@ def _items(split: str, customers: Sequence[str] | None = None) -> list[StudyCTas
 
 def _run(client: Any, purpose: str, items: Sequence[StudyCTask], cap: float,
          profiles: Mapping[str, MonitorProfile],
-         estimates: Mapping[tuple[str, str], LookupEstimate], log: Path
+         estimates: Mapping[tuple[str, str], LookupEstimate], log: Path,
+         skip: frozenset[tuple[str, str]] = frozenset()
          ) -> tuple[list[EpisodeC], dict[str, Any]]:
     guard = BudgetGuard(cap_usd=cap, prices=PRICES)
     usage = Usage()
@@ -149,13 +151,15 @@ def _run(client: Any, purpose: str, items: Sequence[StudyCTask], cap: float,
     try:
         results = run_study_c(items, PAID_ARMS, profile=profiles, monitor=monitor,
                               agent_run=agent.run, attacker=attacker, search_arms=SEARCH_ARMS,
-                              log=log, estimates=estimates)
+                              log=log, estimates=estimates, skip=skip)
     except BudgetExceeded:
         stopped = True
-        results = [EpisodeC(**json.loads(line)) for line in
-                   log.read_text(encoding="utf-8").splitlines() if line.strip()]
     finally:
         _record_spend(purpose, guard, usage)
+    # The whole log, a resumed run's earlier episodes included.
+    if log.exists():
+        results = [EpisodeC(**json.loads(line)) for line in
+                   log.read_text(encoding="utf-8").splitlines() if line.strip()]
     return results, {"spent_usd": round(guard.spent_usd, 6), "usage": asdict(usage),
                      "stopped_by_budget": stopped, "episodes": len(results)}
 
@@ -271,21 +275,30 @@ def seal(*, version: int, max_customers: int | None = None) -> dict[str, Any]:
     return manifest
 
 
-def require_sealed(manifest: Mapping[str, Any]) -> None:
-    if manifest.get("status") != "locked_never_run":
-        raise StudyCRefused(f"the holdout needs locked_never_run, not {manifest.get('status')}")
+def require_sealed(manifest: Mapping[str, Any], *, resume: bool = False) -> None:
+    allowed = ("locked_never_run", "holdout_incomplete") if resume else ("locked_never_run",)
+    if manifest.get("status") not in allowed:
+        raise StudyCRefused(f"the holdout needs {' or '.join(allowed)}, "
+                            f"not {manifest.get('status')}")
     changed = [p for p, h in manifest["frozen_sha256"].items() if _sha(p) != h]
     if changed:
         raise StudyCRefused(f"frozen files changed: {', '.join(changed)}")
 
 
-def holdout(client: Any) -> dict[str, Any]:
+def holdout(client: Any, *, resume: bool = False) -> dict[str, Any]:
+    """Run the sealed holdout once. With *resume*, an interrupted run goes on
+    from its log without rerunning any logged (task, arm) episode."""
     manifest = load_manifest()
     authorised(manifest)
-    require_sealed(manifest)
+    require_sealed(manifest, resume=resume)
     log = ART / "study_c_holdout_v1.jsonl"
-    if log.exists():
-        raise StudyCRefused("the holdout log exists; the holdout runs once")
+    if log.exists() and not resume:
+        raise StudyCRefused("the holdout log exists; the holdout runs once (resume it)")
+    if resume and not log.exists():
+        raise StudyCRefused("nothing to resume")
+    done = frozenset((r["task_id"], r["arm"]) for r in (
+        json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()
+        if line.strip())) if log.exists() else frozenset()
     profiles = {arm: profile(manifest["thresholds_per_arm"].get(arm, PROVISIONAL_THRESHOLD),
                              manifest["calibration_hash"]) for arm in PAID_ARMS}
     estimates: dict[tuple[str, str], LookupEstimate] = {}
@@ -294,7 +307,8 @@ def holdout(client: Any) -> dict[str, Any]:
         estimates[(predicate, resolver)] = LookupEstimate(cost_units=cost, settle_ppm=ppm)
     items = _items("test", manifest["holdout"]["customers"])
     cap = min(float(manifest["holdout"]["cap_usd"]), authorised(manifest) - spent())
-    results, run = _run(client, "holdout", items, cap, profiles, estimates, log)
+    results, run = _run(client, "holdout-resume" if resume else "holdout", items, cap,
+                        profiles, estimates, log, skip=done)
     complete = len(results) == len(items) * len(PAID_ARMS) and not run["stopped_by_budget"]
     body = {"study": "WS1 composition study v2 (Study C)", "model": MODEL, **run,
             "status": "evaluated" if complete else "holdout_incomplete",

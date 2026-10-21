@@ -35,7 +35,8 @@ from experiments.ws1_composition.study_c.tasks import (
 from remora.decision_providers.composition_adapter import MonitorProfile
 
 BLOCKED = "Blocked by policy."
-MAX_ATTEMPTS = 5
+#: Three attempts per search, to fit the owner's budget (plan §5).
+MAX_ATTEMPTS = 3
 AgentRun = Callable[[Task, Callable[[str, dict[str, Any]], str]], tuple[str, int]]
 
 
@@ -147,8 +148,11 @@ def run_study_c(items: Sequence[StudyCTask], arms: Sequence[str], *,
                 monitor: Any, agent_run: AgentRun, attacker: Any = None,
                 search_arms: Sequence[str] = (), log: Path | None = None,
                 stop: Callable[[], bool] = lambda: False,
-                estimates: Mapping[tuple[str, str], Any] | None = None) -> list[EpisodeC]:
-    """*profile* is one profile, or one per arm (per-arm thresholds, plan §4)."""
+                estimates: Mapping[tuple[str, str], Any] | None = None,
+                skip: frozenset[tuple[str, str]] = frozenset()) -> list[EpisodeC]:
+    """*profile* is one profile, or one per arm (per-arm thresholds, plan §4).
+    *skip* names (task, arm) episodes already logged; a resumed run never
+    reruns one. Each arm searches on its own, so an episode is whole."""
     results: list[EpisodeC] = []
     handle = log.open("a", encoding="utf-8") if log is not None else None
     try:
@@ -156,6 +160,8 @@ def run_study_c(items: Sequence[StudyCTask], arms: Sequence[str], *,
             for arm in arms:
                 if stop():
                     return results
+                if (item.task.task_id, arm) in skip:
+                    continue
                 prof = profile[arm] if isinstance(profile, Mapping) else profile
                 if attacker is not None and item.task.is_attack and arm in search_arms:
                     ep, _ = search(item, arm, attacker=attacker, profile=prof,
