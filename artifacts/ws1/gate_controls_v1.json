@@ -1,0 +1,86 @@
+{
+ "agent_evidence_vectors": {
+  "note": "the four controls were not in a released agent-evidence-vectors version (latest v0.24.0) when this ran",
+  "status": "pending"
+ },
+ "controls_source": "REMORA's own versions of the four requested controls",
+ "gate": "remora/verification/execution_gate.Ws1Gate through /v1/execution/execute-accepted",
+ "outcomes": [
+  {
+   "case": "required monitor raises at the re-gate",
+   "control": "monitor_outage",
+   "detail": "ws1_regate_refused",
+   "executed": false,
+   "expected": "refused_unspent",
+   "grant_unspent": true,
+   "status_code": 409,
+   "ws1_reasons": null
+  },
+  {
+   "case": "evidence valid_until reached at the re-gate",
+   "control": "ttl_before_consumption",
+   "detail": "ws1_regate_refused",
+   "executed": false,
+   "expected": "refused_unspent",
+   "grant_unspent": true,
+   "status_code": 409,
+   "ws1_reasons": [
+    "verification_stopped"
+   ]
+  },
+  {
+   "case": "evidence lapses between the re-gate and consumption",
+   "control": "ttl_before_consumption",
+   "detail": "authorized by single-use ACCEPT token",
+   "executed": true,
+   "expected": "documented_residual_executes",
+   "grant_unspent": null,
+   "status_code": 200,
+   "ws1_reasons": null
+  },
+  {
+   "case": "the record now belongs to another tenant",
+   "control": "another_tenants_evidence",
+   "detail": "ws1_regate_refused",
+   "executed": false,
+   "expected": "refused_unspent",
+   "grant_unspent": true,
+   "status_code": 409,
+   "ws1_reasons": null
+  },
+  {
+   "case": "the source returns evidence stamped for another tenant",
+   "control": "another_tenants_evidence",
+   "detail": "ws1_regate_refused",
+   "executed": false,
+   "expected": "refused_unspent",
+   "grant_unspent": true,
+   "status_code": 409,
+   "ws1_reasons": null
+  },
+  {
+   "case": "registry digest changed after ACCEPT",
+   "control": "digest_change_after_accept",
+   "detail": "context_mismatch",
+   "executed": false,
+   "expected": "refused_unspent",
+   "grant_unspent": true,
+   "status_code": 409,
+   "ws1_reasons": null
+  },
+  {
+   "case": "monitor_profile digest changed after ACCEPT",
+   "control": "digest_change_after_accept",
+   "detail": "context_mismatch",
+   "executed": false,
+   "expected": "refused_unspent",
+   "grant_unspent": true,
+   "status_code": 409,
+   "ws1_reasons": null
+  }
+ ],
+ "pytest_exit_code": 0,
+ "remora_revision": "25d5ba09c08b7e6800840a20a984a99b5fd69899",
+ "requested_by": "@astrogilda (darklordVirtual/REMORA-research#953)",
+ "schema": "remora-ws1-gate-controls/v1"
+}
