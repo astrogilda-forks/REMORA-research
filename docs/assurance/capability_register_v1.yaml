@@ -1647,6 +1647,7 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 71d7a23a66710e0ca46e71ec981a95d6012ba949
     verified_by: >-
+      re-audited 2026-10-21 at 47fe8bb (STUDY B AND C OUTCOMES): no code changed. The caveat now records that Study C measured grounding from proofs through the runtime gate (NEGATIVE_RESULTS section 96) and that no utility claim is registered; the evidence list adds the grounding, task-budget, cost-mode and typed-uncertainty tests and the two holdout artifacts. Status and scope unchanged.
       re-audited 2026-10-20 at 10d4f0a (STRICT MONOTONE), from 6136767: remora/policy/decision_engine.py gains the opt-in strict_monotone profile (_decide_monotone): the least approvable of the call's decision and the decisions with any subset of its active risk signals removed, and for a high or critical production write the decision at medium tier; a refusal from removing signals carries risk_signal_no_route (remora/policy/report.py, in NON_APPROVABLE_REASONS in remora/policy/composition.py). decide() still emits one governance event per decision. The library default is off and every default decision is unchanged (golden tables, Rego parity and committed-evidence replays pass). servers/execution_api.py turns it on by default for the enforcing engine (REMORA_STRICT_MONOTONE=0 opts out); servers/api.py adds strict_monotone to the engine identity, hashed only when on. Strictly narrowing. Tests: tests/policy/test_signal_monotonicity.py, tests/policy/test_strict_monotone_api.py, tests/test_policy_identity.py. Status, scope and caveats unchanged.
       re-audited 2026-10-20 at 6136767 (FLOW BEFORE GRANT, EXECUTOR FLOW, COST AUDIT), from 4ad9f9c: remora/execution/service.py checks the call's current flow verdict on the ACCEPT path before the grant is consumed and refuses unspent on a violation (execution_flow_refused); servers/execution_api.py checks flow on /dispatch-leased in the execution domain's own store as the lease's actor and commits labels before returning; remora/verification/execution_gate.py adds lookups per resolver and cost units charged to the WS1 audit block. Strictly narrowing; nothing is lifted. Tests: tests/flow/test_flow_at_dispatch.py, tests/flow/test_flow_dispatch_leased.py, tests/verification/test_ws1_cost_modes.py. Status, scope and caveats unchanged.
       re-audited 2026-10-20 at 4ad9f9c (FLOW RACE, PROPOSER, MONITOR BUDGET), from c6e7194: servers/execution_api.py: the flow label commit now passes the epoch the dispatch check passed on, and a context that moved during dispatch withholds the result (flow_epoch_changed_during_dispatch); /execute and the async worker run with the review item's proposer as the flow principal, so the worker's observation and dispatch-time flow check read the proposing agent's context instead of none. Strictly narrowing for result release; no refusal is lifted. Tests: tests/flow/test_flow_at_dispatch.py. Status, scope and caveats unchanged. Also remora/verification/execution_gate.py: a hint request is skipped when one monitor call is left, so a required monitor's final assessment can no longer read monitor_budget_exhausted after the hints spent the cap; a hint veto stays sticky (tests/verification/test_ws1_monitor_budget.py).
@@ -1682,8 +1683,14 @@ capabilities:
       - remora/execution/service.py
       - servers/execution_api.py
       - tests/test_ws1_execution_binding.py
+      - tests/test_ws1_grounding.py
+      - tests/test_ws1_task_budget.py
       - tests/verification/test_authority_ceiling.py
       - tests/verification/test_architecture_boundary.py
+      - tests/verification/test_ws1_cost_modes.py
+      - tests/verification/test_ws1_typed_uncertainty.py
+      - artifacts/ws1/study_b_holdout_v1.json
+      - artifacts/ws1/study_c_holdout_v1.json
       - docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md
     caveat: >-
       Off by default and never enabled in any deployment here. Enforce is
@@ -1695,8 +1702,11 @@ capabilities:
       grant (IFC-08), so a GRANT precondition is a refusal, and so is every
       other WS1 cap under enforce. No calibrated monitor profile exists, and on the
       AgentDojo development split no blocked call is recoverable by a bounded
-      lookup (NEGATIVE_RESULTS.md section 93), so no utility gain is claimed.
-      Grounding from proofs (Ws1Deployment.grounding) is opt-in and measured in
-      no study; Study B's recovery ran through its own harness (section 94).
+      lookup (NEGATIVE_RESULTS.md section 93). Grounding from proofs
+      (Ws1Deployment.grounding) is opt-in. Study C measured it once through the
+      runtime Ws1Gate and engine, not through the HTTP routes, on an
+      author-written synthetic domain (section 96); Study B's recovery ran
+      through its own harness (sections 94 and 95). No utility claim is
+      registered, and section 94 stays open until a run through the routes.
       The verifiers and resolvers in the tests are fixtures. Producer-written
       code and tests; independence NOT_ESTABLISHED.
