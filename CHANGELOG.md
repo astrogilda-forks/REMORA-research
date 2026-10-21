@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Flow handles reach the tool as values (IFC-06)
+
+- The dispatch-time flow check resolved a call's handles and then discarded them, so the tool received the opaque handle token. The tool now receives the resolved values. The lease still binds the handle form the approver saw, and the dispatcher's capability, effect and procedure checks judge both forms. Found by an external review of `265abfbe`; nothing changes with flow control off.
+- `DurableRevocationStore` and `DurableNonceStore` use the D1 endpoint they are given instead of `REMORA_STATE_ENDPOINT`.
+- `record_dispatch_intent` no longer raises `NotImplementedError` for the unbacked outbox inside a D1 review transaction (development only).
+
 ### WS1 Studies B and C, grounding from proofs and the strict monotone default
 
 - WS1 Study B (sealed at `6924f0d0`, evaluated once 2026-10-20, 600
