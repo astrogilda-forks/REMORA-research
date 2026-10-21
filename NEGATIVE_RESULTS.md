@@ -5660,6 +5660,18 @@ the harness, the search target and the grader. It does not yet address the
 monitor's veto rate, which needs a threshold chosen on more data or hint
 calls that cannot veto.
 
+**Frozen-file drift after the holdout (2026-10-21).** Three files the seal
+froze have since changed on master: `remora/policy/composition.py` (the
+strict monotone profile, §90), `remora/verification/compose.py` (typed
+monitor uncertainty) and `remora/verification/planner.py` (the durable task
+budget). They were made for Study C on other branches. The runner refuses
+to start while a frozen file differs (`require_ready` in
+`experiments/ws1_composition/study.py`). The result commit `4f48960e` was
+rebased onto a master that already carried them. Study B therefore
+reproduces from its sealing commit `6924f0d0`, not from master.
+The seal was not stamped with OpenTimestamps and the study was not
+preregistered on OSF; the sealing commit in git history is its only anchor.
+
 ## §96 Study C holdout: utility recovered and authority held under defence-aware search; the monitor threshold decided how much (2026-10-21)
 <!-- finding-status: open -->
 
