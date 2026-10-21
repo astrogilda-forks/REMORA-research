@@ -24,7 +24,11 @@ from remora.enforcement.lease import (
     ToolExecutionStateUnknown,
 )
 from remora.enforcement.lease_signing import SigningUnavailable
-from remora.enforcement.outbox import ExecutionOutbox, OutboxRow, UnbackedExecutionOutbox
+from remora.enforcement.outbox import (
+    ExecutionOutbox,
+    OutboxRow,
+    UnbackedExecutionOutbox,
+)
 from remora.enforcement.result_envelope import capture_tool_result
 from remora.execution.ports import ToolCallPort, ToolDispatcherPort
 from remora.execution.remote_dispatch import (
