@@ -56,3 +56,35 @@ def test_no_endpoint_anywhere_fails_closed(monkeypatch) -> None:
     with pytest.raises(d1.D1Unavailable):
         with d1.connect() as conn:
             conn.execute("SELECT 1")
+
+
+# The same defect survived in two later stores until the M4.1a topology
+# mapping (docs/architecture/ADR-ws1-m4-admission-topology.md) found it:
+# both accepted ``state_endpoint`` and then called ``connect()`` without it.
+
+def test_revocation_store_uses_its_explicit_endpoint(monkeypatch) -> None:
+    monkeypatch.delenv(d1.ENDPOINT_ENV, raising=False)
+    fake = _Fake()
+    monkeypatch.setattr(d1, "_post", fake.post)
+
+    from remora.governance.revocation_store import DurableRevocationStore
+
+    store = DurableRevocationStore(state_endpoint=ENDPOINT)
+    assert store.is_revoked("agent-1", tenant_id="t1") is False
+
+    assert fake.urls, "the revocation store never reached the state store"
+    assert set(fake.urls) == {ENDPOINT}
+
+
+def test_nonce_store_uses_its_explicit_endpoint(monkeypatch) -> None:
+    monkeypatch.delenv(d1.ENDPOINT_ENV, raising=False)
+    fake = _Fake()
+    monkeypatch.setattr(d1, "_post", fake.post)
+
+    from remora.enforcement.nonce_store import DurableNonceStore
+
+    store = DurableNonceStore(state_endpoint=ENDPOINT)
+    store.try_consume("nonce-1", tenant_id="t1")
+
+    assert fake.urls, "the nonce store never reached the state store"
+    assert set(fake.urls) == {ENDPOINT}
