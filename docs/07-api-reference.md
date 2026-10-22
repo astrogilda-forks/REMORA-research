@@ -636,6 +636,35 @@ set or profile refuses as `context_mismatch`. Enforce refuses startup without
 `REMORA_FLOW_CONTROL=1` and evidence named for the prerequisite IFC work
 packages ([design](design/ws1-deterministic-authorization-learned-monitoring-v1.md)).
 
+**Spend budgets (opt-in, default off):** `REMORA_SPEND_BUDGET_FILE` names a
+YAML or JSON `remora-spend-budget/v1` policy and `REMORA_SPEND_LEDGER` the
+SQLite file its reservations are kept in. Either one without the other
+refuses startup. The policy names the tools that spend, with the argument
+that carries the amount and the one that carries the unit. It also declares
+a budget per tenant, principal and unit, each with a `budget_id` and an
+integer `limit`:
+
+```json
+{"schema": "remora-spend-budget/v1",
+ "tools": {"transfer_payment": {"amount_argument": "amount", "unit_argument": "unit"}},
+ "budgets": [{"budget_id": "ops-q4", "tenant": "acme", "principal": "agent-1",
+              "unit": "JPY", "limit": 20000}]}
+```
+
+The governed dispatcher reserves a budgeted call's amount as its last check
+before the lease nonce is spent. A call the budget cannot cover never reaches
+the tool, and `tool_execution.refusal_reason` reads `spend_budget_exhausted`.
+Other refusals are `spend_budget_undeclared` (no budget for that principal
+and unit), `spend_amount_invalid` (not an integer from 1 to 1,000,000) and
+`spend_unit_invalid`. A limit edited under an existing `budget_id` refuses as
+`spend_budget_changed`, so a new limit needs a new id. The last two are
+`spend_budget_closed` and `spend_ledger_unavailable`. `/assess` gives the
+same answer earlier as a 409 and records `spend_refused` on the chain. That
+check reserves nothing; the reservation at dispatch is what holds. The budget
+belongs to the principal the lease names, so a new task or context does not
+reset it. A reservation is never returned, and the ledger is per host.
+NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
+
 **Capability sets (WS8 Q8.2, opt-in):** with
 `REMORA_CAPABILITY_POLICY_FILE` naming a YAML or JSON capability policy,
 the API resolves an `EffectiveCapabilitySet` for every call. It uses the
