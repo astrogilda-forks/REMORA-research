@@ -153,6 +153,11 @@ def report(body: dict[str, Any]) -> str:
         "- No REMORA grant, lease or dispatch exists for these calls; "
         "`remora_dispatch_authority` is `NOT_ESTABLISHED` for every case. This row does "
         "not say REMORA would have prevented C.",
+        "- REMORA as of this commit has no cumulative spend limit on tool calls: no "
+        "admission or dispatch path reserves a call's cost against a running total. "
+        "Each case costs 7000, so no single-call limit separates C from A and B. REMORA "
+        "could not have refused C on budget grounds; that is a capability gap, not a "
+        "measured result.",
         "- No physical effect, no runtime use of the dataset and no production or "
         "certification claim.",
         "- Keys and the trust configuration come from the producer's own bundle.",

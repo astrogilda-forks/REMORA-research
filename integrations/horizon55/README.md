@@ -107,5 +107,9 @@ only. Without it, `dataset_byte_identity` cannot be established.
   Identical result bytes do not make them one call.
 - The mutation tests are the author's own controls, not external adversarial
   coverage.
+- REMORA has no cumulative spend limit on tool calls today. `TaskCallLedger`
+  can reserve units against a cap atomically, but the execution gate charges
+  it one unit per verification lookup, not the cost of a call. REMORA could
+  therefore not have refused C on budget grounds.
 - This row does not say REMORA would have prevented C, and makes no
   certification, production or comparative security claim.
