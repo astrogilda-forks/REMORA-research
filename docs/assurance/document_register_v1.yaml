@@ -3222,7 +3222,7 @@ documents:
   claims: []
 - id: DOC-405
   path: docs/architecture/ADR-ws1-m4-admission-topology.md
-  status: proposal
+  status: canonical
   topic: docs_architecture_ADR-ws1-m4-admission-topology_md
   code_synced: verified
   verdict: current

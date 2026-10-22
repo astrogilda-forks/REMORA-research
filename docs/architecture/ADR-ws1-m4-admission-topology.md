@@ -1,8 +1,9 @@
 # ADR: WS1-M4 admission topology (trust, clock and state)
 
-- Status: **proposed** (2026-10-22). Work package M4.1a of the
-  [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9. No code
-  changes with this ADR.
+- Status: **accepted** (2026-10-22), with the owner decisions below. Work
+  package M4.1a of the
+  [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9. M4.1b
+  (receipts and epochs) is implemented and not yet wired; M4.1c wires it.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -140,10 +141,34 @@ evidence expiry with database time.
 
 Both need a test and a fix in their own PR.
 
-## Open questions for the owner
+## Owner decisions (2026-10-22)
 
-- Whether the approved-review path may consume the grant before the claim, as
-  part of the admission transaction, or whether review approval stays a
-  separate authority whose token is issued at claim time.
-- Whether `max_clock_skew_ms` is a deployment parameter or a single value fixed
-  in the strict profile.
+The owner asked for the recommendations to be followed.
+
+- **Review path.** The approved-review path consumes the grant in the same
+  admission transaction as the claim, after the receipt and epoch checks. All
+  three paths then share one linearization point. The token is still issued at
+  claim time, so a review approval stays a separate authority until then.
+- **Clock skew.** `max_clock_skew_ms` is a deployment parameter. The strict
+  profile requires it, has no default, and accepts at most 5000 ms
+  (`MAX_CLOCK_SKEW_MS` in `remora/verification/receipts.py`). A deployment
+  whose clocks drift further must fix them, not widen the window.
+
+## M4.1b, implemented (not wired)
+
+- `remora/verification/receipts.py`: `EvidenceReceiptV1`, built only from a
+  composition record's PROVED and completed results, with the subject epoch
+  read before the lookups. `admission_refusal` is the pure admission check.
+  It refuses expiry at database time, with equality expired and the skew
+  subtracted, and a stale or revoked epoch. It also refuses a foreign,
+  duplicated, missing or modified receipt
+  (`tests/verification/test_evidence_receipts.py`, M4-T01, T03, T04, T07, T09,
+  T10).
+- `remora/governance/authority_epochs.py`: `AuthorityEpochs` over Postgres or
+  SQLite. Every advance moves the epoch by one; it joins the caller's
+  transaction; a locked read outside a transaction is refused; an unreachable
+  store raises. Revoke-first and admit-first orderings are tested with two
+  contending SQLite transactions (`tests/test_authority_epochs.py`).
+
+Nothing on an execution path calls either module yet, so no claim or
+capability changes.
