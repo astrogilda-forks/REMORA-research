@@ -259,6 +259,37 @@ FT-02 requires. All three paths now spend at one linearization point.
   refused on a lapse and on a revocation, grant unspent, row settled) and
   the worker (admitted, and refused on a revocation with the row settled).
 
-Still open: `execution_authorized` inside the transaction (M4-T12), a
-principal-revocation read on the ACCEPT path, a route that writes authority
-epochs, the `transaction_state` DDL race, and M4-T14 to T20.
+Still open after slice 2a: see slice 2b.
+
+## M4.1c slice 2b, implemented (revocation at admission)
+
+- **Principals.** Admission reads principal revocation inside its
+  transaction on all three paths, through the durable revocation store,
+  which joins the transaction. It checks:
+  - the authenticated actor;
+  - the proposer a delegate acts for;
+  - on the review and worker paths, the approver.
+
+  `revoke-principal` already writes under the same tenant lock, so a
+  revocation and an admission are ordered. Revocation refuses as
+  `principal_revoked`. A store that cannot answer refuses as
+  `revocation_store_unavailable` (M4-T03).
+- **Evidence sources.** `POST /v1/execution/revoke-authority` (`review`
+  capability) revokes or reinstates `source:<id>` through
+  `AtomicAdmission.advance_authority`. The epoch change and its
+  `authority_revoked` or `authority_reinstated` event commit in one
+  transaction. Without atomic admission the route answers 409: nothing
+  would read the epoch.
+- **Fix.** `transaction_state` creates its Postgres tables once, in
+  autocommit, under an advisory lock (`_ensure_pg_schema`). Concurrent first
+  transactions on a fresh database no longer collide on the catalog index.
+  The contention tests now run without a warm-up transaction.
+
+Still open:
+- `execution_authorized` is appended after commit (M4-T12). Moving it into
+  the transaction defers its chain sequence number, which `execution_result`
+  and the outbox projection link by today. That needs a linking change of
+  its own.
+- M4-T14 to T20.
+- The real Postgres matrix beyond the contention and ordering cases. M4.1
+  stays open until the SDD §5 gate is met.

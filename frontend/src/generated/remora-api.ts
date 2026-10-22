@@ -719,6 +719,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/execution/revoke-authority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Authority
+         * @description Revoke or reinstate an evidence source for WS1-M4 admission.
+         *
+         *     Advances the source's authority epoch under the tenant lock admission
+         *     takes, with its audit event in the same transaction. Either way the epoch
+         *     moves, so evidence read before the change no longer admits (INV-M4-02).
+         *     Same capability as ``revoke-principal``. Only under
+         *     ``REMORA_WS1_ADMISSION=atomic``: without it nothing reads the epoch, and
+         *     answering "revoked" would claim an effect the deployment does not have.
+         */
+        post: operations["revoke_authority_v1_execution_revoke_authority_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution/revoke-principal": {
         parameters: {
             query?: never;
@@ -1635,6 +1662,24 @@ export interface components {
              * @description Client-declared annotation only: when it differs from the authenticated principal it is recorded as unverified metadata. The audited reviewer identity is always the principal from the bearer token.
              */
             reviewer_id: string;
+        };
+        /**
+         * RevokeAuthorityRequest
+         * @description Revoke or reinstate an evidence source for WS1-M4 admission.
+         *
+         *     ``subject_key`` is ``source:<source_id>`` as the WS1 registry names it.
+         *     Both directions advance the source's authority epoch.
+         */
+        RevokeAuthorityRequest: {
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Revoked
+             * @default true
+             */
+            revoked: boolean;
+            /** Subject Key */
+            subject_key: string;
         };
         /**
          * RevokePrincipalRequest
@@ -3301,6 +3346,68 @@ export interface operations {
                 };
             };
             /** @description Item is not pending. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_authority_v1_execution_revoke_authority_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokeAuthorityRequest"];
+            };
+        };
+        responses: {
+            /** @description The evidence source's authority epoch advanced; receipts read before it no longer admit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Atomic admission is not enabled, or the subject is not an evidence source. */
             409: {
                 headers: {
                     [name: string]: unknown;

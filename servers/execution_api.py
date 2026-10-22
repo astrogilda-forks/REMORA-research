@@ -130,6 +130,7 @@ from servers.execution_contracts import (  # noqa: F401
     LoopSafetyResetRequest,
     PepResult,
     RejectRequest,
+    RevokeAuthorityRequest,
     RevokePrincipalRequest,
     SemanticAssessment,
     SignedEffectReceiptRequest,
@@ -1136,7 +1137,8 @@ def _admission() -> Any:
             transaction=db_transaction_state, connection=_ACTIVE_TX_CONNECTION.get,
             epochs=AuthorityEpochs(dsn=dsn, db_path=db_path,
                                    connection_provider=_ACTIVE_TX_CONNECTION.get),
-            dialect="postgres" if dsn else "sqlite", max_clock_skew_ms=skew)
+            dialect="postgres" if dsn else "sqlite", max_clock_skew_ms=skew,
+            revocations=_revocation_store())
         _ADMISSION_KEY = key
     return _ADMISSION
 
@@ -2598,6 +2600,59 @@ def revoke_principal(req: RevokePrincipalRequest, request: Request) -> dict[str,
             ),
         ) from exc
     return {"principal": req.principal, "revoked_by": revoker, "status": "revoked"}
+
+
+@router.post("/revoke-authority", responses={
+    200: {"description": "The evidence source's authority epoch advanced; "
+                         "receipts read before it no longer admit."},
+    **_AUTH_RESPONSES,
+    409: {"model": ErrorDetail,
+          "description": "Atomic admission is not enabled, or the subject is "
+                         "not an evidence source."},
+})
+def revoke_authority(req: RevokeAuthorityRequest, request: Request) -> dict[str, Any]:
+    """Revoke or reinstate an evidence source for WS1-M4 admission.
+
+    Advances the source's authority epoch under the tenant lock admission
+    takes, with its audit event in the same transaction. Either way the epoch
+    moves, so evidence read before the change no longer admits (INV-M4-02).
+    Same capability as ``revoke-principal``. Only under
+    ``REMORA_WS1_ADMISSION=atomic``: without it nothing reads the epoch, and
+    answering "revoked" would claim an effect the deployment does not have.
+    """
+    tenant, role, revoker = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "review")
+    admission = _admission()
+    if admission is None:
+        raise HTTPException(status_code=409,
+                            detail="atomic admission is not enabled (REMORA_WS1_ADMISSION)")
+    if not req.subject_key.startswith("source:") or not req.subject_key[7:].strip():
+        raise HTTPException(status_code=409, detail="subject_key must name source:<id>")
+    from uuid import uuid4
+
+    event = "authority_revoked" if req.revoked else "authority_reinstated"
+    # One key per change: every call moves the epoch, so no two are the same event.
+    key = _audit_outbox.encode_key(
+        tenant, event, req.subject_key, revoker, req.reason or "", uuid4().hex)
+
+    def record(epoch: int) -> None:
+        chain_append_transactional(tenant, {
+            "event": event, "subject_key": req.subject_key, "epoch": epoch,
+            "revoked_by": revoker, "reason": req.reason or "",
+        }, key=key)
+
+    try:
+        epoch = admission.advance_authority(tenant, req.subject_key,
+                                            revoked=req.revoked, record=record)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="authority store unavailable; the epoch did NOT advance and this "
+                   "call must be retried") from exc
+    return {"subject_key": req.subject_key, "epoch": epoch, "revoked": req.revoked,
+            "revoked_by": revoker}
 
 
 def _resolution_plan_for(

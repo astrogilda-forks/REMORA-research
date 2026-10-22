@@ -34,6 +34,7 @@ from remora.execution.dispatch import record_dispatch_intent
 from remora.governance import authority_epochs as epochs_mod
 from remora.governance.authority_epochs import AuthorityEpochs, AuthorityEpochsUnavailable
 from remora.governance.review_queue import ReviewQueue
+from remora.governance.revocation_store import DurableRevocationStore
 from remora.persistence.execution_state import transaction_state
 from remora.policy.report import DecisionAction
 from remora.verification import receipts as receipts_mod
@@ -114,15 +115,13 @@ def rig(backend, tmp_path, monkeypatch):
                                  active_tx_connection=var, dsn=dsn, db_path=db)
 
     epochs = AuthorityEpochs(dsn=dsn, db_path=db, connection_provider=var.get)
-    # transaction_state creates its tables with CREATE TABLE IF NOT EXISTS
-    # inside the first transaction. On a fresh Postgres schema, concurrent
-    # first transactions can collide on the catalog's unique index (fails
-    # closed; recorded in the ADR). One transaction first keeps the
-    # contention tests about admission.
-    with tx(T):
-        pass
+    # No warm-up transaction: the contention tests open the first
+    # transactions on a fresh schema concurrently, which is what pins
+    # _ensure_pg_schema in remora/persistence/execution_state.py.
     yield Rig(
         admission=AtomicAdmission(transaction=tx, connection=var.get, epochs=epochs,
+                                  revocations=DurableRevocationStore(
+                                      dsn=dsn, db_path=db, connection_provider=var.get),
                                   # The largest declarable skew: a database in a
                                   # desktop VM drifts by more than a second
                                   # against the host clock that stamps grants.
@@ -471,3 +470,65 @@ def test_eight_workers_on_one_row_claim_and_spend_once(rig):
         t.join(30)
     assert sorted(outcomes) == ["admitted"] + ["claim_lost"] * 7
     assert sum(rig.spent(t) for t in tokens) == 1
+
+
+# ── principal revocation and the epoch writer (slice 2b) ─────────────────────
+
+
+def test_m4_t03_a_revoked_principal_refuses_unspent(rig):
+    with rig.tx():
+        rig.admission._revocations.revoke("approver-1", tenant_id=T, reason="left")
+    token = _token()
+    with pytest.raises(AdmissionRefused) as caught:
+        rig.admission.admit(
+            T, ws1=_ws1(), principals=("agent-1", "approver-1"),
+            consume=lambda conn, now: rig.gate.check(
+                token, OBS, consume=True, now=now, connection=conn))
+    assert caught.value.reason == "principal_revoked"
+    assert not rig.spent(token)
+
+
+def test_principals_unrevoked_in_this_tenant_admit(rig):
+    with rig.tx("other"):
+        rig.admission._revocations.revoke("agent-1", tenant_id="other")
+    token = _token()
+    rig.admission.admit(T, ws1=_ws1(), principals=("agent-1",),
+                        consume=lambda conn, now: rig.gate.check(
+                            token, OBS, consume=True, now=now, connection=conn))
+    assert rig.spent(token)
+
+
+def test_an_unreadable_revocation_store_refuses(rig, monkeypatch):
+    def down(*args, **kwargs):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(rig.admission._revocations, "is_revoked", down)
+    token = _token()
+    with pytest.raises(AdmissionRefused) as caught:
+        rig.admission.admit(T, ws1=_ws1(), principals=("agent-1",),
+                            consume=lambda conn, now: rig.gate.check(
+                                token, OBS, consume=True, now=now, connection=conn))
+    assert caught.value.reason == "revocation_store_unavailable"
+    assert not rig.spent(token)
+
+
+def test_principals_without_a_revocation_store_refuse(rig):
+    rig.admission._revocations = None
+    with pytest.raises(AdmissionRefused) as caught:
+        rig.admission.admit(T, ws1=None, principals=("agent-1",),
+                            consume=lambda conn, now: None)
+    assert caught.value.reason == "revocation_store_unavailable"
+
+
+def test_an_epoch_change_and_its_record_commit_together(rig):
+    seen = []
+    assert rig.admission.advance_authority(T, SUBJECT, revoked=True,
+                                           record=seen.append) == 1
+    assert seen == [1]
+
+    def crash(epoch):
+        raise RuntimeError("audit write failed")
+
+    with pytest.raises(RuntimeError):
+        rig.admission.advance_authority(T, SUBJECT, revoked=False, record=crash)
+    assert rig.admission.pin_epochs(T)([SUBJECT]) == {SUBJECT: 1}

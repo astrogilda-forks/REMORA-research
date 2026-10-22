@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1-M4 revocation at admission (M4.1c slice 2b, opt-in)
+
+- Under `REMORA_WS1_ADMISSION=atomic`, admission refuses a revoked actor, delegating proposer or approver inside its transaction (`principal_revoked`). `POST /v1/execution/revoke-authority` revokes or reinstates a WS1 evidence source, and the epoch change and its audit event commit together.
+- `transaction_state` creates its Postgres tables once, in autocommit, under an advisory lock. Concurrent first transactions on a fresh database no longer fail on the catalog's unique index.
+
 ### WS1-M4 atomic admission on the review and worker paths (M4.1c slice 2a, opt-in)
 
 - Under `REMORA_WS1_ADMISSION=atomic`, the synchronous review path and the async dispatch worker claim the intent, check the WS1 receipts and authority epochs at the database instant, and spend the grant in one transaction. A lost claim spends nothing. Any other refusal settles the intent `REFUSED` without dispatch ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).

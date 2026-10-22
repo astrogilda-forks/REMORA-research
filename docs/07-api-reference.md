@@ -480,7 +480,7 @@ it does not, and `UNSIGNED` when no record carries a signature. `valid` covers
 only the checks that ran (RMR-CR-007). The control-plane
 `GET /v1/audit/chain/verify` follows record links only and says so with
 `verification_scope: linkage_only` and `signature_status: NOT_CHECKED`. RBAC: `assess`/`execute` capabilities gate assess/execute;
-`review` gates approve; `read` gates audit. `review` also gates `POST /revoke-principal`, which withdraws a principal's authority after the fact. An approval that principal granted is invalidated at the execution re-gate, not rewritten. The chain therefore shows both the approval and the revocation.
+`review` gates approve; `read` gates audit. `review` also gates `POST /revoke-principal`, which withdraws a principal's authority after the fact. An approval that principal granted is invalidated at the execution re-gate, not rewritten. The chain therefore shows both the approval and the revocation. With `REMORA_WS1_ADMISSION=atomic`, `review` also gates `POST /revoke-authority`. It revokes or reinstates a WS1 evidence source (`source:<id>`) by advancing its authority epoch under the admission lock, together with an `authority_revoked` or `authority_reinstated` audit event. Evidence read before the change no longer admits. Without the mode the route answers 409.
 
 **Rejection, effects and the proposal trail.** `POST /reject` (`review`)
 refuses a pending review item terminally and requires a `reason`. The

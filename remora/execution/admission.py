@@ -105,7 +105,8 @@ class AtomicAdmission:
 
     def __init__(self, *, transaction: Callable[[str], Any],
                  connection: Callable[[], Any], epochs: AuthorityEpochs,
-                 dialect: str, max_clock_skew_ms: int) -> None:
+                 dialect: str, max_clock_skew_ms: int,
+                 revocations: Any = None) -> None:
         if dialect not in DIALECTS:
             raise ValueError(f"atomic admission needs Postgres or SQLite, not {dialect!r}")
         if (isinstance(max_clock_skew_ms, bool) or not isinstance(max_clock_skew_ms, int)
@@ -115,6 +116,10 @@ class AtomicAdmission:
         self._transaction = transaction
         self._connection = connection
         self._epochs = epochs
+        #: Principal revocation (``DurableRevocationStore``), joined to the
+        #: same transaction. ``revoke-principal`` writes it under the same
+        #: tenant lock, so a revocation and an admission are ordered.
+        self._revocations = revocations
         self._dialect = dialect
         self.max_clock_skew_ms = max_clock_skew_ms
         epochs.ensure_schema()
@@ -138,16 +143,25 @@ class AtomicAdmission:
             raise AdmissionRefused("admission_transaction_unavailable")
         return conn
 
-    def advance_authority(self, tenant: str, subject_key: str, *, revoked: bool) -> int:
-        """Revoke or reinstate a subject under the tenant lock admission takes."""
+    def advance_authority(self, tenant: str, subject_key: str, *, revoked: bool,
+                          record: Callable[[int], Any] | None = None) -> int:
+        """Revoke or reinstate a subject under the tenant lock admission takes.
+
+        ``record(epoch)`` runs in the same transaction, so the audit event of
+        the change commits with it or not at all (REM-047).
+        """
         with self._transaction(tenant):
             self._open()
-            return self._epochs.advance(subject_key, tenant_id=tenant, revoked=revoked)
+            epoch = self._epochs.advance(subject_key, tenant_id=tenant, revoked=revoked)
+            if record is not None:
+                record(epoch)
+            return epoch
 
     def admit(self, tenant: str, *, ws1: Ws1OutcomePort | None,
               consume: Callable[[Any, str], EnforcementResult],
               record_intent: Callable[[], Any] | None = None,
-              claim: Callable[[Any], Any] | None = None) -> AdmissionResult:
+              claim: Callable[[Any], Any] | None = None,
+              principals: Sequence[str] = ()) -> AdmissionResult:
         """Check, claim, spend and record in one transaction, or raise.
 
         ``claim(connection)`` claims an intent that already exists, for the
@@ -157,6 +171,9 @@ class AtomicAdmission:
         connection at the database instant plus the declared skew.
         ``record_intent()`` writes a new dispatch intent, for the direct-ACCEPT
         path; it finds the connection through the same ambient transaction.
+        ``principals`` are the identities whose authority the call rests on:
+        the actor, a proposer a delegate acts for, the approver. Any of them
+        revoked refuses as ``principal_revoked`` (M4-T03).
         """
         try:
             with self._transaction(tenant):
@@ -171,6 +188,7 @@ class AtomicAdmission:
                         max_clock_skew_ms=self.max_clock_skew_ms, epochs=epochs)
                     if refusal is not None:
                         raise AdmissionRefused(refusal)
+                self._refuse_revoked(tenant, principals)
                 # The grant is judged at the database instant plus the declared
                 # skew, as the evidence is (valid_until minus the skew): its
                 # expiry comes that much sooner, and an issue time stamped by
@@ -190,3 +208,18 @@ class AtomicAdmission:
                 return AdmissionResult(gate_result, intent, now_ms, dict(epochs), claimed)
         except AuthorityEpochsUnavailable as exc:
             raise AdmissionRefused(exc.reason_code) from exc
+
+    def _refuse_revoked(self, tenant: str, principals: Sequence[str]) -> None:
+        wanted = sorted({p for p in principals if p and p.strip()})
+        if not wanted:
+            return
+        if self._revocations is None:
+            # Asked to check and unable to: refuse rather than assume.
+            raise AdmissionRefused("revocation_store_unavailable")
+        for principal in wanted:
+            try:
+                revoked = self._revocations.is_revoked(principal, tenant_id=tenant)
+            except Exception as exc:
+                raise AdmissionRefused("revocation_store_unavailable") from exc
+            if revoked:
+                raise AdmissionRefused("principal_revoked")
