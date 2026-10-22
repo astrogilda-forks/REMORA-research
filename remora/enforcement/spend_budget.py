@@ -201,7 +201,7 @@ class SpendPolicy:
     budgets: tuple[SpendBudget, ...]
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "SpendPolicy":
+    def from_dict(cls, data: Mapping[str, Any]) -> SpendPolicy:
         if not isinstance(data, Mapping) or data.get("schema") != SCHEMA:
             raise SpendPolicyError(f"spend policy schema must be {SCHEMA!r}")
         raw_tools = data.get("tools")
