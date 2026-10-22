@@ -1091,53 +1091,74 @@ def _ws1_gate() -> Any:
     return _WS1_GATE
 
 
-_SPEND_GUARD: Any = None
-_SPEND_GUARD_KEY: tuple[str, str] | None = None
+_LIMIT_GUARD: Any = None
+_LIMIT_GUARD_KEY: tuple[str, str] | None = None
 
 
-def _spend_guard() -> Any:
-    """Cumulative spend budgets, or None when ``REMORA_SPEND_BUDGET_FILE`` is unset.
+def _tool_is_write(tool_name: str) -> bool | None:
+    """Whether the signed ToolSpec says ``tool_name`` writes; None when unknown.
 
-    The file is a JSON or YAML ``remora-spend-budget/v1`` policy
-    (``remora/enforcement/spend_budget.py``); ``REMORA_SPEND_LEDGER`` names the
-    SQLite file the reservations are kept in. One without the other, or a
-    malformed policy, refuses at startup: a budget that silently does not
-    apply would read as one that holds.
+    Read for the cumulative-limit coverage check: without a bundle, or for a
+    tool the bundle does not hold, the answer is unknown, and coverage
+    ``all_writes`` refuses an unknown tool rather than assume it reads.
     """
-    global _SPEND_GUARD, _SPEND_GUARD_KEY
-    path = _os.environ.get("REMORA_SPEND_BUDGET_FILE", "").strip()
-    ledger = _os.environ.get("REMORA_SPEND_LEDGER", "").strip()
+    bundle = _toolspec_bundle()
+    if bundle is None:
+        return None
+    try:
+        spec = bundle.get(tool_name)
+    except ToolSpecRefused:
+        return None
+    return spec.action_type != "read" or bool(spec.semantic_contract.get("mutation"))
+
+
+def _limit_guard() -> Any:
+    """Cumulative limits, or None when ``REMORA_LIMITS_FILE`` is unset.
+
+    The file is a JSON or YAML ``remora-cumulative-limits/v1`` policy
+    (``remora/enforcement/cumulative_limits.py``); ``REMORA_LIMITS_LEDGER``
+    names the SQLite file the reservations are kept in. One without the
+    other, or a malformed policy, refuses at startup: a limit that silently
+    does not apply would read as one that holds.
+    """
+    global _LIMIT_GUARD, _LIMIT_GUARD_KEY
+    path = _os.environ.get("REMORA_LIMITS_FILE", "").strip()
+    ledger = _os.environ.get("REMORA_LIMITS_LEDGER", "").strip()
     if not path and not ledger:
         return None
     if not path or not ledger:
-        raise ValueError("REMORA_SPEND_BUDGET_FILE and REMORA_SPEND_LEDGER are set together")
-    if _SPEND_GUARD is None or _SPEND_GUARD_KEY != (path, ledger):
+        raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
+    if _LIMIT_GUARD is None or _LIMIT_GUARD_KEY != (path, ledger):
         import yaml
 
-        from remora.enforcement.spend_budget import SpendGuard, SpendLedger, SpendPolicy
+        from remora.enforcement.cumulative_limits import (
+            LimitGuard,
+            LimitLedger,
+            LimitPolicy,
+        )
 
         with open(path, encoding="utf-8") as handle:
-            policy = SpendPolicy.from_dict(yaml.safe_load(handle))
-        _SPEND_GUARD = SpendGuard(policy, SpendLedger(ledger))
-        _SPEND_GUARD_KEY = (path, ledger)
-    return _SPEND_GUARD
+            policy = LimitPolicy.from_dict(yaml.safe_load(handle))
+        _LIMIT_GUARD = LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write)
+        _LIMIT_GUARD_KEY = (path, ledger)
+    return _LIMIT_GUARD
 
 
-def _spend_or_refuse(req: Any, tenant: str, principal: str) -> None:
-    """Refuse a budgeted call its principal's budget cannot cover.
+def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
+    """Refuse a call its cumulative limits cannot take.
 
     409 before anything is decided or queued, so no reviewer is asked to
-    approve a payment that could not run. Advisory only: the reservation at
-    dispatch (``GovernedToolDispatcher.bind_spend_guard``) is what holds.
+    approve a call that could not run. Advisory only: the reservation at
+    dispatch (``GovernedToolDispatcher.bind_limit_guard``) is what holds.
     """
-    guard = _spend_guard()
+    guard = _limit_guard()
     if guard is None or not guard.governs(req.tool_name):
         return
     refusal = guard.preview(tenant=tenant, principal=principal, tool_name=req.tool_name,
                             arguments=req.arguments)
     if refusal is None:
         return
-    _CHAIN.append(tenant, {"event": "spend_refused", "actor": principal,
+    _CHAIN.append(tenant, {"event": "limit_refused", "actor": principal,
                            "tool_name": req.tool_name, "detail": refusal,
                            "stage": "assess"})
     raise HTTPException(status_code=409, detail=refusal)
@@ -1692,9 +1713,9 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                     dispatcher.bind_binding_policy(policy)
                     dispatcher.bind_effect_policy(_effect_policy_check)
                 _bind_premise_checks(dispatcher)
-                spend = _spend_guard()
-                if spend is not None:
-                    dispatcher.bind_spend_guard(spend)
+                limits = _limit_guard()
+                if limits is not None:
+                    dispatcher.bind_limit_guard(limits)
                 spec = _os.environ.get("REMORA_TOOL_REGISTRY_MODULE", "").strip()
                 if spec:
                     import importlib
@@ -1893,9 +1914,9 @@ def _downstream_ceiling(tool_name: str) -> Any:
 
 def _reset_tool_dispatcher() -> None:
     """Test hook: drop the cached dispatcher (e.g. after env changes)."""
-    global _DISPATCHER, _EFFECT_RESOLVER, _CAPABILITY_RESOLVER, _EFFECT_DOMAIN, _SPEND_GUARD
+    global _DISPATCHER, _EFFECT_RESOLVER, _CAPABILITY_RESOLVER, _EFFECT_DOMAIN, _LIMIT_GUARD
     _DISPATCHER = None
-    _SPEND_GUARD = None
+    _LIMIT_GUARD = None
     _EFFECT_DOMAIN = None
     _EFFECT_RESOLVER = None
     _CAPABILITY_RESOLVER = None
@@ -2252,7 +2273,7 @@ def assess(req: ToolCallRequest, request: Request) -> dict[str, Any]:
     api_mod._require_tenant_capability(role, tenant, "assess")
     _task_or_refuse(req)
     _delegation_or_refuse(req, tenant, principal)
-    _spend_or_refuse(req, tenant, principal)
+    _limits_or_refuse(req, tenant, principal)
     claim = None
     if req.idempotency_key:
         claim = _idempotency_claim(tenant, principal, req.idempotency_key, req)
@@ -2329,7 +2350,7 @@ from servers.semantic_shadow import (
 # and when REMORA_WS1_ADMISSION=atomic lacks a transactional backend or a skew.
 _ws1_gate()
 _admission()
-_spend_guard()
+_limit_guard()
 
 _SEMANTIC_SHADOW = build_semantic_shadow_from_env(
     engine=_ENGINE, tool_description=_toolspec_description,
