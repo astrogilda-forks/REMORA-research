@@ -1096,20 +1096,31 @@ _LIMIT_GUARD_KEY: tuple[str, str] | None = None
 
 
 def _tool_is_write(tool_name: str) -> bool | None:
-    """Whether the signed ToolSpec says ``tool_name`` writes; None when unknown.
+    """Whether the deployment declares that ``tool_name`` writes; None when unknown.
 
-    Read for the cumulative-limit coverage check: without a bundle, or for a
-    tool the bundle does not hold, the answer is unknown, and coverage
-    ``all_writes`` refuses an unknown tool rather than assume it reads.
+    Read for the cumulative-limit coverage check. The signed ToolSpec answers
+    when a bundle is configured; otherwise the deployment's semantic bundle
+    (its contract's ``mutation``, else its signature's ``effect``). A tool
+    neither declares is unknown, and coverage ``all_writes`` refuses it
+    rather than assume it reads.
     """
     bundle = _toolspec_bundle()
-    if bundle is None:
+    if bundle is not None:
+        try:
+            spec = bundle.get(tool_name)
+        except ToolSpecRefused:
+            return None
+        return spec.action_type != "read" or bool(spec.semantic_contract.get("mutation"))
+    semantic, _ = _semantic_bundle()
+    if semantic is None:
         return None
-    try:
-        spec = bundle.get(tool_name)
-    except ToolSpecRefused:
+    contract = semantic.contracts.get(tool_name)
+    if contract is not None:
+        return bool(contract.mutation) or contract.effect != "read"
+    signature = semantic.registry.signatures.get(tool_name)
+    if signature is None or signature.effect is None:
         return None
-    return spec.action_type != "read" or bool(spec.semantic_contract.get("mutation"))
+    return signature.effect != "read"
 
 
 def _limit_guard() -> Any:

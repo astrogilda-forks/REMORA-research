@@ -1,0 +1,46 @@
+{
+  "schema": "remora-cumulative-limits/v1",
+  "coverage": "all_writes",
+  "meters": {
+    "adjust_setpoint": [{"quantity": "setpoint_movement", "kind": "change", "argument": "value",
+                         "scale": 100, "unit": "engineering_units",
+                         "resource_argument": "loop"}],
+    "set_valve_position": [{"quantity": "valve_travel", "kind": "change",
+                            "argument": "position_pct", "unit": "pct",
+                            "resource_argument": "valve"}],
+    "acknowledge_alarm": [{"quantity": "alarm_acks", "kind": "count", "unit": "acks",
+                           "resource_argument": "alarm_id"}],
+    "create_work_order": [{"quantity": "work_orders_created", "kind": "count",
+                           "unit": "orders"}],
+    "close_work_order": [{"quantity": "work_orders_closed", "kind": "count",
+                          "unit": "orders"}]
+  },
+  "limits": [
+    {"limit_id": "pic-101-movement", "tenant": "ot-pilot", "quantity": "setpoint_movement",
+     "unit": "engineering_units", "resource": "PIC-101", "principal": "*",
+     "max": 50, "window_seconds": 3600},
+    {"limit_id": "fic-220-movement", "tenant": "ot-pilot", "quantity": "setpoint_movement",
+     "unit": "engineering_units", "resource": "FIC-220", "principal": "*",
+     "max": 1000, "window_seconds": 3600},
+    {"limit_id": "valve-travel", "tenant": "ot-pilot", "quantity": "valve_travel",
+     "unit": "pct", "resource": "*", "principal": "*", "max": 60, "window_seconds": 3600},
+    {"limit_id": "alarm-acks", "tenant": "ot-pilot", "quantity": "alarm_acks",
+     "unit": "acks", "resource": "*", "principal": "*", "max": 5, "window_seconds": 3600},
+    {"limit_id": "work-orders-created", "tenant": "ot-pilot",
+     "quantity": "work_orders_created", "unit": "orders", "principal": "*", "max": 20,
+     "window_seconds": 86400},
+    {"limit_id": "work-orders-closed", "tenant": "ot-pilot",
+     "quantity": "work_orders_closed", "unit": "orders", "principal": "*", "max": 20,
+     "window_seconds": 86400}
+  ],
+  "baselines": [
+    {"tenant": "ot-pilot", "quantity": "setpoint_movement", "resource": "PIC-101",
+     "value": 4.00, "seed_id": "pilot-initial"},
+    {"tenant": "ot-pilot", "quantity": "setpoint_movement", "resource": "FIC-220",
+     "value": 120.0, "seed_id": "pilot-initial"},
+    {"tenant": "ot-pilot", "quantity": "valve_travel", "resource": "V-12",
+     "value": 15, "seed_id": "pilot-initial"},
+    {"tenant": "ot-pilot", "quantity": "valve_travel", "resource": "V-18",
+     "value": 40, "seed_id": "pilot-initial"}
+  ]
+}
