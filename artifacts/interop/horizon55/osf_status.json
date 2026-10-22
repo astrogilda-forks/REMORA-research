@@ -1,0 +1,14 @@
+{
+ "external_publication_approved": false,
+ "input_lock_sha256": "1a423378f20b6f4d18f33558da72bd966035d72571bf89b9c277ce1172150bf8",
+ "mirror_commit_verified": null,
+ "mirror_status": "NOT_VERIFIED",
+ "mirror_workflow_run_url": null,
+ "note": "status record only; confers no authority and is not proof of remote synchronisation",
+ "osf_project": "5hfae",
+ "prospective_preregistration": "NOT_APPLICABLE_RETROSPECTIVE",
+ "release_registration_id": null,
+ "release_registration_status": "NOT_REQUESTED",
+ "remora_source_revision": null,
+ "schema": "remora-h55-osf-status-v1"
+}

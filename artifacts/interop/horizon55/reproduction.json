@@ -1,0 +1,17 @@
+{
+ "commands": [
+  "python integrations/horizon55/prepare.py",
+  "python integrations/horizon55/run.py --check"
+ ],
+ "cryptography": "50.0.1",
+ "implementation": "CPython",
+ "network_during_run": false,
+ "note": "environment fields vary by machine and are excluded from byte-identity checks",
+ "os": "Darwin",
+ "outputs_sha256": {
+  "REPORT.md": "74bbcfc4d69174ab62a5aad801e2a0cc2c8eda3818de47bffd8652c0f1774831",
+  "results.json": "568e4bbdd09472fda7c16ac77f4389a15f0c559582e3ce9c233c13f4622c9ac2"
+ },
+ "python": "3.13.7",
+ "schema": "remora-h55-reproduction-v1"
+}
