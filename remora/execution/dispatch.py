@@ -24,7 +24,11 @@ from remora.enforcement.lease import (
     ToolExecutionStateUnknown,
 )
 from remora.enforcement.lease_signing import SigningUnavailable
-from remora.enforcement.outbox import ExecutionOutbox, OutboxRow
+from remora.enforcement.outbox import (
+    ExecutionOutbox,
+    OutboxRow,
+    UnbackedExecutionOutbox,
+)
 from remora.enforcement.result_envelope import capture_tool_result
 from remora.execution.ports import ToolCallPort, ToolDispatcherPort
 from remora.execution.remote_dispatch import (
@@ -68,6 +72,7 @@ def dispatch_under_lease(
     surface_digest: str = "",
     report_lease: bool = False,
     result_commit: Callable[[Any], tuple[Any, dict[str, Any]]] | None = None,
+    invocation_arguments: Any = None,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -112,6 +117,12 @@ def dispatch_under_lease(
     executed call before anything is returned. It returns what the caller may
     see and an audit block. When it raises, the call still counts as executed,
     and the result is withheld: no preview and no envelope are returned.
+
+    ``invocation_arguments`` (IFC-06) are the call's flow handles resolved to
+    their values by this execution domain. The lease binds
+    ``tool_call.arguments``; the local dispatcher checks both forms and the
+    tool receives these. A forwarded call ignores them: the executing domain
+    resolves the handles in its own store.
     """
     tool_execution: dict[str, Any] = {"executed": False}
     if not gate_allowed:
@@ -230,6 +241,8 @@ def dispatch_under_lease(
         task_kwargs["plan"] = plan
     if capability_set is not None:
         task_kwargs["capability_set"] = capability_set
+    if invocation_arguments is not None:
+        task_kwargs["invocation_arguments"] = invocation_arguments
     context = _execution_context(semantic)
     if context is not None:
         task_kwargs["execution_context"] = context
@@ -457,7 +470,11 @@ def record_dispatch_intent(
     """
     # Only the durable adapters can join a transaction; the in-process base
     # class refuses enlistment by design rather than faking the guarantee.
-    if connection is not None and type(outbox) is not ExecutionOutbox:
+    # UnbackedExecutionOutbox is that same in-process store under another
+    # name: a D1 review transaction publishes its connection, and enlisting
+    # would reach the base class's NotImplementedError.
+    if connection is not None and type(outbox) not in (
+            ExecutionOutbox, UnbackedExecutionOutbox):
         return outbox.record_intent_enlisted(
             connection,
             proposal_id=proposal_id,
