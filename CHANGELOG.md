@@ -8,6 +8,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 - With `REMORA_WS1_ADMISSION=atomic` and a required `REMORA_MAX_CLOCK_SKEW_MS`, `/v1/execution/execute-accepted` checks the WS1 evidence receipts at the database instant and against authority epochs read under lock. It then spends the grant and records the dispatch intent, all in one tenant transaction. Evidence that lapses after the re-gate, or a source revoked or revised during the lookups, now refuses before the grant is spent. The default path is unchanged ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).
 
+### Flow handles reach the tool as values (IFC-06)
+
+- The dispatch-time flow check resolved a call's handles and then discarded them, so the tool received the opaque handle token. The tool now receives the resolved values. The lease still binds the handle form the approver saw, and the dispatcher's capability, effect and procedure checks judge both forms. Found by an external review of `265abfbe`; nothing changes with flow control off.
+- `DurableRevocationStore` and `DurableNonceStore` use the D1 endpoint they are given instead of `REMORA_STATE_ENDPOINT`.
+- `record_dispatch_intent` no longer raises `NotImplementedError` for the unbacked outbox inside a D1 review transaction (development only).
+
 ### WS1-M4 receipts and authority epochs (M4.1b, not wired)
 
 - `remora/verification/receipts.py` and `remora/governance/authority_epochs.py` add the pieces the M4.1 admission transaction will check: versioned evidence receipts with a pure admission check, and durable per-subject authority epochs that join the caller's transaction. No execution path calls them yet ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).
