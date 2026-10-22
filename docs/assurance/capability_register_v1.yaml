@@ -1779,8 +1779,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative spend budget per principal, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: 57c27c52413fe5d1848a79d5703736f861aecbce
+    verified_at_sha: 89cfc13e1cbdb612f1bd63dd879866c2e59df948
     verified_by: >-
+      re-audited 2026-10-22 at 89cfc13 (STRICT LINT), from 57c27c5: remora/enforcement/spend_budget.py changes only the return annotation of SpendPolicy.from_dict (unquoted, UP037); no behaviour changed. Status, scope and caveats unchanged.
       audit 2026-10-22 at registration: the Horizon Shield #51 set-2 sequence
       (three payments of 7000 JPY-testnet under a 20000 budget) was replayed
       through /v1/execution/assess, /approve, /execute and the governed
