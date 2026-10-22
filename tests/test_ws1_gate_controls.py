@@ -132,7 +132,9 @@ def test_control_2b_evidence_lapsing_after_the_regate_is_the_documented_residual
         client, monkeypatch):
     """The re-gate proves the evidence fresh at its instant. If it lapses in
     the moment before consumption, nothing reads it again: the call runs.
-    This pins the residual so a change in either direction is seen."""
+    This pins the residual so a change in either direction is seen. With
+    REMORA_WS1_ADMISSION=atomic the same lapse refuses (M4-T02,
+    tests/test_ws1_atomic_admission_route.py); this is the legacy path."""
     clock = {"ms": fixture.time.time_ns() // 1_000_000}
     gate = _install(monkeypatch, "enforce", clock_ms=lambda: clock["ms"], resolvers={
         "assets": InMemorySource("assets", "asset-inventory", fixture.ASSETS, ttl_s=1)})

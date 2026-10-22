@@ -65,6 +65,12 @@ from remora.verification.preconditions import (
     derive_preconditions,
     tagged_digest,
 )
+from remora.verification.receipts import (
+    EvidenceReceiptV1,
+    admission_refusal,
+    receipt_set_digest,
+    receipts_from_record,
+)
 from remora.verification.records import CompositionRecord
 from remora.verification.registry import PredicateSpec, PreconditionRegistry
 from remora.verification.resolvers import Resolver
@@ -269,6 +275,32 @@ class Ws1Outcome:
     #: reconcile its estimates with what its sources bill.
     lookups: Mapping[str, int] = field(default_factory=dict)
     cost_units_charged: int | None = None
+    #: WS1-M4 atomic admission (``remora/execution/admission.py``): the
+    #: evidence receipts of a clean evaluation, built against the authority
+    #: epochs read before the lookups ran. Empty unless the caller passed an
+    #: epoch reader; ``receipts_pinned`` tells "none needed" from "none built".
+    receipts: tuple[EvidenceReceiptV1, ...] = ()
+    receipts_pinned: bool = False
+    required_preconditions: tuple[str, ...] = ()
+
+    @property
+    def receipt_subjects(self) -> tuple[str, ...]:
+        return tuple(sorted({r.subject_key for r in self.receipts}))
+
+    def admission_refusal(self, *, tenant_id: str, now_ms: int, max_clock_skew_ms: int,
+                          epochs: Mapping[str, tuple[int, bool]]) -> str | None:
+        """Why admission must refuse at the database instant *now_ms*, or None.
+
+        ``epochs`` are the subjects' epochs as admission read them under lock.
+        An outcome built without an epoch reader cannot be admitted.
+        """
+        if not self.receipts_pinned:
+            return "evidence_receipts_absent"
+        return admission_refusal(
+            self.receipts, tenant_id=tenant_id, binding_hash=self.binding_hash,
+            expected_set_digest=receipt_set_digest(self.receipts),
+            required_preconditions=self.required_preconditions, now_ms=now_ms,
+            max_clock_skew_ms=max_clock_skew_ms, epochs=epochs)
 
     @property
     def clean(self) -> bool:
@@ -293,6 +325,12 @@ class Ws1Outcome:
             block["grounded_action"] = self.grounded_report.action.value
         if self.record is not None:
             block["record"] = {**self.record.body(), "record_hash": self.record.record_hash}
+        if self.receipts_pinned:
+            block["receipts"] = {"set_digest": receipt_set_digest(self.receipts),
+                                 "subjects": {r.subject_key: r.source_epoch
+                                              for r in self.receipts},
+                                 "earliest_valid_until_ms": min(
+                                     (r.valid_until_ms for r in self.receipts), default=None)}
         return block
 
     def apply(self, report: DecisionReport) -> DecisionReport:
@@ -393,20 +431,24 @@ class Ws1Gate:
                  review_attestation: tuple[str, str] | None = None,
                  task_id: str | None = None,
                  redecide: Callable[[Mapping[str, bool]], DecisionReport] | None = None,
+                 authority_epochs: Callable[[Sequence[str]], Mapping[str, int]] | None = None,
                  ) -> Ws1Outcome:
         """*review_attestation* is ``(approver, approver_role)`` from the stored
         approval, passed on the review path's re-gate only. *task_id* is the
         server-bound task identity the call is made under (``context_id/task_id``).
         *redecide* re-runs the caller's decision on its observation plus the
         given grounding signals; it is used only when the deployment declares
-        ``grounding`` (assessment, never a re-gate)."""
+        ``grounding`` (assessment, never a re-gate). *authority_epochs* reads
+        the current epoch of each authority subject; with it, a clean outcome
+        carries evidence receipts for atomic admission (WS1-M4)."""
         try:
             review = (ReviewAttestation(proposal_id, *review_attestation)
                       if review_attestation is not None else None)
             return self._evaluate(proposal_id, tenant, principal, tool_name, arguments,
                                   intent_authority_hash, policy_bundle_hash, toolspec_hash,
                                   capability, flow_digest, flow_epoch, attempt_family_id,
-                                  base, veto_on_record, review, task_id, redecide)
+                                  base, veto_on_record, review, task_id, redecide,
+                                  authority_epochs)
         except Exception as exc:  # a gate fault refuses; its text never reaches the record
             return Ws1Outcome(self.mode, DecisionAction.ABSTAIN, f"error:{type(exc).__name__}")
 
@@ -418,6 +460,7 @@ class Ws1Gate:
                   base: DecisionReport, veto_on_record: bool,
                   review: ReviewAttestation | None, task_id: str | None,
                   redecide: Callable[[Mapping[str, bool]], DecisionReport] | None = None,
+                  authority_epochs: Callable[[Sequence[str]], Mapping[str, int]] | None = None,
                   ) -> Ws1Outcome:
         d = self.deployment
         for name, value in (("intent_authority", intent_authority_hash),
@@ -451,6 +494,15 @@ class Ws1Gate:
                 return Ws1Outcome(self.mode, DecisionAction.ABSTAIN,
                                   "refused:task_binding_mismatch")
         requirements = derive_preconditions(context, args, d.registry)
+        # The authority subjects each precondition's evidence depends on: the
+        # sources of the resolvers registered for it. Their epochs are read
+        # BEFORE any lookup, so a revocation committed during the lookups
+        # leaves the receipts on the older epoch and admission refuses them.
+        subjects_of = {p.precondition_id: tuple(sorted(
+            {f"source:{d.registry.resolvers[r].source_id}" for r in p.resolver_ids
+             if r in d.registry.resolvers})) for p in requirements.preconditions}
+        pinned = (dict(authority_epochs(sorted({s for v in subjects_of.values() for s in v})))
+                  if authority_epochs is not None else None)
         monitor_calls = 0
         monitor_veto = veto_on_record
 
@@ -529,4 +581,12 @@ class Ws1Gate:
                 "context_hash": context.context_hash,
                 "requirements_hash": requirements.requirements_hash, **d.binding_terms})
             outcome = dataclasses.replace(outcome, binding_hash=binding)
+            if pinned is not None:
+                outcome = dataclasses.replace(
+                    outcome, receipts_pinned=True,
+                    receipts=receipts_from_record(record, tenant_id=tenant,
+                                                  binding_hash=binding,
+                                                  subjects_of=subjects_of, epochs=pinned),
+                    required_preconditions=tuple(sorted(
+                        p.precondition_id for p in requirements.preconditions if p.required)))
         return outcome

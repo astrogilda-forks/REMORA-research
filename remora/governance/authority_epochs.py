@@ -38,7 +38,13 @@ from typing import Any
 
 from remora.errors import RemoraError
 
-__all__ = ["AuthorityEpochs", "AuthorityEpochsUnavailable"]
+__all__ = ["MAX_CLOCK_SKEW_MS", "AuthorityEpochs", "AuthorityEpochsUnavailable"]
+
+#: The largest clock skew a deployment may declare for admission. A larger
+#: value would let evidence count as fresh long after it lapsed, which is the
+#: hole admission closes; a deployment whose clocks drift further must fix its
+#: clocks (owner decision, ADR-ws1-m4-admission-topology).
+MAX_CLOCK_SKEW_MS = 5_000
 
 _CREATE = (
     "CREATE TABLE IF NOT EXISTS authority_revision ("
@@ -68,6 +74,9 @@ class AuthorityEpochs:
         self._db_path = db_path
         #: Returns the caller's in-flight transaction connection, or None.
         self._connection_provider = connection_provider
+        #: The table exists and committed. Set only by a connection this store
+        #: owns: DDL inside a caller's transaction is gone if they roll back.
+        self._ready = False
 
     # ── backend plumbing ────────────────────────────────────────────────────
 
@@ -84,18 +93,30 @@ class AuthorityEpochs:
     def _ph(self) -> str:
         return "%s" if self._dsn else "?"
 
-    def _run(self, work: Callable[[Any], Any]) -> Any:
+    def ensure_schema(self) -> None:
+        """Create the table on a connection of its own, and commit.
+
+        Admission calls this once before its first transaction. Two Postgres
+        transactions that both run ``CREATE TABLE IF NOT EXISTS`` for a table
+        neither has committed can fail on the catalog's unique index, so the
+        DDL is kept out of the admission transaction once it has run here.
+        """
+        self._run(lambda conn: None, own=True)
+
+    def _run(self, work: Callable[[Any], Any], *, own: bool = False) -> Any:
         try:
-            ambient = self._ambient()
+            ambient = None if own else self._ambient()
             if ambient is not None:
                 # The caller's transaction owns the commit.
-                ambient.execute(_CREATE)
+                if not self._ready:
+                    ambient.execute(_CREATE)
                 return work(ambient)
             conn = self._connect()
             try:
                 conn.execute(_CREATE)
                 out = work(conn)
                 conn.commit()
+                self._ready = True
                 return out
             except BaseException:
                 conn.rollback()

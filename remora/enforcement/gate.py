@@ -287,8 +287,14 @@ class EnforcementGate:
         consume: bool = False,
         now: str | None = None,
         context: "AuthorizationContext | None" = None,
+        connection: Any = None,
     ) -> EnforcementResult:
         """Check whether the token authorizes execution, and log the outcome.
+
+        ``connection`` is an open admission transaction on this gate's own
+        Postgres or SQLite ledger (WS1-M4, ADR-ws1-m4-admission-topology).
+        The spend then joins that transaction and commits or rolls back with
+        it; the gate never commits it. Without one, nothing changes.
 
         Every exit path funnels through the ``grant.checked`` governance
         event. It used to be emitted only on the fall-through path, so the
@@ -298,7 +304,7 @@ class EnforcementGate:
         happened iff consumption was requested and the check allowed.
         """
         result = self._check_unlogged(
-            token, expected_observation_hash, consume, now, context)
+            token, expected_observation_hash, consume, now, context, connection)
         governance_event(
             "grant.checked",
             level=logging.INFO if result.allowed else logging.WARNING,
@@ -307,6 +313,8 @@ class EnforcementGate:
             reason=result.reason,
             token_jti=token.jti,
             consumed=bool(consume and result.allowed),
+            # An enlisted spend is final only when the caller commits.
+            enlisted=connection is not None,
             strict_mode=self.strict,
             token_verified=result.token_verified,
         )
@@ -319,6 +327,7 @@ class EnforcementGate:
         consume: bool,
         now: str | None,
         context: "AuthorizationContext | None",
+        connection: Any,
     ) -> EnforcementResult:
         """The decision logic behind :meth:`check`, with no logging.
 
@@ -450,6 +459,10 @@ class EnforcementGate:
                 reason="token_missing_jti",
                 strict_mode=self.strict,
             )
+        if token.jti and connection is not None:
+            return self._spend_enlisted(
+                connection, token, vr, consume=consume and allowed, allowed=allowed,
+                reason=reason)
         if token.jti:
             if self._dsn:
                 import psycopg  # type: ignore
@@ -558,6 +571,48 @@ class EnforcementGate:
         )
         return result
 
+    def _spend_enlisted(self, conn: Any, token: PolicyDecisionToken, vr: Any, *,
+                        consume: bool, allowed: bool, reason: str) -> EnforcementResult:
+        """Spend or look up ``token.jti`` on the caller's open transaction.
+
+        Postgres runs the spend in a savepoint, so a duplicate key aborts the
+        savepoint and leaves the caller's transaction usable. SQLite keeps a
+        transaction open past a failed INSERT. Only a durable Postgres or
+        SQLite gate can join a transaction: the in-process set and D1 have
+        none, and are refused rather than spent outside it.
+        """
+        if not (self._dsn or self._db_path):
+            return self._ledger_unavailable(
+                token, vr, "not_enlistable",
+                RuntimeError("this gate's ledger cannot join a transaction"))
+        ph = "%s" if self._dsn else "?"
+        try:
+            if consume:
+                if self._dsn:
+                    with conn.transaction():
+                        conn.execute(f"INSERT INTO pep_consumed (jti) VALUES ({ph})",  # noqa: S608
+                                     (token.jti,))
+                        self._bump_watermark(conn)
+                else:
+                    conn.execute(f"INSERT INTO pep_consumed (jti) VALUES ({ph})",  # noqa: S608
+                                 (token.jti,))
+                    self._bump_watermark(conn)
+            elif conn.execute(f"SELECT 1 FROM pep_consumed WHERE jti = {ph}",  # noqa: S608
+                              (token.jti,)).fetchone():
+                return EnforcementResult(
+                    allowed=False, action=token.action, token_verified=vr.verified,
+                    reason="token_already_consumed", strict_mode=self.strict)
+        except Exception as exc:
+            if _is_unique_violation(exc):
+                return EnforcementResult(
+                    allowed=False, action=token.action, token_verified=vr.verified,
+                    reason="token_already_consumed", strict_mode=self.strict)
+            return self._ledger_unavailable(
+                token, vr, "postgres" if self._dsn else "sqlite", exc)
+        return EnforcementResult(
+            allowed=allowed, action=token.action, token_verified=vr.verified,
+            reason=reason, strict_mode=self.strict)
+
     def enforce(
         self,
         token: PolicyDecisionToken,
@@ -591,3 +646,17 @@ class EnforcementGate:
                 f"strict={self.strict}"
             )
         return action_fn()
+
+
+def _is_unique_violation(exc: BaseException) -> bool:
+    """A duplicate jti, as each driver reports it: psycopg's UniqueViolation
+    (an IntegrityError) or sqlite3's IntegrityError on the primary key."""
+    import sqlite3
+
+    if isinstance(exc, sqlite3.IntegrityError):
+        return True
+    try:
+        import psycopg  # type: ignore
+    except ImportError:
+        return False
+    return isinstance(exc, psycopg.IntegrityError)

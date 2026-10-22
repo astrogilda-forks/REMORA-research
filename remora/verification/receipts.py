@@ -41,7 +41,9 @@ SCHEMA = "remora-ws1-evidence-receipt/v1"
 
 #: The largest clock skew a deployment may declare. A larger value would let
 #: evidence count as fresh long after it lapsed, which is the hole receipts
-#: close; a deployment whose clocks drift further must fix its clocks.
+#: close; a deployment whose clocks drift further must fix its clocks. The
+#: execution core keeps the same bound in remora/governance/authority_epochs.py,
+#: because neither layer may import the other; a test pins them equal.
 MAX_CLOCK_SKEW_MS = 5_000
 
 
@@ -52,7 +54,9 @@ class EvidenceReceiptV1:
     tenant_id: str
     binding_hash: str
     precondition_id: str
-    #: The authority subject the evidence depends on, e.g. ``source:crm``.
+    #: An authority subject the evidence depends on, e.g. ``source:crm``. A
+    #: precondition a resolver of more than one source can serve has one
+    #: receipt per source, so revoking any of them refuses it.
     subject_key: str
     #: The subject's authority epoch when the evidence was read.
     source_epoch: int
@@ -83,13 +87,13 @@ def receipts_from_record(
     *,
     tenant_id: str,
     binding_hash: str,
-    subject_of: Mapping[str, str],
+    subjects_of: Mapping[str, Sequence[str]],
     epochs: Mapping[str, int],
 ) -> tuple[EvidenceReceiptV1, ...]:
-    """One receipt per PROVED, completed precondition in ``record``.
+    """One receipt per authority subject of each PROVED, completed precondition.
 
-    ``subject_of`` maps each precondition to the authority subject its
-    evidence depends on; ``epochs`` is that subject's epoch as read before the
+    ``subjects_of`` maps each precondition to the authority subjects its
+    evidence depends on; ``epochs`` is each subject's epoch as read before the
     lookups ran. A PROVED result without a subject, an epoch or an expiry
     raises: a receipt that admission cannot check is not a receipt.
     """
@@ -101,23 +105,24 @@ def receipts_from_record(
                 or result.get("processing_status") != ProcessingStatus.COMPLETED.value):
             continue
         pid = str(result["precondition_id"])
-        subject = subject_of.get(pid)
-        if not subject:
+        subjects = sorted(set(subjects_of.get(pid) or ()))
+        if not subjects:
             raise ValueError(f"precondition {pid} has no authority subject")
-        if subject not in epochs:
-            raise ValueError(f"no epoch was read for subject {subject}")
         verified_at, valid_until = result.get("verified_at"), result.get("valid_until")
         if verified_at is None or valid_until is None:
             raise ValueError(f"precondition {pid} was PROVED without an expiry")
-        out.append(EvidenceReceiptV1(
-            tenant_id=tenant_id, binding_hash=binding_hash, precondition_id=pid,
-            subject_key=subject, source_epoch=int(epochs[subject]),
-            source_version=str(result.get("source_version") or ""),
-            evidence_refs=tuple(str(r) for r in result.get("evidence_refs") or ()),
-            verified_at_ms=int(verified_at) * 1000,
-            valid_until_ms=int(valid_until) * 1000,
-            verifier_profile_hash=record.profile_hash))
-    return tuple(sorted(out, key=lambda r: r.precondition_id))
+        for subject in subjects:
+            if subject not in epochs:
+                raise ValueError(f"no epoch was read for subject {subject}")
+            out.append(EvidenceReceiptV1(
+                tenant_id=tenant_id, binding_hash=binding_hash, precondition_id=pid,
+                subject_key=subject, source_epoch=int(epochs[subject]),
+                source_version=str(result.get("source_version") or ""),
+                evidence_refs=tuple(str(r) for r in result.get("evidence_refs") or ()),
+                verified_at_ms=int(verified_at) * 1000,
+                valid_until_ms=int(valid_until) * 1000,
+                verifier_profile_hash=record.profile_hash))
+    return tuple(sorted(out, key=lambda r: (r.precondition_id, r.subject_key)))
 
 
 def receipt_set_digest(receipts: Sequence[EvidenceReceiptV1]) -> str:
@@ -154,14 +159,15 @@ def admission_refusal(
             f"max_clock_skew_ms must be an int from 0 to {MAX_CLOCK_SKEW_MS}")
     if receipt_set_digest(receipts) != expected_set_digest:
         return "evidence_receipt_modified"
-    by_id: dict[str, EvidenceReceiptV1] = {}
+    seen: set[tuple[str, str]] = set()
     for receipt in receipts:
         if receipt.tenant_id != tenant_id or receipt.binding_hash != binding_hash:
             return "evidence_receipt_foreign"
-        if receipt.precondition_id in by_id:
+        key = (receipt.precondition_id, receipt.subject_key)
+        if key in seen:
             return "evidence_receipt_duplicate"
-        by_id[receipt.precondition_id] = receipt
-    if any(pid not in by_id for pid in required_preconditions):
+        seen.add(key)
+    if any(pid not in {p for p, _ in seen} for pid in required_preconditions):
         return "evidence_receipt_missing"
     for receipt in receipts:
         if receipt.valid_until_ms - max_clock_skew_ms <= now_ms:
