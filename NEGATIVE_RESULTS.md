@@ -173,10 +173,11 @@ cites only `open` sections and that no `open` section is missing a theme.
    opens a review route, and raising a production write from medium to high
    risk lowers ESCALATE to VERIFY. The owner decided on 2026-10-18 to make
    approvability monotone too; two strict xfails pin the gap.
-19. **Spend is enforced only where a deployment declares it** (§97): REMORA
-   as shipped executed three approved payments of 7000 past a 20000 budget. An opt-in budget reserved before dispatch now refuses the
-   third, tested on the author's replay of that public sequence only. How
-   often it refuses legitimate payments is unmeasured.
+19. **Cumulative limits hold only where a deployment declares them** (§97):
+   REMORA as shipped executed three approved payments of 7000 past a 20000
+   budget, and small setpoint moves that added up without bound. Opt-in
+   limits reserved before dispatch now refuse both, tested on the author's
+   replays only. How often they refuse legitimate calls is unmeasured.
 
 <!-- backlog-end -->
 
@@ -2675,7 +2676,7 @@ sections again.
 | Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. Two strict xfails; the owner decided on 2026-10-18 and the change is pending | Medium |
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
 | Study C holdout: utility recovered and authority held under defence-aware search; the monitor threshold decided how much (§96) | H_DET and H_COST 20/33 reads, H_EDV 32/33, H0 0/33; every loss a monitor veto at the threshold. No WS1 arm executed an attack goal, an out-of-scope call or a leak in 121 attack episodes each; arm A did | **High** |
-| REMORA did not stop a payment past its budget, and had nothing that could (§97) | Replayed through /assess, /approve and /execute, all three 7000 payments ran (21000 of 20000). An opt-in spend budget reserved at dispatch (CAP-031) now refuses the third; author's replay only, false refusals unmeasured | **High** |
+| REMORA did not stop a payment past its budget, and had nothing that could (§97) | Replayed through /assess, /approve and /execute, all three 7000 payments ran (21000 of 20000). Opt-in cumulative limits reserved at dispatch (CAP-031) now refuse the third, and cap setpoint movement, starts and runtime per unit; author's replays only, false refusals unmeasured | **High** |
 | Study B holdout: the monitor-directed arm lost utility, and the attack search was barely adaptive (§95) | H_EDV 15/45 reads against H_DET 28/45; it vetoed all 43 benign port reads. 55 of 60 final injections were the fixed template. No unauthorized dispatch in any WS1 arm | **High** |
 | WS1 evidence could not make a call executable on the execution API (§94) | WS1 caps only; the grounding that turned PROVED preconditions into an engine ACCEPT lived in Study B's harness. Grounding from proofs is now opt-in on the assess path, tested through the route, and not yet measured in a study | **High** |
 | No blocked development call is recoverable by a bounded lookup alone (§93) | After schema validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT. Causes: no extracted intent (71), undeclared risk tier on a write (16), ground-truth call refused as the wrong tool (5). WS1 recovery needs intent and contract coverage first | **High** |
@@ -5793,7 +5794,7 @@ and REMORA was not in the path of those calls.
 To learn whether REMORA itself would hold, the same sequence was replayed
 through REMORA's execution API: `/v1/execution/assess`, `/approve` and
 `/execute`, the governed dispatcher and a sandboxed payment tool that records
-each call reaching it (`tests/spend/`). Each payment was assessed as VERIFY
+each call reaching it (`tests/limits/`). Each payment was assessed as VERIFY
 and went to review, and the reviewer approved each one. All three reached
 the tool, for a total of 21000. Nothing on the call path kept a running total
 of what calls spend. The WS1 task ledger counts verification lookups, one
@@ -5801,19 +5802,31 @@ unit each; argument constraints compare one call with a fixed number; the
 effect budget counts effects inside one execution. None of them could tell C
 from A or B, because each costs the same 7000.
 
-The repair is opt-in. A deployment declares the tools that spend and a budget
-per tenant, principal and unit (`REMORA_SPEND_BUDGET_FILE`,
-`REMORA_SPEND_LEDGER`). The governed dispatcher reserves each budgeted call's
-amount as its last check before the nonce is spent, and C refuses as
-`spend_budget_exhausted` without reaching the tool. It still refuses when all
-three were approved before any ran, under six concurrent executions, after a
-restart and under a new task id. `/assess` refuses it with 409 first, before
-a reviewer is asked. Without the two settings REMORA behaves as measured
-above, and `test_baseline_remora_as_shipped_pays_all_three` keeps that
-baseline visible.
+The repair is opt-in. A deployment declares what each tool consumes and the
+limits on it (`REMORA_LIMITS_FILE`, `REMORA_LIMITS_LEDGER`). The governed
+dispatcher reserves each metered call against every matching limit as its
+last check before the nonce is spent, and C refuses as `limit_exceeded`
+without reaching the tool. It still refuses when all three were approved
+before any ran, under six concurrent executions, after a restart and under a
+new task id. `/assess` refuses it with 409 first, before a reviewer is asked.
+Without the two settings REMORA behaves as measured above, and
+`test_baseline_remora_as_shipped_pays_all_three` keeps that baseline visible.
 
-Limits: the ledger is SQLite on one host; a reservation is never returned;
-the amount is the argument the deployment names, not what a rail settled.
+The first repair covered money only, and the same error remained for
+equipment. Without limits, eight setpoint moves of 0.5 degC on one ventilation
+unit all ran, 4.0 degC in total, each passing any check on one call
+(`test_baseline_without_limits_small_moves_add_up_without_bound`). The repair
+now meters movement of an absolute value (moving back counts), calls per
+window and summed amounts. Limits can be shared by every principal on one
+unit, and a value too small to count at the meter's scale is refused. A
+failed write leaves the unit unknown until it is re-seeded. Under
+`all_writes` coverage, a write tool with no meter is refused, so a tool added
+later does not run unbounded because nobody declared it.
+
+Limits: the ledger is SQLite on one host, and a reservation is never
+returned. The amount is the argument the deployment names, not what a rail
+settled, and a change meter tracks the values REMORA let through, not the
+plant.
 The sequence is public and was replayed by the author, so this shows the
 mechanism works on the case it was built for. It does not measure how often
 legitimate payments are refused, which needs new tasks and a holdout.
