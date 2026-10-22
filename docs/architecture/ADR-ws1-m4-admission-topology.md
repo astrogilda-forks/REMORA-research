@@ -3,9 +3,9 @@
 - Status: **accepted** (2026-10-22), with the owner decisions below. Work
   package M4.1a of the
   [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9. M4.1b
-  (receipts and epochs) is implemented. M4.1c slice 1 wires it into the
-  direct-ACCEPT path behind `REMORA_WS1_ADMISSION=atomic`; slice 2 covers the
-  review and worker paths.
+  (receipts and epochs) is implemented. M4.1c wires it into all three
+  dispatch paths behind `REMORA_WS1_ADMISSION=atomic`: slice 1 the
+  direct-ACCEPT path, slice 2a the approved-review path and the async worker.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -212,7 +212,7 @@ Not yet covered:
 
 - The `execution_authorized` audit row is appended after commit, as before.
   M4-T12 needs it in the transaction.
-- The review and worker paths are unchanged.
+- The review and worker paths are unchanged (done in slice 2a, below).
 - The ACCEPT path does not read principal revocation.
 - No route writes authority epochs.
 - M4-T14 to T20 are open.
@@ -225,3 +225,40 @@ and nothing commits. It happens only before the first transaction on a new
 database has committed. The tests run one transaction first. The epoch store
 avoids the problem with `ensure_schema()`. `transaction_state` needs the same
 fix in its own PR.
+
+## M4.1c slice 2a, implemented (approved review and async worker, opt-in)
+
+Under the same switch, the synchronous review path and the async worker claim
+the intent, check the receipts and epochs at the database instant and spend
+the grant in one transaction. This follows the owner decision on the review
+path. The queue's own transaction still records the intent before that, as
+FT-02 requires. All three paths now spend at one linearization point.
+
+- `claim_enlisted` on the SQLite and Postgres outboxes claims inside the
+  admission transaction. On Postgres it holds the row `FOR UPDATE` until
+  commit. The claim runs before the spend, and a lost race raises
+  `ClaimLost`. The transaction rolls back, so the loser has spent nothing
+  (issue #417).
+- Any other refusal settles the intent `REFUSED` under its reason, and
+  nothing is dispatched. The review route answers 200 with that refusal in
+  `tool_execution`, as a refused grant does on the legacy path. It records
+  `execution_admission_refused` and no `execution_authorized`. The worker
+  settles the row through its existing refusal path.
+- A REVIEW precondition gets no receipt. The stored approval closes it, and
+  the queue checks that approval, its role and its expiry in its own
+  transaction. The receipt check covers the precondition's source evidence.
+  The approval's expiry is therefore checked at the queue's transaction and
+  is not re-read at database time.
+- In async mode the review route pins no epochs: the worker admits later
+  with its own fresh re-gate.
+- Tests: `tests/test_atomic_admission.py` adds the claim paths on SQLite
+  and Postgres. They cover claim plus spend together, a lost claim that
+  spends nothing, a refused spend that releases the claim, and eight
+  workers on one row with one claim and one spend.
+  `tests/test_ws1_atomic_admission_route.py` adds the review path (admitted,
+  refused on a lapse and on a revocation, grant unspent, row settled) and
+  the worker (admitted, and refused on a revocation with the row settled).
+
+Still open: `execution_authorized` inside the transaction (M4-T12), a
+principal-revocation read on the ACCEPT path, a route that writes authority
+epochs, the `transaction_state` DDL race, and M4-T14 to T20.
