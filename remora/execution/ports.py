@@ -412,4 +412,5 @@ class AdmissionPort(Protocol):
         consume: Callable[[Any, str], EnforcementResult],
         record_intent: Callable[[], Any] | None = None,
         claim: Callable[[Any], Any] | None = None,
+        principals: Sequence[str] = (),
     ) -> Any: ...

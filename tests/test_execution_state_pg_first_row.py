@@ -49,7 +49,8 @@ class _Conn:
 
 def test_pg_first_transaction_inserts_row_before_for_update(monkeypatch):
     log: list[str] = []
-    fake = types.SimpleNamespace(connect=lambda dsn: _Conn(log))
+    # **kwargs: the schema step connects with autocommit=True first.
+    fake = types.SimpleNamespace(connect=lambda dsn, **kwargs: _Conn(log))
     monkeypatch.setitem(sys.modules, "psycopg", fake)
     with transaction_state(
         "new-tenant",

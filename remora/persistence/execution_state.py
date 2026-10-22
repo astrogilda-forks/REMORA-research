@@ -135,6 +135,37 @@ def _persist_projection(conn: Any, tenant: str, items: dict[str, Any],
         )
 
 
+_GLOBAL_STATE_DDL = ("CREATE TABLE IF NOT EXISTS global_state "
+                     "(tenant_id TEXT PRIMARY KEY, qs_json TEXT, it_json TEXT)")
+#: DSNs whose tables exist and are committed (see _ensure_pg_schema).
+_PG_SCHEMA_READY: set[str] = set()
+
+
+def _ensure_pg_schema(dsn: str) -> None:
+    """Create the review-state tables once, outside any state transaction.
+
+    ``CREATE TABLE IF NOT EXISTS`` inside the first transactions on a fresh
+    database is not safe under concurrency on Postgres: two transactions that
+    both create a table neither has committed collide on the catalog's unique
+    index (``pg_type_typname_nsp_index``), and one of them fails. Found by the
+    WS1-M4 admission contention tests. Here the DDL runs in autocommit under
+    a session advisory lock, so concurrent creators take turns and each
+    statement is committed before any state transaction needs it.
+    """
+    if dsn in _PG_SCHEMA_READY:
+        return
+    import psycopg  # type: ignore
+
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        conn.execute("SELECT pg_advisory_lock(hashtext('remora_execution_state_ddl'))")
+        try:
+            for ddl in (_GLOBAL_STATE_DDL, _PROJECTION_DDL, *_PROJECTION_INDEXES):
+                conn.execute(ddl)
+        finally:
+            conn.execute("SELECT pg_advisory_unlock(hashtext('remora_execution_state_ddl'))")
+    _PG_SCHEMA_READY.add(dsn)
+
+
 @contextmanager
 def transaction_state(
     tenant: str,
@@ -201,6 +232,7 @@ def transaction_state(
                 active_tx_connection.reset(_tx_token)
     elif dsn:
         import psycopg  # type: ignore
+        _ensure_pg_schema(dsn)
         with psycopg.connect(dsn) as conn:
             conn.execute("CREATE TABLE IF NOT EXISTS global_state (tenant_id TEXT PRIMARY KEY, qs_json TEXT, it_json TEXT)")
             with conn.transaction():

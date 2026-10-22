@@ -1054,6 +1054,7 @@ def execute_approved_item(
         # token was minted just above, outside it, at claim time.
         assert intent is not None
         pending = intent
+        approver = _stored_approver(transaction, tenant, item_id)
         try:
             admitted = admission.admit(
                 tenant, ws1=ws1,
@@ -1061,7 +1062,9 @@ def execute_approved_item(
                     connection, pending.outbox_id, worker_id=worker_id),
                 consume=lambda connection, now_iso: gate.check(
                     token, observation_binding(fresh_obs), consume=True,
-                    context=review_context, now=now_iso, connection=connection))
+                    context=review_context, now=now_iso, connection=connection),
+                principals=(principal, acting_for or "",
+                            approver))
         except ClaimLost:
             return _claim_lost()
         except RemoraError as exc:
@@ -1701,6 +1704,7 @@ def dispatch_pending_intent(
     if admission is not None:
         # WS1-M4: claim first, then check and spend, in one transaction. The
         # token was minted above, outside it: minting reads no shared state.
+        approver = _stored_approver(transaction, tenant, row.item_id)
         try:
             admitted = admission.admit(
                 tenant, ws1=ws1,
@@ -1708,7 +1712,9 @@ def dispatch_pending_intent(
                     connection, row.outbox_id, worker_id=worker_id),
                 consume=lambda connection, now_iso: gate.check(
                     token, observation_binding(fresh_obs), consume=True,
-                    context=honour_context, now=now_iso, connection=connection))
+                    context=honour_context, now=now_iso, connection=connection),
+                principals=(actor, acting_for or "",
+                            approver))
         except ClaimLost:
             return None
         except RemoraError as exc:
@@ -1925,6 +1931,17 @@ def _ws1_approval_binding_matches(chain: AuditChainPort, tenant: str,
     expected = prior.get("binding_hash")
     return (prior.get("mode") == "enforce" and isinstance(expected, str)
             and bool(expected) and hmac.compare_digest(expected, outcome.binding_hash))
+
+def _stored_approver(transaction: Callable[[str], Any], tenant: str, item_id: str) -> str:
+    """The approver of the item's stored approval, with or without a role, or
+    "". Admission checks it for revocation (M4-T03)."""
+    try:
+        with transaction(tenant) as q:
+            approval = q.item(item_id).approval
+    except (KeyError, LookupError):
+        return ""
+    return str(approval.approver) if approval is not None else ""
+
 
 def stored_approval(transaction: Callable[[str], Any], tenant: str,
                     item_id: str) -> tuple[str, str] | None:
@@ -2280,7 +2297,8 @@ def redeem_accept_token(
                 consume=lambda connection, now_iso: gate.check(
                     token, observation_binding(obs), consume=True,
                     context=current_context, now=now_iso, connection=connection),
-                record_intent=_record_intent)
+                record_intent=_record_intent,
+                principals=(principal, acting_for or ""))
         except RemoraError as exc:
             refusal = _admission_reason(exc)
             chain.append(tenant, {

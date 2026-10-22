@@ -213,3 +213,56 @@ def test_the_worker_refuses_a_revoked_source_and_settles_the_row(client, monkeyp
     assert _row_state(item_id) == {"REFUSED"}
     # Settled: a second pass finds nothing to dispatch.
     assert _mod().dispatch_pending_intents("acme", worker_id="w-2") == []
+
+
+# ── principal revocation and the epoch writer route (slice 2b) ────────────
+
+
+def _as_principal(monkeypatch, name):
+    import servers.api as api_mod
+
+    monkeypatch.setattr(api_mod, "_authenticated_principal", lambda request: name)
+
+
+def test_m4_t03_a_principal_revoked_after_the_grant_refuses_unspent(client, monkeypatch):
+    gate = _install(monkeypatch, "enforce")
+    token = _mint(gate)
+    _as_principal(monkeypatch, "security-officer")
+    r = client.post("/v1/execution/revoke-principal", json={"principal": "employee-1"})
+    assert r.status_code == 200, r.text
+    _as_principal(monkeypatch, "employee-1")
+    assert _try(client, token) == (409, "principal_revoked", False)
+    assert not _events("execution_authorized")
+
+
+def test_the_authority_route_revokes_and_reinstates_a_source(client, monkeypatch):
+    gate = _install(monkeypatch, "enforce")
+    token = _mint(gate)
+    _as_principal(monkeypatch, "security-officer")
+    r = client.post("/v1/execution/revoke-authority",
+                    json={"subject_key": SOURCE, "reason": "feed compromised"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"subject_key": SOURCE, "epoch": 1, "revoked": True,
+                        "revoked_by": "security-officer"}
+    _mod().drain_audit_outbox("acme")
+    assert _events("authority_revoked")[-1]["epoch"] == 1
+    _as_principal(monkeypatch, "employee-1")
+    assert _try(client, token) == (409, "authority_revoked", False)
+    _as_principal(monkeypatch, "security-officer")
+    r = client.post("/v1/execution/revoke-authority",
+                    json={"subject_key": SOURCE, "revoked": False})
+    assert r.json()["epoch"] == 2
+    _as_principal(monkeypatch, "employee-1")
+    assert _try(client, token)[2] is True
+
+
+@pytest.mark.parametrize("subject", ["principal:x", "source:", "sourcex:y"])
+def test_the_authority_route_names_sources_only(client, subject):
+    r = client.post("/v1/execution/revoke-authority", json={"subject_key": subject})
+    assert r.status_code in (409, 422)
+
+
+def test_the_authority_route_refuses_without_atomic_admission(client, monkeypatch):
+    monkeypatch.delenv("REMORA_WS1_ADMISSION", raising=False)
+    r = client.post("/v1/execution/revoke-authority", json={"subject_key": SOURCE})
+    assert r.status_code == 409

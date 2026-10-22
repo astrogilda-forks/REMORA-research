@@ -379,6 +379,18 @@ class RevokePrincipalRequest(BaseModel):
     reason: str | None = Field(None, max_length=512)
 
 
+class RevokeAuthorityRequest(BaseModel):
+    """Revoke or reinstate an evidence source for WS1-M4 admission.
+
+    ``subject_key`` is ``source:<source_id>`` as the WS1 registry names it.
+    Both directions advance the source's authority epoch.
+    """
+
+    subject_key: str = Field(..., min_length=8, max_length=256)
+    revoked: bool = True
+    reason: str | None = Field(None, max_length=512)
+
+
 class ContextMintRequest(BaseModel):
     """Mint a flow context (flow-control SDD v1.3 §3.2, §5.2).
 
