@@ -828,6 +828,7 @@ class GovernedToolDispatcher:
         self._spec_identity: Callable[[str], tuple[str, int] | None] | None = None
         self._require_task = require_task_identity
         self._require_capability = require_capability_set
+        self._spend_guard: Any = None
         self._require_execution_context = require_execution_context
         self._execution_context_provider = execution_context_provider
         # NTA-2 phase 3: under a strict profile a mediated tool whose spec
@@ -1202,6 +1203,36 @@ class GovernedToolDispatcher:
             else:
                 self._mediated.discard(tool_name)
             self._registry_versions[tool_name] = self._registry_versions.get(tool_name, 0) + 1
+
+    def bind_spend_guard(self, guard: Any) -> None:
+        """Reserve each budgeted call's amount before it is dispatched.
+
+        ``guard`` is a ``remora.enforcement.spend_budget.SpendGuard``. A call
+        whose amount would take its principal's running total past the
+        declared limit refuses as ``spend_budget_exhausted`` and leaves the
+        nonce unspent. Tools the guard does not govern are unaffected.
+        """
+        self._spend_guard = guard
+
+    def _spend_refusal(self, lease: ExecutionLease, tool_name: str, arguments: Any,
+                       invocation: Any) -> str | None:
+        guard = self._spend_guard
+        if guard is None or not guard.governs(tool_name):
+            return None
+        principal = lease.actor_identity or ""
+        if invocation is not arguments:
+            # A resolved handle must not spend more, or in another unit, than
+            # the approved wire form names.
+            wire = guard.charge_for(tenant=lease.tenant_id, principal=principal,
+                                    tool_name=tool_name, arguments=arguments)
+            resolved = guard.charge_for(tenant=lease.tenant_id, principal=principal,
+                                        tool_name=tool_name, arguments=invocation)
+            if (wire.budget, wire.amount) != (resolved.budget, resolved.amount):
+                return "spend_invocation_differs"
+        return guard.reserve(tenant=lease.tenant_id, principal=principal,
+                             tool_name=tool_name, arguments=arguments,
+                             operation_id=f"lease:{lease.nonce}",
+                             request_hash=lease.tool_args_hash or "none")
 
     def bind_downstream_ceilings(self, resolver: Callable[[str], Any]) -> None:
         """Supply each tool's declared downstream ceiling (NTA-2).
@@ -1623,6 +1654,22 @@ class GovernedToolDispatcher:
             )
             return DispatchResult(
                 executed=False, refusal_reason=final_hop_refusal,
+                proposal_id=proposal_id,
+            )
+
+        # Spend budget: the last check before anything is recorded or spent,
+        # because a successful reservation is itself a durable spend. A retry
+        # of this lease finds its own reservation and is not charged twice.
+        spend_refusal = self._spend_refusal(lease, tool_name, arguments, invocation)
+        if spend_refusal is not None:
+            governance_event(
+                "dispatch.refused", level=logging.WARNING,
+                reason=spend_refusal, tenant_id=tenant_id,
+                tool_name=tool_name, proposal_id=proposal_id,
+                grant_jti=lease.grant_jti,
+            )
+            return DispatchResult(
+                executed=False, refusal_reason=spend_refusal,
                 proposal_id=proposal_id,
             )
 
