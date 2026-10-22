@@ -129,3 +129,59 @@ def test_a_closed_budget_refuses(guard):
 def test_the_ledger_refuses_an_in_memory_database():
     with pytest.raises(Exception):
         sb.SpendLedger(":memory:")
+
+
+@pytest.mark.parametrize("changes", [
+    {"tools": {"pay": "amount"}},
+    {"budgets": ["b1"]},
+])
+def test_a_policy_entry_that_is_not_an_object_refuses(changes):
+    with pytest.raises(sb.SpendPolicyError):
+        policy(**changes)
+
+
+@pytest.mark.parametrize("arguments, reason", [
+    ({"amount": 7000}, sb.UNIT_INVALID),
+    ({"amount": 7000, "unit": ""}, sb.UNIT_INVALID),
+    ({"amount": 10 ** 7, "unit": "JPY"}, sb.AMOUNT_INVALID),
+    ("not-a-mapping", sb.AMOUNT_INVALID),
+])
+def test_a_call_that_names_no_valid_charge_is_refused_before_the_ledger(guard, arguments,
+                                                                      reason):
+    assert guard.reserve(tenant="t", principal="p", tool_name="pay", arguments=arguments,
+                         operation_id="op", request_hash="h") == reason
+    assert guard.preview(tenant="t", principal="p", tool_name="pay",
+                         arguments=arguments) == reason
+
+
+def test_a_call_without_a_principal_is_refused(guard):
+    assert reserve(guard, 7000, "A", principal="") == sb.PRINCIPAL_MISSING
+
+
+def test_preview_reports_an_unreadable_or_rebound_ledger(guard, monkeypatch):
+    args = {"amount": 7000, "unit": "JPY"}
+
+    def rebound(*a, **k):
+        raise ValueError("budget binding mismatch")
+
+    def broken(*a, **k):
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(guard.ledger, "remaining", rebound)
+    assert guard.preview(tenant="t", principal="p", tool_name="pay",
+                         arguments=args) == sb.BUDGET_CHANGED
+    monkeypatch.setattr(guard.ledger, "remaining", broken)
+    assert guard.preview(tenant="t", principal="p", tool_name="pay",
+                         arguments=args) == sb.LEDGER_UNAVAILABLE
+
+
+def test_the_ledger_refuses_malformed_input(tmp_path):
+    ledger = sb.SpendLedger(tmp_path / "l.db")
+    with pytest.raises(ValueError):
+        ledger.reserve("", "b", 10, "op", "h", 1)
+    with pytest.raises(ValueError):
+        ledger.reserve("k", "b", -1, "op", "h", 1)
+    with pytest.raises(ValueError):
+        ledger.reserve("k", "b", 10, "op", "h", 0)
+    with pytest.raises(ValueError):
+        ledger.close("unknown", "b")
