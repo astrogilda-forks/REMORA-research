@@ -313,8 +313,9 @@ class EnforcementGate:
             reason=result.reason,
             token_jti=token.jti,
             consumed=bool(consume and result.allowed),
-            # An enlisted spend is final only when the caller commits.
-            enlisted=connection is not None,
+            # An enlisted spend is final only when the caller commits. Only
+            # then is the field present, so every other event keeps its shape.
+            **({"enlisted": True} if connection is not None else {}),
             strict_mode=self.strict,
             token_verified=result.token_verified,
         )
