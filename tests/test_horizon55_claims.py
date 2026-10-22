@@ -175,3 +175,44 @@ def test_t15_a_different_operator_key_unverifies_the_whole_log(inputs):
     out = claims.evaluate(dataclasses.replace(inputs, bundle=canon.jcs(bundle)))
     assert not out["log"]["verified"]
     assert all(r["verdict"] != E for r in out["results"])
+
+
+def test_t12_a_producer_receipt_mapped_onto_a_remora_grant_is_not_authority(inputs, evaluated):
+    bundle = canon.loads(inputs.bundle)
+    receipts = [e["item"] for e in evaluated_entries(inputs)
+                if e["item"]["type"] == "musubi.ca2a.execution-receipt.v0"]
+    # A grant and a lease shaped from the producer's receipts, as a naive mapping would.
+    bundle["remora_grants"] = [{"decision": "ACCEPT", "request_sha256": r["request_sha256"],
+                                "lease": {"call_hash": r["outcome"]["response_sha256"]}}
+                               for r in receipts]
+    v = verdicts(claims.evaluate(dataclasses.replace(inputs, bundle=canon.jcs(bundle))))
+    for case in claims.CASES:
+        r = v[(case, "remora_dispatch_authority")]
+        assert r["verdict"] == N
+        assert r["reason_codes"] == ["no_remora_grant_lease_or_dispatch_record"]
+
+
+def test_t13_an_unsigned_acceptance_record_does_not_establish_acceptance(inputs, evaluated):
+    entries = [canon.loads(raw) for raw in inputs.entries]
+    receipt_a = entries[6]["item"]
+    entries.append({**entries[-1], "seq": len(entries),
+                    "item": {"type": "musubi.ca2a.acceptance-record.v0", "accepted": True,
+                             "request_sha256": receipt_a["request_sha256"]}})
+    out = claims.evaluate(dataclasses.replace(
+        inputs, entries=[canon.jcs(e) for e in entries],
+        entry_paths=[*inputs.entry_paths, "forged/013_acceptance_A.json"]))
+    assert not out["log"]["verified"]
+    assert all(r["verdict"] == N for r in out["results"]
+               if r["claim_id"] == "receiver_accepted_result")
+
+
+def test_t14_a_signed_audit_and_a_timestamp_do_not_establish_an_effect(inputs, evaluated):
+    v = verdicts(evaluated)
+    assert v[("A", "audit_byte_identity")]["verdict"] == E  # signed bytes are present
+    assert evaluated["anchoring"]["native_reported"]  # and the producer reports a timestamp
+    for case in claims.CASES:
+        assert v[(case, "physical_effect")]["verdict"] == N
+
+
+def evaluated_entries(inputs):
+    return [canon.loads(raw) for raw in inputs.entries]

@@ -63,6 +63,30 @@ python integrations/horizon55/run.py --check # offline: inputs, verdicts, output
 `cryptography` version and is excluded from the byte-identity check. Tests:
 `pytest tests/test_horizon55_*.py`.
 
+## Test coverage (SDD-H55 section 5)
+
+| Test | Where |
+|---|---|
+| H55-T00 pinned bytes, fail closed | `tests/test_horizon55_inputs.py::test_t00_*`, `test_t05_a_tampered_vendored_file_fails_closed_before_evaluation` |
+| H55-T01 A/B/C joins | `tests/test_horizon55_claims.py::test_t01_*` |
+| H55-T02 cumulative budget | `test_t02_c_overspends_while_its_delegation_is_unchanged` |
+| H55-T03, T09 shared A/C audit | `test_t03_t09_identical_audit_bytes_do_not_make_a_and_c_one_call` |
+| H55-T04 swapped receipts, changed join | `tests/test_horizon55_mutations.py::test_t04_*` |
+| H55-T05 mutated amount or budget | `test_t05_*` |
+| H55-T06 removed entry | `test_t06_a_removed_entry_is_not_silently_accepted` |
+| H55-T07 strict JSON | `test_t07_*` |
+| H55-T08 B without audit bytes | `test_t08_*` |
+| H55-T10 dataset bytes | `test_t10_*` (two need the prepared cache) |
+| H55-T11 altered native settlement | `test_t11_*` |
+| H55-T12 receipt mapped to a REMORA grant | `test_t12_*` |
+| H55-T13 acceptance records | `test_t12_t13_t14_*`, `test_t13_*` |
+| H55-T14 effect from signed audit or timestamp | `test_t12_t13_t14_*`, `test_t14_*` |
+| H55-T15 anchoring, unrecognised keys | `test_t15_*` |
+| H55-T16 determinism, committed outputs current | `test_t16_*` (the second needs the prepared cache) |
+| H55-T17 disclosure gate | `test_t17_*` |
+
+All of these are the author's own controls, not external adversarial coverage.
+
 ## Inputs and licence
 
 The set-2 log, bundle, settlement, the public A/C audit and the original
