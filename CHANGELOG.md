@@ -10,6 +10,10 @@ This file lists externally relevant changes by release. Fine-grained development
 - `DurableRevocationStore` and `DurableNonceStore` use the D1 endpoint they are given instead of `REMORA_STATE_ENDPOINT`.
 - `record_dispatch_intent` no longer raises `NotImplementedError` for the unbacked outbox inside a D1 review transaction (development only).
 
+### WS1-M4 receipts and authority epochs (M4.1b, not wired)
+
+- `remora/verification/receipts.py` and `remora/governance/authority_epochs.py` add the pieces the M4.1 admission transaction will check: versioned evidence receipts with a pure admission check, and durable per-subject authority epochs that join the caller's transaction. No execution path calls them yet ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).
+
 ### WS1 Studies B and C, grounding from proofs and the strict monotone default
 
 - WS1 Study B (sealed at `6924f0d0`, evaluated once 2026-10-20, 600

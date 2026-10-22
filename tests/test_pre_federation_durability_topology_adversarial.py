@@ -133,3 +133,23 @@ def test_assessed_tool_identity_reads_the_latest_assessment():
     assert execution_api._assessed_tool_identity(events) == ("b", "h2")
     assert execution_api._assessed_tool_identity(events[:2]) == ("a", "h1")
     assert execution_api._assessed_tool_identity([]) == ("", "")
+
+
+def test_unbacked_outbox_records_an_intent_inside_a_d1_transaction():
+    """A D1 review transaction publishes its connection to the outbox.
+
+    With only REMORA_STATE_ENDPOINT set (development), the outbox is the
+    in-process store under the name UnbackedExecutionOutbox. Enlisting it
+    used to reach the base class's NotImplementedError; it now records the
+    intent the same non-atomic way the reference default does
+    (docs/architecture/ADR-ws1-m4-admission-topology.md).
+    """
+    from remora.enforcement.outbox import UnbackedExecutionOutbox
+    from remora.execution.dispatch import record_dispatch_intent
+
+    outbox = UnbackedExecutionOutbox()
+    row = record_dispatch_intent(
+        outbox, object(),  # an ambient connection the store cannot join
+        proposal_id="p-1", tenant="t1", item_id="i-1", tool_name="tool",
+        tool_call_hash="h" * 64, grant_jti="")
+    assert row.proposal_id == "p-1"
