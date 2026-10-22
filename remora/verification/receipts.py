@@ -89,6 +89,7 @@ def receipts_from_record(
     binding_hash: str,
     subjects_of: Mapping[str, Sequence[str]],
     epochs: Mapping[str, int],
+    exclude: Collection[str] = (),
 ) -> tuple[EvidenceReceiptV1, ...]:
     """One receipt per authority subject of each PROVED, completed precondition.
 
@@ -96,6 +97,8 @@ def receipts_from_record(
     evidence depends on; ``epochs`` is each subject's epoch as read before the
     lookups ran. A PROVED result without a subject, an epoch or an expiry
     raises: a receipt that admission cannot check is not a receipt.
+    ``exclude`` names preconditions whose authority is not source evidence,
+    such as a REVIEW precondition an approval closes; they get no receipt.
     """
     if not tenant_id or not binding_hash:
         raise ValueError("a receipt needs a tenant and a WS1 binding hash")
@@ -105,6 +108,8 @@ def receipts_from_record(
                 or result.get("processing_status") != ProcessingStatus.COMPLETED.value):
             continue
         pid = str(result["precondition_id"])
+        if pid in exclude:
+            continue
         subjects = sorted(set(subjects_of.get(pid) or ()))
         if not subjects:
             raise ValueError(f"precondition {pid} has no authority subject")

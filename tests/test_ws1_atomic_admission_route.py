@@ -132,3 +132,84 @@ def test_atomic_admission_refuses_to_start_without_its_prerequisites(
 def test_legacy_admission_is_the_default(client, monkeypatch):
     monkeypatch.delenv("REMORA_WS1_ADMISSION", raising=False)
     assert _mod()._admission() is None
+
+
+# ── the approved-review path and the async worker ─────────────────────────
+
+
+def _approved(client, monkeypatch):
+    from tests.test_ws1_execution_binding import _as_role, _assess_write, _review_deployment
+
+    _install(monkeypatch, "enforce", **_review_deployment())
+    item_id = _assess_write(client)["review_item_id"]
+    _as_role(monkeypatch, "change-manager")
+    assert client.post("/v1/execution/approve", json={"item_id": item_id}).status_code == 200
+    return item_id
+
+
+def _execute(client, item_id):
+    from tests.test_ws1_execution_binding import WRITE_CALL
+
+    r = client.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": WRITE_CALL})
+    assert r.status_code in (200, 202), r.text
+    return r.json()
+
+
+def _row_state(item_id):
+    rows = [r for r in _mod()._outbox().pending("acme")] + [
+        r for p in {e["proposal_id"] for e in _events("assessed")}
+        for r in _mod()._outbox().rows_for_proposal("acme", p)]
+    return {r.state.value for r in rows if r.item_id == item_id}
+
+
+def test_an_approved_review_is_admitted_atomically(client, monkeypatch):
+    """The WS1 REVIEW precondition is closed by the approval and carries no
+    receipt; the MACHINE one is re-checked at admission."""
+    body = _execute(client, _approved(client, monkeypatch))
+    assert body["tool_execution"]["executed"] is True
+    authorized = _events("execution_authorized")[-1]
+    assert authorized["admission"]["authority_epochs"] == {
+        SOURCE: {"epoch": 0, "revoked": False}}
+
+
+@pytest.mark.parametrize("cause", ["lapse", "revocation"])
+def test_review_admission_refuses_and_settles_without_dispatch(client, monkeypatch, cause):
+    item_id = _approved(client, monkeypatch)
+    expected = "evidence_expired_at_admission"
+    if cause == "lapse":
+        real = admission_mod.db_now_ms
+        monkeypatch.setattr(admission_mod, "db_now_ms",
+                            lambda conn, dialect: real(conn, dialect) + 120_000)
+    else:
+        _mod()._admission().advance_authority("acme", SOURCE, revoked=True)
+        expected = "authority_revoked"
+    body = _execute(client, item_id)
+    assert body["tool_execution"] == {"executed": False, "dispatch_began": False,
+                                      "state_unknown": False, "refusal_reason": expected}
+    assert not _events("execution_authorized")
+    assert _events("execution_admission_refused")[-1]["detail"] == expected
+    grant = _mod().PolicyDecisionToken.from_dict(body["execution_grant"])
+    assert _mod()._GATE.check(grant, consume=False).reason != "token_already_consumed"
+    assert _row_state(item_id) == {"REFUSED"}
+
+
+def test_the_worker_admits_atomically(client, monkeypatch):
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    item_id = _approved(client, monkeypatch)
+    assert _execute(client, item_id).get("dispatch") == "pending"
+    results = _mod().dispatch_pending_intents("acme", worker_id="w-1")
+    assert [r["tool_execution"]["executed"] for r in results] == [True]
+    assert _events("execution_authorized")[-1]["admission"]["mode"] == "atomic"
+
+
+def test_the_worker_refuses_a_revoked_source_and_settles_the_row(client, monkeypatch):
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    item_id = _approved(client, monkeypatch)
+    _execute(client, item_id)
+    _mod()._admission().advance_authority("acme", SOURCE, revoked=True)
+    results = _mod().dispatch_pending_intents("acme", worker_id="w-1")
+    assert [r["tool_execution"]["refusal_reason"] for r in results] == ["authority_revoked"]
+    assert not _events("execution_authorized")
+    assert _row_state(item_id) == {"REFUSED"}
+    # Settled: a second pass finds nothing to dispatch.
+    assert _mod().dispatch_pending_intents("acme", worker_id="w-2") == []

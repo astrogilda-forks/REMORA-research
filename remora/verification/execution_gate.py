@@ -62,6 +62,7 @@ from remora.verification.preconditions import (
     LogicalState,
     ProposalContext,
     RequirementSet,
+    ResolutionClass,
     derive_preconditions,
     tagged_digest,
 )
@@ -582,11 +583,19 @@ class Ws1Gate:
                 "requirements_hash": requirements.requirements_hash, **d.binding_terms})
             outcome = dataclasses.replace(outcome, binding_hash=binding)
             if pinned is not None:
+                # A REVIEW precondition is closed by the stored approval, not
+                # by source evidence. The queue checks that approval, its
+                # expiry and its approver in its own transaction, so it has
+                # no receipt and admission does not ask for one.
+                reviewed = {p.precondition_id for p in requirements.preconditions
+                            if p.resolution_class is ResolutionClass.REVIEW}
                 outcome = dataclasses.replace(
                     outcome, receipts_pinned=True,
                     receipts=receipts_from_record(record, tenant_id=tenant,
                                                   binding_hash=binding,
-                                                  subjects_of=subjects_of, epochs=pinned),
+                                                  subjects_of=subjects_of, epochs=pinned,
+                                                  exclude=reviewed),
                     required_preconditions=tuple(sorted(
-                        p.precondition_id for p in requirements.preconditions if p.required)))
+                        p.precondition_id for p in requirements.preconditions
+                        if p.required and p.precondition_id not in reviewed)))
         return outcome

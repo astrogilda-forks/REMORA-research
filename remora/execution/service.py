@@ -21,9 +21,11 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
+from remora.enforcement.gate import EnforcementResult
 from remora.enforcement.outbox import OutboxState
 from remora.enforcement.token import AuthorizationContext, PolicyDecisionToken
 from remora.errors import RemoraError
+from remora.execution.admission import ClaimLost
 from remora.execution.outcome import DispatchOutcome, classify_outcome
 from remora.execution.ports import (
     AdmissionPort,
@@ -766,6 +768,7 @@ def execute_approved_item(
     approval_policy: Callable[[Any], str] | None = None,
     ws1_gate: Ws1GatePort | None = None,
     ws1_capability: Callable[[Any, str], Any] | None = None,
+    admission: AdmissionPort | None = None,
 ) -> dict[str, Any]:
     """Execute a previously approved item under full re-gating.
 
@@ -791,6 +794,14 @@ def execute_approved_item(
     with fresh lookups, before the queue is touched. An approval lifts the
     engine's route only; it never stands in for a WS1 precondition. A refusal
     leaves the approval standing, like a context refusal.
+
+    With ``admission`` (WS1-M4, synchronous mode), the claim, the receipt and
+    epoch check at the database instant and the grant spend run in one
+    transaction, after the queue's own transaction recorded the intent
+    (owner decision in the admission ADR). An admission refusal dispatches
+    nothing and settles the intent REFUSED under its reason, as a refused
+    grant does on the legacy path. The async mode leaves all of it to the
+    worker, which admits the same way.
     """
     # RMR-CR-002: the review path mints and consumes in this process. A
     # redeemer holding only verify keys cannot do the first half, so it refuses
@@ -844,6 +855,7 @@ def execute_approved_item(
         chain, tenant, assessed_proposal_id, tool_call)
     acting_for = _acting_for(
         _assessed_payload(chain, tenant, assessed_proposal_id), principal)
+    ws1: Ws1OutcomePort | None = None
     if context_refusal is None:
         proposer = str((_assessed_payload(chain, tenant, assessed_proposal_id) or {})
                        .get("actor") or principal)
@@ -855,7 +867,9 @@ def execute_approved_item(
             capability=(ws1_capability(tool_call, proposer)
                         if ws1_capability is not None else None),
             review_attestation=(stored_approval(transaction, tenant, item_id)
-                                if ws1_gate is not None else None))
+                                if ws1_gate is not None else None),
+            authority_epochs=(admission.pin_epochs(tenant)
+                              if admission is not None and not async_dispatch else None))
         ws1_binding_matches = _ws1_approval_binding_matches(
             chain, tenant, assessed_proposal_id, ws1)
         if not ws1_binding_matches or (
@@ -1002,12 +1016,15 @@ def execute_approved_item(
     # outbox exists to prevent. The claim comes BEFORE the grant is minted and
     # consumed and before execution_authorized is appended, the order issue
     # #417 set for the worker path: the loser consumes and asserts nothing.
-    if not _claim_or_none(outbox, intent, worker_id=worker_id):
+    def _claim_lost() -> dict[str, Any]:
         return _claim_lost_response(
             response, chain=chain, tenant=tenant, principal=principal,
             proposal_id=proposal_id, item_id=item_id,
             tool_call_hash=fresh_obs.tool_call_hash, grant_jti="",
             intent_sequence_no=None)
+
+    if admission is None and not _claim_or_none(outbox, intent, worker_id=worker_id):
+        return _claim_lost()
 
     # The re-gate only AUTHORIZED the call; EXECUTED is recorded separately
     # after the dispatcher reports what actually happened.
@@ -1030,10 +1047,46 @@ def execute_approved_item(
         audience=token_audience,
         context=review_context,
     )
-    # PEP consumption happens HERE: the grant is consumed atomically the
-    # moment it is honoured - a re-presented token can never execute twice.
-    gate_result = gate.check(
-        token, observation_binding(fresh_obs), consume=True, context=review_context)
+    admitted: Any = None
+    admission_refusal: str | None = None
+    if admission is not None:
+        # WS1-M4: the claim, the check and the spend in one transaction. The
+        # token was minted just above, outside it, at claim time.
+        assert intent is not None
+        pending = intent
+        try:
+            admitted = admission.admit(
+                tenant, ws1=ws1,
+                claim=lambda connection: outbox().claim_enlisted(
+                    connection, pending.outbox_id, worker_id=worker_id),
+                consume=lambda connection, now_iso: gate.check(
+                    token, observation_binding(fresh_obs), consume=True,
+                    context=review_context, now=now_iso, connection=connection))
+        except ClaimLost:
+            return _claim_lost()
+        except RemoraError as exc:
+            admission_refusal = _admission_reason(exc)
+            chain.append(tenant, {
+                "event": "execution_admission_refused",
+                "proposal_id": proposal_id,
+                "actor": principal,
+                "item_id": item_id,
+                "grant_jti": token.jti,
+                "detail": admission_refusal,
+                **({"ws1": ws1.audit_block()} if ws1 is not None else {}),
+            })
+            # Rolled back with the refusal, so the intent is still pending.
+            # Claimed now only to settle it: nothing will dispatch it.
+            if not _claim_or_none(outbox, intent, worker_id=worker_id):
+                return _claim_lost()
+        gate_result = (admitted.gate_result if admitted is not None else EnforcementResult(
+            allowed=False, action="accept", token_verified=False,
+            reason=admission_refusal or "admission_refused", strict_mode=True))
+    else:
+        # PEP consumption happens HERE: the grant is consumed atomically the
+        # moment it is honoured - a re-presented token can never execute twice.
+        gate_result = gate.check(
+            token, observation_binding(fresh_obs), consume=True, context=review_context)
     response["execution_grant"] = token.to_dict()
     response["pep"] = {"allowed": gate_result.allowed,
                        "reason": gate_result.reason}
@@ -1049,8 +1102,9 @@ def execute_approved_item(
     # distinction POST_V2_AUDIT_KEYS makes on the envelope.
     coverage = policy_coverage() if policy_coverage is not None else None
 
-    # Durable INTENT record BEFORE the external side effect.
-    intent_entry = chain.append(tenant, {
+    # Durable INTENT record BEFORE the external side effect. An admission
+    # refusal authorized nothing, so it records none.
+    intent_entry: Any = None if admission_refusal is not None else chain.append(tenant, {
         "event": "execution_authorized",
         "proposal_id": proposal_id,
         "actor": principal,
@@ -1072,9 +1126,13 @@ def execute_approved_item(
         # A composite alone can say the views differed and never which
         # component, which is why this is not policy_bundle_hash again.
         "policy_components": coverage,
+        **({"admission": admitted.audit_block()} if admitted is not None else {}),
     })
 
-    tool_execution = dispatch_under_lease(
+    tool_execution: dict[str, Any] = (
+        {"executed": False, "dispatch_began": False, "state_unknown": False,
+                       "refusal_reason": admission_refusal}
+                      if admission_refusal is not None else dispatch_under_lease(
         tenant=tenant,
         principal=principal,
         tool_call=tool_call,
@@ -1086,7 +1144,7 @@ def execute_approved_item(
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
         **_flow_kwargs(fresh_obs),
-    )
+    ))
 
     # FT-02: settle with what actually happened - derived, never assumed.
     #
@@ -1108,7 +1166,8 @@ def execute_approved_item(
                 tool_call_hash=fresh_obs.tool_call_hash or "",
                 grant_jti=token.jti, outcome=outcome,
                 tool_execution=tool_execution,
-                intent_sequence_no=intent_entry.sequence_no,
+                intent_sequence_no=(intent_entry.sequence_no
+                                    if intent_entry is not None else None),
             ))
         if already:
             settled_before = settled_row
@@ -1128,7 +1187,8 @@ def execute_approved_item(
         "item_id": item_id,
         "tool_call_hash": fresh_obs.tool_call_hash,
         "grant_jti": token.jti,
-        "intent_sequence_no": intent_entry.sequence_no,
+        "intent_sequence_no": (intent_entry.sequence_no
+                               if intent_entry is not None else None),
         "tool_executed": tool_execution["executed"],
         # Whether the outcome is unknown, not merely unsuccessful. An effect
         # receipt may resolve an UNKNOWN dispatch -- a lost response does not
@@ -1371,6 +1431,7 @@ def dispatch_pending_intent(
     approval_policy: Callable[[Any], str] | None = None,
     ws1_gate: Ws1GatePort | None = None,
     ws1_capability: Callable[[Any, str], Any] | None = None,
+    admission: AdmissionPort | None = None,
 ) -> dict[str, Any] | None:
     """Dispatch one DISPATCH_PENDING intent from a separate worker (issue #82).
 
@@ -1411,6 +1472,11 @@ def dispatch_pending_intent(
 
     Under WS1 enforce (issue #953) the WS1 gate must reach ACCEPT again with
     fresh lookups too, or the row refuses as ``ws1_regate_refused``.
+
+    With ``admission`` (WS1-M4), the claim, the receipt and epoch check at
+    the database instant and the grant spend run in one transaction. A lost
+    claim walks away as before; any other admission refusal settles the row
+    REFUSED under its reason, with the grant unspent.
     """
     _refuse_minting_on_a_redeemer()
     if row.state is not OutboxState.DISPATCH_PENDING:
@@ -1514,6 +1580,7 @@ def dispatch_pending_intent(
                                  and regate.fresh_action is not None
                                  else None),
             }
+    ws1: Ws1OutcomePort | None = None
     if refusal is None and fresh_semantic is not None:
         proposer = acting_for or actor
         ws1 = ws1_regate(
@@ -1525,7 +1592,8 @@ def dispatch_pending_intent(
             capability=(ws1_capability(tool_call, proposer)
                         if ws1_capability is not None else None),
             review_attestation=(stored_approval(transaction, tenant, row.item_id)
-                                if ws1_gate is not None else None))
+                                if ws1_gate is not None else None),
+            authority_epochs=admission.pin_epochs(tenant) if admission is not None else None)
         ws1_binding_matches = _ws1_approval_binding_matches(
             chain, tenant, str(proposal_id or ""), ws1)
         if not ws1_binding_matches or (
@@ -1538,7 +1606,7 @@ def dispatch_pending_intent(
     # separately as executed_by and never substituted for the requester's.
     # ``principal`` remains the worker binder's process identity and is not
     # an actor fallback.
-    if refusal is not None:
+    def _refuse(refusal: str, refusal_detail: dict[str, Any]) -> dict[str, Any] | None:
         if outbox().claim(row.outbox_id, worker_id=worker_id) is None:
             return None
         refusal_execution = {"executed": False, "dispatch_began": False,
@@ -1590,6 +1658,9 @@ def dispatch_pending_intent(
                                "entry_hash": entry.entry_hash}
         return result
 
+    if refusal is not None:
+        return _refuse(refusal, refusal_detail)
+
     # Past the refusal gate both are populated; the split assignment above
     # is only for the refusal path. Narrowing for the type checker.
     assert fresh_obs is not None and fresh_semantic is not None
@@ -1600,7 +1671,7 @@ def dispatch_pending_intent(
     # event for a dispatch that never happened — evidence claiming two
     # honourings where there was one. The loser now walks away having
     # consumed and asserted nothing.
-    if outbox().claim(row.outbox_id, worker_id=worker_id) is None:
+    if admission is None and outbox().claim(row.outbox_id, worker_id=worker_id) is None:
         return None
 
     now = datetime.now(UTC)
@@ -1626,8 +1697,28 @@ def dispatch_pending_intent(
         audience=token_audience,
         context=honour_context,
     )
-    gate_result = gate.check(
-        token, observation_binding(fresh_obs), consume=True, context=honour_context)
+    admitted: Any = None
+    if admission is not None:
+        # WS1-M4: claim first, then check and spend, in one transaction. The
+        # token was minted above, outside it: minting reads no shared state.
+        try:
+            admitted = admission.admit(
+                tenant, ws1=ws1,
+                claim=lambda connection: outbox().claim_enlisted(
+                    connection, row.outbox_id, worker_id=worker_id),
+                consume=lambda connection, now_iso: gate.check(
+                    token, observation_binding(fresh_obs), consume=True,
+                    context=honour_context, now=now_iso, connection=connection))
+        except ClaimLost:
+            return None
+        except RemoraError as exc:
+            reason = _admission_reason(exc)
+            return _refuse(reason, {"admission_refused": reason,
+                                    **({"ws1": ws1.audit_block()} if ws1 is not None else {})})
+        gate_result = admitted.gate_result
+    else:
+        gate_result = gate.check(
+            token, observation_binding(fresh_obs), consume=True, context=honour_context)
     coverage = policy_coverage() if policy_coverage is not None else None
     intent_entry = chain.append(tenant, {
         "event": "execution_authorized",
@@ -1645,6 +1736,7 @@ def dispatch_pending_intent(
         "tool_contract_bundle_hash": fresh_semantic["tool_contract_bundle_hash"],
         "intent_authority_hash": fresh_semantic["intent_authority_hash"],
         "policy_components": coverage,
+        **({"admission": admitted.audit_block()} if admitted is not None else {}),
     })
 
     tool_execution = dispatch_under_lease(
@@ -1720,6 +1812,12 @@ def dispatch_pending_intent(
         result["audit"] = {"sequence_no": entry.sequence_no,
                            "entry_hash": entry.entry_hash}
     return result
+
+
+def _admission_reason(exc: BaseException) -> str:
+    """The bounded reason an admission refusal is recorded and reported under."""
+    return str(getattr(exc, "reason", "") or getattr(exc, "code", "")
+               or "admission_refused")
 
 
 class TokenRefused(RemoraError):
@@ -2184,8 +2282,7 @@ def redeem_accept_token(
                     context=current_context, now=now_iso, connection=connection),
                 record_intent=_record_intent)
         except RemoraError as exc:
-            refusal = str(getattr(exc, "reason", "") or getattr(exc, "code", "")
-                          or "admission_refused")
+            refusal = _admission_reason(exc)
             chain.append(tenant, {
                 "event": "execution_admission_refused",
                 "proposal_id": proposal_id,

@@ -29,7 +29,7 @@ from remora.enforcement.gate import EnforcementGate
 from remora.enforcement.outbox import PostgresExecutionOutbox, SQLiteExecutionOutbox
 from remora.enforcement.token import PolicyDecisionToken
 from remora.execution import admission as admission_mod
-from remora.execution.admission import AdmissionRefused, AtomicAdmission
+from remora.execution.admission import AdmissionRefused, AtomicAdmission, ClaimLost
 from remora.execution.dispatch import record_dispatch_intent
 from remora.governance import authority_epochs as epochs_mod
 from remora.governance.authority_epochs import AuthorityEpochs, AuthorityEpochsUnavailable
@@ -403,3 +403,71 @@ def test_an_in_process_gate_cannot_join_a_transaction(monkeypatch):
 
 def test_the_core_and_ws1_skew_bounds_agree():
     assert epochs_mod.MAX_CLOCK_SKEW_MS == receipts_mod.MAX_CLOCK_SKEW_MS == 5_000
+
+
+# ── the claim paths (approved review, async worker) ──────────────────────────
+
+
+def _pending_row(rig, proposal_id: str = ""):
+    return rig.outbox.record_intent(
+        proposal_id=proposal_id or f"p-{uuid.uuid4().hex}", tenant_id=T, item_id="item-1",
+        tool_name="store_artifact", tool_call_hash="h" * 64, grant_jti="")
+
+
+def _admit_claim(rig, token, row, worker: str):
+    return rig.admission.admit(
+        T, ws1=_ws1(),
+        claim=lambda conn: rig.outbox.claim_enlisted(conn, row.outbox_id, worker_id=worker),
+        consume=lambda conn, now: rig.gate.check(
+            token, OBS, consume=True, now=now, connection=conn))
+
+
+def test_a_claim_admission_claims_and_spends_together(rig):
+    row, token = _pending_row(rig), _token()
+    admitted = _admit_claim(rig, token, row, "w-1")
+    assert admitted.claimed.state.value == "DISPATCHING"
+    assert rig.outbox.get(row.outbox_id).worker_id == "w-1"
+    assert rig.spent(token)
+
+
+def test_a_lost_claim_spends_nothing(rig):
+    row, token = _pending_row(rig), _token()
+    assert rig.outbox.claim(row.outbox_id, worker_id="other") is not None
+    with pytest.raises(ClaimLost):
+        _admit_claim(rig, token, row, "w-1")
+    assert not rig.spent(token)
+
+
+def test_a_refused_spend_releases_the_claim(rig):
+    row, token = _pending_row(rig), _token()
+    rig.admit(token, _ws1())  # spends the grant elsewhere
+    with pytest.raises(AdmissionRefused) as caught:
+        _admit_claim(rig, token, row, "w-1")
+    assert caught.value.reason == "token_already_consumed"
+    assert rig.outbox.get(row.outbox_id).state.value == "DISPATCH_PENDING"
+
+
+def test_eight_workers_on_one_row_claim_and_spend_once(rig):
+    row = _pending_row(rig)
+    tokens = [_token() for _ in range(8)]
+    barrier = threading.Barrier(8)
+    outcomes: list[str] = []
+    lock = threading.Lock()
+
+    def work(i):
+        barrier.wait(10)
+        try:
+            _admit_claim(rig, tokens[i], row, f"w-{i}")
+            result = "admitted"
+        except AdmissionRefused as exc:
+            result = exc.reason
+        with lock:
+            outcomes.append(result)
+
+    threads = [threading.Thread(target=work, args=(i,)) for i in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert sorted(outcomes) == ["admitted"] + ["claim_lost"] * 7
+    assert sum(rig.spent(t) for t in tokens) == 1

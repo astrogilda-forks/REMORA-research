@@ -246,6 +246,11 @@ class DispatchOutboxPort(Protocol):
         self, outbox_id: str, *, worker_id: str, now: datetime | None = None
     ) -> OutboxRow | None: ...
 
+    def claim_enlisted(
+        self, connection: Any, outbox_id: str, *, worker_id: str,
+        now: datetime | None = None,
+    ) -> OutboxRow | None: ...
+
     def record_intent_enlisted(
         self,
         connection: sqlite3.Connection,
@@ -405,5 +410,6 @@ class AdmissionPort(Protocol):
         *,
         ws1: Ws1OutcomePort | None,
         consume: Callable[[Any, str], EnforcementResult],
-        record_intent: Callable[[], Any],
+        record_intent: Callable[[], Any] | None = None,
+        claim: Callable[[Any], Any] | None = None,
     ) -> Any: ...

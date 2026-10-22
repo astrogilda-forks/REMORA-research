@@ -48,7 +48,7 @@ from remora.governance.authority_epochs import (
 )
 
 __all__ = ["DIALECTS", "AdmissionRefused", "AdmissionResult", "AtomicAdmission",
-           "db_now_ms"]
+           "ClaimLost", "db_now_ms"]
 
 DIALECTS = ("postgres", "sqlite")
 
@@ -71,12 +71,23 @@ class AdmissionRefused(RemoraError, RuntimeError):
         self.reason = reason
 
 
+class ClaimLost(AdmissionRefused):
+    """Another worker holds the intent. Rolled back like any refusal, so the
+    loser has spent and asserted nothing (issue #417); not an error."""
+
+    code = "claim_lost"
+
+    def __init__(self) -> None:
+        super().__init__("claim_lost")
+
+
 @dataclass(frozen=True)
 class AdmissionResult:
     gate_result: EnforcementResult
     intent: Any
     db_time_ms: int
     authority_epochs: Mapping[str, tuple[int, bool]]
+    claimed: Any = None
 
     def audit_block(self) -> dict[str, Any]:
         return {"mode": "atomic", "db_time_ms": self.db_time_ms,
@@ -135,12 +146,17 @@ class AtomicAdmission:
 
     def admit(self, tenant: str, *, ws1: Ws1OutcomePort | None,
               consume: Callable[[Any, str], EnforcementResult],
-              record_intent: Callable[[], Any]) -> AdmissionResult:
-        """Check, spend and record in one transaction, or raise AdmissionRefused.
+              record_intent: Callable[[], Any] | None = None,
+              claim: Callable[[Any], Any] | None = None) -> AdmissionResult:
+        """Check, claim, spend and record in one transaction, or raise.
 
-        ``consume(connection, now_iso)`` spends the grant on the connection at
-        the database instant plus the declared skew. ``record_intent()`` writes the dispatch intent;
-        it finds the connection through the same ambient transaction.
+        ``claim(connection)`` claims an intent that already exists, for the
+        review and worker paths; ``None`` from it raises :class:`ClaimLost`.
+        It runs before the spend, so a lost race spends nothing even before
+        the rollback. ``consume(connection, now_iso)`` spends the grant on the
+        connection at the database instant plus the declared skew.
+        ``record_intent()`` writes a new dispatch intent, for the direct-ACCEPT
+        path; it finds the connection through the same ambient transaction.
         """
         try:
             with self._transaction(tenant):
@@ -162,10 +178,15 @@ class AtomicAdmission:
                 # not refused as "not yet valid".
                 grant_now = now_ms + self.max_clock_skew_ms
                 now_iso = datetime.fromtimestamp(grant_now / 1000, UTC).isoformat()
+                claimed = None
+                if claim is not None:
+                    claimed = claim(conn)
+                    if claimed is None:
+                        raise ClaimLost()
                 gate_result = consume(conn, now_iso)
                 if not gate_result.allowed:
                     raise AdmissionRefused(str(gate_result.reason))
-                intent = record_intent()
-                return AdmissionResult(gate_result, intent, now_ms, dict(epochs))
+                intent = record_intent() if record_intent is not None else None
+                return AdmissionResult(gate_result, intent, now_ms, dict(epochs), claimed)
         except AuthorityEpochsUnavailable as exc:
             raise AdmissionRefused(exc.reason_code) from exc

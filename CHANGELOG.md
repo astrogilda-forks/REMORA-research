@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1-M4 atomic admission on the review and worker paths (M4.1c slice 2a, opt-in)
+
+- Under `REMORA_WS1_ADMISSION=atomic`, the synchronous review path and the async dispatch worker claim the intent, check the WS1 receipts and authority epochs at the database instant, and spend the grant in one transaction. A lost claim spends nothing. Any other refusal settles the intent `REFUSED` without dispatch ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).
+
 ### WS1-M4 atomic admission on the direct-ACCEPT path (M4.1c slice 1, opt-in)
 
 - With `REMORA_WS1_ADMISSION=atomic` and a required `REMORA_MAX_CLOCK_SKEW_MS`, `/v1/execution/execute-accepted` checks the WS1 evidence receipts at the database instant and against authority epochs read under lock. It then spends the grant and records the dispatch intent, all in one tenant transaction. Evidence that lapses after the re-gate, or a source revoked or revised during the lookups, now refuses before the grant is spent. The default path is unchanged ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).
