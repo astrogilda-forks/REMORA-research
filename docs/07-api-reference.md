@@ -686,8 +686,8 @@ matches as its last check before the lease nonce is spent. A call that does
 not fit never reaches the tool, and `tool_execution.refusal_reason` names
 the reason. `limit_exceeded` is the main one. `limit_undeclared` means no
 limit matches a meter. `limit_tool_unmetered` means a write tool has no meter
-under `all_writes`, and `limit_coverage_unknown` that its signed ToolSpec
-cannot be read. `limit_amount_invalid`, `limit_unit_invalid` and
+under `all_writes`, and `limit_coverage_unknown` that neither its signed
+ToolSpec nor the deployment's semantic bundle says whether it writes. `limit_amount_invalid`, `limit_unit_invalid` and
 `limit_resource_invalid` reject an unreadable call. `limit_baseline_unknown`
 means a `change` resource has no known value. `limit_resource_busy` means
 another change to it has not settled. `limit_changed` means a limit was
