@@ -29,7 +29,7 @@ own with their own tests.
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -190,6 +190,7 @@ class EnforcementGatePort(Protocol):
         consume: bool = False,
         now: str | None = None,
         context: Any = None,
+        connection: Any = None,
     ) -> EnforcementResult: ...
 
 
@@ -357,6 +358,12 @@ class Ws1OutcomePort(Protocol):
 
     def apply(self, report: DecisionReport) -> DecisionReport: ...
 
+    @property
+    def receipt_subjects(self) -> tuple[str, ...]: ...
+
+    def admission_refusal(self, *, tenant_id: str, now_ms: int, max_clock_skew_ms: int,
+                          epochs: Mapping[str, tuple[int, bool]]) -> str | None: ...
+
 
 class Ws1GatePort(Protocol):
     """The WS1 gate the server wires in when ``REMORA_WS1_MODE`` is not off."""
@@ -383,4 +390,20 @@ class Ws1GatePort(Protocol):
         review_attestation: tuple[str, str] | None = None,
         task_id: str | None = None,
         redecide: Callable[[Mapping[str, bool]], DecisionReport] | None = None,
+        authority_epochs: Callable[[Sequence[str]], Mapping[str, int]] | None = None,
     ) -> Ws1OutcomePort: ...
+
+
+class AdmissionPort(Protocol):
+    """WS1-M4 atomic admission (``remora/execution/admission.py``)."""
+
+    def pin_epochs(self, tenant: str) -> Callable[[Sequence[str]], Mapping[str, int]]: ...
+
+    def admit(
+        self,
+        tenant: str,
+        *,
+        ws1: Ws1OutcomePort | None,
+        consume: Callable[[Any, str], EnforcementResult],
+        record_intent: Callable[[], Any],
+    ) -> Any: ...

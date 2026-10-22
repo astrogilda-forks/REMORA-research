@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -26,6 +26,7 @@ from remora.enforcement.token import AuthorizationContext, PolicyDecisionToken
 from remora.errors import RemoraError
 from remora.execution.outcome import DispatchOutcome, classify_outcome
 from remora.execution.ports import (
+    AdmissionPort,
     AuditChainPort,
     DispatchOutboxPort,
     EnforcementGatePort,
@@ -1782,6 +1783,7 @@ def ws1_regate(
     policy_bundle_hash: str,
     capability: Any,
     review_attestation: tuple[str, str] | None = None,
+    authority_epochs: Callable[[Sequence[str]], Mapping[str, int]] | None = None,
 ) -> Ws1OutcomePort | None:
     """A fresh WS1 evaluation before a dispatch path consumes anything, or
     None when WS1 does not enforce. Fresh lookups, so evidence that expired,
@@ -1789,11 +1791,15 @@ def ws1_regate(
     assessment recorded stays a veto (A13). *review_attestation* is
     ``(approver, approver_role)`` of the approval the queue stored, on the
     review path only: it closes a REVIEW precondition of exactly that role
-    and nothing else."""
+    and nothing else. *authority_epochs* is atomic admission's epoch reader
+    (WS1-M4); with it the outcome carries the receipts admission re-checks."""
     if gate is None or gate.mode != "enforce":
         return None
     assessed = _assessed_payload(chain, tenant, proposal_id) or {}
     prior = assessed.get("ws1") or {}
+    # Passed only when set, so a gate port that predates admission works.
+    extra: dict[str, Any] = (
+        {"authority_epochs": authority_epochs} if authority_epochs is not None else {})
     return gate.evaluate(
         proposal_id=proposal_id, tenant=tenant, principal=proposer,
         tool_name=tool_call.tool_name, arguments=tool_call.arguments,
@@ -1804,7 +1810,7 @@ def ws1_regate(
         base=_ws1_regate_base(observation),
         veto_on_record=bool(prior.get("monitor_veto")),
         review_attestation=review_attestation,
-        task_id=_ws1_task_id(task_identity_of(tool_call)))
+        task_id=_ws1_task_id(task_identity_of(tool_call)), **extra)
 
 
 
@@ -1993,6 +1999,7 @@ def redeem_accept_token(
     require_execution_context: bool = False,
     ws1_gate: Ws1GatePort | None = None,
     ws1_capability: Callable[[Any, str], Any] | None = None,
+    admission: AdmissionPort | None = None,
 ) -> dict[str, Any]:
     """Execute a directly-ACCEPTed proposal under its single-use token.
 
@@ -2018,6 +2025,12 @@ def redeem_accept_token(
     ``ws1_regate_refused``, a moved requirement as ``context_mismatch``, and
     neither spends the grant. ``ws1_capability(call, principal)`` gives the
     capability block the binding covers.
+
+    With ``admission`` (WS1-M4 atomic admission), steps (2) and (3) run in one
+    tenant transaction, after the WS1 receipts are checked again at the
+    database instant and against the authority epochs read under lock. A
+    refusal there rolls everything back: the grant stays unspent and no
+    intent exists. Without it, nothing changes.
     """
     obs, semantic = build_observation(tool_call, tenant)
     proposal_id = token.request_id or None
@@ -2089,7 +2102,8 @@ def redeem_accept_token(
         observation=obs, toolspec_hash=str((toolspec_identity or {}).get("hash", "")),
         policy_bundle_hash=_policy_bundle_hash(policy_bundle_hash),
         capability=(ws1_capability(tool_call, acting_for or principal)
-                    if ws1_capability is not None else None))
+                    if ws1_capability is not None else None),
+        authority_epochs=admission.pin_epochs(tenant) if admission is not None else None)
     if ws1 is not None and ws1.final_action is not DecisionAction.ACCEPT:
         chain.append(tenant, {
             "event": "execution_ws1_refused",
@@ -2147,10 +2161,46 @@ def redeem_accept_token(
             "flow refused at redemption: the call's information flow is not "
             "clean now", flow_refusal)
 
-    # Consume exactly once. A refused check here is expiry, audience
-    # mismatch, a bad signature, or a replay - all terminal for this token.
-    gate_result = gate.check(
-        token, observation_binding(obs), consume=True, context=current_context)
+    def _record_intent() -> Any:
+        # Durable dispatch intent before any side effect (FT-02).
+        return record_dispatch_intent(
+            proposal_id=str(proposal_id or token.jti),
+            tenant=tenant,
+            item_id=f"accept:{token.jti}",
+            tool_name=tool_call.tool_name,
+            tool_call_hash=obs.tool_call_hash or "",
+            grant_jti=token.jti,
+        )
+
+    admitted: Any = None
+    if admission is not None:
+        # WS1-M4: check, spend and record in one transaction (module
+        # docstring of remora/execution/admission.py for the order).
+        try:
+            admitted = admission.admit(
+                tenant, ws1=ws1,
+                consume=lambda connection, now_iso: gate.check(
+                    token, observation_binding(obs), consume=True,
+                    context=current_context, now=now_iso, connection=connection),
+                record_intent=_record_intent)
+        except RemoraError as exc:
+            refusal = str(getattr(exc, "reason", "") or getattr(exc, "code", "")
+                          or "admission_refused")
+            chain.append(tenant, {
+                "event": "execution_admission_refused",
+                "proposal_id": proposal_id,
+                "actor": principal,
+                "grant_jti": token.jti,
+                "detail": refusal,
+                **({"ws1": ws1.audit_block()} if ws1 is not None else {}),
+            })
+            raise TokenRefused(f"admission refused: {refusal}", refusal) from exc
+        gate_result = admitted.gate_result
+    else:
+        # Consume exactly once. A refused check here is expiry, audience
+        # mismatch, a bad signature, or a replay - all terminal for this token.
+        gate_result = gate.check(
+            token, observation_binding(obs), consume=True, context=current_context)
     if not gate_result.allowed:
         chain.append(tenant, {
             "event": "execution_grant_refused",
@@ -2175,15 +2225,7 @@ def redeem_accept_token(
         "pep": {"allowed": gate_result.allowed, "reason": gate_result.reason},
     }
 
-    # Durable dispatch intent before any side effect (FT-02).
-    intent = record_dispatch_intent(
-        proposal_id=str(proposal_id or token.jti),
-        tenant=tenant,
-        item_id=f"accept:{token.jti}",
-        tool_name=tool_call.tool_name,
-        tool_call_hash=obs.tool_call_hash or "",
-        grant_jti=token.jti,
-    )
+    intent = admitted.intent if admitted is not None else _record_intent()
     intent_entry = chain.append(tenant, {
         "event": "execution_authorized",
         "proposal_id": proposal_id,
@@ -2199,6 +2241,7 @@ def redeem_accept_token(
         "tool_contract_bundle_hash": semantic["tool_contract_bundle_hash"],
         "intent_authority_hash": semantic["intent_authority_hash"],
         **request_ref_fields,
+        **({"admission": admitted.audit_block()} if admitted is not None else {}),
         # The signed grant itself, recorded only now that the gate has
         # consumed it: a spent grant authorizes nothing, and without it an
         # export has a jti and no signature to check it against.

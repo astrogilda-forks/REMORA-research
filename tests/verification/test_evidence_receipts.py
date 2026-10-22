@@ -39,7 +39,7 @@ def _record(*results):
         review_class="", reason_codes=(), parent_record_hash=None)
 
 
-SUBJECTS = {"port_up": "source:noc", "customer_active": "source:crm"}
+SUBJECTS = {"port_up": ("source:noc",), "customer_active": ("source:crm",)}
 EPOCHS = {"source:noc": 3, "source:crm": 1}
 
 
@@ -47,7 +47,7 @@ def _receipts():
     return receipts_from_record(
         _record(_result("port_up"), _result("customer_active", valid_until=1_090),
                 _result("not_proved", state="unknown")),
-        tenant_id=T, binding_hash=BINDING, subject_of=SUBJECTS, epochs=EPOCHS)
+        tenant_id=T, binding_hash=BINDING, subjects_of=SUBJECTS, epochs=EPOCHS)
 
 
 def _check(receipts, *, now_ms=1_000_000, skew=0, epochs=None, digest=None,
@@ -130,6 +130,17 @@ def test_a_duplicated_precondition_refuses():
     assert _check(doubled) == "evidence_receipt_duplicate"
 
 
+def test_a_precondition_served_by_two_sources_has_a_receipt_for_each():
+    receipts = receipts_from_record(
+        _record(_result("port_up")), tenant_id=T, binding_hash=BINDING,
+        subjects_of={"port_up": ("source:noc", "source:cmdb")},
+        epochs={"source:noc": 3, "source:cmdb": 9})
+    assert [(r.subject_key, r.source_epoch) for r in receipts] == [
+        ("source:cmdb", 9), ("source:noc", 3)]
+    epochs = {"source:noc": (3, False), "source:cmdb": (9, True)}
+    assert _check(receipts, epochs=epochs, required=("port_up",)) == "authority_revoked"
+
+
 def test_the_set_digest_ignores_order_and_changes_with_any_field():
     a, b = _receipts()
     assert receipt_set_digest((a, b)) == receipt_set_digest((b, a))
@@ -140,8 +151,8 @@ def test_the_set_digest_ignores_order_and_changes_with_any_field():
 @pytest.mark.parametrize("missing", ["subject", "epoch", "expiry"])
 def test_a_proved_result_admission_could_not_check_is_not_a_receipt(missing):
     result = _result("port_up", valid_until=None if missing == "expiry" else 1_060)
-    subjects = {} if missing == "subject" else {"port_up": "source:noc"}
+    subjects = {} if missing == "subject" else {"port_up": ("source:noc",)}
     epochs = {} if missing == "epoch" else {"source:noc": 3}
     with pytest.raises(ValueError):
         receipts_from_record(_record(result), tenant_id=T, binding_hash=BINDING,
-                             subject_of=subjects, epochs=epochs)
+                             subjects_of=subjects, epochs=epochs)

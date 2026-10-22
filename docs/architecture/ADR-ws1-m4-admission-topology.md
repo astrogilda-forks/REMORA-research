@@ -3,7 +3,9 @@
 - Status: **accepted** (2026-10-22), with the owner decisions below. Work
   package M4.1a of the
   [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9. M4.1b
-  (receipts and epochs) is implemented and not yet wired; M4.1c wires it.
+  (receipts and epochs) is implemented. M4.1c slice 1 wires it into the
+  direct-ACCEPT path behind `REMORA_WS1_ADMISSION=atomic`; slice 2 covers the
+  review and worker paths.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -172,3 +174,54 @@ The owner asked for the recommendations to be followed.
 
 Nothing on an execution path calls either module yet, so no claim or
 capability changes.
+
+## M4.1c slice 1, implemented (direct ACCEPT, opt-in)
+
+`REMORA_WS1_ADMISSION=atomic` changes `/v1/execution/execute-accepted` only.
+`remora/execution/admission.py` runs the order from the Consequences section
+inside one `transaction_state` for the tenant. The steps are the lock, the
+database instant (`clock_timestamp()` on Postgres), the receipt and epoch
+check under lock, the grant spend on the same connection, and the dispatch
+intent on the same connection. Every refusal or fault before commit rolls
+all of them back.
+
+- The WS1 re-gate reads each evidence source's epoch before its lookups and
+  returns receipts for a clean outcome. A precondition gets one receipt per
+  source its resolvers can read, so revoking any of them refuses it.
+- `EnforcementGate.check(..., connection=)` spends the grant on the
+  admission connection, in a savepoint on Postgres. An in-process or D1 gate
+  cannot join and refuses as `consumed_ledger_unavailable`.
+- The grant is judged at the database instant plus `max_clock_skew_ms`, and
+  the evidence at `valid_until` minus it, so both expire that much sooner.
+  The same allowance keeps a grant whose application-stamped `issued_at` is
+  slightly ahead of the database clock from being refused as not yet valid.
+- `AtomicAdmission.advance_authority` revokes or reinstates a subject under
+  the same tenant lock, so a revocation and an admission are strictly
+  ordered (decision 2). No route calls it yet.
+- The server refuses the mode at startup without Postgres or SQLite, with
+  `REMORA_STATE_ENDPOINT` set, or without a skew from 0 to 5000.
+- Tests: `tests/test_atomic_admission.py` covers M4-T01, T02, T03, T04, T05
+  in both orders, T06 with eight admitters, T10, T11 and T13, on SQLite and
+  on a real Postgres in the CI postgres-contract job.
+  `tests/test_ws1_atomic_admission_route.py` covers T02, T03 and T04 through
+  the route and the real dispatcher. Control 2b in
+  `tests/test_ws1_gate_controls.py` still pins the legacy residual, which is
+  unchanged with the mode off.
+
+Not yet covered:
+
+- The `execution_authorized` audit row is appended after commit, as before.
+  M4-T12 needs it in the transaction.
+- The review and worker paths are unchanged.
+- The ACCEPT path does not read principal revocation.
+- No route writes authority epochs.
+- M4-T14 to T20 are open.
+
+**Finding.** `transaction_state` runs `CREATE TABLE IF NOT EXISTS` inside
+its first transaction. On a fresh Postgres schema, concurrent first
+transactions can fail on the catalog's unique index
+(`pg_type_typname_nsp_index`). The failure is closed: the transaction raises
+and nothing commits. It happens only before the first transaction on a new
+database has committed. The tests run one transaction first. The epoch store
+avoids the problem with `ensure_schema()`. `transaction_state` needs the same
+fix in its own PR.
