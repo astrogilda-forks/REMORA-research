@@ -471,3 +471,46 @@ def test_nonce_ledger_is_atomic_single_use() -> None:
     assert ledger.consume("n-1") is True
     assert ledger.consume("n-1") is False
     assert ledger.consume("n-2") is True
+
+
+# ── IFC-06: invocation arguments (resolved flow handles) ───────────────────
+
+
+def test_invocation_arguments_reach_the_tool_while_the_lease_binds_the_wire_form() -> None:
+    d = _dispatcher()
+    resolved = dict(ARGS, site="hq-resolved")
+    res = d.dispatch(_issue(), TOOL, ARGS, tenant_id=TENANT,
+                     target_environment=TARGET, now=BEFORE_EXPIRY,
+                     actor_identity=ACTOR, invocation_arguments=resolved)
+    assert res.executed is True
+    assert d._test_calls == [resolved]  # type: ignore[attr-defined]
+
+
+def test_a_lease_for_the_resolved_form_does_not_cover_the_wire_form() -> None:
+    d = _dispatcher()
+    wire = dict(ARGS, site="⟦h:AAAAAAAAAAAAAAAA⟧")
+    res = d.dispatch(_issue(), TOOL, wire, tenant_id=TENANT,
+                     target_environment=TARGET, now=BEFORE_EXPIRY,
+                     actor_identity=ACTOR, invocation_arguments=ARGS)
+    assert res.executed is False
+    assert d._test_calls == []  # type: ignore[attr-defined]
+
+
+def test_the_runtime_checks_also_judge_the_invocation_arguments(monkeypatch) -> None:
+    """A handle must not carry a value the wire form could not name."""
+    d = _dispatcher()
+    seen: list[object] = []
+
+    def capability(lease, tool_name, tenant_id, target, capability_set, now,
+                   arguments=None):
+        seen.append(arguments)
+        return "capability_argument_refused" if arguments.get("site") == "dc-2" else None
+
+    monkeypatch.setattr(d, "_capability_refusal", capability)
+    res = d.dispatch(_issue(), TOOL, ARGS, tenant_id=TENANT,
+                     target_environment=TARGET, now=BEFORE_EXPIRY,
+                     actor_identity=ACTOR, invocation_arguments=dict(ARGS, site="dc-2"))
+    assert res.executed is False
+    assert res.refusal_reason == "capability_argument_refused"
+    assert d._test_calls == []  # type: ignore[attr-defined]
+    assert seen == [ARGS, dict(ARGS, site="dc-2")]
