@@ -1089,6 +1089,56 @@ def _ws1_gate() -> Any:
     return _WS1_GATE
 
 
+_ADMISSION: Any = None
+_ADMISSION_KEY: tuple[str, str, int] | None = None
+
+
+def _admission() -> Any:
+    """WS1-M4 atomic admission, or None when ``REMORA_WS1_ADMISSION`` is unset.
+
+    ``REMORA_WS1_ADMISSION=atomic`` makes ``/v1/execution/execute-accepted``
+    check the WS1 receipts at the database instant, spend the grant and record
+    the dispatch intent in one tenant transaction
+    (``remora/execution/admission.py``). It needs Postgres (the reference
+    backend) or SQLite (single host), and ``REMORA_MAX_CLOCK_SKEW_MS`` from 0
+    to 5000, which has no default. D1 and in-process state are refused: neither
+    has a transaction the steps could share
+    (docs/architecture/ADR-ws1-m4-admission-topology.md, decision 5).
+    """
+    global _ADMISSION, _ADMISSION_KEY
+    mode = _os.environ.get("REMORA_WS1_ADMISSION", "").strip().lower() or "legacy"
+    if mode == "legacy":
+        return None
+    if mode != "atomic":
+        raise ValueError(f"REMORA_WS1_ADMISSION={mode!r} is not one of legacy, atomic")
+    dsn = _os.environ.get("REMORA_PG_DSN", "").strip()
+    db_path = "" if dsn else _os.environ.get("REMORA_CHAIN_DB", "").strip()
+    if _os.environ.get("REMORA_STATE_ENDPOINT", "").strip() or not (dsn or db_path):
+        raise ValueError(
+            "REMORA_WS1_ADMISSION=atomic needs REMORA_PG_DSN or REMORA_CHAIN_DB and no "
+            "REMORA_STATE_ENDPOINT: D1 and in-process state have no shared transaction")
+    raw = _os.environ.get("REMORA_MAX_CLOCK_SKEW_MS", "").strip()
+    if not raw:
+        raise ValueError("REMORA_WS1_ADMISSION=atomic needs REMORA_MAX_CLOCK_SKEW_MS; "
+                         "it has no default")
+    try:
+        skew = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"REMORA_MAX_CLOCK_SKEW_MS={raw!r} is not an integer") from exc
+    key = (dsn, db_path, skew)
+    if _ADMISSION is None or _ADMISSION_KEY != key:
+        from remora.execution.admission import AtomicAdmission
+        from remora.governance.authority_epochs import AuthorityEpochs
+
+        _ADMISSION = AtomicAdmission(
+            transaction=db_transaction_state, connection=_ACTIVE_TX_CONNECTION.get,
+            epochs=AuthorityEpochs(dsn=dsn, db_path=db_path,
+                                   connection_provider=_ACTIVE_TX_CONNECTION.get),
+            dialect="postgres" if dsn else "sqlite", max_clock_skew_ms=skew)
+        _ADMISSION_KEY = key
+    return _ADMISSION
+
+
 def _ws1_capability(tenant: str) -> Any:
     """The capability block a WS1 binding covers, for a call and its proposer."""
     if _capability_resolver() is None:
@@ -2214,8 +2264,10 @@ from servers.semantic_shadow import (
     build_semantic_shadow_from_env,
 )
 
-# Refused at startup when REMORA_WS1_MODE is set without a usable deployment.
+# Refused at startup when REMORA_WS1_MODE is set without a usable deployment,
+# and when REMORA_WS1_ADMISSION=atomic lacks a transactional backend or a skew.
 _ws1_gate()
+_admission()
 
 _SEMANTIC_SHADOW = build_semantic_shadow_from_env(
     engine=_ENGINE, tool_description=_toolspec_description,
@@ -2942,6 +2994,7 @@ def execute_accepted(req: ExecuteAcceptedRequest, request: Request) -> dict[str,
             require_execution_context=context_required(),
             ws1_gate=_ws1_gate(),
             ws1_capability=_ws1_capability(tenant),
+            admission=_admission(),
         )
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc

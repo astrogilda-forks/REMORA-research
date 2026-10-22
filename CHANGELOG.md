@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1-M4 atomic admission on the direct-ACCEPT path (M4.1c slice 1, opt-in)
+
+- With `REMORA_WS1_ADMISSION=atomic` and a required `REMORA_MAX_CLOCK_SKEW_MS`, `/v1/execution/execute-accepted` checks the WS1 evidence receipts at the database instant and against authority epochs read under lock. It then spends the grant and records the dispatch intent, all in one tenant transaction. Evidence that lapses after the re-gate, or a source revoked or revised during the lookups, now refuses before the grant is spent. The default path is unchanged ([ADR](docs/architecture/ADR-ws1-m4-admission-topology.md)).
+
 ### Flow handles reach the tool as values (IFC-06)
 
 - The dispatch-time flow check resolved a call's handles and then discarded them, so the tool received the opaque handle token. The tool now receives the resolved values. The lease still binds the handle form the approver saw, and the dispatcher's capability, effect and procedure checks judge both forms. Found by an external review of `265abfbe`; nothing changes with flow control off.

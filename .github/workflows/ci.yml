@@ -321,6 +321,8 @@ jobs:
         # same day: spend-once, watermark, reset and outage on a real server.
         # The flow context store joined 2026-10-18 (IFC-02): one winner per
         # sequence and stale-seq refusal on a real server.
+        # WS1-M4 atomic admission joined 2026-10-22 (M4.1c): spend and intent
+        # in one transaction, database time, epochs under lock, contention.
         run: |
           python -m pytest tests/test_execution_api.py tests/test_execution_outbox.py \
             tests/test_postgres_outbox_fault_injection.py \
@@ -328,6 +330,7 @@ jobs:
             tests/test_assess_idempotency_reservation.py \
             tests/test_enforcement_ledgers_postgres.py \
             tests/flow/test_context_store.py \
+            tests/test_atomic_admission.py \
             -q -rs -k "postgres" | tee out.txt
           if grep -qiE "skipped|no tests ran" out.txt; then
             echo "ERROR: Postgres contract tests skipped despite service DSN" >&2
