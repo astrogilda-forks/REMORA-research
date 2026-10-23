@@ -6,6 +6,16 @@ The cases A, B and C and C's budget outcome were public and examined before
 this row was designed. It is not a holdout, not a preregistered confirmation
 and not an independent evaluation.
 
+## Answer in short
+
+Payment C took the buyer's spending to 21000 JPY-testnet against a signed
+budget of 20000. Reading the signed records, REMORA finds C over budget and A
+and B within it. Run through REMORA's own execution path with that budget
+declared, C does not run: it is refused before review, and refused at dispatch
+when all three were approved in advance. Without a declared limit REMORA lets
+all three run. [`REPORT.md`](../../artifacts/interop/horizon55/REPORT.md)
+explains what A, B and C are and gives every table.
+
 ## What it is
 
 An offline, read-only consumer of the MUSUBI companion records that Horizon
@@ -50,11 +60,25 @@ so its audit and dataset identity are `NOT_ESTABLISHED`. Runtime dataset use,
 receiver acceptance, REMORA dispatch authority and physical effect are
 `NOT_ESTABLISHED` for every case.
 
+## Part 2: REMORA's own engine
+
+`enforce.py` takes the three payments and the issuer-signed budget from the
+verified log. It sends each payment through REMORA's execution API in this
+process: `/v1/execution/assess`, `/approve`, `/execute` and the governed
+dispatcher. The tool is a sandbox (`payment_tool.py`) that records every call
+reaching it. It runs three times: with no limit declared, with the budget
+declared as a cumulative limit for the payer, and with that limit after all
+three payments were approved in advance. The result is `enforcement.json`.
+Unlike `run.py`, this script imports REMORA, because REMORA's decision path is
+what it tests. The limits themselves are `remora/enforcement/cumulative_limits.py`
+(CAP-031), added outside this package.
+
 ## Reproduce
 
 ```bash
 python integrations/horizon55/prepare.py     # once, networked: fetch and check against the lock
 python integrations/horizon55/run.py --check # offline: inputs, verdicts, outputs, disclosure gate
+python integrations/horizon55/enforce.py --check  # offline: REMORA's engine on A, B and C
 ```
 
 `run.py --write` rewrites `results.json`, `REPORT.md`, `SHA256SUMS` and
@@ -84,6 +108,7 @@ python integrations/horizon55/run.py --check # offline: inputs, verdicts, output
 | H55-T15 anchoring, unrecognised keys | `test_t15_*` |
 | H55-T16 determinism, committed outputs current | `test_t16_*` (the second needs the prepared cache) |
 | H55-T17 disclosure gate | `test_t17_*` |
+| Part 2: REMORA's engine on A, B and C | `tests/test_horizon55_enforcement.py` |
 
 All of these are the author's own controls, not external adversarial coverage.
 
@@ -107,9 +132,7 @@ only. Without it, `dataset_byte_identity` cannot be established.
   Identical result bytes do not make them one call.
 - The mutation tests are the author's own controls, not external adversarial
   coverage.
-- REMORA has no cumulative spend limit on tool calls today. `TaskCallLedger`
-  can reserve units against a cap atomically, but the execution gate charges
-  it one unit per verification lookup, not the cost of a call. REMORA could
-  therefore not have refused C on budget grounds.
-- This row does not say REMORA would have prevented C, and makes no
-  certification, production or comparative security claim.
+- REMORA was not in the path of the live calls. Part 2 is REMORA's decision on
+  a replay with a sandboxed tool, and the limit holds only where a deployment
+  declares it, on one host.
+- No certification, production or comparative security claim.

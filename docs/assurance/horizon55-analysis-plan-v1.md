@@ -71,10 +71,27 @@ any output was published:
 
 Neither fix changed a verdict or reason code on the unmodified inputs.
 
+## Part 2, added by owner decision
+
+The first version of this row read the records only and recorded that REMORA
+could not have refused C. Replayed through REMORA's execution API, REMORA as
+shipped ran all three payments (NEGATIVE_RESULTS.md section 97). The owner then
+decided that REMORA must handle this, because the same pattern governs
+setpoints and ventilation in the planned pilot. Cumulative limits were added to
+REMORA's enforcement path in pull requests #1025 and #1033, outside this
+package and not under this plan. `enforce.py` adds part 2: the verified
+payments and the signed budget replayed through REMORA's own decision path,
+with and without the limit. Its expected outcomes are pinned in `run.py`
+(`EXPECTED_ENFORCEMENT`). They were written after the mechanism was built and
+tested on the same sequence, so part 2 shows the mechanism works on the case it
+was built for. It is not a measurement of how often it refuses legitimate
+calls.
+
 ## Out of scope
 
-No live calls, payments, cloud tokens or network access during `run.py`. No
-Bitcoin anchor verification. No claim that REMORA would have prevented C, and
-no comparison of REMORA with MUSUBI as more or less secure. A future study of
+No live calls, payments, cloud tokens or network access during `run.py` or
+`enforce.py`. No Bitcoin anchor verification. No comparison of REMORA with
+MUSUBI as more or less secure: they act at different points, before the call
+and after it. A future study of
 pre-dispatch budget enforcement would need a new synthetic population, an
 unseen holdout and a prospective OSF registration before any data is read.

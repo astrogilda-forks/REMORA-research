@@ -1,7 +1,8 @@
 {
  "commands": [
   "python integrations/horizon55/prepare.py",
-  "python integrations/horizon55/run.py --check"
+  "python integrations/horizon55/run.py --check",
+  "python integrations/horizon55/enforce.py --check"
  ],
  "cryptography": "50.0.1",
  "implementation": "CPython",
@@ -9,7 +10,7 @@
  "note": "environment fields vary by machine and are excluded from byte-identity checks",
  "os": "Darwin",
  "outputs_sha256": {
-  "REPORT.md": "959a49bff012bb1d58a2ff91ef83965536a84b963ceb33d2e97989f68ec99a7b",
+  "REPORT.md": "d324a628d3dc61facb7605aa48fc615c81d2aae2e6a21546e0504be9758c300e",
   "results.json": "568e4bbdd09472fda7c16ac77f4389a15f0c559582e3ce9c233c13f4622c9ac2"
  },
  "python": "3.13.7",
