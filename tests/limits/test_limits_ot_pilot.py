@@ -46,6 +46,7 @@ def pilot(monkeypatch, tmp_path):
         monkeypatch.setenv("REMORA_INTENT_SOURCE_FILE", str(PILOT / "work_orders.json"))
         monkeypatch.setenv("REMORA_LIMITS_FILE", str(path))
         monkeypatch.setenv("REMORA_LIMITS_LEDGER", str(tmp_path / "limits-ledger.db"))
+        monkeypatch.setenv("REMORA_LIMITS_OBSERVER_MODULE", "ot_registry")
         exec_mod._reset_semantic_bundle()
         exec_mod._reset_tool_dispatcher()
         return client
@@ -133,3 +134,28 @@ def test_a_write_tool_the_limits_forget_is_refused(pilot):
                                alarm_id="LT-410-HI"))["detail"] == "limit_tool_unmetered"
     assert run(client, payload("read_sensor", "MON-ROUND", sensor_id="PT-101")) \
         .get("detail") != "limit_tool_unmetered"
+
+
+def test_an_outside_change_at_the_plant_is_measured_not_assumed(pilot):
+    client = pilot()
+    import ot_registry
+
+    ot_registry.PLANT["loops"]["PIC-101"]["setpoint"] = 3.5  # changed at the plant
+    # 3.50 -> 4.00 is 0.50 of movement at the plant: the whole hour's limit.
+    assert run(client, payload("adjust_setpoint", "WO-1201", loop="PIC-101",
+                               value=4.0))["executed"] is True
+    assert run(client, payload("adjust_setpoint", "WO-1201", loop="PIC-101",
+                               value=4.1))["detail"] == "limit_exceeded"
+
+
+def test_the_pilot_observer_reads_the_plant():
+    sys.path.insert(0, str(PILOT))
+    try:
+        import ot_registry
+
+        assert ot_registry.observe_limit_value("ot-pilot", "valve_travel", "V-18") == 40.0
+        with pytest.raises(KeyError):
+            ot_registry.observe_limit_value("ot-pilot", "alarm_acks", "LT-410-HI")
+    finally:
+        sys.path.remove(str(PILOT))
+        sys.modules.pop("ot_registry", None)

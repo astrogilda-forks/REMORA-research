@@ -696,11 +696,37 @@ are `limit_principal_missing` and `limit_ledger_unavailable`.
 
 After the tool runs, the dispatcher records whether it ran. A write that
 raised leaves its resource unknown until a baseline with a new `seed_id` is
-declared, because REMORA cannot tell where the equipment ended up. `/assess`
+declared, because REMORA cannot tell where the equipment ended up.
+
+A `change` meter can instead be `"observed": true`. The deployment then names
+a module in `REMORA_LIMITS_OBSERVER_MODULE` that exposes
+`observe_limit_value(tenant, quantity, resource)` and returns the value the
+equipment reports. Movement is measured from that value before each change,
+rounded up, so a change made outside REMORA is not charged and a change REMORA
+makes is never missed. After the tool runs, the value is read back. If the
+equipment did not reach the target, the dispatcher logs
+`dispatch.limit_target_not_reached`, and the next change starts from the
+value read back. An observed meter needs no baseline and no re-seed after a
+failed write. An observation that fails or is not a finite number refuses as
+`limit_observation_unavailable`. A policy with observed meters and no
+observer refuses startup.
+
+The plant can change between the read the reservation is charged from and
+the write. Just before the tool runs, the dispatcher reads each observed
+resource again. If it moved, the write does not happen. The call refuses as
+`limit_state_changed`, the lease's nonce is spent and its reservation is
+given back. A meter may also name `previous_field`, a field of the tool's
+result in which the controller reports the value it replaced. The movement
+from that value to where the plant ended up is charged, and anything beyond
+the reservation is logged as `dispatch.limit_charged_after_the_fact` and
+counts against later changes. Without such a report, a change in the last
+moment before the write is charged as reserved. Only a conditional write at
+the controller closes that window. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
-holds. A reservation is never returned, the ledger is per host, and a
-`change` meter tracks the values REMORA let through, not the plant.
+holds. A reservation is never returned and the ledger is per host. A
+`change` meter that is not observed tracks the values REMORA let through, not
+the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
 
 **Capability sets (WS8 Q8.2, opt-in):** with
