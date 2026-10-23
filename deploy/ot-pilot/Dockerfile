@@ -2,8 +2,8 @@
 #
 # Runs servers.api with REMORA_ENV=production, which means the fail-closed
 # prerequisites are real: without durable execution state, a durable envelope
-# store, a token table and a non-mock oracle backend the process refuses to
-# start. docker-compose.yml supplies all four.
+# store and a token table the process refuses to start. docker-compose.yml
+# supplies all three; the oracle surface is unmounted here, so it needs none.
 FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="REMORA OT Pilot API" \

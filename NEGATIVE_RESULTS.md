@@ -5854,8 +5854,8 @@ also part of the policy identity that ACCEPT tokens bind. Limit policies can
 be signed by the authority that sets them, and `REMORA_REQUIRE_LIMITS` makes
 signed limits with `all_writes` coverage mandatory, as the OT pilot now does.
 
-Limits: the ledger is SQLite on one host, and a reservation is never
-returned. The amount is the argument the deployment names, not what a rail
+Limits: the ledger is SQLite on one host. A reservation is given back only
+when the fence refused the write; otherwise it is never returned. The amount is the argument the deployment names, not what a rail
 settled. A change meter that is not observed tracks the values REMORA let
 through, not the plant, and an observed one is only as good as the observer.
 The sequence is public and was replayed by the author, so this shows the

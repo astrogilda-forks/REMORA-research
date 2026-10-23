@@ -40,7 +40,7 @@ a limit by a call.
 
 What this guarantees: on one host, the sum of reservations inside a window
 never passes the limit (one SQLite transaction per call). A reservation is
-never returned. A ``change`` meter's last value is the value REMORA last let
+returned only when the fence refused and the tool provably did not run. A ``change`` meter's last value is the value REMORA last let
 through; a call that fails or whose outcome is unknown leaves the resource
 ``unknown``, and the next change refuses until a baseline with a new
 ``seed_id`` is declared. It is not a distributed limit across hosts, and it

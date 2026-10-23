@@ -61,7 +61,7 @@ services:
     environment:
       REMORA_ENV: production
 
-      # --- Fail-closed prerequisites (all four are required) --------------
+      # --- Fail-closed prerequisites (all three are required) -------------
       # Durable execution state: tenant audit chain, review queue, and the
       # one-time-grant ledger. Without it a consumed grant is replayable.
       REMORA_PG_DSN: postgresql://remora:remora-local-pilot@postgres:5432/remora
@@ -113,6 +113,11 @@ services:
       # Prometheus scrape without a bearer token (local pilot only).
       REMORA_PROMETHEUS_PUBLIC: "1"
       PYTHONPATH: /app
+    # The limit ledger and the execution artifacts live under /var/lib/remora.
+    # Without a volume a recreate would empty the ledger, and every limit
+    # would start from zero. The Postgres service already persists the rest.
+    volumes:
+      - remora-state:/var/lib/remora
 
   # Operator console: live metrics, scenario buttons, one-click OT battery.
   # Holds the demo tokens because this is a local pilot — a real deployment
@@ -147,3 +152,4 @@ services:
 
 volumes:
   remora-evidence:
+  remora-state:

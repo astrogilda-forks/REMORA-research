@@ -125,7 +125,10 @@ or ESCALATE.
 the tool through `GovernedToolDispatcher`. Permission is welded to the exact call it
 was granted for: approval to run `{"motor": "M1", "mode": "read"}` cannot be reused for
 `{"motor": "*", "mode": "shutdown"}`: the arguments are re-hashed and re-checked in
-the instant before the tool runs, and the permission expires and is single-use. Tools
+the instant before the tool runs, and the permission expires and is single-use. Where
+a deployment declares cumulative limits (`REMORA_LIMITS_FILE`), the call's amount,
+count or movement is also reserved against them in that instant, so a running total
+cannot pass a limit by many small calls. Tools
 come **only** from deployment configuration (`REMORA_TOOL_REGISTRY_MODULE`), never from
 the request, so an agent cannot introduce a tool or the credentials behind it. With no
 registry configured, dispatch reports `executed: false` and nothing happens.

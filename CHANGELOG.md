@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Horizon Shield #55 row, parts 1 and 2 (#1024)
+
+- `integrations/horizon55/` reads the signed #51 set-2 records offline and gives ten claims per case; `enforce.py` replays the three payments and the signed budget through the execution API with a sandboxed tool. Without a declared limit all three run (21000 against 20000); with the budget declared, C is refused at assess and at dispatch. Retrospective and author-operated (`NEGATIVE_RESULTS.md` §97).
+
+### Cumulative limits reserved before dispatch (CAP-031, opt-in; #1025, #1033, #1037)
+
+- `REMORA_LIMITS_FILE` and `REMORA_LIMITS_LEDGER` declare `sum`, `count` and `change` meters per tool and limits per tenant, principal or resource, with optional sliding windows. The governed dispatcher reserves a metered call's amount in one SQLite transaction as its last check before the nonce is spent; a call that does not fit refuses (`limit_exceeded` and related codes) and `/v1/execution/assess` answers 409 first.
+- A `change` meter may be `observed`: `REMORA_LIMITS_OBSERVER_MODULE` reads the equipment, movement is measured from that value, the plant is read again just before the write (`limit_state_changed`) and read back after it.
+- Limit policies may be Ed25519-signed (`REMORA_LIMITS_TRUSTED_KEYS`, `scripts/sign_limit_policy.py`); the policy digest is part of the policy identity, an approval given under other limits refuses as `limits_changed`, a replaced policy file refuses every metered call until a restart (`limit_policy_changed`), and `REMORA_REQUIRE_LIMITS=1` makes signed `all_writes` limits mandatory. The OT pilot runs with it.
+
 ### WS1-M4 negative matrix through the route (M4.1c slice 5, tests only)
 
 - `tests/test_ws1_m4_fault_matrix.py` covers M4-T07, T08, T15 and T17 to T20 under atomic admission: a dropped response stays `UNKNOWN` and is never retried, a failing or lying monitor supplies no authority, a source or policy revised mid-lookup refuses, an altered or misdirected lease is refused by the executor, and a grant or lease replayed after a restart is refused by the durable ledgers. The ADR's matrix table records what each row covers and what stays open.
