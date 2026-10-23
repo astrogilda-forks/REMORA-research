@@ -88,6 +88,9 @@ class SignatureDomain(str, Enum):
     #: An effect receipt from a verifier domain (CAPR-06): what a read-only
     #: observer saw after a dispatch. REMORA computes the verdict from it.
     EFFECT_RECEIPT = "REMORA/EFFECT-RECEIPT/v1"
+    #: A cumulative-limit policy (remora.enforcement.cumulative_limits), signed
+    #: by the authority that sets the budgets; REMORA holds only the public key.
+    LIMIT_POLICY = "REMORA/LIMIT-POLICY/v1"
 
 
 class SigningUnavailable(RemoraError, RuntimeError):

@@ -243,6 +243,7 @@ def assess_proposal(
     token_audience: str,
     token_ttl_seconds: int,
     policy_bundle_hash: Callable[[], str] | None = None,
+    limits_policy_hash: Callable[[], str | None] | None = None,
     loop_safety: Any = None,
     capability_gate: Callable[[Any], dict[str, Any] | None] | None = None,
     semantic_shadow: Callable[[dict[str, Any]], None] | None = None,
@@ -403,6 +404,11 @@ def assess_proposal(
         "toolspec_hash": toolspec_identity["hash"],
         "toolspec_version": toolspec_identity["version"],
     }
+    bound_limits = limits_policy_hash() if limits_policy_hash is not None else None
+    if bound_limits:
+        # The limits this decision was made under; an approval of it is not
+        # executed under other limits, or none (limits_binding_refusal).
+        record["limits_policy_hash"] = bound_limits
     if task is not None:
         record["context_id"] = task.context_id
         record["task_id"] = task.task_id
@@ -684,6 +690,27 @@ def _acting_for(record: dict[str, Any] | None, executor: str) -> str:
     return ""
 
 
+LIMITS_CHANGED = "limits_changed"
+
+
+def limits_binding_refusal(chain: AuditChainPort, tenant: str, proposal_id: str,
+                           current: str | None) -> str | None:
+    """``limits_changed`` when the proposal was assessed under other limits, or None.
+
+    The assessment records the digest of the cumulative-limit policy in force
+    (``limits_policy_hash``). An approval must not be executed after those
+    limits were turned off, relaxed or replaced: it would then run under a
+    budget nobody approved it against. A proposal assessed with no limits
+    may run under limits enabled since, because the dispatcher enforces the
+    limits in force at dispatch.
+    """
+    record = _assessed_payload(chain, tenant, proposal_id)
+    bound = str((record or {}).get("limits_policy_hash") or "")
+    if bound and bound != (current or ""):
+        return LIMITS_CHANGED
+    return None
+
+
 def approved_context_refusal(
     chain: AuditChainPort,
     tenant: str,
@@ -762,6 +789,7 @@ def execute_approved_item(
     token_ttl_seconds: int,
     policy_coverage: Callable[[], dict[str, Any]] | None = None,
     policy_bundle_hash: Callable[[], str] | None = None,
+    limits_policy_hash: Callable[[], str | None] | None = None,
     async_dispatch: bool = False,
     transactional_append: TransactionalAppendPort | None = None,
     require_execution_context: bool = False,
@@ -853,6 +881,12 @@ def execute_approved_item(
     # be re-presented as another. Same placement, same non-consumption.
     context_refusal = context_refusal or proposal_envelope_refusal(
         chain, tenant, assessed_proposal_id, tool_call)
+    if context_refusal is None and limits_policy_hash is not None and limits_binding_refusal(
+            chain, tenant, assessed_proposal_id, limits_policy_hash()):
+        context_refusal = ApprovalContextRefused(
+            "this item was approved under cumulative limits that are no longer the "
+            "ones in force; it must be assessed and approved again",
+            reason=LIMITS_CHANGED)
     acting_for = _acting_for(
         _assessed_payload(chain, tenant, assessed_proposal_id), principal)
     ws1: Ws1OutcomePort | None = None
@@ -1440,6 +1474,7 @@ def dispatch_pending_intent(
     resolve_toolspec: Callable[[str, dict[str, Any], str], dict[str, Any]] | None = None,
     policy_coverage: Callable[[], dict[str, Any]] | None = None,
     policy_bundle_hash: Callable[[], str] | None = None,
+    limits_policy_hash: Callable[[], str | None] | None = None,
     rebuild_call: Callable[[dict[str, Any]], Any] | None = None,
     assessed_record: Callable[[str, str], tuple[str, str]] | None = None,
     require_execution_context: bool = False,
@@ -1673,6 +1708,9 @@ def dispatch_pending_intent(
                                "entry_hash": entry.entry_hash}
         return result
 
+    if refusal is None and limits_policy_hash is not None and limits_binding_refusal(
+            chain, tenant, proposal_id, limits_policy_hash()):
+        refusal, refusal_detail = LIMITS_CHANGED, {"limits_changed": True}
     if refusal is not None:
         return _refuse(refusal, refusal_detail)
 

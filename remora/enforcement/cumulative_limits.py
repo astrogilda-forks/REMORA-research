@@ -49,6 +49,7 @@ does not observe the plant or the payment rail.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import sqlite3
 import time
@@ -79,13 +80,64 @@ LEDGER_UNAVAILABLE = "limit_ledger_unavailable"
 OBSERVATION_UNAVAILABLE = "limit_observation_unavailable"
 STATE_CHANGED = "limit_state_changed"
 INVOCATION_DIFFERS = "limit_invocation_differs"
+POLICY_CHANGED = "limit_policy_changed"
 
 KINDS = ("sum", "count", "change")
 COVERAGES = ("listed", "all_writes")
 
 
+SIGNED_SCHEMA = "remora-cumulative-limits-signed/v1"
+
+
 class LimitPolicyError(ValueError):
     """The declared policy is malformed; the deployment must not start."""
+
+
+def canonical_policy_bytes(policy: Mapping[str, Any]) -> bytes:
+    """The bytes a limit-policy signature covers."""
+    return json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
+
+
+def sign_policy(policy: Mapping[str, Any], key: Any, signed_at: str) -> dict[str, Any]:
+    """Wrap ``policy`` in a signed envelope. Offline signer helper, not runtime.
+
+    ``key`` is a ``remora.crypto.SigningKey`` bound to the LIMIT_POLICY domain:
+    the authority that sets the budgets signs, and REMORA verifies with its
+    public key, so a REMORA host cannot write itself a larger budget.
+
+    The signature covers ``policy`` only. ``signed_at`` is unsigned metadata
+    for the operator: anyone who can write the file can change it, and
+    nothing REMORA decides reads it. The policy identity a grant binds is the
+    digest of the whole file, so a changed ``signed_at`` still changes it.
+    """
+    from remora.crypto import SignatureDomain, sign
+
+    signature = sign(SignatureDomain.LIMIT_POLICY, canonical_policy_bytes(policy), key)
+    return {"schema": SIGNED_SCHEMA, "policy": dict(policy), "signed_at": signed_at,
+            "signature": signature.to_dict()}
+
+
+def verify_signed_policy(document: Any, keys: Any) -> tuple[dict[str, Any], str]:
+    """The policy and the signer's key id, or ``LimitPolicyError`` with the reason.
+
+    ``keys`` are ``remora.crypto.VerificationKey`` objects for the domain.
+    ``signed_at`` is not verified and not returned (see :func:`sign_policy`).
+    """
+    from remora.crypto import Signature, SignatureDomain, verify
+
+    if not isinstance(document, Mapping) or document.get("schema") != SIGNED_SCHEMA:
+        raise LimitPolicyError(f"limit policy is not a signed {SIGNED_SCHEMA!r} envelope")
+    policy, raw_signature = document.get("policy"), document.get("signature")
+    if not isinstance(policy, Mapping) or not isinstance(raw_signature, Mapping):
+        raise LimitPolicyError("signed limit policy needs a policy and a signature")
+    # A malformed block reads as empty fields, and verify refuses those.
+    signature = Signature.from_dict(raw_signature)
+    result = verify(SignatureDomain.LIMIT_POLICY, canonical_policy_bytes(policy), signature,
+                    list(keys))
+    if not result.ok:
+        raise LimitPolicyError(f"limit policy signature refused: {result.reason}")
+    return dict(policy), result.kid
 
 
 class _Refused(Exception):
@@ -458,13 +510,35 @@ class LimitGuard:
 
     def __init__(self, policy: LimitPolicy, ledger: LimitLedger,
                  is_write: Callable[[str], bool | None] | None = None,
-                 observer: Callable[[str, str, str], Any] | None = None) -> None:
+                 observer: Callable[[str, str, str], Any] | None = None,
+                 in_force: Callable[[], bool] | None = None) -> None:
+        """``in_force`` answers whether ``policy`` is still the one deployed.
+
+        The deployment builds the guard once, from the policy it verified at
+        startup, while a grant binds the digest of the policy file it reads
+        at that moment. When the two part (the file replaced on the same path
+        by a smaller budget, a larger one, or one whose signature does not
+        verify), every call refuses with ``limit_policy_changed`` until a
+        restart verifies the new policy: neither budget is enforced for a
+        grant bound to the other. Reservations already made are still
+        released and settled, so the ledger stays exact. A failing check
+        counts as changed.
+        """
         if policy.observed_quantities and observer is None:
             raise LimitPolicyError("observed change meters need an observer")
         self.policy = policy
         self.ledger = ledger
         self.is_write = is_write
         self.observer = observer
+        self.in_force = in_force
+
+    def _changed(self) -> bool:
+        if self.in_force is None:
+            return False
+        try:
+            return not self.in_force()
+        except Exception:
+            return True
 
     def _observe(self, tenant: str, quantity: str, resource: str, scale: int) -> Decimal | None:
         """The observed value, scaled; None when it cannot be read as a finite number."""
@@ -481,6 +555,8 @@ class LimitGuard:
         return Decimal(str(raw)) * scale
 
     def governs(self, tool_name: str) -> bool:
+        if self._changed():
+            return True  # the deployed policy may meter it; refuse rather than guess
         return tool_name in self.policy.meters or self.policy.coverage == "all_writes"
 
     def _coverage_refusal(self, tool_name: str) -> str | None:
@@ -595,6 +671,8 @@ class LimitGuard:
     def _run(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
              operation_id: str, request_hash: str, now: str | float | None,
              write: bool) -> str | None:
+        if self._changed():
+            return POLICY_CHANGED
         refusal = self._coverage_refusal(tool_name)
         if refusal is not None:
             return refusal
@@ -660,6 +738,8 @@ class LimitGuard:
 
     def compare(self, tool_name: str, wire: Any, invocation: Any) -> str | None:
         """Refuse a resolved invocation that would meter differently from the wire form."""
+        if self._changed():
+            return POLICY_CHANGED
         if tool_name not in self.policy.meters:
             return None
         try:
@@ -680,6 +760,8 @@ class LimitGuard:
         narrows the window between reading the plant and writing to it; it
         cannot close it. Only a conditional write at the controller can.
         """
+        if self._changed():
+            return POLICY_CHANGED
         for value_key, seen, _ in self.ledger.observations(operation_id):
             tenant, quantity, resource = value_key.split("\x1f")
             now_seen = self._observe(tenant, quantity, resource, self._scale_of(quantity))

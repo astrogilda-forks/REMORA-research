@@ -119,6 +119,30 @@ def test_a_limit_added_after_a_reservation_refuses_its_retry(tmp_path):
     assert reserve(second, "pay", "A", amount=7000, cur="JPY") == cl.CHANGED
 
 
+@pytest.mark.parametrize("answer", ["moved", "raises"])
+def test_a_guard_whose_policy_is_no_longer_in_force_refuses(tmp_path, answer):
+    state = {"in_force": True}
+
+    def in_force():
+        if not state["in_force"] and answer == "raises":
+            raise OSError("policy file unreadable")
+        return state["in_force"]
+
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "l.db"), in_force=in_force)
+    assert reserve(guard, "pay", "A", amount=7000, cur="JPY") is None
+    state["in_force"] = False
+    assert guard.governs("unmetered")
+    assert reserve(guard, "pay", "B", amount=1, cur="JPY") == cl.POLICY_CHANGED
+    assert guard.preview(tenant="t", principal="p", tool_name="pay",
+                         arguments={"amount": 1, "cur": "JPY"}) == cl.POLICY_CHANGED
+    assert guard.fence("A") == cl.POLICY_CHANGED
+    assert guard.compare("pay", {"amount": 1, "cur": "JPY"},
+                         {"amount": 1, "cur": "JPY"}) == cl.POLICY_CHANGED
+    guard.release("A")           # what was reserved is still released, not stranded
+    state["in_force"] = True
+    assert reserve(guard, "pay", "C", amount=20000, cur="JPY") is None
+
+
 def test_movement_is_measured_from_the_last_value(guard):
     assert reserve(guard, "move", "1", unit="AHU-1", value=20.0) is None
     settle(guard, "1")
@@ -504,3 +528,21 @@ def test_after_the_fact_charges_only_the_moved_quantity(tmp_path):
     guard.settle("1", ok=True, result={"previous": 17.0})
     after = [(k.split("\x1f")[0], a) for k, a in guard.ledger.charges("1#after")]
     assert after == [("seen", 20)]
+
+
+def test_a_signed_policy_verifies_only_as_signed():
+    from remora.crypto import SignatureDomain, SigningKey
+
+    key = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+    body = {"schema": cl.SCHEMA, "meters": METERS, "limits": LIMITS}
+    document = cl.sign_policy(body, key, "2026-10-23T00:00:00Z")
+    policy_out, kid = cl.verify_signed_policy(document, [key.verification_key()])
+    assert policy_out == body and kid == key.kid
+    other = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+    with pytest.raises(cl.LimitPolicyError, match="unknown_kid"):
+        cl.verify_signed_policy(document, [other.verification_key()])
+    for broken in (body, {"schema": cl.SIGNED_SCHEMA},
+                   {"schema": cl.SIGNED_SCHEMA, "policy": body, "signature": {"x": 1}},
+                   dict(document, policy=dict(body, coverage="all_writes"))):
+        with pytest.raises(cl.LimitPolicyError):
+            cl.verify_signed_policy(broken, [key.verification_key()])
