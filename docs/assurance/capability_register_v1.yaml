@@ -210,8 +210,9 @@ capabilities:
       - remora/enforcement/gate.py
       - tests/test_token_hardening.py
       - servers/execution_api.py
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -348,8 +349,9 @@ capabilities:
   - id: CAP-004
     name: "Tool-call payload binding (canonical hash, recomputed before execution)"
     status: WIRED_API_PATH
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -430,8 +432,9 @@ capabilities:
   - id: CAP-005
     name: "Audit chain (hash-chained decision history)"
     status: PERSISTED_ATOMIC
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -529,8 +532,9 @@ capabilities:
   - id: CAP-007
     name: "Review queue with TTL-to-ABSTAIN and approval freshness re-gate"
     status: WIRED_API_PATH
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -727,8 +731,9 @@ capabilities:
       - tests/test_effect_receipt_atomicity.py
       - tests/test_effect_record_endpoint.py
       - docs/deployment/authority-custody-evidence.md
-    verified_at_sha: ebfcc02f6f477a5c9c2c276dcfb77a0f9bc336ac
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1019,8 +1024,9 @@ capabilities:
   - id: CAP-018
     name: "Task-bound authority and non-decaying loop safety on the execution API"
     status: WIRED_API_PATH
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -1111,8 +1117,9 @@ capabilities:
   - id: CAP-019
     name: "Evidence coverage verdicts on the evidence export"
     status: WIRED_API_PATH
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -1186,8 +1193,9 @@ capabilities:
   - id: CAP-020
     name: "Pre-dispatch premise checks: resolved effect, plan premises, procedure obligations"
     status: WIRED_API_PATH
-    verified_at_sha: ebfcc02f6f477a5c9c2c276dcfb77a0f9bc336ac
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1276,8 +1284,9 @@ capabilities:
   - id: CAP-021
     name: "Independent recorder: evidence captured outside the executing process"
     status: WIRED_API_PATH
-    verified_at_sha: ebfcc02f6f477a5c9c2c276dcfb77a0f9bc336ac
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1407,8 +1416,9 @@ capabilities:
   - id: CAP-023
     name: "Capability minimization: task-scoped capability sets enforced at assess, execution and dispatch"
     status: WIRED_API_PATH
-    verified_at_sha: ebfcc02f6f477a5c9c2c276dcfb77a0f9bc336ac
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1514,8 +1524,9 @@ capabilities:
   - id: CAP-024
     name: "Capability mediation for implementation effects, with an effect domain for strict deployments (NTA-2 phases 1 to 3)"
     status: WIRED_API_PATH
-    verified_at_sha: ebfcc02f6f477a5c9c2c276dcfb77a0f9bc336ac
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1834,8 +1845,9 @@ capabilities:
   - id: CAP-030
     name: "WS1 execution preconditions and monitor composition on the execution API (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: 7702ed73b3e6b88f69bad6601135bc8906ee304b
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
@@ -1919,8 +1931,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: ebfcc02f6f477a5c9c2c276dcfb77a0f9bc336ac
+    verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
