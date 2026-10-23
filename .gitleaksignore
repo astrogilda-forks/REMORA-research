@@ -19,3 +19,11 @@
 # with a live-key prefix on purpose, so it is not quoted here. The scheduled
 # full-history scan has failed on it since 2026-10-19.
 d3d690ebbdfb8b689e8ee4dd4ecba72bb069699b:scripts/execution_chain_attack_eval.py:generic-api-key:96
+
+# deploy/ot-pilot/docker-compose.yml at f5f33630, line 111:
+# REMORA_LIMITS_TRUSTED_KEYS, the Ed25519 PUBLIC verification key of the OT
+# pilot's limit authority. It verifies the signature on
+# deploy/ot-pilot/limits.json (kid ed25519-79ffe2c9...); the private half is
+# not in the repository. The generic-api-key rule reads "..._KEYS: <hex>" as a
+# key and its value.
+f5f3363090becd74f64e399d37b099370c336967:deploy/ot-pilot/docker-compose.yml:generic-api-key:111

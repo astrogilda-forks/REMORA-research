@@ -755,6 +755,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             resolve_toolspec=_resolve_toolspec_unwrapped,
             policy_coverage=_policy_coverage,
             policy_bundle_hash=_current_policy_bundle_hash,
+            limits_policy_hash=_limits_policy_hash,
             rebuild_call=_rebuild_tool_call,
             assessed_record=_assessed_record,
             require_execution_context=context_required(),
@@ -1091,8 +1092,8 @@ def _ws1_gate() -> Any:
     return _WS1_GATE
 
 
-#: The guard and the (policy file, ledger) pair it was built from.
-_LIMIT_GUARD: tuple[tuple[str, str], Any] | None = None
+#: The guard and the limit settings it was built from (_limit_settings).
+_LIMIT_GUARD: tuple[tuple[str, str, str, bool], Any] | None = None
 
 
 def _tool_is_write(tool_name: str) -> bool | None:
@@ -1133,13 +1134,16 @@ def _limit_guard() -> Any:
     does not apply would read as one that holds.
     """
     global _LIMIT_GUARD
-    path = _os.environ.get("REMORA_LIMITS_FILE", "").strip()
-    ledger = _os.environ.get("REMORA_LIMITS_LEDGER", "").strip()
+    settings = _limit_settings()
+    path, ledger, _keys, required = settings
     if not path and not ledger:
+        if required:
+            raise ValueError("REMORA_REQUIRE_LIMITS is set and no cumulative limits are "
+                             "configured (REMORA_LIMITS_FILE, REMORA_LIMITS_LEDGER)")
         return None
     if not path or not ledger:
         raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
-    if _LIMIT_GUARD is None or _LIMIT_GUARD[0] != (path, ledger):
+    if _LIMIT_GUARD is None or _LIMIT_GUARD[0] != settings:
         import yaml
 
         from remora.enforcement.cumulative_limits import (
@@ -1148,11 +1152,100 @@ def _limit_guard() -> Any:
             LimitPolicy,
         )
 
-        with open(path, encoding="utf-8") as handle:
-            policy = LimitPolicy.from_dict(yaml.safe_load(handle))
-        _LIMIT_GUARD = ((path, ledger),
-                        LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write))
+        # One read: the bytes digested are the bytes verified and enforced.
+        with open(path, "rb") as handle:
+            raw = handle.read()
+        digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+        policy = LimitPolicy.from_dict(_verified_limit_policy(yaml.safe_load(raw), required))
+        if required and policy.coverage != "all_writes":
+            raise ValueError("REMORA_REQUIRE_LIMITS needs coverage all_writes: a write tool "
+                             "the policy does not meter must not run")
+        _LIMIT_GUARD = (settings,
+                        LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write,
+                                   observer=_limit_observer(),
+                                   in_force=lambda: _limit_policy_in_force(settings, digest)))
     return _LIMIT_GUARD[1]
+
+
+def _limit_settings() -> tuple[str, str, str, bool]:
+    """(policy file, ledger, trusted keys, required): what a limit guard is built from."""
+    return (_os.environ.get("REMORA_LIMITS_FILE", "").strip(),
+            _os.environ.get("REMORA_LIMITS_LEDGER", "").strip(),
+            _os.environ.get("REMORA_LIMITS_TRUSTED_KEYS", "").strip(),
+            _os.environ.get("REMORA_REQUIRE_LIMITS", "").strip().lower() in {
+                "1", "true", "yes", "on"})
+
+
+def _limit_policy_in_force(settings: tuple[str, str, str, bool], digest: str) -> bool:
+    """Whether the guard built from ``settings`` and ``digest`` is still the deployed one.
+
+    The policy identity a grant binds (``limits_policy_hash``) is the digest
+    of the file at ``REMORA_LIMITS_FILE`` read now, so this reads it the same
+    way. The dispatcher keeps the guard it was given; when the file or the
+    settings have moved, that guard refuses every call instead of enforcing
+    a policy no grant names.
+    """
+    from pathlib import Path
+
+    from servers import api as api_mod
+
+    return (_limit_settings() == settings
+            and api_mod._sha256_file(Path(settings[0])) == digest)
+
+
+def _verified_limit_policy(document: Any, required: bool) -> Any:
+    """The limit policy to enforce, verified when a signer is trusted.
+
+    ``REMORA_LIMITS_TRUSTED_KEYS`` lists the Ed25519 public keys (hex or
+    base64, comma-separated) of the authority that sets the budgets. With
+    them, the file must be a signed envelope by one of those keys. Without
+    them, a signed envelope refuses (it cannot be checked) and a plain policy
+    is accepted only when ``REMORA_REQUIRE_LIMITS`` is off.
+    """
+    from remora.crypto import SignatureDomain, VerificationKey
+    from remora.enforcement.cumulative_limits import SIGNED_SCHEMA, verify_signed_policy
+
+    raw_keys = [k for k in _os.environ.get("REMORA_LIMITS_TRUSTED_KEYS", "").split(",")
+                if k.strip()]
+    signed = isinstance(document, dict) and document.get("schema") == SIGNED_SCHEMA
+    if not raw_keys:
+        if required:
+            raise ValueError("REMORA_REQUIRE_LIMITS needs REMORA_LIMITS_TRUSTED_KEYS: the "
+                             "limits must be signed by the authority that sets them")
+        if signed:
+            raise ValueError("the limit policy is signed and REMORA_LIMITS_TRUSTED_KEYS is "
+                             "unset, so its signature cannot be checked")
+        return document
+    keys = [VerificationKey.from_text(k, {SignatureDomain.LIMIT_POLICY}) for k in raw_keys]
+    policy, _kid = verify_signed_policy(document, keys)
+    return policy
+
+
+def _limits_policy_hash() -> str | None:
+    """The digest of the cumulative-limit policy in force, or None without one."""
+    from servers import api as api_mod
+
+    return api_mod._policy_component_hashes().get("limits_policy_hash")
+
+
+def _limit_observer() -> Any:
+    """The deployment's reader of actual equipment values, or None.
+
+    ``REMORA_LIMITS_OBSERVER_MODULE`` names a module exposing
+    ``observe_limit_value(tenant, quantity, resource)``, which returns the
+    value the equipment reports now (a number) or raises. A policy with
+    ``observed`` change meters and no observer refuses at startup.
+    """
+    spec = _os.environ.get("REMORA_LIMITS_OBSERVER_MODULE", "").strip()
+    if not spec:
+        return None
+    import importlib
+
+    observe = getattr(importlib.import_module(spec), "observe_limit_value", None)
+    if not callable(observe):
+        raise ValueError(f"{spec} does not expose observe_limit_value(tenant, quantity, "
+                         "resource)")
+    return observe
 
 
 def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
@@ -1222,7 +1315,7 @@ def _admission() -> Any:
             epochs=AuthorityEpochs(dsn=dsn, db_path=db_path,
                                    connection_provider=_ACTIVE_TX_CONNECTION.get),
             dialect="postgres" if dsn else "sqlite", max_clock_skew_ms=skew,
-            revocations=_revocation_store())
+            revocations=_revocation_store(), drain=drain_audit_outbox)
         _ADMISSION_KEY = key
     return _ADMISSION
 
@@ -2383,6 +2476,7 @@ def _assess_proposal_with_loop_state(
         token_audience=PEP_AUDIENCE,
         token_ttl_seconds=EXECUTION_TOKEN_TTL_SECONDS,
         policy_bundle_hash=_current_policy_bundle_hash,
+        limits_policy_hash=_limits_policy_hash,
         loop_safety=_loop_safety_monitor(),
         capability_gate=(lambda proposal: _capability_block(proposal, principal, tenant))
         if _capability_resolver() is not None else None,
@@ -2883,6 +2977,7 @@ def _dispatch_under_lease(
     capability_set: Any = None,
     report_lease: bool = False,
     flow_expected: tuple[int, str] | None = None,
+    not_after: datetime | None = None,
 ) -> dict[str, Any]:
     """Governed dispatch (see remora.execution.dispatch); binds this module's
     dispatcher and current policy bundle hash. Shared by /execute,
@@ -2977,6 +3072,7 @@ def _dispatch_under_lease(
             invocation_arguments=(
                 resolved_arguments if resolved_arguments not in (None, tool_call.arguments)
                 else None),
+            not_after=not_after,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):
@@ -3043,6 +3139,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             token_ttl_seconds=EXECUTION_TOKEN_TTL_SECONDS,
             policy_coverage=_policy_coverage,
             policy_bundle_hash=_current_policy_bundle_hash,
+            limits_policy_hash=_limits_policy_hash,
             async_dispatch=async_mode,
             transactional_append=chain_append_transactional,
             require_execution_context=context_required(),

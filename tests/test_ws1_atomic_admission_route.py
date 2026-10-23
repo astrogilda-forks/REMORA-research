@@ -266,3 +266,156 @@ def test_the_authority_route_refuses_without_atomic_admission(client, monkeypatc
     monkeypatch.delenv("REMORA_WS1_ADMISSION", raising=False)
     r = client.post("/v1/execution/revoke-authority", json={"subject_key": SOURCE})
     assert r.status_code == 409
+
+
+# ── the admission's audit row (M4-T12) ───────────────────────────────────────
+
+
+def _joined(authorized: dict) -> dict:
+    """The execution_admitted entry an execution_authorized one names, which
+    the drain after commit put on the chain before it."""
+    names = [e.payload.get("event") for e in _mod()._CHAIN.entries("acme")]
+    [admitted] = [e for e in _events("execution_admitted")
+                  if authorized["admission"]["audit_key"].endswith(e["grant_jti"])]
+    assert names.index("execution_admitted") < names.index("execution_authorized")
+    assert admitted["grant_jti"] == authorized["grant_jti"]
+    return admitted
+
+
+def test_m4_t12_each_path_commits_its_admission_record_with_the_spend(client, monkeypatch):
+    gate = _install(monkeypatch, "enforce")
+    assert _try(client, _mint(gate))[2] is True
+    admitted = _joined(_events("execution_authorized")[-1])
+    assert admitted["admission"]["mode"] == "atomic" and admitted["outbox_id"]
+
+
+def test_m4_t12_the_review_path_commits_its_admission_record(client, monkeypatch):
+    assert _execute(client, _approved(client, monkeypatch))["tool_execution"]["executed"]
+    assert _joined(_events("execution_authorized")[-1])["item_id"]
+
+
+def test_m4_t12_the_worker_commits_its_admission_record(client, monkeypatch):
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    _execute(client, _approved(client, monkeypatch))
+    _mod().dispatch_pending_intents("acme", worker_id="w-1")
+    assert _joined(_events("execution_authorized")[-1])["executed_by"] == "w-1"
+
+
+def test_m4_t12_an_audit_outbox_failure_refuses_unspent(client, monkeypatch):
+    gate = _install(monkeypatch, "enforce")
+    token = _mint(gate)
+    real = admission_mod.audit_outbox.enqueue
+
+    def down(*args, **kwargs):
+        raise RuntimeError("audit outbox insert failed")
+
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", down)
+    assert _try(client, token) == (409, "audit_outbox_unavailable", False)
+    assert not _events("execution_authorized") and not _events("execution_admitted")
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", real)
+    assert _try(client, token)[2] is True
+
+
+# ── the permit before the send (INV-M4-03, M4-T14, M4-T16) ───────────────────
+
+
+def _between_commit_and_permit(monkeypatch, act):
+    """Run *act* after admission committed and before the permit check."""
+    admission = _mod()._admission()
+    real = admission.permit
+
+    def late(tenant, **kwargs):
+        act(admission)
+        return real(tenant, **kwargs)
+
+    monkeypatch.setattr(admission, "permit", late)
+
+
+def _lapse(monkeypatch):
+    def act(admission):
+        real = admission_mod.db_now_ms
+        monkeypatch.setattr(admission_mod, "db_now_ms",
+                            lambda conn, dialect: real(conn, dialect) + 120_000)
+    return act
+
+
+def _revoke(admission):
+    admission.advance_authority("acme", SOURCE, revoked=True)
+
+
+def test_m4_t14_the_lease_ends_when_the_evidence_does(client, monkeypatch):
+    from datetime import datetime
+
+    gate = _install(monkeypatch, "enforce")
+    r = _redeem(client, _mint(gate))
+    execution = r.json()["tool_execution"]
+    assert execution["executed"] is True
+    permit = execution["permit"]
+    assert (permit["validity"], permit["at_effect"]) == (
+        "AUTHORIZED_AT_COMMIT", "NOT_ESTABLISHED")
+    result = _events("execution_result")[-1]
+    assert result["permit"] == permit
+    expires = datetime.fromisoformat(result["lease"]["expires_at"])
+    assert expires.timestamp() * 1000 <= permit["not_after_ms"]
+
+
+@pytest.mark.parametrize("cause,reason", [("lapse", "evidence_expired_at_admission"),
+                                          ("revocation", "authority_revoked")])
+def test_m4_t14_t16_a_change_after_commit_refuses_before_the_send(
+        client, monkeypatch, cause, reason):
+    gate = _install(monkeypatch, "enforce")
+    token = _mint(gate)
+    sent: list[str] = []
+    real_impl = _mod()._dispatch_under_lease_impl
+    monkeypatch.setattr(_mod(), "_dispatch_under_lease_impl",
+                        lambda **kw: sent.append(kw["tool_call"].tool_name) or real_impl(**kw))
+    _between_commit_and_permit(monkeypatch, _lapse(monkeypatch) if cause == "lapse" else _revoke)
+    r = _redeem(client, token)
+    execution = r.json()["tool_execution"]
+    assert (execution["executed"], execution["refusal_reason"], execution["permit_refusal"]) == (
+        False, "permit_refused", reason)
+    assert sent == []
+    result = _events("execution_result")[-1]
+    assert (result["tool_executed"], result["tool_refusal_reason"]) == (False, "permit_refused")
+    # The grant was spent at admission: a permit refusal is not a retry.
+    grant = _mod().PolicyDecisionToken.from_dict(token)
+    assert _mod()._GATE.check(grant, consume=False).reason == "token_already_consumed"
+
+
+def test_m4_t16_a_revocation_during_the_send_is_not_called_safe_at_effect(client, monkeypatch):
+    """Revoked after the permit, while the call is out: this deployment's
+    executor does not check again, so the call runs and the record says the
+    effect-time authority is NOT_ESTABLISHED."""
+    gate = _install(monkeypatch, "enforce")
+    real_impl = _mod()._dispatch_under_lease_impl
+
+    def revoke_mid_send(**kw):
+        _revoke(_mod()._admission())
+        return real_impl(**kw)
+
+    monkeypatch.setattr(_mod(), "_dispatch_under_lease_impl", revoke_mid_send)
+    execution = _redeem(client, _mint(gate)).json()["tool_execution"]
+    assert execution["executed"] is True
+    assert execution["permit"]["at_effect"] == "NOT_ESTABLISHED"
+    assert "refusal" not in execution["permit"]
+    assert _events("execution_result")[-1]["permit"]["at_effect"] == "NOT_ESTABLISHED"
+
+
+def test_m4_t16_the_review_path_refuses_a_revocation_before_the_send(client, monkeypatch):
+    item_id = _approved(client, monkeypatch)
+    _between_commit_and_permit(monkeypatch, _revoke)
+    execution = _execute(client, item_id)["tool_execution"]
+    assert (execution["executed"], execution["permit_refusal"]) == (False, "authority_revoked")
+    assert _events("execution_authorized")  # admitted, then refused before the send
+    assert _row_state(item_id) == {"REFUSED"}
+
+
+def test_m4_t16_the_worker_refuses_a_revocation_before_the_send(client, monkeypatch):
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    item_id = _approved(client, monkeypatch)
+    _execute(client, item_id)
+    _between_commit_and_permit(monkeypatch, _revoke)
+    [result] = _mod().dispatch_pending_intents("acme", worker_id="w-1")
+    assert result["tool_execution"]["permit_refusal"] == "authority_revoked"
+    assert _row_state(item_id) == {"REFUSED"}
+    assert _mod().dispatch_pending_intents("acme", worker_id="w-2") == []

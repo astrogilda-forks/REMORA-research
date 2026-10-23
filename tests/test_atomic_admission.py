@@ -532,3 +532,202 @@ def test_an_epoch_change_and_its_record_commit_together(rig):
     with pytest.raises(RuntimeError):
         rig.admission.advance_authority(T, SUBJECT, revoked=False, record=crash)
     assert rig.admission.pin_epochs(T)([SUBJECT]) == {SUBJECT: 1}
+
+
+# ── the audit row in the transaction (M4-T12) ────────────────────────────────
+
+
+def _audit(token) -> dict[str, Any]:
+    return {"proposal_id": token.request_id, "actor": "agent-1", "grant_jti": token.jti}
+
+
+def _pending_audit(rig) -> list[tuple[str, str, dict[str, Any]]]:
+    from remora.governance import audit_outbox
+
+    with rig.tx():
+        return audit_outbox.pending(rig.var.get(), tenant=T)
+
+
+def _admit_audited(rig, token):
+    return rig.admission.admit(
+        T, ws1=_ws1(), audit=_audit(token),
+        consume=lambda conn, now: rig.gate.check(
+            token, OBS, consume=True, now=now, connection=conn),
+        record_intent=lambda: record_dispatch_intent(
+            rig.outbox, rig.var.get(), proposal_id=token.request_id, tenant=T,
+            item_id=f"accept:{token.jti}", tool_name="read_telemetry",
+            tool_call_hash="h" * 64, grant_jti=token.jti))
+
+
+def test_m4_t12_the_admission_enqueues_its_audit_row_before_commit(rig):
+    token = _token()
+    admitted = _admit_audited(rig, token)
+    [(key, tenant, payload)] = _pending_audit(rig)
+    assert (key, tenant) == (admitted.audit_key, T)
+    assert payload["event"] == "execution_admitted"
+    assert payload["grant_jti"] == token.jti
+    assert payload["outbox_id"] == admitted.intent.outbox_id
+    assert payload["admission"]["authority_epochs"] == {SUBJECT: {"epoch": 0, "revoked": False}}
+    assert admitted.audit_block()["audit_key"] == key
+
+
+def test_m4_t12_an_audit_outbox_failure_rolls_the_whole_admission_back(rig, monkeypatch):
+    def down(*args, **kwargs):
+        raise RuntimeError("audit outbox insert failed")
+
+    real = admission_mod.audit_outbox.enqueue
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", down)
+    token = _token()
+    with pytest.raises(AdmissionRefused) as caught:
+        _admit_audited(rig, token)
+    assert caught.value.reason == "audit_outbox_unavailable"
+    assert not rig.spent(token) and rig.intents(token) == 0
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", real)
+    assert _pending_audit(rig) == []
+    _admit_audited(rig, token)  # nothing was spent: the retry admits
+    assert rig.spent(token) and rig.intents(token) == 1
+
+
+def test_m4_t12_an_audit_failure_on_a_claim_releases_the_claim(rig, monkeypatch):
+    row, token = _pending_row(rig), _token()
+
+    def down(*args, **kwargs):
+        raise RuntimeError("audit outbox insert failed")
+
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", down)
+    with pytest.raises(AdmissionRefused):
+        rig.admission.admit(
+            T, ws1=_ws1(), audit=_audit(token),
+            claim=lambda conn: rig.outbox.claim_enlisted(conn, row.outbox_id, worker_id="w-1"),
+            consume=lambda conn, now: rig.gate.check(
+                token, OBS, consume=True, now=now, connection=conn))
+    assert rig.outbox.get(row.outbox_id).state.value == "DISPATCH_PENDING"
+    assert not rig.spent(token)
+
+
+def test_an_unkeyed_audit_record_refuses_unspent(rig):
+    token = _token()
+    with pytest.raises(AdmissionRefused) as caught:
+        rig.admission.admit(T, ws1=_ws1(), audit={"actor": "agent-1"},
+                            consume=lambda conn, now: rig.gate.check(
+                                token, OBS, consume=True, now=now, connection=conn))
+    assert caught.value.reason == "admission_audit_unkeyed"
+    assert not rig.spent(token)
+
+
+def test_a_failed_drain_leaves_the_committed_row_for_the_next_one(rig):
+    calls: list[str] = []
+
+    def drain(tenant):
+        calls.append(tenant)
+        raise RuntimeError("chain unreachable")
+
+    rig.admission._drain = drain
+    token = _token()
+    admitted = _admit_audited(rig, token)  # committed despite the drain
+    assert calls == [T] and rig.spent(token)
+    assert [k for k, _, _ in _pending_audit(rig)] == [admitted.audit_key]
+
+
+# ── the permit before the send (INV-M4-03, M4-T14, M4-T16) ───────────────────
+
+
+def test_a_permit_after_admission_bounds_the_lease_by_the_evidence(rig):
+    token, ws1 = _token(), _ws1()
+    rig.admit(token, ws1)
+    permit = rig.admission.permit(T, ws1=ws1, principals=("agent-1",))
+    assert permit.refusal is None
+    assert permit.not_after_ms == ws1.evidence_valid_until_ms - 2 * 5_000
+    assert permit.audit_block()["at_effect"] == "NOT_ESTABLISHED"
+
+
+def test_m4_t14_evidence_lapsing_after_commit_refuses_the_permit(rig, monkeypatch):
+    token, ws1 = _token(), _ws1()
+    rig.admit(token, ws1)
+    real = admission_mod.db_now_ms
+    monkeypatch.setattr(admission_mod, "db_now_ms",
+                        lambda conn, dialect: real(conn, dialect) + 120_000)
+    assert rig.admission.permit(T, ws1=ws1).refusal == "evidence_expired_at_admission"
+
+
+def test_m4_t14_evidence_too_close_to_expiry_for_the_executor_refuses(rig):
+    """Admitted with the skew to spare, but the lease would have to end the
+    skew earlier again for an executor clock running behind."""
+    token, ws1 = _token(), _ws1(valid_for_ms=8_000)
+    rig.admit(token, ws1)
+    assert rig.admission.permit(T, ws1=ws1).refusal == "evidence_expires_before_dispatch"
+
+
+def test_m4_t16_a_source_revoked_after_commit_refuses_the_permit(rig):
+    token, ws1 = _token(), _ws1()
+    rig.admit(token, ws1)
+    rig.admission.advance_authority(T, SUBJECT, revoked=True)
+    assert rig.admission.permit(T, ws1=ws1).refusal == "authority_revoked"
+
+
+def test_m4_t16_a_principal_revoked_after_commit_refuses_the_permit(rig):
+    token, ws1 = _token(), _ws1()
+    rig.admit(token, ws1)
+    with rig.tx():
+        rig.admission._revocations.revoke("agent-1", tenant_id=T)
+    assert rig.admission.permit(T, ws1=ws1, principals=("agent-1",)).refusal == (
+        "principal_revoked")
+
+
+def test_an_unreachable_epoch_store_refuses_the_permit(rig, monkeypatch):
+    def down(*args, **kwargs):
+        raise AuthorityEpochsUnavailable("down")
+
+    monkeypatch.setattr(rig.epochs, "read", down)
+    assert rig.admission.permit(T, ws1=_ws1()).refusal == "authority_epochs_unavailable"
+
+
+def test_a_permit_writes_nothing(rig):
+    ws1 = _ws1()
+    before = rig.admission.pin_epochs(T)([SUBJECT])
+    assert rig.admission.permit(T, ws1=ws1).refusal is None
+    assert rig.admission.pin_epochs(T)([SUBJECT]) == before
+    assert _pending_audit(rig) == []
+
+
+def test_m4_t16_a_revocation_racing_the_permit_has_one_order(rig):
+    """The permit and the revocation take the same tenant lock: whichever
+    commits first, the other sees it, and nothing in between."""
+    ws1 = _ws1()
+    barrier = threading.Barrier(2)
+    seen: dict[str, Any] = {}
+
+    def permit():
+        barrier.wait(10)
+        seen["permit"] = rig.admission.permit(T, ws1=ws1).refusal
+
+    def revoke():
+        barrier.wait(10)
+        seen["epoch"] = rig.admission.advance_authority(T, SUBJECT, revoked=True)
+
+    threads = [threading.Thread(target=permit), threading.Thread(target=revoke)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert seen["epoch"] == 1
+    assert seen["permit"] in (None, "authority_revoked")
+    assert rig.admission.permit(T, ws1=ws1).refusal == "authority_revoked"
+
+
+def test_m4_t14_a_permit_past_its_bound_mints_no_lease():
+    from types import SimpleNamespace
+
+    from remora.execution.dispatch import dispatch_under_lease
+
+    class Dispatcher:
+        def dispatch(self, *args, **kwargs):
+            raise AssertionError("nothing may be sent past the permit's bound")
+
+    now = datetime.now(UTC)
+    result = dispatch_under_lease(
+        tenant=T, principal="agent-1", semantic={},
+        tool_call=SimpleNamespace(tool_name="read_telemetry", arguments={},
+                                  target_environment="prod"),
+        now=now, dispatcher=Dispatcher(), policy_bundle_hash="p", not_after=now)
+    assert result == {"executed": False, "refusal_reason": "permit_expired"}

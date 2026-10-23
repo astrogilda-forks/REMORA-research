@@ -95,10 +95,20 @@ services:
       # A check on one call cannot see that small setpoint moves or valve
       # strokes add up. These cap movement per loop and valve, alarm acks and
       # work orders per window, shared by every principal, and refuse any
-      # write tool without a meter (coverage all_writes). The ledger is SQLite
-      # on this one container; see NEGATIVE_RESULTS.md section 97.
+      # write tool without a meter (coverage all_writes). Setpoint and valve
+      # movement is measured from what the plant reports (the observer), not
+      # from what REMORA last allowed. The ledger is SQLite on this one
+      # container; see NEGATIVE_RESULTS.md section 97.
       REMORA_LIMITS_FILE: /app/limits.json
       REMORA_LIMITS_LEDGER: /var/lib/remora/limits-ledger.db
+      REMORA_LIMITS_OBSERVER_MODULE: ot_registry
+      # Limits are mandatory here: the API refuses to start without them,
+      # unsigned, or with coverage other than all_writes. limits.json is
+      # signed by the pilot's limit authority; this host holds only its
+      # public key. To change the limits, sign a new policy with your own key
+      # (scripts/sign_limit_policy.py) and replace the key below.
+      REMORA_REQUIRE_LIMITS: "1"
+      REMORA_LIMITS_TRUSTED_KEYS: e6195cd0d965e0ae3554152a45d578d56843a4f27fa60e413630c0a42e531a0d
 
       # Prometheus scrape without a bearer token (local pilot only).
       REMORA_PROMETHEUS_PUBLIC: "1"

@@ -366,6 +366,9 @@ class Ws1OutcomePort(Protocol):
     @property
     def receipt_subjects(self) -> tuple[str, ...]: ...
 
+    @property
+    def evidence_valid_until_ms(self) -> int | None: ...
+
     def admission_refusal(self, *, tenant_id: str, now_ms: int, max_clock_skew_ms: int,
                           epochs: Mapping[str, tuple[int, bool]]) -> str | None: ...
 
@@ -413,4 +416,9 @@ class AdmissionPort(Protocol):
         record_intent: Callable[[], Any] | None = None,
         claim: Callable[[Any], Any] | None = None,
         principals: Sequence[str] = (),
+        audit: Mapping[str, Any] | None = None,
+    ) -> Any: ...
+
+    def permit(
+        self, tenant: str, *, ws1: Ws1OutcomePort | None, principals: Sequence[str] = (),
     ) -> Any: ...

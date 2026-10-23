@@ -1232,12 +1232,59 @@ class GovernedToolDispatcher:
                                 request_hash=lease.tool_args_hash or "none", now=now)
         return None if refusal is None else str(refusal)
 
-    def _limit_settle(self, lease: ExecutionLease, tool_name: str, ok: bool) -> None:
+    def _limit_fence(self, lease: ExecutionLease, tool_name: str) -> str | None:
+        """Re-read observed resources just before the write; the refusal, or None."""
+        guard = self._limit_guard
+        if guard is None or not guard.governs(tool_name):
+            return None
+        try:
+            refusal = guard.fence(f"lease:{lease.nonce}")
+        except Exception:
+            refusal = "limit_observation_unavailable"
+        return None if refusal is None else str(refusal)
+
+    def _limit_release(self, lease: ExecutionLease, tool_name: str) -> None:
         guard = self._limit_guard
         if guard is None or not guard.governs(tool_name):
             return
         try:
-            guard.settle(f"lease:{lease.nonce}", ok)
+            guard.release(f"lease:{lease.nonce}")
+        except Exception as exc:
+            # Kept reserved: the limit errs towards refusing.
+            governance_event(
+                "dispatch.limit_release_failed", level=logging.WARNING,
+                tenant_id=lease.tenant_id, tool_name=tool_name,
+                proposal_id=lease.proposal_id, error_type=type(exc).__name__)
+
+    def _limit_settle(self, lease: ExecutionLease, tool_name: str, ok: bool,
+                      result: Any = None, now: str | None = None) -> None:
+        guard = self._limit_guard
+        if guard is None or not guard.governs(tool_name):
+            return
+        try:
+            observations = guard.settle(f"lease:{lease.nonce}", ok, result=result,
+                                        now=now) or []
+            for record in observations:
+                if record.get("charged_after"):
+                    # The plant moved further than was reserved: it changed
+                    # between the last read and the write. Charged now.
+                    governance_event(
+                        "dispatch.limit_charged_after_the_fact", level=logging.ERROR,
+                        tenant_id=lease.tenant_id, tool_name=tool_name,
+                        proposal_id=lease.proposal_id, quantity=record.get("quantity"),
+                        resource=record.get("resource"),
+                        actual_movement=record.get("actual_movement"),
+                        charged_after=record.get("charged_after"))
+                if record.get("reached") is False:
+                    # The plant did not end where REMORA let it go: the next
+                    # change is measured from where it is, and this is the
+                    # record an operator needs.
+                    governance_event(
+                        "dispatch.limit_target_not_reached", level=logging.WARNING,
+                        tenant_id=lease.tenant_id, tool_name=tool_name,
+                        proposal_id=lease.proposal_id, quantity=record.get("quantity"),
+                        resource=record.get("resource"), target=record.get("target"),
+                        observed=record.get("observed"))
         except Exception as exc:
             # Left pending, the resource refuses the next change until this
             # lease is retried or a new baseline is declared: closed, not open.
@@ -1786,9 +1833,28 @@ class GovernedToolDispatcher:
                 mediator, root_effect_digest=lease.resolved_effect_hash or None)
             return graph.summary(), graph
 
+        # Cumulative limits: the plant may have moved since the reservation
+        # read it. The nonce is spent, so a refusal here costs the grant; the
+        # write does not happen, and what it reserved is given back.
+        fence_refusal = self._limit_fence(lease, tool_name)
+        if fence_refusal is not None:
+            self._limit_settle(lease, tool_name, ok=False, now=now)
+            self._limit_release(lease, tool_name)
+            self._record_outcome(lease, tool_name, recorder_seq, "refused")
+            governance_event(
+                "dispatch.refused", level=logging.WARNING,
+                reason=fence_refusal, tenant_id=tenant_id,
+                tool_name=tool_name, proposal_id=proposal_id,
+                grant_jti=lease.grant_jti,
+            )
+            return DispatchResult(
+                executed=False, refusal_reason=fence_refusal,
+                proposal_id=proposal_id, recorder_seq=recorder_seq,
+            )
+
         try:
             res = fn(invocation, mediator) if mediator is not None else fn(invocation)
-            self._limit_settle(lease, tool_name, ok=True)
+            self._limit_settle(lease, tool_name, ok=True, result=res, now=now)
             nested_effects, effect_graph = _nested()
             self._record_outcome(lease, tool_name, recorder_seq, "executed")
             governance_event(
@@ -1805,7 +1871,7 @@ class GovernedToolDispatcher:
                 execution_id=lease.grant_jti, dispatch_check=check,
             )
         except Exception as e:
-            self._limit_settle(lease, tool_name, ok=False)
+            self._limit_settle(lease, tool_name, ok=False, now=now)
             # Burn is recorded with its reason so failure() can surface it;
             # the nonce stays consumed — state at the tool is unknown.
             if hasattr(self._ledger, "fail_consume"):

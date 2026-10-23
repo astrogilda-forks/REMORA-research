@@ -49,6 +49,7 @@ does not observe the plant or the payment rail.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import sqlite3
 import time
@@ -76,14 +77,67 @@ BASELINE_UNKNOWN = "limit_baseline_unknown"
 RESOURCE_BUSY = "limit_resource_busy"
 CHANGED = "limit_changed"
 LEDGER_UNAVAILABLE = "limit_ledger_unavailable"
+OBSERVATION_UNAVAILABLE = "limit_observation_unavailable"
+STATE_CHANGED = "limit_state_changed"
 INVOCATION_DIFFERS = "limit_invocation_differs"
+POLICY_CHANGED = "limit_policy_changed"
 
 KINDS = ("sum", "count", "change")
 COVERAGES = ("listed", "all_writes")
 
 
+SIGNED_SCHEMA = "remora-cumulative-limits-signed/v1"
+
+
 class LimitPolicyError(ValueError):
     """The declared policy is malformed; the deployment must not start."""
+
+
+def canonical_policy_bytes(policy: Mapping[str, Any]) -> bytes:
+    """The bytes a limit-policy signature covers."""
+    return json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
+
+
+def sign_policy(policy: Mapping[str, Any], key: Any, signed_at: str) -> dict[str, Any]:
+    """Wrap ``policy`` in a signed envelope. Offline signer helper, not runtime.
+
+    ``key`` is a ``remora.crypto.SigningKey`` bound to the LIMIT_POLICY domain:
+    the authority that sets the budgets signs, and REMORA verifies with its
+    public key, so a REMORA host cannot write itself a larger budget.
+
+    The signature covers ``policy`` only. ``signed_at`` is unsigned metadata
+    for the operator: anyone who can write the file can change it, and
+    nothing REMORA decides reads it. The policy identity a grant binds is the
+    digest of the whole file, so a changed ``signed_at`` still changes it.
+    """
+    from remora.crypto import SignatureDomain, sign
+
+    signature = sign(SignatureDomain.LIMIT_POLICY, canonical_policy_bytes(policy), key)
+    return {"schema": SIGNED_SCHEMA, "policy": dict(policy), "signed_at": signed_at,
+            "signature": signature.to_dict()}
+
+
+def verify_signed_policy(document: Any, keys: Any) -> tuple[dict[str, Any], str]:
+    """The policy and the signer's key id, or ``LimitPolicyError`` with the reason.
+
+    ``keys`` are ``remora.crypto.VerificationKey`` objects for the domain.
+    ``signed_at`` is not verified and not returned (see :func:`sign_policy`).
+    """
+    from remora.crypto import Signature, SignatureDomain, verify
+
+    if not isinstance(document, Mapping) or document.get("schema") != SIGNED_SCHEMA:
+        raise LimitPolicyError(f"limit policy is not a signed {SIGNED_SCHEMA!r} envelope")
+    policy, raw_signature = document.get("policy"), document.get("signature")
+    if not isinstance(policy, Mapping) or not isinstance(raw_signature, Mapping):
+        raise LimitPolicyError("signed limit policy needs a policy and a signature")
+    # A malformed block reads as empty fields, and verify refuses those.
+    signature = Signature.from_dict(raw_signature)
+    result = verify(SignatureDomain.LIMIT_POLICY, canonical_policy_bytes(policy), signature,
+                    list(keys))
+    if not result.ok:
+        raise LimitPolicyError(f"limit policy signature refused: {result.reason}")
+    return dict(policy), result.kid
 
 
 class _Refused(Exception):
@@ -126,6 +180,10 @@ class Meter:
     unit: str | None
     unit_argument: str | None
     resource_argument: str | None
+    observed: bool = False
+    #: A field of the tool's result that carries the value before the write,
+    #: as the controller reports it. Used to account for the actual movement.
+    previous_field: str | None = None
 
     @classmethod
     def from_dict(cls, tool: str, raw: Any) -> Meter:
@@ -145,6 +203,12 @@ class Meter:
         resource = raw.get("resource_argument")
         if kind == "change" and resource is None:
             raise LimitPolicyError(f"tool {tool!r}: a change meter needs resource_argument")
+        observed = raw.get("observed", False)
+        if type(observed) is not bool or (observed and kind != "change"):
+            raise LimitPolicyError(f"tool {tool!r}: observed is a boolean, on change meters only")
+        previous = raw.get("previous_field")
+        if previous is not None and not observed:
+            raise LimitPolicyError(f"tool {tool!r}: previous_field needs an observed meter")
         return cls(
             quantity=_text(raw.get("quantity"), f"tool {tool!r} quantity"), kind=kind,
             argument=argument, scale=_int(raw.get("scale", 1), "scale", 1),
@@ -153,7 +217,9 @@ class Meter:
             unit_argument=None if unit_argument is None else _text(unit_argument,
                                                                     "unit_argument"),
             resource_argument=None if resource is None else _text(resource,
-                                                                   "resource_argument"))
+                                                                   "resource_argument"),
+            observed=observed,
+            previous_field=None if previous is None else _text(previous, "previous_field"))
 
 
 @dataclass(frozen=True)
@@ -263,6 +329,12 @@ class LimitPolicy:
         return cls(coverage=coverage, meters=meters, limits=tuple(limits),
                    baselines=tuple(baselines))
 
+    @property
+    def observed_quantities(self) -> frozenset[str]:
+        """Quantities whose change is measured from an observed value."""
+        return frozenset(m.quantity for meters in self.meters.values() for m in meters
+                         if m.observed)
+
     def baseline(self, tenant: str, quantity: str, resource: str) -> Baseline | None:
         return next((b for b in self.baselines
                      if (b.tenant, b.quantity, b.resource) == (tenant, quantity, resource)),
@@ -301,6 +373,11 @@ class LimitLedger:
                     operation_id TEXT NOT NULL, request_hash TEXT NOT NULL,
                     amount INTEGER NOT NULL CHECK(amount >= 0), at REAL NOT NULL,
                     PRIMARY KEY(counter_key, operation_id)
+                );
+                CREATE TABLE IF NOT EXISTS limit_observation (
+                    operation_id TEXT NOT NULL, value_key TEXT NOT NULL,
+                    observed TEXT NOT NULL, charged INTEGER NOT NULL,
+                    PRIMARY KEY(operation_id, value_key)
                 );
                 CREATE TABLE IF NOT EXISTS limit_value (
                     value_key TEXT PRIMARY KEY, value INTEGER NOT NULL,
@@ -369,11 +446,55 @@ class LimitLedger:
                      "operation_id=excluded.operation_id, seed_id=excluded.seed_id",
                      (key, value, status, operation_id, seed_id))
 
-    def settle(self, operation_id: str, ok: bool) -> None:
-        """Record whether the call reserved under ``operation_id`` ran."""
+    def settle(self, operation_id: str, ok: bool) -> list[tuple[str, int]]:
+        """Record whether the call reserved under ``operation_id`` ran.
+
+        Returns the (value key, target) pairs it settled.
+        """
         with self._connect() as conn:
+            rows = conn.execute("SELECT value_key,value FROM limit_value WHERE operation_id=? "
+                                "AND status='pending'", (operation_id,)).fetchall()
             conn.execute("UPDATE limit_value SET status=? WHERE operation_id=? "
                          "AND status='pending'", ("settled" if ok else "unknown", operation_id))
+        return [(str(key), int(value)) for key, value in rows]
+
+    @staticmethod
+    def record_observation(conn: sqlite3.Connection, operation_id: str, value_key: str,
+                           observed: Decimal, charged: int) -> None:
+        conn.execute("INSERT OR IGNORE INTO limit_observation VALUES(?,?,?,?)",
+                     (operation_id, value_key, str(observed), charged))
+
+    def observations(self, operation_id: str) -> list[tuple[str, Decimal, int]]:
+        """(value key, value observed at reservation, amount charged) for one operation."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT value_key,observed,charged FROM limit_observation "
+                                "WHERE operation_id=?", (operation_id,)).fetchall()
+        return [(str(k), Decimal(str(v)), int(c)) for k, v, c in rows]
+
+    def charges(self, operation_id: str) -> list[tuple[str, int]]:
+        """(counter key, amount) this operation reserved."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT counter_key,amount FROM limit_reservation "
+                                "WHERE operation_id=?", (operation_id,)).fetchall()
+        return [(str(k), int(a)) for k, a in rows]
+
+    def release(self, operation_id: str) -> None:
+        """Return an operation's reservations. Only for a call that provably did not run."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM limit_reservation WHERE operation_id=?", (operation_id,))
+            conn.execute("DELETE FROM limit_observation WHERE operation_id=?", (operation_id,))
+
+    def debit(self, key: str, operation_id: str, amount: int, now: float) -> None:
+        """Charge movement found after the fact; it is not checked against the limit."""
+        with self._connect() as conn:
+            conn.execute("INSERT OR IGNORE INTO limit_reservation VALUES(?,?,?,?,?)",
+                         (key, operation_id, "after-the-fact", amount, now))
+
+    def observe(self, value_key: str, value: int) -> None:
+        """Replace a settled or unknown value with what was observed."""
+        with self._connect() as conn:
+            conn.execute("UPDATE limit_value SET value=?, status='settled' WHERE value_key=? "
+                         "AND status!='pending'", (value, value_key))
 
 
 def _epoch(now: str | float | None) -> float:
@@ -388,12 +509,54 @@ class LimitGuard:
     """Measures a call, and reserves it against every limit it matches."""
 
     def __init__(self, policy: LimitPolicy, ledger: LimitLedger,
-                 is_write: Callable[[str], bool | None] | None = None) -> None:
+                 is_write: Callable[[str], bool | None] | None = None,
+                 observer: Callable[[str, str, str], Any] | None = None,
+                 in_force: Callable[[], bool] | None = None) -> None:
+        """``in_force`` answers whether ``policy`` is still the one deployed.
+
+        The deployment builds the guard once, from the policy it verified at
+        startup, while a grant binds the digest of the policy file it reads
+        at that moment. When the two part (the file replaced on the same path
+        by a smaller budget, a larger one, or one whose signature does not
+        verify), every call refuses with ``limit_policy_changed`` until a
+        restart verifies the new policy: neither budget is enforced for a
+        grant bound to the other. Reservations already made are still
+        released and settled, so the ledger stays exact. A failing check
+        counts as changed.
+        """
+        if policy.observed_quantities and observer is None:
+            raise LimitPolicyError("observed change meters need an observer")
         self.policy = policy
         self.ledger = ledger
         self.is_write = is_write
+        self.observer = observer
+        self.in_force = in_force
+
+    def _changed(self) -> bool:
+        if self.in_force is None:
+            return False
+        try:
+            return not self.in_force()
+        except Exception:
+            return True
+
+    def _observe(self, tenant: str, quantity: str, resource: str, scale: int) -> Decimal | None:
+        """The observed value, scaled; None when it cannot be read as a finite number."""
+        if self.observer is None:
+            return None
+        try:
+            raw = self.observer(tenant, quantity, resource)
+        except Exception:
+            return None
+        if isinstance(raw, bool) or not isinstance(raw, int | float):
+            return None
+        if isinstance(raw, float) and not math.isfinite(raw):
+            return None
+        return Decimal(str(raw)) * scale
 
     def governs(self, tool_name: str) -> bool:
+        if self._changed():
+            return True  # the deployed policy may meter it; refuse rather than guess
         return tool_name in self.policy.meters or self.policy.coverage == "all_writes"
 
     def _coverage_refusal(self, tool_name: str) -> str | None:
@@ -435,18 +598,36 @@ class LimitGuard:
 
     def _plan(self, conn: sqlite3.Connection, *, tenant: str, principal: str,
               readings: list[Reading], operation_id: str, request_hash: str,
-              now: float) -> tuple[bool, list[tuple[Limit, str, int]],
-                                   list[tuple[str, int, str]]]:
+              now: float, observed: Mapping[int, Decimal] | None = None,
+              ) -> tuple[bool, list[tuple[Limit, str, int]], list[tuple[str, int, str]],
+                         list[tuple[str, Decimal, int]]]:
         """Charges and value updates for this call, checked against every limit.
 
         Returns (already reserved, charges, value updates). Raises ``_Refused``.
         """
         charges: list[tuple[Limit, str, int]] = []
         values: list[tuple[str, int, str]] = []
-        for reading in readings:
+        seen_at: list[tuple[str, Decimal, int]] = []
+        for index, reading in enumerate(readings):
             m = reading.meter
             amount: int | None = reading.value
-            if m.kind == "change":
+            if m.kind == "change" and m.observed:
+                resource = reading.resource or ""
+                value_key = "\x1f".join((tenant, m.quantity, resource))
+                state = self.ledger.value(conn, value_key)
+                if state is not None and state[2] == operation_id:
+                    amount = None  # a retry of this operation: its charge is recorded
+                elif state is not None and state[1] == "pending":
+                    raise _Refused(RESOURCE_BUSY)
+                else:
+                    # Measured from the plant, not from the last value let
+                    # through, so a change made outside REMORA is not counted
+                    # and one REMORA made is. Rounded up: never under-counted.
+                    seen = (observed or {})[index]
+                    amount = math.ceil(abs(reading.value - seen))
+                    seen_at.append((value_key, seen, amount))
+                values.append((value_key, reading.value, "observed"))
+            elif m.kind == "change":
                 resource = reading.resource or ""
                 value_key = "\x1f".join((tenant, m.quantity, resource))
                 base = self.policy.baseline(tenant, m.quantity, resource)
@@ -478,18 +659,20 @@ class LimitGuard:
             for (_, _, amount), prior in zip(charges, priors, strict=True):
                 if prior is None or prior[0] != request_hash or amount not in (-1, prior[1]):
                     raise _Refused(CHANGED)
-            return True, charges, values
+            return True, charges, values, seen_at
         if any(p is not None for p in priors) or any(a == -1 for _, _, a in charges):
             raise _Refused(CHANGED)
         # Each charge has its own counter: one meter per quantity, one quantity per limit.
         for lim, key, amount in charges:
             if self.ledger.used(conn, key, lim.binding, lim.window_seconds, now) + amount > lim.max:
                 raise _Refused(EXCEEDED)
-        return False, charges, values
+        return False, charges, values, seen_at
 
     def _run(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
              operation_id: str, request_hash: str, now: str | float | None,
              write: bool) -> str | None:
+        if self._changed():
+            return POLICY_CHANGED
         refusal = self._coverage_refusal(tool_name)
         if refusal is not None:
             return refusal
@@ -499,11 +682,20 @@ class LimitGuard:
             return PRINCIPAL_MISSING
         try:
             readings = self.readings(tool_name, arguments)
+            observed: dict[int, Decimal] = {}
+            for index, reading in enumerate(readings):
+                if reading.meter.observed:
+                    seen = self._observe(tenant, reading.meter.quantity, reading.resource or "",
+                                         reading.meter.scale)
+                    if seen is None:
+                        return OBSERVATION_UNAVAILABLE
+                    observed[index] = seen
             at = _epoch(now)
             with self.ledger.transaction() as conn:
-                done, charges, values = self._plan(
+                done, charges, values, seen_at = self._plan(
                     conn, tenant=tenant, principal=principal, readings=readings,
-                    operation_id=operation_id, request_hash=request_hash, now=at)
+                    operation_id=operation_id, request_hash=request_hash, now=at,
+                    observed=observed)
                 if write and not done:
                     for lim, key, amount in charges:
                         self.ledger.record(conn, key, lim.binding, operation_id,
@@ -511,6 +703,9 @@ class LimitGuard:
                     for value_key, value, seed_id in values:
                         self.ledger.set_value(conn, value_key, value, "pending",
                                               operation_id, seed_id)
+                    for value_key, seen, amount in seen_at:
+                        self.ledger.record_observation(conn, operation_id, value_key, seen,
+                                                       amount)
         except _Refused as exc:
             return exc.reason
         except Exception:
@@ -543,6 +738,8 @@ class LimitGuard:
 
     def compare(self, tool_name: str, wire: Any, invocation: Any) -> str | None:
         """Refuse a resolved invocation that would meter differently from the wire form."""
+        if self._changed():
+            return POLICY_CHANGED
         if tool_name not in self.policy.meters:
             return None
         try:
@@ -551,5 +748,102 @@ class LimitGuard:
             return exc.reason
         return None if same else INVOCATION_DIFFERS
 
-    def settle(self, operation_id: str, ok: bool) -> None:
-        self.ledger.settle(operation_id, ok)
+    def _scale_of(self, quantity: str) -> int:
+        return next(m.scale for meters in self.policy.meters.values() for m in meters
+                    if m.quantity == quantity)
+
+    def fence(self, operation_id: str) -> str | None:
+        """Read each observed resource again just before the write.
+
+        None when every value is still the one the reservation was charged
+        from; otherwise the refusal, and the write must not happen. This
+        narrows the window between reading the plant and writing to it; it
+        cannot close it. Only a conditional write at the controller can.
+        """
+        if self._changed():
+            return POLICY_CHANGED
+        for value_key, seen, _ in self.ledger.observations(operation_id):
+            tenant, quantity, resource = value_key.split("\x1f")
+            now_seen = self._observe(tenant, quantity, resource, self._scale_of(quantity))
+            if now_seen is None:
+                return OBSERVATION_UNAVAILABLE
+            if now_seen != seen:
+                return STATE_CHANGED
+        return None
+
+    def release(self, operation_id: str) -> None:
+        """Give back what a call reserved when the write provably did not happen.
+
+        The dispatcher calls this only after the fence refused, when the tool
+        was never invoked and the lease's nonce is spent, so the lease cannot
+        run later under the same reservation. Every other refusal after a
+        reservation keeps it: the same lease may be retried.
+        """
+        self.ledger.release(operation_id)
+
+    def _account(self, operation_id: str, result: Any, records: list[dict[str, Any]],
+                 now: float) -> None:
+        """Charge movement the controller reports beyond what was reserved.
+
+        ``previous_field`` in the tool's result is the value before the write,
+        as the controller saw it. If the move from there to where the plant
+        ended up is larger than the reservation (the plant changed between
+        the last read and the write), the difference is charged to every
+        counter this operation reserved for that quantity, without a limit
+        check: it has already happened. Later changes then meet the limit.
+        """
+        if not isinstance(result, Mapping):
+            return
+        fields = {m.quantity: m.previous_field for meters in self.policy.meters.values()
+                  for m in meters if m.previous_field}
+        limit_quantity = {lim.limit_id: lim.quantity for lim in self.policy.limits}
+        charged_at = {k: c for k, _, c in self.ledger.observations(operation_id)}
+        charges = self.ledger.charges(operation_id)
+        for record in records:
+            field = fields.get(record["quantity"])
+            previous = result.get(field) if field else None
+            if isinstance(previous, bool) or not isinstance(previous, int | float):
+                continue
+            scale = self._scale_of(record["quantity"])
+            ended = record["observed"] if record["observed"] is not None else record["target"]
+            actual = math.ceil(abs(Decimal(ended) - Decimal(str(previous)) * scale))
+            charged = charged_at.get("\x1f".join((record["tenant"], record["quantity"],
+                                                   record["resource"])), 0)
+            record["actual_movement"] = actual
+            if actual > charged:
+                record["charged_after"] = actual - charged
+                for key, _ in charges:
+                    if limit_quantity.get(key.split("\x1f", 1)[0]) == record["quantity"]:
+                        self.ledger.debit(key, f"{operation_id}#after", actual - charged, now)
+
+    def settle(self, operation_id: str, ok: bool, result: Any = None,
+               now: str | float | None = None) -> list[dict[str, Any]]:
+        """Record whether the call ran, and for observed meters where the plant ended up.
+
+        Returns one record per observed resource: the target REMORA let
+        through, the value read back, and whether the plant reached it. A
+        resource whose value cannot be read back keeps the target (or
+        ``unknown`` after a failure); the next change reads the plant anyway.
+        """
+        settled = self.ledger.settle(operation_id, ok)
+        out: list[dict[str, Any]] = []
+        if self.observer is None:
+            return out
+        scales = {m.quantity: m.scale for meters in self.policy.meters.values()
+                  for m in meters if m.observed}
+        for value_key, target in settled:
+            tenant, quantity, resource = value_key.split("\x1f")
+            if quantity not in scales:
+                continue
+            seen = self._observe(tenant, quantity, resource, scales[quantity])
+            record: dict[str, Any] = {"tenant": tenant, "quantity": quantity,
+                                      "resource": resource, "target": target,
+                                      "observed": None, "reached": None}
+            if seen is not None:
+                observed_value = int(seen.to_integral_value())
+                self.ledger.observe(value_key, observed_value)
+                record.update(observed=observed_value, reached=seen == target)
+            out.append(record)
+        if ok:
+            self._account(operation_id, result, out, _epoch(now))
+        return out

@@ -480,7 +480,7 @@ it does not, and `UNSIGNED` when no record carries a signature. `valid` covers
 only the checks that ran (RMR-CR-007). The control-plane
 `GET /v1/audit/chain/verify` follows record links only and says so with
 `verification_scope: linkage_only` and `signature_status: NOT_CHECKED`. RBAC: `assess`/`execute` capabilities gate assess/execute;
-`review` gates approve; `read` gates audit. `review` also gates `POST /revoke-principal`, which withdraws a principal's authority after the fact. An approval that principal granted is invalidated at the execution re-gate, not rewritten. The chain therefore shows both the approval and the revocation. With `REMORA_WS1_ADMISSION=atomic`, `review` also gates `POST /revoke-authority`. It revokes or reinstates a WS1 evidence source (`source:<id>`) by advancing its authority epoch under the admission lock, together with an `authority_revoked` or `authority_reinstated` audit event. Evidence read before the change no longer admits. Without the mode the route answers 409.
+`review` gates approve; `read` gates audit. `review` also gates `POST /revoke-principal`, which withdraws a principal's authority after the fact. An approval that principal granted is invalidated at the execution re-gate, not rewritten. The chain therefore shows both the approval and the revocation. With `REMORA_WS1_ADMISSION=atomic`, `review` also gates `POST /revoke-authority`. It revokes or reinstates a WS1 evidence source (`source:<id>`) by advancing its authority epoch under the admission lock, together with an `authority_revoked` or `authority_reinstated` audit event. Evidence read before the change no longer admits. Without the mode the route answers 409. In that mode an admitted call is checked again just before it is sent. A change committed after the admission refuses the send: `tool_execution.refusal_reason` is `permit_refused` and `permit_refusal` names the cause. `tool_execution.permit` records the check, and `at_effect: NOT_ESTABLISHED` marks that a revocation during the send is not seen.
 
 **Rejection, effects and the proposal trail.** `POST /reject` (`review`)
 refuses a pending review item terminally and requires a `reason`. The
@@ -696,11 +696,60 @@ are `limit_principal_missing` and `limit_ledger_unavailable`.
 
 After the tool runs, the dispatcher records whether it ran. A write that
 raised leaves its resource unknown until a baseline with a new `seed_id` is
-declared, because REMORA cannot tell where the equipment ended up. `/assess`
+declared, because REMORA cannot tell where the equipment ended up.
+
+A `change` meter can instead be `"observed": true`. The deployment then names
+a module in `REMORA_LIMITS_OBSERVER_MODULE` that exposes
+`observe_limit_value(tenant, quantity, resource)` and returns the value the
+equipment reports. Movement is measured from that value before each change,
+rounded up, so a change made outside REMORA is not charged and a change REMORA
+makes is never missed. After the tool runs, the value is read back. If the
+equipment did not reach the target, the dispatcher logs
+`dispatch.limit_target_not_reached`, and the next change starts from the
+value read back. An observed meter needs no baseline and no re-seed after a
+failed write. An observation that fails or is not a finite number refuses as
+`limit_observation_unavailable`. A policy with observed meters and no
+observer refuses startup.
+
+The plant can change between the read the reservation is charged from and
+the write. Just before the tool runs, the dispatcher reads each observed
+resource again. If it moved, the write does not happen. The call refuses as
+`limit_state_changed`, the lease's nonce is spent and its reservation is
+given back. A meter may also name `previous_field`, a field of the tool's
+result in which the controller reports the value it replaced. The movement
+from that value to where the plant ended up is charged, and anything beyond
+the reservation is logged as `dispatch.limit_charged_after_the_fact` and
+counts against later changes. Without such a report, a change in the last
+moment before the write is charged as reserved. Only a conditional write at
+the controller closes that window.
+
+The limits are bound to the authority that sets them and to every decision
+made under them. `REMORA_LIMITS_TRUSTED_KEYS` lists the Ed25519 public keys of
+that authority. With it, `REMORA_LIMITS_FILE` must be a
+`remora-cumulative-limits-signed/v1` envelope signed by one of those keys
+(`scripts/sign_limit_policy.py`), so a REMORA host cannot write itself a
+larger budget. The digest of the limit policy is part of the policy identity
+(`limits_policy_hash`, `cumulative_limits` in the coverage block), so an ACCEPT
+token issued under one set of limits refuses under another. The assessment of
+a proposal records the digest too. An approval is refused with 409
+`limits_changed` on `/execute` and in the async worker when the limits it was
+given under were turned off, relaxed or replaced. Limits turned on after an
+approval apply at dispatch. The dispatcher enforces the policy it verified at
+startup, built from the same bytes it digested. When the file at
+`REMORA_LIMITS_FILE`, or the limit settings, change without a restart, every
+call refuses with `limit_policy_changed` at `/assess` and at dispatch, whether
+the new file is smaller, larger or fails verification. A restart verifies and
+enforces the new policy. The signature covers the `policy` block only:
+`signed_at` is unsigned metadata that no decision reads, though the digest
+covers it. `REMORA_REQUIRE_LIMITS=1` makes limits mandatory:
+startup refuses without limits, without trusted keys, or with coverage other
+than `all_writes`. No profile implies it; a deployment sets it. The OT pilot
+runs with it. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
-holds. A reservation is never returned, the ledger is per host, and a
-`change` meter tracks the values REMORA let through, not the plant.
+holds. A reservation is never returned and the ledger is per host. A
+`change` meter that is not observed tracks the values REMORA let through, not
+the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
 
 **Capability sets (WS8 Q8.2, opt-in):** with

@@ -243,6 +243,7 @@ def assess_proposal(
     token_audience: str,
     token_ttl_seconds: int,
     policy_bundle_hash: Callable[[], str] | None = None,
+    limits_policy_hash: Callable[[], str | None] | None = None,
     loop_safety: Any = None,
     capability_gate: Callable[[Any], dict[str, Any] | None] | None = None,
     semantic_shadow: Callable[[dict[str, Any]], None] | None = None,
@@ -403,6 +404,11 @@ def assess_proposal(
         "toolspec_hash": toolspec_identity["hash"],
         "toolspec_version": toolspec_identity["version"],
     }
+    bound_limits = limits_policy_hash() if limits_policy_hash is not None else None
+    if bound_limits:
+        # The limits this decision was made under; an approval of it is not
+        # executed under other limits, or none (limits_binding_refusal).
+        record["limits_policy_hash"] = bound_limits
     if task is not None:
         record["context_id"] = task.context_id
         record["task_id"] = task.task_id
@@ -684,6 +690,27 @@ def _acting_for(record: dict[str, Any] | None, executor: str) -> str:
     return ""
 
 
+LIMITS_CHANGED = "limits_changed"
+
+
+def limits_binding_refusal(chain: AuditChainPort, tenant: str, proposal_id: str,
+                           current: str | None) -> str | None:
+    """``limits_changed`` when the proposal was assessed under other limits, or None.
+
+    The assessment records the digest of the cumulative-limit policy in force
+    (``limits_policy_hash``). An approval must not be executed after those
+    limits were turned off, relaxed or replaced: it would then run under a
+    budget nobody approved it against. A proposal assessed with no limits
+    may run under limits enabled since, because the dispatcher enforces the
+    limits in force at dispatch.
+    """
+    record = _assessed_payload(chain, tenant, proposal_id)
+    bound = str((record or {}).get("limits_policy_hash") or "")
+    if bound and bound != (current or ""):
+        return LIMITS_CHANGED
+    return None
+
+
 def approved_context_refusal(
     chain: AuditChainPort,
     tenant: str,
@@ -762,6 +789,7 @@ def execute_approved_item(
     token_ttl_seconds: int,
     policy_coverage: Callable[[], dict[str, Any]] | None = None,
     policy_bundle_hash: Callable[[], str] | None = None,
+    limits_policy_hash: Callable[[], str | None] | None = None,
     async_dispatch: bool = False,
     transactional_append: TransactionalAppendPort | None = None,
     require_execution_context: bool = False,
@@ -853,6 +881,12 @@ def execute_approved_item(
     # be re-presented as another. Same placement, same non-consumption.
     context_refusal = context_refusal or proposal_envelope_refusal(
         chain, tenant, assessed_proposal_id, tool_call)
+    if context_refusal is None and limits_policy_hash is not None and limits_binding_refusal(
+            chain, tenant, assessed_proposal_id, limits_policy_hash()):
+        context_refusal = ApprovalContextRefused(
+            "this item was approved under cumulative limits that are no longer the "
+            "ones in force; it must be assessed and approved again",
+            reason=LIMITS_CHANGED)
     acting_for = _acting_for(
         _assessed_payload(chain, tenant, assessed_proposal_id), principal)
     ws1: Ws1OutcomePort | None = None
@@ -1064,7 +1098,11 @@ def execute_approved_item(
                     token, observation_binding(fresh_obs), consume=True,
                     context=review_context, now=now_iso, connection=connection),
                 principals=(principal, acting_for or "",
-                            approver))
+                            approver),
+                audit=_admission_audit(
+                    proposal_id=proposal_id, actor=principal, acting_for=acting_for,
+                    item_id=item_id, tool_call_hash=fresh_obs.tool_call_hash,
+                    grant_jti=token.jti, ws1=ws1))
         except ClaimLost:
             return _claim_lost()
         except RemoraError as exc:
@@ -1132,22 +1170,29 @@ def execute_approved_item(
         **({"admission": admitted.audit_block()} if admitted is not None else {}),
     })
 
+    permit = (admission.permit(tenant, ws1=ws1, principals=(principal, acting_for or "",
+                                                            approver))
+              if admission is not None and admitted is not None else None)
     tool_execution: dict[str, Any] = (
-        {"executed": False, "dispatch_began": False, "state_unknown": False,
-                       "refusal_reason": admission_refusal}
-                      if admission_refusal is not None else dispatch_under_lease(
+        _not_sent(admission_refusal) if admission_refusal is not None
+        else _not_sent("permit_refused", permit)
+        if permit is not None and permit.refusal is not None
+        else dispatch_under_lease(
         tenant=tenant,
         principal=principal,
         tool_call=tool_call,
         semantic=fresh_semantic,
-        now=now,
+        now=datetime.now(UTC) if permit is not None else now,
         gate_allowed=gate_result.allowed,
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
         **_flow_kwargs(fresh_obs),
+        **_permit_kwargs(permit),
     ))
+    if permit is not None:
+        tool_execution["permit"] = permit.audit_block()
 
     # FT-02: settle with what actually happened - derived, never assumed.
     #
@@ -1193,6 +1238,7 @@ def execute_approved_item(
         "intent_sequence_no": (intent_entry.sequence_no
                                if intent_entry is not None else None),
         "tool_executed": tool_execution["executed"],
+        **({"permit": tool_execution["permit"]} if "permit" in tool_execution else {}),
         # Whether the outcome is unknown, not merely unsuccessful. An effect
         # receipt may resolve an UNKNOWN dispatch -- a lost response does not
         # mean nothing happened -- so the chain has to carry the distinction.
@@ -1428,6 +1474,7 @@ def dispatch_pending_intent(
     resolve_toolspec: Callable[[str, dict[str, Any], str], dict[str, Any]] | None = None,
     policy_coverage: Callable[[], dict[str, Any]] | None = None,
     policy_bundle_hash: Callable[[], str] | None = None,
+    limits_policy_hash: Callable[[], str | None] | None = None,
     rebuild_call: Callable[[dict[str, Any]], Any] | None = None,
     assessed_record: Callable[[str, str], tuple[str, str]] | None = None,
     require_execution_context: bool = False,
@@ -1661,6 +1708,9 @@ def dispatch_pending_intent(
                                "entry_hash": entry.entry_hash}
         return result
 
+    if refusal is None and limits_policy_hash is not None and limits_binding_refusal(
+            chain, tenant, proposal_id, limits_policy_hash()):
+        refusal, refusal_detail = LIMITS_CHANGED, {"limits_changed": True}
     if refusal is not None:
         return _refuse(refusal, refusal_detail)
 
@@ -1714,7 +1764,11 @@ def dispatch_pending_intent(
                     token, observation_binding(fresh_obs), consume=True,
                     context=honour_context, now=now_iso, connection=connection),
                 principals=(actor, acting_for or "",
-                            approver))
+                            approver),
+                audit=_admission_audit(
+                    proposal_id=proposal_id, actor=actor, acting_for=acting_for,
+                    item_id=row.item_id, tool_call_hash=fresh_obs.tool_call_hash,
+                    grant_jti=token.jti, ws1=ws1, executed_by=worker_id))
         except ClaimLost:
             return None
         except RemoraError as exc:
@@ -1745,19 +1799,27 @@ def dispatch_pending_intent(
         **({"admission": admitted.audit_block()} if admitted is not None else {}),
     })
 
-    tool_execution = dispatch_under_lease(
+    permit = (admission.permit(tenant, ws1=ws1, principals=(actor, acting_for or "", approver))
+              if admission is not None else None)
+    tool_execution = (
+        _not_sent("permit_refused", permit)
+        if permit is not None and permit.refusal is not None
+        else dispatch_under_lease(
         tenant=tenant,
         principal=actor,
         tool_call=tool_call,
         semantic=fresh_semantic,
-        now=now,
+        now=datetime.now(UTC) if permit is not None else now,
         gate_allowed=gate_result.allowed,
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or row.item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
         **_flow_kwargs(fresh_obs),
-    )
+        **_permit_kwargs(permit),
+    ))
+    if permit is not None:
+        tool_execution["permit"] = permit.audit_block()
 
     outcome = classify_outcome(tool_execution)
     # Issue #416: projection payload commits WITH the terminal state.
@@ -1789,6 +1851,7 @@ def dispatch_pending_intent(
         "grant_jti": token.jti,
         "intent_sequence_no": intent_entry.sequence_no,
         "tool_executed": tool_execution["executed"],
+        **({"permit": tool_execution["permit"]} if "permit" in tool_execution else {}),
         "state_unknown": bool(tool_execution.get("state_unknown")),
         "policy_components": (
             policy_coverage() if policy_coverage is not None else None
@@ -1818,6 +1881,36 @@ def dispatch_pending_intent(
         result["audit"] = {"sequence_no": entry.sequence_no,
                            "entry_hash": entry.entry_hash}
     return result
+
+
+def _not_sent(reason: str, permit: Any = None) -> dict[str, Any]:
+    """A dispatch that provably sent nothing: refused before the lease."""
+    return {"executed": False, "dispatch_began": False, "state_unknown": False,
+            "refusal_reason": reason,
+            **({"permit_refusal": permit.refusal} if permit is not None else {})}
+
+
+def _permit_kwargs(permit: Any) -> dict[str, Any]:
+    """The lease bound a permit sets, passed only when there is one, so a
+    dispatcher without the parameter keeps working on the legacy path."""
+    not_after = getattr(permit, "not_after", None)
+    return {"not_after": not_after} if not_after is not None else {}
+
+
+def _admission_audit(*, proposal_id: Any, actor: str, acting_for: str | None,
+                     item_id: str, tool_call_hash: str | None, grant_jti: str,
+                     ws1: Ws1OutcomePort | None, executed_by: str = "") -> dict[str, Any]:
+    """The ``execution_admitted`` record the admission transaction enqueues (M4-T12)."""
+    return {
+        "proposal_id": proposal_id,
+        "actor": actor,
+        **({"acting_for": acting_for} if acting_for else {}),
+        **({"executed_by": executed_by} if executed_by else {}),
+        "item_id": item_id,
+        "tool_call_hash": tool_call_hash,
+        "grant_jti": grant_jti,
+        **({"ws1": ws1.audit_block()} if ws1 is not None else {}),
+    }
 
 
 def _admission_reason(exc: BaseException) -> str:
@@ -2298,7 +2391,11 @@ def redeem_accept_token(
                     token, observation_binding(obs), consume=True,
                     context=current_context, now=now_iso, connection=connection),
                 record_intent=_record_intent,
-                principals=(principal, acting_for or ""))
+                principals=(principal, acting_for or ""),
+                audit=_admission_audit(
+                    proposal_id=proposal_id, actor=principal, acting_for=acting_for,
+                    item_id=f"accept:{token.jti}", tool_call_hash=obs.tool_call_hash,
+                    grant_jti=token.jti, ws1=ws1))
         except RemoraError as exc:
             refusal = _admission_reason(exc)
             chain.append(tenant, {
@@ -2374,20 +2471,29 @@ def redeem_accept_token(
             tool_call_hash=obs.tool_call_hash, grant_jti=token.jti,
             intent_sequence_no=intent_entry.sequence_no)
 
-    # Governed dispatch - same dispatcher, same lease discipline.
-    tool_execution = dispatch_under_lease(
+    # Governed dispatch - same dispatcher, same lease discipline. Under
+    # atomic admission the permit is checked first (INV-M4-03).
+    permit = (admission.permit(tenant, ws1=ws1, principals=(principal, acting_for or ""))
+              if admission is not None else None)
+    tool_execution = (
+        _not_sent("permit_refused", permit)
+        if permit is not None and permit.refusal is not None
+        else dispatch_under_lease(
         tenant=tenant,
         principal=principal,
         tool_call=tool_call,
         semantic=semantic,
-        now=now,
+        now=datetime.now(UTC) if permit is not None else now,
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or token.jti),
         grant_jti=token.jti,
         report_lease=True,
         **_task_kwargs(tool_call),
         **_flow_kwargs(obs),
-    )
+        **_permit_kwargs(permit),
+    ))
+    if permit is not None:
+        tool_execution["permit"] = permit.audit_block()
 
     # Same structural classification as the review path: a dispatch that began
     # and then failed is UNKNOWN, not a durable claim that nothing happened.
@@ -2420,6 +2526,7 @@ def redeem_accept_token(
         "grant_jti": token.jti,
         "intent_sequence_no": intent_entry.sequence_no,
         "tool_executed": tool_execution["executed"],
+        **({"permit": tool_execution["permit"]} if "permit" in tool_execution else {}),
         # Whether the outcome is unknown, not merely unsuccessful. An effect
         # receipt may resolve an UNKNOWN dispatch -- a lost response does not
         # mean nothing happened -- so the chain has to carry the distinction.
