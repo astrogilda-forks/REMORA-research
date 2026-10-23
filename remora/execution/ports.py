@@ -413,4 +413,5 @@ class AdmissionPort(Protocol):
         record_intent: Callable[[], Any] | None = None,
         claim: Callable[[Any], Any] | None = None,
         principals: Sequence[str] = (),
+        audit: Mapping[str, Any] | None = None,
     ) -> Any: ...

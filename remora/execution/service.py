@@ -1098,7 +1098,11 @@ def execute_approved_item(
                     token, observation_binding(fresh_obs), consume=True,
                     context=review_context, now=now_iso, connection=connection),
                 principals=(principal, acting_for or "",
-                            approver))
+                            approver),
+                audit=_admission_audit(
+                    proposal_id=proposal_id, actor=principal, acting_for=acting_for,
+                    item_id=item_id, tool_call_hash=fresh_obs.tool_call_hash,
+                    grant_jti=token.jti, ws1=ws1))
         except ClaimLost:
             return _claim_lost()
         except RemoraError as exc:
@@ -1752,7 +1756,11 @@ def dispatch_pending_intent(
                     token, observation_binding(fresh_obs), consume=True,
                     context=honour_context, now=now_iso, connection=connection),
                 principals=(actor, acting_for or "",
-                            approver))
+                            approver),
+                audit=_admission_audit(
+                    proposal_id=proposal_id, actor=actor, acting_for=acting_for,
+                    item_id=row.item_id, tool_call_hash=fresh_obs.tool_call_hash,
+                    grant_jti=token.jti, ws1=ws1, executed_by=worker_id))
         except ClaimLost:
             return None
         except RemoraError as exc:
@@ -1856,6 +1864,22 @@ def dispatch_pending_intent(
         result["audit"] = {"sequence_no": entry.sequence_no,
                            "entry_hash": entry.entry_hash}
     return result
+
+
+def _admission_audit(*, proposal_id: Any, actor: str, acting_for: str | None,
+                     item_id: str, tool_call_hash: str | None, grant_jti: str,
+                     ws1: Ws1OutcomePort | None, executed_by: str = "") -> dict[str, Any]:
+    """The ``execution_admitted`` record the admission transaction enqueues (M4-T12)."""
+    return {
+        "proposal_id": proposal_id,
+        "actor": actor,
+        **({"acting_for": acting_for} if acting_for else {}),
+        **({"executed_by": executed_by} if executed_by else {}),
+        "item_id": item_id,
+        "tool_call_hash": tool_call_hash,
+        "grant_jti": grant_jti,
+        **({"ws1": ws1.audit_block()} if ws1 is not None else {}),
+    }
 
 
 def _admission_reason(exc: BaseException) -> str:
@@ -2336,7 +2360,11 @@ def redeem_accept_token(
                     token, observation_binding(obs), consume=True,
                     context=current_context, now=now_iso, connection=connection),
                 record_intent=_record_intent,
-                principals=(principal, acting_for or ""))
+                principals=(principal, acting_for or ""),
+                audit=_admission_audit(
+                    proposal_id=proposal_id, actor=principal, acting_for=acting_for,
+                    item_id=f"accept:{token.jti}", tool_call_hash=obs.tool_call_hash,
+                    grant_jti=token.jti, ws1=ws1))
         except RemoraError as exc:
             refusal = _admission_reason(exc)
             chain.append(tenant, {

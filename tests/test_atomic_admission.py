@@ -532,3 +532,98 @@ def test_an_epoch_change_and_its_record_commit_together(rig):
     with pytest.raises(RuntimeError):
         rig.admission.advance_authority(T, SUBJECT, revoked=False, record=crash)
     assert rig.admission.pin_epochs(T)([SUBJECT]) == {SUBJECT: 1}
+
+
+# ── the audit row in the transaction (M4-T12) ────────────────────────────────
+
+
+def _audit(token) -> dict[str, Any]:
+    return {"proposal_id": token.request_id, "actor": "agent-1", "grant_jti": token.jti}
+
+
+def _pending_audit(rig) -> list[tuple[str, str, dict[str, Any]]]:
+    from remora.governance import audit_outbox
+
+    with rig.tx():
+        return audit_outbox.pending(rig.var.get(), tenant=T)
+
+
+def _admit_audited(rig, token):
+    return rig.admission.admit(
+        T, ws1=_ws1(), audit=_audit(token),
+        consume=lambda conn, now: rig.gate.check(
+            token, OBS, consume=True, now=now, connection=conn),
+        record_intent=lambda: record_dispatch_intent(
+            rig.outbox, rig.var.get(), proposal_id=token.request_id, tenant=T,
+            item_id=f"accept:{token.jti}", tool_name="read_telemetry",
+            tool_call_hash="h" * 64, grant_jti=token.jti))
+
+
+def test_m4_t12_the_admission_enqueues_its_audit_row_before_commit(rig):
+    token = _token()
+    admitted = _admit_audited(rig, token)
+    [(key, tenant, payload)] = _pending_audit(rig)
+    assert (key, tenant) == (admitted.audit_key, T)
+    assert payload["event"] == "execution_admitted"
+    assert payload["grant_jti"] == token.jti
+    assert payload["outbox_id"] == admitted.intent.outbox_id
+    assert payload["admission"]["authority_epochs"] == {SUBJECT: {"epoch": 0, "revoked": False}}
+    assert admitted.audit_block()["audit_key"] == key
+
+
+def test_m4_t12_an_audit_outbox_failure_rolls_the_whole_admission_back(rig, monkeypatch):
+    def down(*args, **kwargs):
+        raise RuntimeError("audit outbox insert failed")
+
+    real = admission_mod.audit_outbox.enqueue
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", down)
+    token = _token()
+    with pytest.raises(AdmissionRefused) as caught:
+        _admit_audited(rig, token)
+    assert caught.value.reason == "audit_outbox_unavailable"
+    assert not rig.spent(token) and rig.intents(token) == 0
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", real)
+    assert _pending_audit(rig) == []
+    _admit_audited(rig, token)  # nothing was spent: the retry admits
+    assert rig.spent(token) and rig.intents(token) == 1
+
+
+def test_m4_t12_an_audit_failure_on_a_claim_releases_the_claim(rig, monkeypatch):
+    row, token = _pending_row(rig), _token()
+
+    def down(*args, **kwargs):
+        raise RuntimeError("audit outbox insert failed")
+
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", down)
+    with pytest.raises(AdmissionRefused):
+        rig.admission.admit(
+            T, ws1=_ws1(), audit=_audit(token),
+            claim=lambda conn: rig.outbox.claim_enlisted(conn, row.outbox_id, worker_id="w-1"),
+            consume=lambda conn, now: rig.gate.check(
+                token, OBS, consume=True, now=now, connection=conn))
+    assert rig.outbox.get(row.outbox_id).state.value == "DISPATCH_PENDING"
+    assert not rig.spent(token)
+
+
+def test_an_unkeyed_audit_record_refuses_unspent(rig):
+    token = _token()
+    with pytest.raises(AdmissionRefused) as caught:
+        rig.admission.admit(T, ws1=_ws1(), audit={"actor": "agent-1"},
+                            consume=lambda conn, now: rig.gate.check(
+                                token, OBS, consume=True, now=now, connection=conn))
+    assert caught.value.reason == "admission_audit_unkeyed"
+    assert not rig.spent(token)
+
+
+def test_a_failed_drain_leaves_the_committed_row_for_the_next_one(rig):
+    calls: list[str] = []
+
+    def drain(tenant):
+        calls.append(tenant)
+        raise RuntimeError("chain unreachable")
+
+    rig.admission._drain = drain
+    token = _token()
+    admitted = _admit_audited(rig, token)  # committed despite the drain
+    assert calls == [T] and rig.spent(token)
+    assert [k for k, _, _ in _pending_audit(rig)] == [admitted.audit_key]

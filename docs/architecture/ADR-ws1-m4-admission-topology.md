@@ -5,7 +5,8 @@
   [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9. M4.1b
   (receipts and epochs) is implemented. M4.1c wires it into all three
   dispatch paths behind `REMORA_WS1_ADMISSION=atomic`: slice 1 the
-  direct-ACCEPT path, slice 2a the approved-review path and the async worker.
+  direct-ACCEPT path, slice 2a the approved-review path and the async worker,
+  slice 2b revocation at admission, slice 3 the audit row.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -285,11 +286,37 @@ Still open after slice 2a: see slice 2b.
   transactions on a fresh database no longer collide on the catalog index.
   The contention tests now run without a warm-up transaction.
 
+Still open after slice 2b: see slice 3.
+
+## M4.1c slice 3, implemented (the audit row in the transaction)
+
+The Consequences section puts the audit row inside admission, before
+commit. Each admission now enqueues an `execution_admitted` record in the
+audit outbox (REM-047) on the admission connection, as its last step. If
+the enqueue fails, admission refuses as `audit_outbox_unavailable` and rolls
+back with it: the grant stays unspent, no intent exists and a claim is
+released (M4-T12).
+
+- The record names the grant, the intent's outbox id, the actor, the
+  delegating proposer, the worker on the async path, the WS1 audit block and
+  the admission block. It is keyed on the grant's `jti`, which the spend
+  makes single-use, so a replayed drain appends it once.
+- After commit, admission drains the audit outbox into the chain, so the
+  record lands before `execution_authorized`. That entry's `admission` block
+  carries the record's `audit_key`, which joins the two. A failed drain does
+  not fail the admission: the row is committed, and the next drain projects
+  it (the lazy sweep in `reconcile_stale_dispatches`).
+- `execution_authorized` stays a direct append after commit. Its sequence
+  number is what `execution_result` and the outbox projection link to, so
+  moving it would need a linking change. It no longer has to move: the
+  record of what was admitted commits with the admission.
+- Tests: `tests/test_atomic_admission.py` (SQLite and Postgres) covers the
+  row and its payload, an enqueue failure on the record path and on the
+  claim path, an unkeyed record, and a failed drain.
+  `tests/test_ws1_atomic_admission_route.py` covers all three paths and an
+  enqueue failure through the route.
+
 Still open:
-- `execution_authorized` is appended after commit (M4-T12). Moving it into
-  the transaction defers its chain sequence number, which `execution_result`
-  and the outbox projection link by today. That needs a linking change of
-  its own.
 - M4-T14 to T20.
 - The real Postgres matrix beyond the contention and ordering cases. M4.1
   stays open until the SDD §5 gate is met.

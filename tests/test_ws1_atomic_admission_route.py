@@ -266,3 +266,51 @@ def test_the_authority_route_refuses_without_atomic_admission(client, monkeypatc
     monkeypatch.delenv("REMORA_WS1_ADMISSION", raising=False)
     r = client.post("/v1/execution/revoke-authority", json={"subject_key": SOURCE})
     assert r.status_code == 409
+
+
+# ── the admission's audit row (M4-T12) ───────────────────────────────────────
+
+
+def _joined(authorized: dict) -> dict:
+    """The execution_admitted entry an execution_authorized one names, which
+    the drain after commit put on the chain before it."""
+    names = [e.payload.get("event") for e in _mod()._CHAIN.entries("acme")]
+    [admitted] = [e for e in _events("execution_admitted")
+                  if authorized["admission"]["audit_key"].endswith(e["grant_jti"])]
+    assert names.index("execution_admitted") < names.index("execution_authorized")
+    assert admitted["grant_jti"] == authorized["grant_jti"]
+    return admitted
+
+
+def test_m4_t12_each_path_commits_its_admission_record_with_the_spend(client, monkeypatch):
+    gate = _install(monkeypatch, "enforce")
+    assert _try(client, _mint(gate))[2] is True
+    admitted = _joined(_events("execution_authorized")[-1])
+    assert admitted["admission"]["mode"] == "atomic" and admitted["outbox_id"]
+
+
+def test_m4_t12_the_review_path_commits_its_admission_record(client, monkeypatch):
+    assert _execute(client, _approved(client, monkeypatch))["tool_execution"]["executed"]
+    assert _joined(_events("execution_authorized")[-1])["item_id"]
+
+
+def test_m4_t12_the_worker_commits_its_admission_record(client, monkeypatch):
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    _execute(client, _approved(client, monkeypatch))
+    _mod().dispatch_pending_intents("acme", worker_id="w-1")
+    assert _joined(_events("execution_authorized")[-1])["executed_by"] == "w-1"
+
+
+def test_m4_t12_an_audit_outbox_failure_refuses_unspent(client, monkeypatch):
+    gate = _install(monkeypatch, "enforce")
+    token = _mint(gate)
+    real = admission_mod.audit_outbox.enqueue
+
+    def down(*args, **kwargs):
+        raise RuntimeError("audit outbox insert failed")
+
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", down)
+    assert _try(client, token) == (409, "audit_outbox_unavailable", False)
+    assert not _events("execution_authorized") and not _events("execution_admitted")
+    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", real)
+    assert _try(client, token)[2] is True
