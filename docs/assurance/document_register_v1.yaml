@@ -3243,7 +3243,7 @@ documents:
   audience:
   - maintainers
   - researchers
-  last_reviewed: '2026-10-22'
+  last_reviewed: '2026-10-23'
   validates_against: []
   claims: []
 - id: DOC-407
@@ -3259,6 +3259,17 @@ documents:
   last_reviewed: '2026-10-22'
   validates_against: []
   claims: []
+- id: DOC-408
+  path: provenance/verified-prior-art-cumulative-limits-2026-10-23.md
+  status: supporting
+  topic: provenance_verified-prior-art-cumulative-limits-2026-10-23_md
+  code_synced: verified
+  verdict: current
+  last_reviewed: '2026-10-23'
+  audience:
+  - maintainers
+  - evaluators
+  - researchers
 topics:
 - provenance_README_md
 - provenance_prior-art-review-2026-10-04_md
@@ -3592,3 +3603,4 @@ topics:
 - docs_architecture_ADR-ws1-m4-admission-topology_md
 - docs_architecture_ADR-ws1-m4-recovery-scheduler_md
 - docs_assurance_horizon55-analysis-plan-v1_md
+- provenance_verified-prior-art-cumulative-limits-2026-10-23_md

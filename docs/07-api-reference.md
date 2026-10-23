@@ -754,6 +754,8 @@ did not run; otherwise it is never returned. The ledger is per host. A
 `change` meter that is not observed tracks the values REMORA let through, not
 the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
+[provenance/verified-prior-art-cumulative-limits-2026-10-23.md](../provenance/verified-prior-art-cumulative-limits-2026-10-23.md)
+lists the prior art these limits build on and what may not be claimed for them.
 
 **Other settings the API reads:** `REMORA_TOOLSPEC_REVOKED_IDENTITIES` is a
 comma-separated list of ToolSpec signing identities that are refused even when

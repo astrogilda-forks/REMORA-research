@@ -30,6 +30,7 @@ the paper.
 | 15 | Custody split as a hard guard | key custody, separation of duty, HSM role split | PRIOR_ART_OVERLAP; composition only |
 | 16 | Task identity bound into the lease | context-bound / resource-bound capabilities; Safety Does Not Compose 2608.27141 | COMPOSITIONAL_CONTRIBUTION candidate |
 | 17 | The authority-to-effect chain, taken together | each link exists separately (AEGIS, CaMeL, Progent, capability systems, audit logs) | strongest COMPOSITIONAL_CONTRIBUTION candidate; the AEGIS crosswalk already argues the difference property by property |
+| none | Cumulative limits reserved at dispatch (CAP-031) | Schneider 2000; edit automata 2005; UCON_ABC 2004; Abadi & Fournet 2003; escrow 1986; leases 1989; Simplex; control barrier functions; shielding 2018 | PRIOR_ART_OVERLAP for every mechanism; composition at most. No PROV record. Bibliography and claim limits: `provenance/verified-prior-art-cumulative-limits-2026-10-23.md` |
 
 Rows 13–15 are classic cryptographic hygiene. The whole chain (policy →
 task/authority grounding → exact-call binding → one-time lease → custody
