@@ -6,7 +6,8 @@
   (receipts and epochs) is implemented. M4.1c wires it into all three
   dispatch paths behind `REMORA_WS1_ADMISSION=atomic`: slice 1 the
   direct-ACCEPT path, slice 2a the approved-review path and the async worker,
-  slice 2b revocation at admission, slice 3 the audit row.
+  slice 2b revocation at admission, slice 3 the audit row, slice 4 the
+  permit before the send.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -316,7 +317,45 @@ released (M4-T12).
   `tests/test_ws1_atomic_admission_route.py` covers all three paths and an
   enqueue failure through the route.
 
+Still open after slice 3: see slice 4.
+
+## M4.1c slice 4, implemented (the permit before the send)
+
+Decision 6 calls for a pre-send permit check (INV-M4-03) against the same
+database. After admission commits and before the lease is minted, all three
+paths call `AtomicAdmission.permit`. It runs in a short transaction under the
+same tenant lock, so it is ordered with every revocation, and it writes
+nothing. It repeats the admission check at a fresh database instant: the
+receipts' expiry, their epochs read under lock, and the principals.
+
+- **Refused before the send (M4-T14, M4-T16).** Evidence that lapsed, a source
+  revoked or revised, or a principal revoked after the commit refuses the
+  attempt. The grant was spent at admission, so this is not a retry. The
+  intent settles `REFUSED`, `tool_execution` reports
+  `refusal_reason: permit_refused` with the cause in `permit_refusal`, and
+  no lease is minted.
+- **The lease is the downstream permit.** A permit carries `not_after`: the
+  earliest receipt `valid_until`, less twice the declared skew. One skew is
+  the admission rule on the database clock, and the other covers an
+  executor whose clock runs behind. The lease minted for the call expires no
+  later than that, and `dispatch_under_lease` refuses to mint at or past it
+  (`permit_expired`). An executor that receives the lease late, local or
+  remote, therefore refuses it as expired.
+- **Not safe at effect (M4-T16).** A revocation after the permit check, while
+  the call is out, is not seen by an executor that does not check it. Every
+  permit records `validity: AUTHORIZED_AT_COMMIT` and
+  `at_effect: NOT_ESTABLISHED` in `tool_execution.permit` and on the
+  `execution_result` entry. The test that revokes mid-send asserts the call
+  runs and is labelled that way.
+- Tests: `tests/test_atomic_admission.py` (SQLite and Postgres) covers the
+  permit's bound, a lapse, evidence too close to expiry for the executor, a
+  source and a principal revoked after commit, an unreachable epoch store,
+  a permit that writes nothing, a revocation racing the permit, and a bound
+  already past. `tests/test_ws1_atomic_admission_route.py` covers the lease
+  bound, a lapse and a revocation between commit and permit on each path,
+  and a revocation mid-send.
+
 Still open:
-- M4-T14 to T20.
+- M4-T15 and T17 to T20.
 - The real Postgres matrix beyond the contention and ordering cases. M4.1
   stays open until the SDD §5 gate is met.
