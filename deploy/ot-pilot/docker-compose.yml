@@ -91,6 +91,15 @@ services:
       REMORA_INTENT_SOURCE_FILE: /app/work_orders.json
       REMORA_EXECUTION_ARTIFACT_DIR: /var/lib/remora/artifacts
 
+      # --- Cumulative limits -------------------------------------------------
+      # A check on one call cannot see that small setpoint moves or valve
+      # strokes add up. These cap movement per loop and valve, alarm acks and
+      # work orders per window, shared by every principal, and refuse any
+      # write tool without a meter (coverage all_writes). The ledger is SQLite
+      # on this one container; see NEGATIVE_RESULTS.md section 97.
+      REMORA_LIMITS_FILE: /app/limits.json
+      REMORA_LIMITS_LEDGER: /var/lib/remora/limits-ledger.db
+
       # Prometheus scrape without a bearer token (local pilot only).
       REMORA_PROMETHEUS_PUBLIC: "1"
       PYTHONPATH: /app

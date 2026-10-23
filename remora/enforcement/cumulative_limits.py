@@ -1,0 +1,555 @@
+# Author: Stian Skogbrott
+# SPDX-License-Identifier: BUSL-1.1
+"""Cumulative limits on governed tool calls, reserved before dispatch.
+
+A per-call check sees one call. It cannot see that three payments of 7000
+pass a budget of 20000, that ten setpoint moves of 0.5 degC add up to 5 degC,
+or that a fan was started eight times in an hour. This module measures every
+call that consumes something and refuses the one that would take a running
+total past its declared limit, before the call reaches the tool.
+
+A deployment declares, in a ``remora-cumulative-limits/v1`` policy:
+
+``meters``
+    Per tool, what one call consumes. A meter has a ``quantity`` name and a
+    kind. ``sum`` takes an amount from an argument (a payment, minutes of
+    runtime, a volume). ``count`` charges a fixed amount per call (one start,
+    one actuation). ``change`` charges how far an absolute value moves from
+    the last value REMORA let through for the same resource (a setpoint, a
+    valve position), so a large move cannot be split into small ones. A
+    meter may name the argument that identifies the resource (``AHU-1``) and
+    the unit, either fixed or from an argument.
+``limits``
+    Per tenant and quantity, a ``max`` in the meter's unit, optionally per
+    sliding window of ``window_seconds``. A limit is for one principal or
+    ``"*"`` (shared by every principal, so two agents cannot each spend it),
+    and for one resource, ``"*"`` (each resource separately) or no resource
+    (all resources together). A call must fit every limit that matches it.
+``baselines``
+    For ``change`` meters, the value each resource starts from. A change
+    meter with no known value refuses; nothing is guessed.
+``coverage``
+    ``listed`` governs only metered tools. ``all_writes`` also refuses any
+    tool whose signed ToolSpec is not a read and that has no meter, so a
+    write tool added later cannot run unbounded by being forgotten.
+
+Numbers are exact: a value is scaled by the meter's ``scale`` and must then
+be an integer, so a move too small to count is refused rather than rounded
+to nothing. Negative amounts are refused, so nothing can be paid back into
+a limit by a call.
+
+What this guarantees: on one host, the sum of reservations inside a window
+never passes the limit (one SQLite transaction per call). A reservation is
+never returned. A ``change`` meter's last value is the value REMORA last let
+through; a call that fails or whose outcome is unknown leaves the resource
+``unknown``, and the next change refuses until a baseline with a new
+``seed_id`` is declared. It is not a distributed limit across hosts, and it
+does not observe the plant or the payment rail.
+"""
+from __future__ import annotations
+
+import hashlib
+import math
+import sqlite3
+import time
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+
+SCHEMA = "remora-cumulative-limits/v1"
+MAX_UNITS = 10**12  # bound on any scaled amount, limit or baseline
+
+#: Refusal reasons, as they appear in dispatch results and audit records.
+AMOUNT_INVALID = "limit_amount_invalid"
+UNIT_INVALID = "limit_unit_invalid"
+RESOURCE_INVALID = "limit_resource_invalid"
+PRINCIPAL_MISSING = "limit_principal_missing"
+UNDECLARED = "limit_undeclared"
+TOOL_UNMETERED = "limit_tool_unmetered"
+COVERAGE_UNKNOWN = "limit_coverage_unknown"
+EXCEEDED = "limit_exceeded"
+BASELINE_UNKNOWN = "limit_baseline_unknown"
+RESOURCE_BUSY = "limit_resource_busy"
+CHANGED = "limit_changed"
+LEDGER_UNAVAILABLE = "limit_ledger_unavailable"
+INVOCATION_DIFFERS = "limit_invocation_differs"
+
+KINDS = ("sum", "count", "change")
+COVERAGES = ("listed", "all_writes")
+
+
+class LimitPolicyError(ValueError):
+    """The declared policy is malformed; the deployment must not start."""
+
+
+class _Refused(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def _text(value: Any, what: str) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > 200:
+        raise LimitPolicyError(f"{what} must be a non-empty string of at most 200 characters")
+    return value
+
+
+def _int(value: Any, what: str, low: int = 0) -> int:
+    if type(value) is not int or not low <= value <= MAX_UNITS:
+        raise LimitPolicyError(f"{what} must be an integer in [{low}, {MAX_UNITS}]")
+    return value
+
+
+def _scaled(value: Any, scale: int) -> int | None:
+    """``value * scale`` as an exact integer, or None when it is not one."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    scaled = Decimal(str(value)) * scale  # finite int or float: always a valid Decimal
+    if scaled != scaled.to_integral_value() or abs(scaled) > MAX_UNITS:
+        return None
+    return int(scaled)
+
+
+@dataclass(frozen=True)
+class Meter:
+    quantity: str
+    kind: str
+    argument: str | None
+    scale: int
+    per_call: int
+    unit: str | None
+    unit_argument: str | None
+    resource_argument: str | None
+
+    @classmethod
+    def from_dict(cls, tool: str, raw: Any) -> Meter:
+        if not isinstance(raw, Mapping):
+            raise LimitPolicyError(f"tool {tool!r}: each meter is an object")
+        kind = raw.get("kind")
+        if kind not in KINDS:
+            raise LimitPolicyError(f"tool {tool!r}: kind must be one of {KINDS}")
+        argument = raw.get("argument")
+        if kind in ("sum", "change"):
+            argument = _text(argument, f"tool {tool!r} argument")
+        elif argument is not None:
+            raise LimitPolicyError(f"tool {tool!r}: a count meter reads no argument")
+        unit, unit_argument = raw.get("unit"), raw.get("unit_argument")
+        if (unit is None) == (unit_argument is None):
+            raise LimitPolicyError(f"tool {tool!r}: declare exactly one of unit, unit_argument")
+        resource = raw.get("resource_argument")
+        if kind == "change" and resource is None:
+            raise LimitPolicyError(f"tool {tool!r}: a change meter needs resource_argument")
+        return cls(
+            quantity=_text(raw.get("quantity"), f"tool {tool!r} quantity"), kind=kind,
+            argument=argument, scale=_int(raw.get("scale", 1), "scale", 1),
+            per_call=_int(raw.get("per_call", 1), "per_call", 1),
+            unit=None if unit is None else _text(unit, "unit"),
+            unit_argument=None if unit_argument is None else _text(unit_argument,
+                                                                    "unit_argument"),
+            resource_argument=None if resource is None else _text(resource,
+                                                                   "resource_argument"))
+
+
+@dataclass(frozen=True)
+class Limit:
+    limit_id: str
+    tenant: str
+    quantity: str
+    unit: str
+    max: int
+    window_seconds: int | None
+    principal: str  # an id, or "*" for one total shared by every principal
+    resource: str | None  # an id, "*" for each resource apart, None for all together
+
+    def matches(self, tenant: str, principal: str, quantity: str, unit: str,
+                resource: str | None) -> bool:
+        return ((self.tenant, self.quantity, self.unit) == (tenant, quantity, unit)
+                and self.principal in ("*", principal)
+                and (self.resource in (None, "*") or self.resource == resource))
+
+    def counter_key(self, principal: str, resource: str | None) -> str:
+        who = "*" if self.principal == "*" else principal
+        what = resource if self.resource == "*" else (self.resource or "*")
+        return "\x1f".join((self.limit_id, who, str(what)))
+
+    @property
+    def binding(self) -> str:
+        """Every declared term, so an edited limit under the same id refuses."""
+        terms = "\x1f".join((SCHEMA, self.limit_id, self.tenant, self.quantity, self.unit,
+                             str(self.max), str(self.window_seconds), self.principal,
+                             str(self.resource)))
+        return hashlib.sha256(terms.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class Baseline:
+    tenant: str
+    quantity: str
+    resource: str
+    value: int  # scaled
+    seed_id: str
+
+
+@dataclass(frozen=True)
+class LimitPolicy:
+    coverage: str
+    meters: Mapping[str, tuple[Meter, ...]]
+    limits: tuple[Limit, ...]
+    baselines: tuple[Baseline, ...]
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> LimitPolicy:
+        if not isinstance(data, Mapping) or data.get("schema") != SCHEMA:
+            raise LimitPolicyError(f"limit policy schema must be {SCHEMA!r}")
+        coverage = data.get("coverage", "listed")
+        if coverage not in COVERAGES:
+            raise LimitPolicyError(f"coverage must be one of {COVERAGES}")
+        raw_meters = data.get("meters")
+        if not isinstance(raw_meters, Mapping) or not raw_meters:
+            raise LimitPolicyError("a limit policy meters at least one tool")
+        meters: dict[str, tuple[Meter, ...]] = {}
+        for tool, raw in raw_meters.items():
+            if not isinstance(raw, list | tuple) or not raw:
+                raise LimitPolicyError(f"tool {tool!r}: a non-empty list of meters")
+            parsed = tuple(Meter.from_dict(tool, m) for m in raw)
+            if len({m.quantity for m in parsed}) != len(parsed):
+                raise LimitPolicyError(f"tool {tool!r}: one meter per quantity")
+            meters[_text(tool, "tool name")] = parsed
+        scales: dict[str, int] = {}
+        for parsed in meters.values():
+            for m in parsed:
+                if scales.setdefault(m.quantity, m.scale) != m.scale:
+                    raise LimitPolicyError(f"quantity {m.quantity!r} has two scales")
+        limits = []
+        for raw in data.get("limits") or ():
+            if not isinstance(raw, Mapping):
+                raise LimitPolicyError("each limit is an object")
+            window = raw.get("window_seconds")
+            resource = raw.get("resource")
+            limits.append(Limit(
+                limit_id=_text(raw.get("limit_id"), "limit_id"),
+                tenant=_text(raw.get("tenant"), "tenant"),
+                quantity=_text(raw.get("quantity"), "quantity"),
+                unit=_text(raw.get("unit"), "unit"), max=_int(raw.get("max"), "max"),
+                window_seconds=None if window is None else _int(window, "window_seconds", 1),
+                principal=_text(raw.get("principal"), "principal"),
+                resource=None if resource is None else _text(resource, "resource")))
+        if len({lim.limit_id for lim in limits}) != len(limits):
+            raise LimitPolicyError("limit_id values must be unique")
+        baselines = []
+        for raw in data.get("baselines") or ():
+            if not isinstance(raw, Mapping):
+                raise LimitPolicyError("each baseline is an object")
+            quantity = _text(raw.get("quantity"), "baseline quantity")
+            if quantity not in scales:
+                raise LimitPolicyError(f"baseline for unmetered quantity {quantity!r}")
+            value = _scaled(raw.get("value"), scales[quantity])
+            if value is None:
+                raise LimitPolicyError(f"baseline value for {quantity!r} is not exact at "
+                                       f"scale {scales[quantity]}")
+            baselines.append(Baseline(
+                tenant=_text(raw.get("tenant"), "tenant"), quantity=quantity,
+                resource=_text(raw.get("resource"), "resource"), value=value,
+                seed_id=_text(raw.get("seed_id"), "seed_id")))
+        keys = [(b.tenant, b.quantity, b.resource) for b in baselines]
+        if len(set(keys)) != len(keys):
+            raise LimitPolicyError("two baselines for one resource")
+        return cls(coverage=coverage, meters=meters, limits=tuple(limits),
+                   baselines=tuple(baselines))
+
+    def baseline(self, tenant: str, quantity: str, resource: str) -> Baseline | None:
+        return next((b for b in self.baselines
+                     if (b.tenant, b.quantity, b.resource) == (tenant, quantity, resource)),
+                    None)
+
+
+@dataclass(frozen=True)
+class Reading:
+    """One meter's reading of one call, before the change is computed."""
+
+    meter: Meter
+    unit: str
+    resource: str | None
+    value: int  # scaled amount (sum, count) or scaled new value (change)
+
+
+class LimitLedger:
+    """Single-host SQLite ledger of reservations and last values.
+
+    Kept in ``remora/enforcement``: the enforcement core does not import the
+    verification library (tests/verification/test_architecture_boundary.py).
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        from remora.persistence.sqlite_path import refuse_memory_db
+
+        self.path = str(path)
+        refuse_memory_db(self.path, what="cumulative limit ledger")
+        with self._connect() as conn:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS limit_counter (
+                    counter_key TEXT PRIMARY KEY, binding TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS limit_reservation (
+                    counter_key TEXT NOT NULL REFERENCES limit_counter(counter_key),
+                    operation_id TEXT NOT NULL, request_hash TEXT NOT NULL,
+                    amount INTEGER NOT NULL CHECK(amount >= 0), at REAL NOT NULL,
+                    PRIMARY KEY(counter_key, operation_id)
+                );
+                CREATE TABLE IF NOT EXISTS limit_value (
+                    value_key TEXT PRIMARY KEY, value INTEGER NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('settled','pending','unknown')),
+                    operation_id TEXT NOT NULL, seed_id TEXT NOT NULL
+                );
+            """)
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self.path, timeout=5.0)
+        try:
+            conn.execute("PRAGMA foreign_keys=ON")
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+    def transaction(self) -> Any:
+        """One ``BEGIN IMMEDIATE`` transaction: reads and writes in it are serial."""
+        @contextmanager
+        def _tx() -> Iterator[sqlite3.Connection]:
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                yield conn
+        return _tx()
+
+    @staticmethod
+    def used(conn: sqlite3.Connection, key: str, binding: str,
+             window_seconds: int | None, now: float) -> int:
+        row = conn.execute("SELECT binding FROM limit_counter WHERE counter_key=?",
+                           (key,)).fetchone()
+        if row is not None and row[0] != binding:
+            raise _Refused(CHANGED)
+        since = -math.inf if window_seconds is None else now - window_seconds
+        total = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) FROM limit_reservation "
+            "WHERE counter_key=? AND at>?", (key, since)).fetchone()[0]
+        return int(total)
+
+    @staticmethod
+    def prior(conn: sqlite3.Connection, key: str, operation_id: str) -> tuple[str, int] | None:
+        row = conn.execute("SELECT request_hash,amount FROM limit_reservation "
+                           "WHERE counter_key=? AND operation_id=?",
+                           (key, operation_id)).fetchone()
+        return None if row is None else (row[0], int(row[1]))
+
+    @staticmethod
+    def record(conn: sqlite3.Connection, key: str, binding: str, operation_id: str,
+               request_hash: str, amount: int, now: float) -> None:
+        conn.execute("INSERT OR IGNORE INTO limit_counter VALUES(?,?)", (key, binding))
+        conn.execute("INSERT INTO limit_reservation VALUES(?,?,?,?,?)",
+                     (key, operation_id, request_hash, amount, now))
+
+    @staticmethod
+    def value(conn: sqlite3.Connection, key: str) -> tuple[int, str, str, str] | None:
+        row = conn.execute("SELECT value,status,operation_id,seed_id FROM limit_value "
+                           "WHERE value_key=?", (key,)).fetchone()
+        return None if row is None else (int(row[0]), row[1], row[2], row[3])
+
+    @staticmethod
+    def set_value(conn: sqlite3.Connection, key: str, value: int, status: str,
+                  operation_id: str, seed_id: str) -> None:
+        conn.execute("INSERT INTO limit_value VALUES(?,?,?,?,?) ON CONFLICT(value_key) DO "
+                     "UPDATE SET value=excluded.value, status=excluded.status, "
+                     "operation_id=excluded.operation_id, seed_id=excluded.seed_id",
+                     (key, value, status, operation_id, seed_id))
+
+    def settle(self, operation_id: str, ok: bool) -> None:
+        """Record whether the call reserved under ``operation_id`` ran."""
+        with self._connect() as conn:
+            conn.execute("UPDATE limit_value SET status=? WHERE operation_id=? "
+                         "AND status='pending'", ("settled" if ok else "unknown", operation_id))
+
+
+def _epoch(now: str | float | None) -> float:
+    if now is None:
+        return time.time()
+    if isinstance(now, int | float):
+        return float(now)
+    return datetime.fromisoformat(now).timestamp()
+
+
+class LimitGuard:
+    """Measures a call, and reserves it against every limit it matches."""
+
+    def __init__(self, policy: LimitPolicy, ledger: LimitLedger,
+                 is_write: Callable[[str], bool | None] | None = None) -> None:
+        self.policy = policy
+        self.ledger = ledger
+        self.is_write = is_write
+
+    def governs(self, tool_name: str) -> bool:
+        return tool_name in self.policy.meters or self.policy.coverage == "all_writes"
+
+    def _coverage_refusal(self, tool_name: str) -> str | None:
+        if tool_name in self.policy.meters or self.policy.coverage != "all_writes":
+            return None
+        try:
+            write = self.is_write(tool_name) if self.is_write is not None else None
+        except Exception:
+            write = None
+        if write is None:
+            return COVERAGE_UNKNOWN
+        return TOOL_UNMETERED if write else None
+
+    def readings(self, tool_name: str, arguments: Any) -> list[Reading]:
+        """What the call consumes per meter; raises ``_Refused`` when unreadable."""
+        args = arguments if isinstance(arguments, Mapping) else {}
+        out = []
+        for meter in self.policy.meters.get(tool_name, ()):
+            if meter.unit_argument is not None:
+                unit = args.get(meter.unit_argument)
+                if not isinstance(unit, str) or not unit or len(unit) > 200:
+                    raise _Refused(UNIT_INVALID)
+            else:
+                unit = meter.unit or ""
+            resource = None
+            if meter.resource_argument is not None:
+                resource = args.get(meter.resource_argument)
+                if not isinstance(resource, str) or not resource or len(resource) > 200:
+                    raise _Refused(RESOURCE_INVALID)
+            if meter.kind == "count":
+                value = meter.per_call
+            else:
+                scaled = _scaled(args.get(meter.argument or ""), meter.scale)
+                if scaled is None or (meter.kind == "sum" and scaled < 1):
+                    raise _Refused(AMOUNT_INVALID)
+                value = scaled
+            out.append(Reading(meter, unit, resource, value))
+        return out
+
+    def _plan(self, conn: sqlite3.Connection, *, tenant: str, principal: str,
+              readings: list[Reading], operation_id: str, request_hash: str,
+              now: float) -> tuple[bool, list[tuple[Limit, str, int]],
+                                   list[tuple[str, int, str]]]:
+        """Charges and value updates for this call, checked against every limit.
+
+        Returns (already reserved, charges, value updates). Raises ``_Refused``.
+        """
+        charges: list[tuple[Limit, str, int]] = []
+        values: list[tuple[str, int, str]] = []
+        for reading in readings:
+            m = reading.meter
+            amount: int | None = reading.value
+            if m.kind == "change":
+                resource = reading.resource or ""
+                value_key = "\x1f".join((tenant, m.quantity, resource))
+                base = self.policy.baseline(tenant, m.quantity, resource)
+                state = self.ledger.value(conn, value_key)
+                if base is not None and (state is None or state[3] != base.seed_id):
+                    state = (base.value, "settled", "", base.seed_id)  # a new seed resets
+                if state is None:
+                    raise _Refused(BASELINE_UNKNOWN)
+                last, status, owner, seed_id = state
+                if owner == operation_id:
+                    amount = None  # a retry of this operation: its charge is recorded
+                elif status == "pending":
+                    raise _Refused(RESOURCE_BUSY)
+                elif status == "unknown":
+                    raise _Refused(BASELINE_UNKNOWN)
+                else:
+                    amount = abs(reading.value - last)
+                values.append((value_key, reading.value, seed_id))
+            matching = [lim for lim in self.policy.limits
+                        if lim.matches(tenant, principal, m.quantity, reading.unit,
+                                       reading.resource)]
+            if not matching:
+                raise _Refused(UNDECLARED)
+            for lim in matching:
+                key = lim.counter_key(principal, reading.resource)
+                charges.append((lim, key, -1 if amount is None else amount))
+        priors = [self.ledger.prior(conn, key, operation_id) for _, key, _ in charges]
+        if charges and all(p is not None for p in priors):
+            for (_, _, amount), prior in zip(charges, priors, strict=True):
+                if prior is None or prior[0] != request_hash or amount not in (-1, prior[1]):
+                    raise _Refused(CHANGED)
+            return True, charges, values
+        if any(p is not None for p in priors) or any(a == -1 for _, _, a in charges):
+            raise _Refused(CHANGED)
+        # Each charge has its own counter: one meter per quantity, one quantity per limit.
+        for lim, key, amount in charges:
+            if self.ledger.used(conn, key, lim.binding, lim.window_seconds, now) + amount > lim.max:
+                raise _Refused(EXCEEDED)
+        return False, charges, values
+
+    def _run(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
+             operation_id: str, request_hash: str, now: str | float | None,
+             write: bool) -> str | None:
+        refusal = self._coverage_refusal(tool_name)
+        if refusal is not None:
+            return refusal
+        if tool_name not in self.policy.meters:
+            return None
+        if not principal:
+            return PRINCIPAL_MISSING
+        try:
+            readings = self.readings(tool_name, arguments)
+            at = _epoch(now)
+            with self.ledger.transaction() as conn:
+                done, charges, values = self._plan(
+                    conn, tenant=tenant, principal=principal, readings=readings,
+                    operation_id=operation_id, request_hash=request_hash, now=at)
+                if write and not done:
+                    for lim, key, amount in charges:
+                        self.ledger.record(conn, key, lim.binding, operation_id,
+                                           request_hash, amount, at)
+                    for value_key, value, seed_id in values:
+                        self.ledger.set_value(conn, value_key, value, "pending",
+                                              operation_id, seed_id)
+        except _Refused as exc:
+            return exc.reason
+        except Exception:
+            return LEDGER_UNAVAILABLE
+        return None
+
+    def preview(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
+                now: str | float | None = None) -> str | None:
+        """The refusal this call would get now; reserves nothing.
+
+        Advisory: the reservation at dispatch decides, and other calls may
+        reserve in between.
+        """
+        return self._run(tenant=tenant, principal=principal, tool_name=tool_name,
+                         arguments=arguments, operation_id="preview",
+                         request_hash="preview", now=now, write=False)
+
+    def reserve(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
+                operation_id: str, request_hash: str,
+                now: str | float | None = None) -> str | None:
+        """Reserve the call against every limit it matches; None when it may run.
+
+        ``operation_id`` names the lease, so a retry of one lease (a crash
+        between this reservation and the nonce consumption) finds its own
+        reservation and is not charged twice.
+        """
+        return self._run(tenant=tenant, principal=principal, tool_name=tool_name,
+                         arguments=arguments, operation_id=operation_id,
+                         request_hash=request_hash, now=now, write=True)
+
+    def compare(self, tool_name: str, wire: Any, invocation: Any) -> str | None:
+        """Refuse a resolved invocation that would meter differently from the wire form."""
+        if tool_name not in self.policy.meters:
+            return None
+        try:
+            same = self.readings(tool_name, wire) == self.readings(tool_name, invocation)
+        except _Refused as exc:
+            return exc.reason
+        return None if same else INVOCATION_DIFFERS
+
+    def settle(self, operation_id: str, ok: bool) -> None:
+        self.ledger.settle(operation_id, ok)

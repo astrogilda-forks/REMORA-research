@@ -828,6 +828,7 @@ class GovernedToolDispatcher:
         self._spec_identity: Callable[[str], tuple[str, int] | None] | None = None
         self._require_task = require_task_identity
         self._require_capability = require_capability_set
+        self._limit_guard: Any = None
         self._require_execution_context = require_execution_context
         self._execution_context_provider = execution_context_provider
         # NTA-2 phase 3: under a strict profile a mediated tool whose spec
@@ -1202,6 +1203,48 @@ class GovernedToolDispatcher:
             else:
                 self._mediated.discard(tool_name)
             self._registry_versions[tool_name] = self._registry_versions.get(tool_name, 0) + 1
+
+    def bind_limit_guard(self, guard: Any) -> None:
+        """Reserve each metered call against its cumulative limits before dispatch.
+
+        ``guard`` is a ``remora.enforcement.cumulative_limits.LimitGuard``. A
+        call that would take a running total past a declared limit (a budget,
+        starts per hour, setpoint movement per window) refuses with the
+        guard's reason and leaves the nonce unspent. After the tool runs, the
+        guard learns whether it ran, so a ``change`` meter knows the value.
+        """
+        self._limit_guard = guard
+
+    def _limit_refusal(self, lease: ExecutionLease, tool_name: str, arguments: Any,
+                       invocation: Any, now: str | None) -> str | None:
+        guard = self._limit_guard
+        if guard is None or not guard.governs(tool_name):
+            return None
+        if invocation is not arguments:
+            # A resolved handle must not consume more, or other, than the
+            # approved wire form names.
+            differs = guard.compare(tool_name, arguments, invocation)
+            if differs is not None:
+                return str(differs)
+        refusal = guard.reserve(tenant=lease.tenant_id, principal=lease.actor_identity or "",
+                                tool_name=tool_name, arguments=arguments,
+                                operation_id=f"lease:{lease.nonce}",
+                                request_hash=lease.tool_args_hash or "none", now=now)
+        return None if refusal is None else str(refusal)
+
+    def _limit_settle(self, lease: ExecutionLease, tool_name: str, ok: bool) -> None:
+        guard = self._limit_guard
+        if guard is None or not guard.governs(tool_name):
+            return
+        try:
+            guard.settle(f"lease:{lease.nonce}", ok)
+        except Exception as exc:
+            # Left pending, the resource refuses the next change until this
+            # lease is retried or a new baseline is declared: closed, not open.
+            governance_event(
+                "dispatch.limit_settle_failed", level=logging.ERROR,
+                tenant_id=lease.tenant_id, tool_name=tool_name,
+                proposal_id=lease.proposal_id, error_type=type(exc).__name__)
 
     def bind_downstream_ceilings(self, resolver: Callable[[str], Any]) -> None:
         """Supply each tool's declared downstream ceiling (NTA-2).
@@ -1626,6 +1669,22 @@ class GovernedToolDispatcher:
                 proposal_id=proposal_id,
             )
 
+        # Cumulative limits: the last check before anything is recorded or
+        # spent, because a successful reservation is itself durable. A retry
+        # of this lease finds its own reservation and is not charged twice.
+        limit_refusal = self._limit_refusal(lease, tool_name, arguments, invocation, now)
+        if limit_refusal is not None:
+            governance_event(
+                "dispatch.refused", level=logging.WARNING,
+                reason=limit_refusal, tenant_id=tenant_id,
+                tool_name=tool_name, proposal_id=proposal_id,
+                grant_jti=lease.grant_jti,
+            )
+            return DispatchResult(
+                executed=False, refusal_reason=limit_refusal,
+                proposal_id=proposal_id,
+            )
+
         # Q7.6: recorded outside this process before anything is spent. A
         # refusal here leaves the nonce unspent, like every refusal above.
         from remora.audit.recorder import RecorderUnavailable
@@ -1729,6 +1788,7 @@ class GovernedToolDispatcher:
 
         try:
             res = fn(invocation, mediator) if mediator is not None else fn(invocation)
+            self._limit_settle(lease, tool_name, ok=True)
             nested_effects, effect_graph = _nested()
             self._record_outcome(lease, tool_name, recorder_seq, "executed")
             governance_event(
@@ -1745,6 +1805,7 @@ class GovernedToolDispatcher:
                 execution_id=lease.grant_jti, dispatch_check=check,
             )
         except Exception as e:
+            self._limit_settle(lease, tool_name, ok=False)
             # Burn is recorded with its reason so failure() can surface it;
             # the nonce stays consumed — state at the tool is unknown.
             if hasattr(self._ledger, "fail_consume"):
