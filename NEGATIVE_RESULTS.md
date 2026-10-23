@@ -5835,6 +5835,15 @@ under clamping, a dropped write and a write that was acknowledged and not
 applied. The OT pilot now observes its setpoints and valves. A tracked meter
 remains for deployments without an observer, with this gap as its caveat.
 
+A review then pointed at the window between reading the plant and writing to
+it, and a deterministic test confirmed it. REMORA read 19.0, an operator set
+17.0, and REMORA wrote 19.5. The ledger charged 0.5 degC for 2.5 of movement.
+The dispatcher now reads the plant again just before the write, and refuses
+the write if it moved; the same test then writes nothing. A change after that
+last read is charged from the value the controller reports it replaced, when
+the controller reports one. Without such a report that last window remains
+open, and a test pins it.
+
 Limits: the ledger is SQLite on one host, and a reservation is never
 returned. The amount is the argument the deployment names, not what a rail
 settled. A change meter that is not observed tracks the values REMORA let
