@@ -76,6 +76,7 @@ BASELINE_UNKNOWN = "limit_baseline_unknown"
 RESOURCE_BUSY = "limit_resource_busy"
 CHANGED = "limit_changed"
 LEDGER_UNAVAILABLE = "limit_ledger_unavailable"
+OBSERVATION_UNAVAILABLE = "limit_observation_unavailable"
 INVOCATION_DIFFERS = "limit_invocation_differs"
 
 KINDS = ("sum", "count", "change")
@@ -126,6 +127,7 @@ class Meter:
     unit: str | None
     unit_argument: str | None
     resource_argument: str | None
+    observed: bool = False
 
     @classmethod
     def from_dict(cls, tool: str, raw: Any) -> Meter:
@@ -145,6 +147,9 @@ class Meter:
         resource = raw.get("resource_argument")
         if kind == "change" and resource is None:
             raise LimitPolicyError(f"tool {tool!r}: a change meter needs resource_argument")
+        observed = raw.get("observed", False)
+        if type(observed) is not bool or (observed and kind != "change"):
+            raise LimitPolicyError(f"tool {tool!r}: observed is a boolean, on change meters only")
         return cls(
             quantity=_text(raw.get("quantity"), f"tool {tool!r} quantity"), kind=kind,
             argument=argument, scale=_int(raw.get("scale", 1), "scale", 1),
@@ -153,7 +158,8 @@ class Meter:
             unit_argument=None if unit_argument is None else _text(unit_argument,
                                                                     "unit_argument"),
             resource_argument=None if resource is None else _text(resource,
-                                                                   "resource_argument"))
+                                                                   "resource_argument"),
+            observed=observed)
 
 
 @dataclass(frozen=True)
@@ -263,6 +269,12 @@ class LimitPolicy:
         return cls(coverage=coverage, meters=meters, limits=tuple(limits),
                    baselines=tuple(baselines))
 
+    @property
+    def observed_quantities(self) -> frozenset[str]:
+        """Quantities whose change is measured from an observed value."""
+        return frozenset(m.quantity for meters in self.meters.values() for m in meters
+                         if m.observed)
+
     def baseline(self, tenant: str, quantity: str, resource: str) -> Baseline | None:
         return next((b for b in self.baselines
                      if (b.tenant, b.quantity, b.resource) == (tenant, quantity, resource)),
@@ -369,11 +381,23 @@ class LimitLedger:
                      "operation_id=excluded.operation_id, seed_id=excluded.seed_id",
                      (key, value, status, operation_id, seed_id))
 
-    def settle(self, operation_id: str, ok: bool) -> None:
-        """Record whether the call reserved under ``operation_id`` ran."""
+    def settle(self, operation_id: str, ok: bool) -> list[tuple[str, int]]:
+        """Record whether the call reserved under ``operation_id`` ran.
+
+        Returns the (value key, target) pairs it settled.
+        """
         with self._connect() as conn:
+            rows = conn.execute("SELECT value_key,value FROM limit_value WHERE operation_id=? "
+                                "AND status='pending'", (operation_id,)).fetchall()
             conn.execute("UPDATE limit_value SET status=? WHERE operation_id=? "
                          "AND status='pending'", ("settled" if ok else "unknown", operation_id))
+        return [(str(key), int(value)) for key, value in rows]
+
+    def observe(self, value_key: str, value: int) -> None:
+        """Replace a settled or unknown value with what was observed."""
+        with self._connect() as conn:
+            conn.execute("UPDATE limit_value SET value=?, status='settled' WHERE value_key=? "
+                         "AND status!='pending'", (value, value_key))
 
 
 def _epoch(now: str | float | None) -> float:
@@ -388,10 +412,28 @@ class LimitGuard:
     """Measures a call, and reserves it against every limit it matches."""
 
     def __init__(self, policy: LimitPolicy, ledger: LimitLedger,
-                 is_write: Callable[[str], bool | None] | None = None) -> None:
+                 is_write: Callable[[str], bool | None] | None = None,
+                 observer: Callable[[str, str, str], Any] | None = None) -> None:
+        if policy.observed_quantities and observer is None:
+            raise LimitPolicyError("observed change meters need an observer")
         self.policy = policy
         self.ledger = ledger
         self.is_write = is_write
+        self.observer = observer
+
+    def _observe(self, tenant: str, quantity: str, resource: str, scale: int) -> Decimal | None:
+        """The observed value, scaled; None when it cannot be read as a finite number."""
+        if self.observer is None:
+            return None
+        try:
+            raw = self.observer(tenant, quantity, resource)
+        except Exception:
+            return None
+        if isinstance(raw, bool) or not isinstance(raw, int | float):
+            return None
+        if isinstance(raw, float) and not math.isfinite(raw):
+            return None
+        return Decimal(str(raw)) * scale
 
     def governs(self, tool_name: str) -> bool:
         return tool_name in self.policy.meters or self.policy.coverage == "all_writes"
@@ -435,18 +477,33 @@ class LimitGuard:
 
     def _plan(self, conn: sqlite3.Connection, *, tenant: str, principal: str,
               readings: list[Reading], operation_id: str, request_hash: str,
-              now: float) -> tuple[bool, list[tuple[Limit, str, int]],
-                                   list[tuple[str, int, str]]]:
+              now: float, observed: Mapping[int, Decimal] | None = None,
+              ) -> tuple[bool, list[tuple[Limit, str, int]], list[tuple[str, int, str]]]:
         """Charges and value updates for this call, checked against every limit.
 
         Returns (already reserved, charges, value updates). Raises ``_Refused``.
         """
         charges: list[tuple[Limit, str, int]] = []
         values: list[tuple[str, int, str]] = []
-        for reading in readings:
+        for index, reading in enumerate(readings):
             m = reading.meter
             amount: int | None = reading.value
-            if m.kind == "change":
+            if m.kind == "change" and m.observed:
+                resource = reading.resource or ""
+                value_key = "\x1f".join((tenant, m.quantity, resource))
+                state = self.ledger.value(conn, value_key)
+                if state is not None and state[2] == operation_id:
+                    amount = None  # a retry of this operation: its charge is recorded
+                elif state is not None and state[1] == "pending":
+                    raise _Refused(RESOURCE_BUSY)
+                else:
+                    # Measured from the plant, not from the last value let
+                    # through, so a change made outside REMORA is not counted
+                    # and one REMORA made is. Rounded up: never under-counted.
+                    seen = (observed or {})[index]
+                    amount = math.ceil(abs(reading.value - seen))
+                values.append((value_key, reading.value, "observed"))
+            elif m.kind == "change":
                 resource = reading.resource or ""
                 value_key = "\x1f".join((tenant, m.quantity, resource))
                 base = self.policy.baseline(tenant, m.quantity, resource)
@@ -499,11 +556,20 @@ class LimitGuard:
             return PRINCIPAL_MISSING
         try:
             readings = self.readings(tool_name, arguments)
+            observed: dict[int, Decimal] = {}
+            for index, reading in enumerate(readings):
+                if reading.meter.observed:
+                    seen = self._observe(tenant, reading.meter.quantity, reading.resource or "",
+                                         reading.meter.scale)
+                    if seen is None:
+                        return OBSERVATION_UNAVAILABLE
+                    observed[index] = seen
             at = _epoch(now)
             with self.ledger.transaction() as conn:
                 done, charges, values = self._plan(
                     conn, tenant=tenant, principal=principal, readings=readings,
-                    operation_id=operation_id, request_hash=request_hash, now=at)
+                    operation_id=operation_id, request_hash=request_hash, now=at,
+                    observed=observed)
                 if write and not done:
                     for lim, key, amount in charges:
                         self.ledger.record(conn, key, lim.binding, operation_id,
@@ -551,5 +617,30 @@ class LimitGuard:
             return exc.reason
         return None if same else INVOCATION_DIFFERS
 
-    def settle(self, operation_id: str, ok: bool) -> None:
-        self.ledger.settle(operation_id, ok)
+    def settle(self, operation_id: str, ok: bool) -> list[dict[str, Any]]:
+        """Record whether the call ran, and for observed meters where the plant ended up.
+
+        Returns one record per observed resource: the target REMORA let
+        through, the value read back, and whether the plant reached it. A
+        resource whose value cannot be read back keeps the target (or
+        ``unknown`` after a failure); the next change reads the plant anyway.
+        """
+        settled = self.ledger.settle(operation_id, ok)
+        out: list[dict[str, Any]] = []
+        if self.observer is None:
+            return out
+        scales = {m.quantity: m.scale for meters in self.policy.meters.values()
+                  for m in meters if m.observed}
+        for value_key, target in settled:
+            tenant, quantity, resource = value_key.split("\x1f")
+            if quantity not in scales:
+                continue
+            seen = self._observe(tenant, quantity, resource, scales[quantity])
+            record: dict[str, Any] = {"quantity": quantity, "resource": resource,
+                                      "target": target, "observed": None, "reached": None}
+            if seen is not None:
+                observed_value = int(seen.to_integral_value())
+                self.ledger.observe(value_key, observed_value)
+                record.update(observed=observed_value, reached=seen == target)
+            out.append(record)
+        return out

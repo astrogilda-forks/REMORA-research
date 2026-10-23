@@ -1237,7 +1237,18 @@ class GovernedToolDispatcher:
         if guard is None or not guard.governs(tool_name):
             return
         try:
-            guard.settle(f"lease:{lease.nonce}", ok)
+            observations = guard.settle(f"lease:{lease.nonce}", ok) or []
+            for record in observations:
+                if record.get("reached") is False:
+                    # The plant did not end where REMORA let it go: the next
+                    # change is measured from where it is, and this is the
+                    # record an operator needs.
+                    governance_event(
+                        "dispatch.limit_target_not_reached", level=logging.WARNING,
+                        tenant_id=lease.tenant_id, tool_name=tool_name,
+                        proposal_id=lease.proposal_id, quantity=record.get("quantity"),
+                        resource=record.get("resource"), target=record.get("target"),
+                        observed=record.get("observed"))
         except Exception as exc:
             # Left pending, the resource refuses the next change until this
             # lease is retried or a new baseline is declared: closed, not open.

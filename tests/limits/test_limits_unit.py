@@ -277,3 +277,111 @@ def test_a_settle_that_fails_leaves_the_unit_closed(guard, monkeypatch):
     d._limit_settle(_lease("n1"), "move", ok=True)
     monkeypatch.undo()
     assert d._limit_refusal(_lease("n2"), "move", args, args, None) == cl.RESOURCE_BUSY
+
+
+OBSERVED_METERS = {**METERS, "move_seen": [{"quantity": "seen", "kind": "change",
+                                            "argument": "value", "scale": 10, "unit": "degC",
+                                            "resource_argument": "unit", "observed": True}]}
+SEEN_LIMIT = {"limit_id": "seen", "tenant": "t", "quantity": "seen", "unit": "degC",
+              "max": 20, "window_seconds": 3600, "principal": "*", "resource": "*"}
+
+
+def observed_guard(tmp_path, plant):
+    def observe(tenant, quantity, resource):
+        value = plant[resource]
+        if isinstance(value, Exception):
+            raise value
+        return value
+    return cl.LimitGuard(policy(meters=OBSERVED_METERS, limits=[*LIMITS, SEEN_LIMIT]),
+                         cl.LimitLedger(tmp_path / "seen.db"), observer=observe)
+
+
+@pytest.mark.parametrize("meter", [
+    {"quantity": "q", "kind": "count", "unit": "u", "observed": True},
+    {"quantity": "q", "kind": "change", "argument": "a", "unit": "u",
+     "resource_argument": "r", "observed": "yes"},
+])
+def test_observed_is_a_boolean_on_change_meters_only(meter):
+    with pytest.raises(cl.LimitPolicyError):
+        policy(meters={"x": [meter]})
+
+
+def test_an_observed_meter_needs_an_observer(tmp_path):
+    with pytest.raises(cl.LimitPolicyError, match="need an observer"):
+        cl.LimitGuard(policy(meters=OBSERVED_METERS), cl.LimitLedger(tmp_path / "l.db"))
+
+
+def test_movement_is_measured_from_the_observed_value_and_rounded_up(tmp_path):
+    plant = {"AHU-1": 19.03}
+    guard = observed_guard(tmp_path, plant)
+    assert reserve(guard, "move_seen", "1", unit="AHU-1", value=20.0) is None  # 9.7 -> 10
+    assert guard.settle("1", ok=True) == [{"quantity": "seen", "resource": "AHU-1",
+                                           "target": 200, "observed": 190, "reached": False}]
+    plant["AHU-1"] = 20.0
+    assert reserve(guard, "move_seen", "2", unit="AHU-1", value=21.0) is None  # 10; 20 in all
+    guard.settle("2", ok=True)
+    plant["AHU-1"] = 21.0
+    assert reserve(guard, "move_seen", "3", unit="AHU-1", value=21.1) == cl.EXCEEDED
+
+
+@pytest.mark.parametrize("reading", [None, "19", True, float("nan"), float("inf"),
+                                     ConnectionError("down")])
+def test_an_unreadable_observation_refuses(tmp_path, reading):
+    guard = observed_guard(tmp_path, {"AHU-1": reading})
+    assert reserve(guard, "move_seen", "1", unit="AHU-1", value=19.5) == \
+        cl.OBSERVATION_UNAVAILABLE
+
+
+def test_observed_moves_are_still_serial_and_retries_are_charged_once(tmp_path):
+    plant = {"AHU-1": 19.0}
+    guard = observed_guard(tmp_path, plant)
+    assert reserve(guard, "move_seen", "1", unit="AHU-1", value=20.0) is None
+    assert reserve(guard, "move_seen", "2", unit="AHU-1", value=20.0) == cl.RESOURCE_BUSY
+    assert reserve(guard, "move_seen", "1", unit="AHU-1", value=20.0) is None  # the retry
+    plant["AHU-1"] = 20.0
+    assert guard.settle("1", ok=True)[0]["reached"] is True
+    assert reserve(guard, "move_seen", "2", unit="AHU-1", value=21.0) is None
+    assert reserve(guard, "move_seen", "3", unit="AHU-2", value=1.0) == \
+        cl.OBSERVATION_UNAVAILABLE  # KeyError at the observer
+
+
+def test_after_a_failure_the_plant_is_read_instead_of_a_baseline(tmp_path):
+    plant = {"AHU-1": 19.0}
+    guard = observed_guard(tmp_path, plant)
+    assert reserve(guard, "move_seen", "1", unit="AHU-1", value=20.0) is None
+    assert guard.settle("1", ok=False)[0]["observed"] == 190
+    assert reserve(guard, "move_seen", "2", unit="AHU-1", value=20.0) is None
+
+
+def test_a_settle_whose_read_back_fails_keeps_the_target(tmp_path):
+    plant = {"AHU-1": 19.0}
+    guard = observed_guard(tmp_path, plant)
+    assert reserve(guard, "move_seen", "1", unit="AHU-1", value=20.0) is None
+    plant["AHU-1"] = ConnectionError("down")
+    assert guard.settle("1", ok=True) == [{"quantity": "seen", "resource": "AHU-1",
+                                           "target": 200, "observed": None, "reached": None}]
+
+
+def test_settle_reads_back_observed_meters_only(tmp_path):
+    guard = observed_guard(tmp_path, {"AHU-1": 19.0})
+    assert reserve(guard, "move", "1", unit="AHU-1", value=19.5) is None  # a tracked meter
+    assert guard.settle("1", ok=True) == []
+    plain = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "plain.db"))
+    assert reserve(plain, "move", "1", unit="AHU-1", value=19.5) is None
+    assert plain.settle("1", ok=True) == []
+
+
+def test_the_dispatcher_records_a_target_the_plant_did_not_reach(tmp_path, caplog):
+    import logging
+
+    plant = {"AHU-1": 19.0}
+    d = _dispatcher(observed_guard(tmp_path, plant))
+    args = {"unit": "AHU-1", "value": 20.0}
+    assert d._limit_refusal(_lease("n1"), "move_seen", args, args, None) is None
+    with caplog.at_level(logging.WARNING):
+        d._limit_settle(_lease("n1"), "move_seen", ok=True)
+    assert "dispatch.limit_target_not_reached" in caplog.text
+
+
+def test_a_guard_without_an_observer_observes_nothing(guard):
+    assert guard._observe("t", "movement", "AHU-1", 10) is None

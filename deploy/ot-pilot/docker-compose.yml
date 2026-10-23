@@ -95,10 +95,13 @@ services:
       # A check on one call cannot see that small setpoint moves or valve
       # strokes add up. These cap movement per loop and valve, alarm acks and
       # work orders per window, shared by every principal, and refuse any
-      # write tool without a meter (coverage all_writes). The ledger is SQLite
-      # on this one container; see NEGATIVE_RESULTS.md section 97.
+      # write tool without a meter (coverage all_writes). Setpoint and valve
+      # movement is measured from what the plant reports (the observer), not
+      # from what REMORA last allowed. The ledger is SQLite on this one
+      # container; see NEGATIVE_RESULTS.md section 97.
       REMORA_LIMITS_FILE: /app/limits.json
       REMORA_LIMITS_LEDGER: /var/lib/remora/limits-ledger.db
+      REMORA_LIMITS_OBSERVER_MODULE: ot_registry
 
       # Prometheus scrape without a bearer token (local pilot only).
       REMORA_PROMETHEUS_PUBLIC: "1"

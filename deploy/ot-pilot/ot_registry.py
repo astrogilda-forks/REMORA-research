@@ -83,6 +83,19 @@ def close_work_order(a: dict[str, Any]) -> dict[str, Any]:
     return {"wo_id": wo, "status": "closed"}
 
 
+def observe_limit_value(tenant: str, quantity: str, resource: str) -> float:
+    """Den faktiske verdien anlegget rapporterer, for kumulative grenser.
+
+    Leser anleggets tilstand, ikke REMORAs ledger. En ukjent størrelse eller
+    ressurs kaster, og grensen avviser da kallet.
+    """
+    if quantity == "setpoint_movement":
+        return float(PLANT["loops"][resource]["setpoint"])
+    if quantity == "valve_travel":
+        return float(PLANT["valves"][resource]["pct"])
+    raise KeyError(f"no observation for {quantity!r}")
+
+
 def register_tools(register: Callable[[str, Callable[[Any], Any]], None]) -> None:
     for name, fn in (
         ("read_sensor", read_sensor),

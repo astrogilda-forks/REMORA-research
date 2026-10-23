@@ -1151,8 +1151,29 @@ def _limit_guard() -> Any:
         with open(path, encoding="utf-8") as handle:
             policy = LimitPolicy.from_dict(yaml.safe_load(handle))
         _LIMIT_GUARD = ((path, ledger),
-                        LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write))
+                        LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write,
+                                   observer=_limit_observer()))
     return _LIMIT_GUARD[1]
+
+
+def _limit_observer() -> Any:
+    """The deployment's reader of actual equipment values, or None.
+
+    ``REMORA_LIMITS_OBSERVER_MODULE`` names a module exposing
+    ``observe_limit_value(tenant, quantity, resource)``, which returns the
+    value the equipment reports now (a number) or raises. A policy with
+    ``observed`` change meters and no observer refuses at startup.
+    """
+    spec = _os.environ.get("REMORA_LIMITS_OBSERVER_MODULE", "").strip()
+    if not spec:
+        return None
+    import importlib
+
+    observe = getattr(importlib.import_module(spec), "observe_limit_value", None)
+    if not callable(observe):
+        raise ValueError(f"{spec} does not expose observe_limit_value(tenant, quantity, "
+                         "resource)")
+    return observe
 
 
 def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
