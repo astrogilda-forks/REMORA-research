@@ -455,6 +455,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_rem013_pdp_pep_boundary.py",
     "tests/test_remote_dispatch_boundary.py",
     "tests/test_resolved_effect_binding.py",
+    "tests/test_review_admission_grant_withheld.py",
     "tests/test_review_fixes_gate_jti.py",
     "tests/test_review_path_audit_r3.py",
     "tests/test_review_path_custody_split.py",

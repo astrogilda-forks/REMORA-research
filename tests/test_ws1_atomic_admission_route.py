@@ -188,8 +188,10 @@ def test_review_admission_refuses_and_settles_without_dispatch(client, monkeypat
                                       "state_unknown": False, "refusal_reason": expected}
     assert not _events("execution_authorized")
     assert _events("execution_admission_refused")[-1]["detail"] == expected
-    grant = _mod().PolicyDecisionToken.from_dict(body["execution_grant"])
-    assert _mod()._GATE.check(grant, consume=False).reason != "token_already_consumed"
+    # A refused admission hands back no grant: the one minted before the
+    # admission is spent and recorded as withheld.
+    assert "execution_grant" not in body
+    assert _events("execution_grant_withheld")[-1]["spent"] is True
     assert _row_state(item_id) == {"REFUSED"}
 
 

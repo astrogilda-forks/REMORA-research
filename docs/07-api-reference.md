@@ -632,7 +632,10 @@ else changes. In enforce any WS1 cap makes the call ABSTAIN with
 `ws1_binding_hash` in its authorization context. `/execute-accepted`,
 `/execute` and the async worker run the gate again with fresh lookups before
 anything is consumed and refuse with `ws1_regate_refused`; a moved requirement
-set or profile refuses as `context_mismatch`. Enforce refuses startup without
+set or profile refuses as `context_mismatch`. Under
+`REMORA_WS1_ADMISSION=atomic`, a review item whose admission refuses returns no
+`execution_grant`: the grant minted before the admission is spent in place and the
+chain records `execution_grant_withheld`. Enforce refuses startup without
 `REMORA_FLOW_CONTROL=1` and evidence named for the prerequisite IFC work
 packages ([design](design/ws1-deterministic-authorization-learned-monitoring-v1.md)).
 
@@ -690,7 +693,9 @@ under `all_writes`, and `limit_coverage_unknown` that neither its signed
 ToolSpec nor the deployment's semantic bundle says whether it writes. `limit_amount_invalid`, `limit_unit_invalid` and
 `limit_resource_invalid` reject an unreadable call, and
 `limit_invocation_differs` a flow-resolved invocation that would meter differently from
-the approved wire form. `limit_baseline_unknown`
+the approved wire form. `limit_principal_invalid` refuses a principal, and
+`limit_unit_invalid` and `limit_resource_invalid` a unit or resource, that contains the
+ledger's key separator. `limit_baseline_unknown`
 means a `change` resource has no known value. `limit_resource_busy` means
 another change to it has not settled. `limit_changed` means a limit was
 edited under an existing `limit_id`; declare a new id instead. The last two
@@ -716,8 +721,9 @@ observer refuses startup.
 The plant can change between the read the reservation is charged from and
 the write. Just before the tool runs, the dispatcher reads each observed
 resource again. If it moved, the write does not happen. The call refuses as
-`limit_state_changed`, the lease's nonce is spent and its reservation is
-given back. A meter may also name `previous_field`, a field of the tool's
+`limit_state_changed`, the lease's nonce is spent, its reservation is
+given back and a `change` meter's value is put back where it was; nothing was
+written, so nothing is unknown. A meter may also name `previous_field`, a field of the tool's
 result in which the controller reports the value it replaced. The movement
 from that value to where the plant ended up is charged, and anything beyond
 the reservation is logged as `dispatch.limit_charged_after_the_fact` and

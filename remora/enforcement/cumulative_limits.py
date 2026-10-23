@@ -56,7 +56,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -69,6 +69,7 @@ AMOUNT_INVALID = "limit_amount_invalid"
 UNIT_INVALID = "limit_unit_invalid"
 RESOURCE_INVALID = "limit_resource_invalid"
 PRINCIPAL_MISSING = "limit_principal_missing"
+PRINCIPAL_INVALID = "limit_principal_invalid"
 UNDECLARED = "limit_undeclared"
 TOOL_UNMETERED = "limit_tool_unmetered"
 COVERAGE_UNKNOWN = "limit_coverage_unknown"
@@ -83,6 +84,8 @@ INVOCATION_DIFFERS = "limit_invocation_differs"
 POLICY_CHANGED = "limit_policy_changed"
 
 KINDS = ("sum", "count", "change")
+#: Joins the parts of ledger keys; refused inside any part.
+_SEP = "\x1f"
 COVERAGES = ("listed", "all_writes")
 
 
@@ -479,8 +482,19 @@ class LimitLedger:
         return [(str(k), int(a)) for k, a in rows]
 
     def release(self, operation_id: str) -> None:
-        """Return an operation's reservations. Only for a call that provably did not run."""
+        """Return an operation's reservations. Only for a call that provably did not run.
+
+        A change meter's value row is put back to the value the reservation
+        was measured from and settled, whatever status it holds: nothing was
+        written, so nothing is unknown.
+        """
         with self._connect() as conn:
+            for key, observed in conn.execute(
+                    "SELECT value_key,observed FROM limit_observation WHERE operation_id=?",
+                    (operation_id,)).fetchall():
+                conn.execute("UPDATE limit_value SET value=?, status='settled' "
+                             "WHERE value_key=? AND operation_id=?",
+                             (int(Decimal(str(observed)).to_integral_value()), key, operation_id))
             conn.execute("DELETE FROM limit_reservation WHERE operation_id=?", (operation_id,))
             conn.execute("DELETE FROM limit_observation WHERE operation_id=?", (operation_id,))
 
@@ -502,7 +516,12 @@ def _epoch(now: str | float | None) -> float:
         return time.time()
     if isinstance(now, int | float):
         return float(now)
-    return datetime.fromisoformat(now).timestamp()
+    parsed = datetime.fromisoformat(now)
+    if parsed.tzinfo is None:
+        # The lease verifier reads a naive stamp as UTC; the window must too,
+        # or the host's zone shifts every reservation by its offset.
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.timestamp()
 
 
 class LimitGuard:
@@ -577,14 +596,15 @@ class LimitGuard:
         for meter in self.policy.meters.get(tool_name, ()):
             if meter.unit_argument is not None:
                 unit = args.get(meter.unit_argument)
-                if not isinstance(unit, str) or not unit or len(unit) > 200:
+                if not isinstance(unit, str) or not unit or len(unit) > 200 or _SEP in unit:
                     raise _Refused(UNIT_INVALID)
             else:
                 unit = meter.unit or ""
             resource = None
             if meter.resource_argument is not None:
                 resource = args.get(meter.resource_argument)
-                if not isinstance(resource, str) or not resource or len(resource) > 200:
+                if (not isinstance(resource, str) or not resource or len(resource) > 200
+                        or _SEP in resource):
                     raise _Refused(RESOURCE_INVALID)
             if meter.kind == "count":
                 value = meter.per_call
@@ -645,6 +665,9 @@ class LimitGuard:
                     raise _Refused(BASELINE_UNKNOWN)
                 else:
                     amount = abs(reading.value - last)
+                    # Kept so a fence refusal, which writes nothing, can put
+                    # the value back instead of leaving the resource unknown.
+                    seen_at.append((value_key, Decimal(last), amount))
                 values.append((value_key, reading.value, seed_id))
             matching = [lim for lim in self.policy.limits
                         if lim.matches(tenant, principal, m.quantity, reading.unit,
@@ -680,6 +703,8 @@ class LimitGuard:
             return None
         if not principal:
             return PRINCIPAL_MISSING
+        if _SEP in principal:
+            return PRINCIPAL_INVALID  # it would collide with another principal's key
         try:
             readings = self.readings(tool_name, arguments)
             observed: dict[int, Decimal] = {}
@@ -762,8 +787,11 @@ class LimitGuard:
         """
         if self._changed():
             return POLICY_CHANGED
+        observed = self.policy.observed_quantities
         for value_key, seen, _ in self.ledger.observations(operation_id):
             tenant, quantity, resource = value_key.split("\x1f")
+            if quantity not in observed:
+                continue  # a tracked meter's row holds its last value, not a reading
             now_seen = self._observe(tenant, quantity, resource, self._scale_of(quantity))
             if now_seen is None:
                 return OBSERVATION_UNAVAILABLE

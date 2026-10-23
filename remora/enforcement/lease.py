@@ -1838,7 +1838,8 @@ class GovernedToolDispatcher:
         # write does not happen, and what it reserved is given back.
         fence_refusal = self._limit_fence(lease, tool_name)
         if fence_refusal is not None:
-            self._limit_settle(lease, tool_name, ok=False, now=now)
+            # Nothing was written, so the resource is not unknown: release
+            # puts its value back. settle(ok=False) is for a write that ran.
             self._limit_release(lease, tool_name)
             self._record_outcome(lease, tool_name, recorder_seq, "refused")
             governance_event(

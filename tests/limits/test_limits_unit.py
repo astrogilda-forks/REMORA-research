@@ -546,3 +546,56 @@ def test_a_signed_policy_verifies_only_as_signed():
                    dict(document, policy=dict(body, coverage="all_writes"))):
         with pytest.raises(cl.LimitPolicyError):
             cl.verify_signed_policy(broken, [key.verification_key()])
+
+
+# ── 2026-10-24 audit: fence refusal, naive clock, key separator ───────────────
+
+
+def test_a_fence_refusal_that_wrote_nothing_does_not_poison_the_resource(tmp_path):
+    """The only fence refusal a tracked meter can get is a moved policy. The
+    write never happened, so after release the next change starts from the
+    value the reservation was measured from, without a new seed."""
+    in_force = {"ok": True}
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "fence.db"),
+                          in_force=lambda: in_force["ok"])
+    assert reserve(guard, "move", "lease:n1", unit="AHU-1", value=20.0) is None  # 1.0
+    in_force["ok"] = False
+    assert guard.fence("lease:n1") == cl.POLICY_CHANGED
+    guard.release("lease:n1")
+    in_force["ok"] = True
+    assert reserve(guard, "move", "lease:n2", unit="AHU-1", value=20.0) is None  # 1.0 from 19.0
+    guard.settle("lease:n2", ok=True)
+    assert reserve(guard, "move", "lease:n3", unit="AHU-1", value=21.5) == cl.EXCEEDED  # 2.5
+
+
+def test_release_after_a_settle_still_restores_the_value(tmp_path):
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "order.db"))
+    assert reserve(guard, "move", "lease:n1", unit="AHU-1", value=20.0) is None
+    guard.settle("lease:n1", ok=False)
+    guard.release("lease:n1")
+    assert reserve(guard, "move", "lease:n2", unit="AHU-1", value=19.5) is None
+
+
+def test_a_naive_iso_timestamp_is_read_as_utc(monkeypatch):
+    import time as _time
+
+    monkeypatch.setenv("TZ", "America/New_York")
+    _time.tzset()
+    try:
+        assert cl._epoch("2027-01-15T10:00:00") == cl._epoch("2027-01-15T10:00:00+00:00")
+    finally:
+        monkeypatch.delenv("TZ")
+        _time.tzset()
+
+
+def test_the_key_separator_is_refused_in_every_part(guard):
+    sep = "\x1f"
+    assert guard.reserve(tenant="t", principal="p", tool_name="move",
+                         arguments={"unit": f"AHU{sep}1", "value": 19.5},
+                         operation_id="op", request_hash="h") == cl.RESOURCE_INVALID
+    assert guard.reserve(tenant="t", principal="p", tool_name="pay",
+                         arguments={"amount": 1, "cur": f"J{sep}PY"},
+                         operation_id="op", request_hash="h") == cl.UNIT_INVALID
+    assert reserve(guard, "pay", "A", principal=f"p{sep}x", amount=1, cur="JPY") == \
+        cl.PRINCIPAL_INVALID
+    assert guard.fence("op") is None  # nothing was recorded for a refused call

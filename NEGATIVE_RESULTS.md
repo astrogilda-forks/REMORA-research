@@ -24,11 +24,11 @@ backlog below disagrees with those markers.
 | `accepted` | Measured, published, and **not to be "fixed"** — a falsified hypothesis or a dataset that cannot answer the question asked of it | No. Tuning against these would be retrofitting |
 | `superseded` | The finding caused a change; a later section documents the result | No. Read it for the causal chain |
 
-Counts as of 2026-10-22: **35 `open`**, **31 `accepted`**, **31 `superseded`**.
+Counts as of 2026-10-24: **36 `open`**, **31 `accepted`**, **31 `superseded`**.
 
 ## The actual backlog
 
-Nineteen themes, all research gaps; the one production gap (CI gates that ran
+Twenty themes, all research gaps; the one production gap (CI gates that ran
 without blocking, §55) is closed and struck from this list; a backlog that
 keeps closed items is the drift the status gate exists to prevent. The section numbers
 after each theme are where its evidence lives, and CI checks that every theme
@@ -178,6 +178,12 @@ cites only `open` sections and that no `open` section is missing a theme.
    budget, and small setpoint moves that added up without bound. Opt-in
    limits reserved before dispatch now refuse both, tested on the author's
    replays only. How often they refuse legitimate calls is unmeasured.
+
+20. **Atomic admission has run only in the author's tests** (§98): a
+   2026-10-24 audit found that the review path returned an unspent, signed
+   ACCEPT grant when the admission transaction refused, redeemable at
+   `/execute-accepted` without the review path's checks. Repaired with route
+   tests; open until the mode runs outside the author's own tests.
 
 <!-- backlog-end -->
 
@@ -2677,6 +2683,7 @@ sections again.
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
 | Study C holdout: utility recovered and authority held under defence-aware search; the monitor threshold decided how much (§96) | H_DET and H_COST 20/33 reads, H_EDV 32/33, H0 0/33; every loss a monitor veto at the threshold. No WS1 arm executed an attack goal, an out-of-scope call or a leak in 121 attack episodes each; arm A did | **High** |
 | REMORA did not stop a payment past its budget, and had nothing that could (§97) | Replayed through /assess, /approve and /execute, all three 7000 payments ran (21000 of 20000). Opt-in cumulative limits reserved at dispatch (CAP-031) now refuse the third, and cap setpoint movement, starts and runtime per unit; author's replays only, false refusals unmeasured | **High** |
+| The review path handed back an unspent grant when the admission refused (§98) | Under `REMORA_WS1_ADMISSION=atomic` the ACCEPT grant was minted before the admission; a refusal rolled the spend back and the response still carried the grant, which `/execute-accepted` accepted and spent. Now spent in place and withheld; route tests pin it. Author's tests only | **High** |
 | Study B holdout: the monitor-directed arm lost utility, and the attack search was barely adaptive (§95) | H_EDV 15/45 reads against H_DET 28/45; it vetoed all 43 benign port reads. 55 of 60 final injections were the fixed template. No unauthorized dispatch in any WS1 arm | **High** |
 | WS1 evidence could not make a call executable on the execution API (§94) | WS1 caps only; the grounding that turned PROVED preconditions into an engine ACCEPT lived in Study B's harness. Grounding from proofs is now opt-in on the assess path, tested through the route, and not yet measured in a study | **High** |
 | No blocked development call is recoverable by a bounded lookup alone (§93) | After schema validation, 0 of 92 E1-blocked AgentDojo development calls reach ACCEPT. Causes: no extracted intent (71), undeclared risk tier on a write (16), ground-truth call refused as the wrong tool (5). WS1 recovery needs intent and contract coverage first | **High** |
@@ -5861,3 +5868,55 @@ through, not the plant, and an observed one is only as good as the observer.
 The sequence is public and was replayed by the author, so this shows the
 mechanism works on the case it was built for. It does not measure how often
 legitimate payments are refused, which needs new tasks and a holdout.
+
+## §98 The review path handed back an unspent grant when the admission refused (2026-10-24)
+<!-- finding-status: open -->
+
+**Status:** repaired with route tests (`tests/test_review_admission_grant_withheld.py`).
+Open until atomic admission runs outside the author's own tests.
+
+An audit of the execution path with probe tests found this under
+`REMORA_WS1_ADMISSION=atomic`, with WS1 mode off or shadow. On the review path
+(`/v1/execution/execute`) the ACCEPT grant is minted before the admission
+transaction, because the transaction spends it. When the admission refused,
+for an approver revoked in the INV-M4-02 window or for any admission-only
+fault such as an audit outbox that failed once, the spend rolled back with
+the refusal. The item settled `REFUSED`, as designed. The 200 response still
+carried the grant: a signed, unspent, five-minute ACCEPT for the proposal.
+
+Posted to `/v1/execution/execute-accepted`, that grant passed the payload,
+ToolSpec and context checks and was admitted. The direct-ACCEPT path checks
+the actor and the delegate; it has no approver, approval policy or review
+queue to check, because a direct ACCEPT never had them. The admission
+transaction spent the grant and wrote `execution_admitted`, and
+`execution_authorized` was appended to the chain for a review item that was
+terminal and refused. The tool did not run in the probe, and only because
+the outbox refused the second intent for the same proposal with an unhandled
+error, which the caller saw as a 500. The authority bypass and the false
+audit records are the defect. Under WS1 enforce the `ws1_binding_hash` in the
+redemption context blocked the redemption; the worker path and
+`redeem_accept_token` did not leak. An existing route test pinned the leak
+as expected behaviour by asserting that the grant came back unspent.
+
+The repair: when the admission refuses, the review path spends the grant it
+minted, outside the transaction, records `execution_grant_withheld` with
+whether the spend succeeded, and returns no `execution_grant`. A ledger that
+cannot spend it still withholds it. Three route tests reproduce the revoked
+approver and the transient fault and check the jti in the durable consumed
+set; an admitted execution still returns its grant. Removing the withholding
+fails four tests, removing the spend fails two.
+
+The same audit found three smaller defects in the cumulative limits, all
+repaired with tests in `tests/limits/test_limits_unit.py`. A fence refusal
+that wrote nothing marked a tracked `change` resource unknown; its value is
+now put back on release. `_epoch` read a naive ISO timestamp in the host's
+zone while the lease verifier reads it as UTC; it now reads UTC, and only
+library callers could reach it, since the routes pass aware stamps. A
+resource, unit or principal containing the ledger's key separator raised
+instead of refusing; it now refuses as `limit_resource_invalid`,
+`limit_unit_invalid` or `limit_principal_invalid`.
+
+Limits: the probe scenarios are the author's. The direct-ACCEPT redemption
+still raises an unhandled error when its proposal has a terminal outbox row;
+that is unreachable now that the grant is withheld, and remains open as a
+hygiene item.

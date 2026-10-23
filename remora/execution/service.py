@@ -1116,6 +1116,26 @@ def execute_approved_item(
                 "detail": admission_refusal,
                 **({"ws1": ws1.audit_block()} if ws1 is not None else {}),
             })
+            # The grant was minted before the admission, and the rollback left
+            # it unspent. Returned, it would redeem at /execute-accepted with
+            # none of the review path's checks (approver, approval policy,
+            # queue state). It is spent here, outside the transaction, and the
+            # response below carries no grant either way.
+            try:
+                gate.check(token, observation_binding(fresh_obs), consume=True,
+                           context=review_context)
+                grant_spent = True
+            except Exception:  # a ledger fault still withholds the grant
+                grant_spent = False
+            chain.append(tenant, {
+                "event": "execution_grant_withheld",
+                "proposal_id": proposal_id,
+                "actor": principal,
+                "item_id": item_id,
+                "grant_jti": token.jti,
+                "spent": grant_spent,
+                "detail": admission_refusal,
+            })
             # Rolled back with the refusal, so the intent is still pending.
             # Claimed now only to settle it: nothing will dispatch it.
             if not _claim_or_none(outbox, intent, worker_id=worker_id):
@@ -1128,7 +1148,8 @@ def execute_approved_item(
         # moment it is honoured - a re-presented token can never execute twice.
         gate_result = gate.check(
             token, observation_binding(fresh_obs), consume=True, context=review_context)
-    response["execution_grant"] = token.to_dict()
+    if admission_refusal is None:
+        response["execution_grant"] = token.to_dict()
     response["pep"] = {"allowed": gate_result.allowed,
                        "reason": gate_result.reason}
 
