@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1-M4 audit row in the admission transaction (M4.1c slice 3, opt-in)
+
+- Under `REMORA_WS1_ADMISSION=atomic`, every admission enqueues an `execution_admitted` audit record on its own transaction, before commit. A failed enqueue refuses the admission (`audit_outbox_unavailable`) and rolls back the spend, the intent and the claim (M4-T12). After commit the record is drained into the chain ahead of `execution_authorized`, which names it by `audit_key`.
+
 ### WS1-M4 revocation at admission (M4.1c slice 2b, opt-in)
 
 - Under `REMORA_WS1_ADMISSION=atomic`, admission refuses a revoked actor, delegating proposer or approver inside its transaction (`principal_revoked`). `POST /v1/execution/revoke-authority` revokes or reinstates a WS1 evidence source, and the epoch change and its audit event commit together.
