@@ -145,6 +145,11 @@ def report(body: dict[str, Any]) -> str:
         "were added to REMORA for this; before them it had no running total of what calls "
         "spend (NEGATIVE_RESULTS.md section 97).",
         "",
+        "Where each part stands: the cumulative limits used in part 2 are on master "
+        "(#1025, merged). Measuring equipment movement from the plant (#1033) and binding "
+        "limits to a signing authority and to every approval (#1037) are open pull "
+        "requests, and part 2 does not depend on them.",
+        "",
         "Exploratory, retrospective and author-operated. The A/B/C records were public and "
         "examined before this row was designed, so this is neither a holdout nor a "
         "preregistered confirmation, and no independent verification is claimed "

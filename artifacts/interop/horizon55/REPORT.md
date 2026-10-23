@@ -8,6 +8,8 @@ Payment C took the buyer's spending to 21000 JPY-testnet against a signed budget
 2. Run through REMORA's own execution path, C does not run once the budget is declared to REMORA. It is refused before review, and refused again at dispatch when all three payments were approved in advance. A and B run, and 14000 reaches the payment tool.
 3. Without a declared limit REMORA lets all three run (21000). Cumulative limits were added to REMORA for this; before them it had no running total of what calls spend (NEGATIVE_RESULTS.md section 97).
 
+Where each part stands: the cumulative limits used in part 2 are on master (#1025, merged). Measuring equipment movement from the plant (#1033) and binding limits to a signing authority and to every approval (#1037) are open pull requests, and part 2 does not depend on them.
+
 Exploratory, retrospective and author-operated. The A/B/C records were public and examined before this row was designed, so this is neither a holdout nor a preregistered confirmation, and no independent verification is claimed (independence: `AUTHOR_OPERATED`).
 
 ## What A, B and C are
