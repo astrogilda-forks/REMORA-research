@@ -275,3 +275,32 @@ def test_signed_at_is_unsigned_metadata_bound_by_the_identity(monkeypatch, tmp_p
     _swap(tmp_path, document)
     assert api_mod._policy_component_hashes()["limits_policy_hash"] != before
     assert run(client, pay("B"))["detail"] == "limit_policy_changed"
+
+
+# ── the replacement, in every order of initialisation ────────────────────
+
+
+def _replace_policy(tmp_path, max_, limit_id):
+    (tmp_path / "limits.json").write_text(json.dumps(signed(policy(max_=max_,
+                                                                   limit_id=limit_id))))
+
+
+@pytest.mark.parametrize("initialised", ["guard_and_dispatcher", "guard_only", "nothing"])
+def test_a_replaced_signed_limit_never_lets_a_call_past_the_new_limit(monkeypatch, tmp_path,
+                                                                      initialised):
+    """A signed 20000 limit is replaced by a valid signed 10000 limit without a
+    restart. A 15000 payment must never reach the tool, whichever parts of
+    REMORA had already loaded the old policy."""
+    import servers.execution_api as exec_mod
+
+    trust(monkeypatch, AUTHORITY)
+    client = make_client(monkeypatch, tmp_path, signed(policy(max_=20000, limit_id="b-20000")))
+    if initialised == "guard_and_dispatcher":
+        assert run(client, pay("A", amount=1000))["executed"] is True
+    elif initialised == "guard_only":
+        exec_mod._DISPATCHER = None
+        assert exec_mod._limit_guard().policy.limits[0].max == 20000
+    _replace_policy(tmp_path, 10000, "b-10000")
+    outcome = run(client, pay("B", amount=15000))
+    assert outcome.get("executed") is not True, outcome
+    assert [p["reference"] for p in ran(tmp_path) if p["amount"] == 15000] == []
