@@ -146,9 +146,9 @@ def report(body: dict[str, Any]) -> str:
         "spend (NEGATIVE_RESULTS.md section 97).",
         "",
         "Where each part stands: the cumulative limits used in part 2 are on master "
-        "(#1025, merged). Measuring equipment movement from the plant (#1033) and binding "
-        "limits to a signing authority and to every approval (#1037) are open pull "
-        "requests, and part 2 does not depend on them.",
+        "(#1025). So are measuring equipment movement from the plant (#1033) and binding "
+        "limits to a signing authority and to every approval (#1037). Part 2 uses only "
+        "the limit itself; it does not depend on the other two.",
         "",
         "Exploratory, retrospective and author-operated. The A/B/C records were public and "
         "examined before this row was designed, so this is neither a holdout nor a "
