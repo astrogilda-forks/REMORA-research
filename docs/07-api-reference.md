@@ -751,6 +751,8 @@ holds. A reservation is never returned and the ledger is per host. A
 `change` meter that is not observed tracks the values REMORA let through, not
 the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
+[provenance/verified-prior-art-cumulative-limits-2026-10-23.md](../provenance/verified-prior-art-cumulative-limits-2026-10-23.md)
+lists the prior art these limits build on and what may not be claimed for them.
 
 **Capability sets (WS8 Q8.2, opt-in):** with
 `REMORA_CAPABILITY_POLICY_FILE` naming a YAML or JSON capability policy,
