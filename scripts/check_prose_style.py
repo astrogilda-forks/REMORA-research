@@ -78,6 +78,7 @@ EXCLUDE_PREFIXES = (
     "artifacts/credibility-pack/",  # frozen evidence pack
     "artifacts/independent-analysis-2026-09-30/",  # third-party report, committed unchanged
     "integrations/acta-e6/upstream/",  # VeritasActa/e6-fixture, vendored unchanged (Apache-2.0)
+    "artifacts/interop/horizon55/inputs/",  # Horizon Shield set-2 files, vendored unchanged (MIT)
     "artifacts/evidence-sufficiency-blind-probe-2026-09-30/",  # generated probe inputs, committed unchanged
     "artifacts/evidence-sufficiency-blind-probe-2-2026-09-30/",  # generated probe inputs, committed unchanged
     "artifacts/evidence-sufficiency-blind-probe-3-2026-09-30/",  # generated probe inputs, committed unchanged

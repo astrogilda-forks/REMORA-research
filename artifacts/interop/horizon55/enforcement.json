@@ -1,0 +1,189 @@
+{
+ "classification": "author-run replay of a public sequence through REMORA's execution API with a sandboxed tool; not a holdout, not independent",
+ "limit_policy": {
+  "coverage": "listed",
+  "limits": [
+   {
+    "limit_id": "hs51-set2-budget",
+    "max": 20000,
+    "principal": "4c3b54ac9bf947d723a035261fa1574c9e66d5bdbcee8c9346369b8be484ef58",
+    "quantity": "spend",
+    "tenant": "hs51-set2",
+    "unit": "JPY-testnet"
+   }
+  ],
+  "meters": {
+   "transfer_payment": [
+    {
+     "argument": "amount",
+     "kind": "sum",
+     "quantity": "spend",
+     "unit_argument": "unit"
+    }
+   ]
+  },
+  "schema": "remora-cumulative-limits/v1"
+ },
+ "question": "Does REMORA's own engine let payment C run past the signed budget?",
+ "runs": {
+  "budget_declared": {
+   "cases": [
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "A",
+     "occurrence_id": "hs51-musubi-2-A",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    },
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "B",
+     "occurrence_id": "hs51-musubi-2-B",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    },
+    {
+     "amount": 7000,
+     "approved": null,
+     "assess": "refused limit_exceeded",
+     "case": "C",
+     "occurrence_id": "hs51-musubi-2-C",
+     "outcome": "refused at assess: limit_exceeded",
+     "reached_tool": false,
+     "unit": "JPY-testnet"
+    }
+   ],
+   "limit_refused_on_chain": 1,
+   "reached_tool": [
+    "hs51-musubi-2-A",
+    "hs51-musubi-2-B"
+   ],
+   "total_reached_tool": 14000,
+   "within_budget": true
+  },
+  "budget_declared_approved_first": {
+   "cases": [
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "A",
+     "occurrence_id": "hs51-musubi-2-A",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    },
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "B",
+     "occurrence_id": "hs51-musubi-2-B",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    },
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "C",
+     "occurrence_id": "hs51-musubi-2-C",
+     "outcome": "refused at dispatch: limit_exceeded",
+     "reached_tool": false,
+     "unit": "JPY-testnet"
+    }
+   ],
+   "limit_refused_on_chain": 0,
+   "reached_tool": [
+    "hs51-musubi-2-A",
+    "hs51-musubi-2-B"
+   ],
+   "total_reached_tool": 14000,
+   "within_budget": true
+  },
+  "remora_as_shipped": {
+   "cases": [
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "A",
+     "occurrence_id": "hs51-musubi-2-A",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    },
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "B",
+     "occurrence_id": "hs51-musubi-2-B",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    },
+    {
+     "amount": 7000,
+     "approved": true,
+     "assess": "verify",
+     "case": "C",
+     "occurrence_id": "hs51-musubi-2-C",
+     "outcome": "executed",
+     "reached_tool": true,
+     "unit": "JPY-testnet"
+    }
+   ],
+   "limit_refused_on_chain": 0,
+   "reached_tool": [
+    "hs51-musubi-2-A",
+    "hs51-musubi-2-B",
+    "hs51-musubi-2-C"
+   ],
+   "total_reached_tool": 21000,
+   "within_budget": false
+  }
+ },
+ "schema": "remora-h55-enforcement-v1",
+ "signed_inputs": {
+  "budget": {
+   "issuer": "ced79be22d276dfecd1f48722c64f3e5362ffd3b0c3766094ad8187734a0c833",
+   "max_total": 20000,
+   "unit": "JPY-testnet"
+  },
+  "payer": "4c3b54ac9bf947d723a035261fa1574c9e66d5bdbcee8c9346369b8be484ef58",
+  "payments": [
+   {
+    "amount": 7000,
+    "case": "A",
+    "occurrence_id": "hs51-musubi-2-A",
+    "payee": "7b1ada68cd366c70a79544b6d719d685fd37e01f26549e08bf388768cc7d0ffe",
+    "payer": "4c3b54ac9bf947d723a035261fa1574c9e66d5bdbcee8c9346369b8be484ef58",
+    "unit": "JPY-testnet"
+   },
+   {
+    "amount": 7000,
+    "case": "B",
+    "occurrence_id": "hs51-musubi-2-B",
+    "payee": "7b1ada68cd366c70a79544b6d719d685fd37e01f26549e08bf388768cc7d0ffe",
+    "payer": "4c3b54ac9bf947d723a035261fa1574c9e66d5bdbcee8c9346369b8be484ef58",
+    "unit": "JPY-testnet"
+   },
+   {
+    "amount": 7000,
+    "case": "C",
+    "occurrence_id": "hs51-musubi-2-C",
+    "payee": "7b1ada68cd366c70a79544b6d719d685fd37e01f26549e08bf388768cc7d0ffe",
+    "payer": "4c3b54ac9bf947d723a035261fa1574c9e66d5bdbcee8c9346369b8be484ef58",
+    "unit": "JPY-testnet"
+   }
+  ]
+ }
+}

@@ -113,3 +113,6 @@ local.env
 # Local agent state (CLAUDE.md: never committed)
 AGENTS.md
 .agents/
+
+# Horizon #55 row: the souba-db dataset is fetched here by prepare.py and never committed
+integrations/horizon55/.cache/

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/darklordVirtual/REMORA-research/blob/master/integrations/horizon55/schemas/inputs-lock-v1.schema.json",
+  "title": "REMORA Horizon #55 input lock v1",
+  "description": "Exact bytes and SHA-256 of every upstream file the row reads. A file that differs fails closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "upstream_repository", "horizon_revision", "dataset_revision", "license",
+               "dataset_terms", "required_occurrences", "known_gaps", "sources"],
+  "properties": {
+    "schema": {"const": "remora-h55-inputs-lock-v1"},
+    "upstream_repository": {"type": "string", "pattern": "^https://github\\.com/"},
+    "horizon_revision": {"$ref": "#/$defs/revision"},
+    "dataset_revision": {"$ref": "#/$defs/revision"},
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spdx", "role", "applies_to"],
+      "properties": {"spdx": {"type": "string"}, "role": {"type": "string"},
+                     "applies_to": {"type": "string"}}
+    },
+    "dataset_terms": {"type": "string"},
+    "required_occurrences": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "known_gaps": {"type": "array", "items": {"type": "string"}},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "revision", "upstream_path", "local_path", "vendored", "bytes", "sha256"],
+        "properties": {
+          "role": {"type": "string", "pattern": "^[A-Za-z0-9_]+$"},
+          "revision": {"$ref": "#/$defs/revision"},
+          "upstream_path": {"type": "string"},
+          "local_path": {"type": "string", "not": {"pattern": "(^/|\\.\\.)"}},
+          "vendored": {"type": "boolean"},
+          "bytes": {"type": "integer", "minimum": 0},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
