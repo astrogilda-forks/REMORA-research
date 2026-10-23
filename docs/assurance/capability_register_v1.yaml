@@ -212,6 +212,17 @@ capabilities:
       - servers/execution_api.py
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -351,6 +362,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -434,6 +456,17 @@ capabilities:
     status: PERSISTED_ATOMIC
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -534,6 +567,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -733,6 +777,17 @@ capabilities:
       - docs/deployment/authority-custody-evidence.md
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
@@ -1026,6 +1081,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1119,6 +1185,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1195,6 +1272,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
@@ -1286,6 +1374,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
@@ -1418,6 +1517,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
@@ -1526,6 +1636,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
@@ -1847,6 +1968,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from 7702ed7: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
@@ -1933,6 +2065,17 @@ capabilities:
     status: WIRED_API_PATH
     verified_at_sha: 2dbaaa23c4ab53f963b60a574735d8f5137ade41
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at 2dbaaa2 (MERGE OF MASTER (#1035) INTO OBSERVED METERS), from ebfcc02: merge of master (WS1-M4 audit row in the admission transaction, #1035) into the observed-meter branch; both sets of changes are kept unchanged and touch different functions of the cited sources. Each side's re-audit above stands for its own change. Status, scope and caveats unchanged.
       re-audited 2026-10-22 at ebfcc02 (TOCTOU FENCE, opt-in), from 7702ed7: remora/enforcement/lease.py reads every observed resource again just before the tool runs and refuses the write if it moved (limit_state_changed), giving back the reservation; settle passes the tool's result so remora/enforcement/cumulative_limits.py can charge movement the controller reports beyond the reservation (previous_field, dispatch.limit_charged_after_the_fact). Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py (the race reproduced, then refused; the residual without a controller report pinned), tests/limits/test_limits_unit.py. Status and scope unchanged; CAP-031's caveat names the residual window.
       re-audited 2026-10-22 at 7702ed7 (OBSERVED CHANGE METERS, opt-in), from 2efe206: remora/enforcement/cumulative_limits.py adds observed change meters: movement is measured from the value a deployment observer reports, rounded up, and read back after the tool runs; an unreadable observation refuses (limit_observation_unavailable) and observed meters without an observer refuse at startup. remora/enforcement/lease.py logs dispatch.limit_target_not_reached when the read-back differs from the target. servers/execution_api.py loads the observer from REMORA_LIMITS_OBSERVER_MODULE. Without observed meters no path changes. Strictly narrowing. Tests: tests/limits/test_limits_observed_ventilation.py against a simulated controller, tests/limits/test_limits_unit.py. Status, scope and caveats unchanged, except CAP-031 below.
