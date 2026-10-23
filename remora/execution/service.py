@@ -1125,7 +1125,7 @@ def execute_approved_item(
                 gate.check(token, observation_binding(fresh_obs), consume=True,
                            context=review_context)
                 grant_spent = True
-            except Exception:  # noqa: BLE001 - a ledger fault still withholds the grant
+            except Exception:  # a ledger fault still withholds the grant
                 grant_spent = False
             chain.append(tenant, {
                 "event": "execution_grant_withheld",
