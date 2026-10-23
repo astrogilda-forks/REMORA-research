@@ -1,12 +1,16 @@
 # Verified prior art: cumulative limits, execution-history authority, and compositional control
 
-**Checked:** 2026-10-23  
-**Status:** bibliographic verification and claim-boundary note; **not** a novelty finding, systematic review, formal safety proof, or endorsement of a production deployment.  
-**Scope:** REMORA CAP-031 and the Horizon Shield #55 A/B/C retrospective simulation, plus proposed extensions for observed OT values and signed limits.
+Checked on 2026-10-23.
+
+Status: a bibliographic verification and claim-boundary note. It is **not** a novelty finding, a systematic review, a formal safety proof, or an endorsement of a production deployment.
+
+Scope: REMORA CAP-031 and the Horizon Shield #55 A/B/C retrospective replay, with the observed OT values (#1033) and signed limits (#1037) since merged.
 
 ## Verification protocol
 
 The bibliographic identity (title, author attribution, venue/year and DOI where available) was checked against a publisher, official proceedings, university bibliographic record, or author-hosted paper index on 2026-10-23. A resolvable bibliographic identifier is **not** evidence that a particular REMORA safety claim is supported. This review does not claim full-text critical appraisal of each work, implementation of its mechanism, independent reproduction, or equivalence between the mechanisms.
+
+A second check on the same day resolved every DOI below through the Crossref API: first author, title and year matched for all fourteen. Crossref records no year for Brewer and Nash. The five locators without a DOI returned HTTP 200, and the NeurIPS and PMLR pages carry the cited titles.
 
 Every identifier below is a clean permanent DOI URL or a primary-source link; no marketing tracking parameters. **Do not invent a DOI** where one was not established. Sections below state *what prior art rules out*; they do not assert REMORA is superior.
 
@@ -54,10 +58,10 @@ Every identifier below is a clean permanent DOI URL or a primary-source link; no
 ## REMORA-specific claim ceiling (as at this note)
 
 **Supported in the repo's stated bounded evaluation, not independently certified:**
-- CAP-031 / merged PR #1025 introduces declared cumulative `sum`, `count` and `change` limits and transactional reservation in a **single-host SQLite ledger** for calls that pass through the governed execution path.
-- Horizon Shield #55 / REMORA PR #1024 replays frozen A/B/C payment fixtures under an author-operated sandboxed tool: 7,000 + 7,000 admitted and the third 7,000 refused under a **declared 20,000** limit; without that limit, 21,000 reaches the sandbox. This is **not** real settlement protection or an independent production test.
-- PR #1033 extends the model with an observed controller state and read-back in a **simulated** ventilation unit. If any write path bypasses the observer/dispatcher, the claim cannot hold for that path.
-- PR #1037 adds signed budget policy and binding to approvals, but its final merge, verified consistency between cached guard and policy identity, and live deployment remain separate issues.
+- CAP-031 (PR #1025, merged) adds declared cumulative `sum`, `count` and `change` limits. Reservation is transactional in a **single-host SQLite ledger**, for calls that pass through the governed execution path.
+- Horizon Shield #55 (PR #1024, merged) replays the frozen A/B/C payments through an author-operated sandboxed tool. Under a **declared 20,000** limit, 7,000 + 7,000 are admitted and the third 7,000 is refused; without the limit, 21,000 reaches the sandbox. This is **not** real settlement protection or an independent production test.
+- PR #1033 (merged) measures movement from an observed controller value and reads it back, in a **simulated** ventilation unit. If any write path bypasses the observer or dispatcher, the claim cannot hold for that path.
+- PR #1037 (merged) binds limits to a signing key and to every approval. A replaced policy file refuses every metered call until a restart, in every order of initialisation. Live deployment remains untested.
 
 **Not established, and must not be claimed:**
 1. Novelty of cumulative limits, history-dependent access control, shielding, Simplex, multi-agent compositional safety, or constrained optimisation.
@@ -69,9 +73,9 @@ Every identifier below is a clean permanent DOI URL or a primary-source link; no
 
 ## Where a genuinely testable REMORA contribution might lie
 
-Hypothesis rather than an originality claim: **exact-call-bound, signed, history-dependent authority budgets at the governed dispatch point for tool-using AI agents, tied to trustworthy observations, replay-resistant leases and bounded effect-evidence records**, while retaining more legitimate task completion than a conservative per-call rule floor.
+Hypothesis rather than an originality claim: **exact-call-bound, signed, history-dependent authority budgets at the governed dispatch point for tool-using AI agents**. They would be tied to trustworthy observations, replay-resistant leases and bounded effect-evidence records. The test is whether they retain more legitimate task completion than a conservative per-call rule floor.
 
-To test that hypothesis, compare against named baselines: a stateless per-action gate; a single-actor cumulative ledger; a shared atomic budget gate; a shield or Simplex-style supervisor; and, for physical case studies, controller-side safety interlocks. Pre-register scenarios (cross-agent, changing policy, race between observation and write, bypasses, crashes/retries, stale tokens, multiple tenants and multi-resource coupling), report blocked legitimate actions and admitted harmful effects, and label each result according to its evidence and operator independence.
+To test that hypothesis, compare against named baselines: a stateless per-action gate; a single-actor cumulative ledger; a shared atomic budget gate; a shield or Simplex-style supervisor; and, for physical case studies, controller-side safety interlocks. Pre-register the scenarios: cross-agent use, changing policy, a race between observation and write, bypasses, crashes and retries, stale tokens, multiple tenants and multi-resource coupling. Report blocked legitimate actions and admitted harmful effects. Label each result by its evidence and operator independence.
 
 ## Citation integration gate
 
