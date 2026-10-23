@@ -1170,22 +1170,29 @@ def execute_approved_item(
         **({"admission": admitted.audit_block()} if admitted is not None else {}),
     })
 
+    permit = (admission.permit(tenant, ws1=ws1, principals=(principal, acting_for or "",
+                                                            approver))
+              if admission is not None and admitted is not None else None)
     tool_execution: dict[str, Any] = (
-        {"executed": False, "dispatch_began": False, "state_unknown": False,
-                       "refusal_reason": admission_refusal}
-                      if admission_refusal is not None else dispatch_under_lease(
+        _not_sent(admission_refusal) if admission_refusal is not None
+        else _not_sent("permit_refused", permit)
+        if permit is not None and permit.refusal is not None
+        else dispatch_under_lease(
         tenant=tenant,
         principal=principal,
         tool_call=tool_call,
         semantic=fresh_semantic,
-        now=now,
+        now=datetime.now(UTC) if permit is not None else now,
         gate_allowed=gate_result.allowed,
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
         **_flow_kwargs(fresh_obs),
+        **_permit_kwargs(permit),
     ))
+    if permit is not None:
+        tool_execution["permit"] = permit.audit_block()
 
     # FT-02: settle with what actually happened - derived, never assumed.
     #
@@ -1231,6 +1238,7 @@ def execute_approved_item(
         "intent_sequence_no": (intent_entry.sequence_no
                                if intent_entry is not None else None),
         "tool_executed": tool_execution["executed"],
+        **({"permit": tool_execution["permit"]} if "permit" in tool_execution else {}),
         # Whether the outcome is unknown, not merely unsuccessful. An effect
         # receipt may resolve an UNKNOWN dispatch -- a lost response does not
         # mean nothing happened -- so the chain has to carry the distinction.
@@ -1791,19 +1799,27 @@ def dispatch_pending_intent(
         **({"admission": admitted.audit_block()} if admitted is not None else {}),
     })
 
-    tool_execution = dispatch_under_lease(
+    permit = (admission.permit(tenant, ws1=ws1, principals=(actor, acting_for or "", approver))
+              if admission is not None else None)
+    tool_execution = (
+        _not_sent("permit_refused", permit)
+        if permit is not None and permit.refusal is not None
+        else dispatch_under_lease(
         tenant=tenant,
         principal=actor,
         tool_call=tool_call,
         semantic=fresh_semantic,
-        now=now,
+        now=datetime.now(UTC) if permit is not None else now,
         gate_allowed=gate_result.allowed,
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or row.item_id),
         grant_jti=token.jti,
         **_task_kwargs(tool_call),
         **_flow_kwargs(fresh_obs),
-    )
+        **_permit_kwargs(permit),
+    ))
+    if permit is not None:
+        tool_execution["permit"] = permit.audit_block()
 
     outcome = classify_outcome(tool_execution)
     # Issue #416: projection payload commits WITH the terminal state.
@@ -1835,6 +1851,7 @@ def dispatch_pending_intent(
         "grant_jti": token.jti,
         "intent_sequence_no": intent_entry.sequence_no,
         "tool_executed": tool_execution["executed"],
+        **({"permit": tool_execution["permit"]} if "permit" in tool_execution else {}),
         "state_unknown": bool(tool_execution.get("state_unknown")),
         "policy_components": (
             policy_coverage() if policy_coverage is not None else None
@@ -1864,6 +1881,20 @@ def dispatch_pending_intent(
         result["audit"] = {"sequence_no": entry.sequence_no,
                            "entry_hash": entry.entry_hash}
     return result
+
+
+def _not_sent(reason: str, permit: Any = None) -> dict[str, Any]:
+    """A dispatch that provably sent nothing: refused before the lease."""
+    return {"executed": False, "dispatch_began": False, "state_unknown": False,
+            "refusal_reason": reason,
+            **({"permit_refusal": permit.refusal} if permit is not None else {})}
+
+
+def _permit_kwargs(permit: Any) -> dict[str, Any]:
+    """The lease bound a permit sets, passed only when there is one, so a
+    dispatcher without the parameter keeps working on the legacy path."""
+    not_after = getattr(permit, "not_after", None)
+    return {"not_after": not_after} if not_after is not None else {}
 
 
 def _admission_audit(*, proposal_id: Any, actor: str, acting_for: str | None,
@@ -2440,20 +2471,29 @@ def redeem_accept_token(
             tool_call_hash=obs.tool_call_hash, grant_jti=token.jti,
             intent_sequence_no=intent_entry.sequence_no)
 
-    # Governed dispatch - same dispatcher, same lease discipline.
-    tool_execution = dispatch_under_lease(
+    # Governed dispatch - same dispatcher, same lease discipline. Under
+    # atomic admission the permit is checked first (INV-M4-03).
+    permit = (admission.permit(tenant, ws1=ws1, principals=(principal, acting_for or ""))
+              if admission is not None else None)
+    tool_execution = (
+        _not_sent("permit_refused", permit)
+        if permit is not None and permit.refusal is not None
+        else dispatch_under_lease(
         tenant=tenant,
         principal=principal,
         tool_call=tool_call,
         semantic=semantic,
-        now=now,
+        now=datetime.now(UTC) if permit is not None else now,
         toolspec=toolspec_identity,
         proposal_id=str(proposal_id or token.jti),
         grant_jti=token.jti,
         report_lease=True,
         **_task_kwargs(tool_call),
         **_flow_kwargs(obs),
-    )
+        **_permit_kwargs(permit),
+    ))
+    if permit is not None:
+        tool_execution["permit"] = permit.audit_block()
 
     # Same structural classification as the review path: a dispatch that began
     # and then failed is UNKNOWN, not a durable claim that nothing happened.
@@ -2486,6 +2526,7 @@ def redeem_accept_token(
         "grant_jti": token.jti,
         "intent_sequence_no": intent_entry.sequence_no,
         "tool_executed": tool_execution["executed"],
+        **({"permit": tool_execution["permit"]} if "permit" in tool_execution else {}),
         # Whether the outcome is unknown, not merely unsuccessful. An effect
         # receipt may resolve an UNKNOWN dispatch -- a lost response does not
         # mean nothing happened -- so the chain has to carry the distinction.

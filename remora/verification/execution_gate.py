@@ -288,6 +288,11 @@ class Ws1Outcome:
     def receipt_subjects(self) -> tuple[str, ...]:
         return tuple(sorted({r.subject_key for r in self.receipts}))
 
+    @property
+    def evidence_valid_until_ms(self) -> int | None:
+        """The earliest ``valid_until`` over the receipts, which bounds the lease."""
+        return min((r.valid_until_ms for r in self.receipts), default=None)
+
     def admission_refusal(self, *, tenant_id: str, now_ms: int, max_clock_skew_ms: int,
                           epochs: Mapping[str, tuple[int, bool]]) -> str | None:
         """Why admission must refuse at the database instant *now_ms*, or None.
