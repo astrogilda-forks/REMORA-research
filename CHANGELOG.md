@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Execution-path audit: a refused admission returns no grant (NEGATIVE_RESULTS §98)
+
+- Under `REMORA_WS1_ADMISSION=atomic`, `/v1/execution/execute` no longer returns `execution_grant` when the admission refuses. The grant minted before the admission is spent in place and the chain records `execution_grant_withheld`. Before, the unspent grant could be redeemed at `/execute-accepted` without the review path's checks.
+- Cumulative limits: a fence refusal that wrote nothing puts a `change` meter's value back instead of leaving the resource unknown; a naive ISO `now` is read as UTC, as the lease verifier reads it; a resource, unit or principal containing the ledger's key separator refuses (`limit_principal_invalid` is new).
+
 ### Horizon Shield #55 row, parts 1 and 2 (#1024)
 
 - `integrations/horizon55/` reads the signed #51 set-2 records offline and gives ten claims per case; `enforce.py` replays the three payments and the signed budget through the execution API with a sandboxed tool. Without a declared limit all three run (21000 against 20000); with the budget declared, C is refused at assess and at dispatch. Retrospective and author-operated (`NEGATIVE_RESULTS.md` §97).
