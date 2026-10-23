@@ -636,6 +636,73 @@ set or profile refuses as `context_mismatch`. Enforce refuses startup without
 `REMORA_FLOW_CONTROL=1` and evidence named for the prerequisite IFC work
 packages ([design](design/ws1-deterministic-authorization-learned-monitoring-v1.md)).
 
+**Cumulative limits (opt-in, default off):** a check on one call cannot see
+that three payments pass a budget, that small setpoint moves add up, or that
+a fan was started too often. `REMORA_LIMITS_FILE` names a YAML or JSON
+`remora-cumulative-limits/v1` policy and `REMORA_LIMITS_LEDGER` the SQLite
+file its reservations are kept in. Either one without the other refuses
+startup.
+
+The policy has four parts. `meters` says what one call of a tool consumes. A
+`sum` meter reads an amount argument, a `count` meter charges `per_call`, and
+a `change` meter charges how far an absolute value moves from the last value
+REMORA let through for that resource. A meter has a fixed `unit` or a
+`unit_argument`, an optional `resource_argument` and a `scale`. `limits`
+cap a quantity per tenant, optionally per sliding `window_seconds`. A limit
+is for one `principal` or `"*"` (one total shared by all principals). Its
+`resource` is one id, `"*"` (each resource apart) or absent (all together).
+`baselines` give each `change` resource its starting value, with a
+`seed_id`. `coverage` is `listed` or `all_writes`.
+
+```json
+{"schema": "remora-cumulative-limits/v1", "coverage": "all_writes",
+ "meters": {
+   "transfer_payment": [{"quantity": "spend", "kind": "sum", "argument": "amount",
+                         "unit_argument": "unit"}],
+   "set_supply_air_setpoint": [{"quantity": "setpoint_movement", "kind": "change",
+                                "argument": "value", "scale": 10, "unit": "degC",
+                                "resource_argument": "unit"}],
+   "start_fan": [{"quantity": "fan_starts", "kind": "count", "unit": "starts",
+                  "resource_argument": "unit"}]},
+ "limits": [
+   {"limit_id": "q4-spend", "tenant": "acme", "quantity": "spend", "unit": "JPY",
+    "max": 20000, "principal": "agent-1"},
+   {"limit_id": "supply-air", "tenant": "acme", "quantity": "setpoint_movement",
+    "unit": "degC", "max": 20, "window_seconds": 3600, "principal": "*", "resource": "*"},
+   {"limit_id": "fan-starts", "tenant": "acme", "quantity": "fan_starts",
+    "unit": "starts", "max": 3, "window_seconds": 3600, "principal": "*", "resource": "*"}],
+ "baselines": [{"tenant": "acme", "quantity": "setpoint_movement", "resource": "AHU-1",
+                "value": 19.0, "seed_id": "2026-10-22"}]}
+```
+
+Here `max: 20` at scale 10 is 2.0 degC of movement per hour per unit, shared
+by every agent. Moving back counts as movement. A value that is not an
+integer at the meter's scale, such as 19.05 at scale 10, is refused, so a
+move cannot be split into steps too small to count. A negative amount is
+refused too.
+
+The governed dispatcher reserves a metered call against every limit it
+matches as its last check before the lease nonce is spent. A call that does
+not fit never reaches the tool, and `tool_execution.refusal_reason` names
+the reason. `limit_exceeded` is the main one. `limit_undeclared` means no
+limit matches a meter. `limit_tool_unmetered` means a write tool has no meter
+under `all_writes`, and `limit_coverage_unknown` that neither its signed
+ToolSpec nor the deployment's semantic bundle says whether it writes. `limit_amount_invalid`, `limit_unit_invalid` and
+`limit_resource_invalid` reject an unreadable call. `limit_baseline_unknown`
+means a `change` resource has no known value. `limit_resource_busy` means
+another change to it has not settled. `limit_changed` means a limit was
+edited under an existing `limit_id`; declare a new id instead. The last two
+are `limit_principal_missing` and `limit_ledger_unavailable`.
+
+After the tool runs, the dispatcher records whether it ran. A write that
+raised leaves its resource unknown until a baseline with a new `seed_id` is
+declared, because REMORA cannot tell where the equipment ended up. `/assess`
+gives the same answer earlier as a 409 and records `limit_refused` on the
+chain. That check reserves nothing; the reservation at dispatch is what
+holds. A reservation is never returned, the ledger is per host, and a
+`change` meter tracks the values REMORA let through, not the plant.
+NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
+
 **Capability sets (WS8 Q8.2, opt-in):** with
 `REMORA_CAPABILITY_POLICY_FILE` naming a YAML or JSON capability policy,
 the API resolves an `EffectiveCapabilitySet` for every call. It uses the

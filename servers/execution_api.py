@@ -1091,6 +1091,90 @@ def _ws1_gate() -> Any:
     return _WS1_GATE
 
 
+#: The guard and the (policy file, ledger) pair it was built from.
+_LIMIT_GUARD: tuple[tuple[str, str], Any] | None = None
+
+
+def _tool_is_write(tool_name: str) -> bool | None:
+    """Whether the deployment declares that ``tool_name`` writes; None when unknown.
+
+    Read for the cumulative-limit coverage check. The signed ToolSpec answers
+    when a bundle is configured; otherwise the deployment's semantic bundle
+    (its contract's ``mutation``, else its signature's ``effect``). A tool
+    neither declares is unknown, and coverage ``all_writes`` refuses it
+    rather than assume it reads.
+    """
+    bundle = _toolspec_bundle()
+    if bundle is not None:
+        try:
+            spec = bundle.get(tool_name)
+        except ToolSpecRefused:
+            return None
+        return spec.action_type != "read" or bool(spec.semantic_contract.get("mutation"))
+    semantic, _ = _semantic_bundle()
+    if semantic is None:
+        return None
+    contract = semantic.contracts.get(tool_name)
+    if contract is not None:
+        return bool(contract.mutation) or contract.effect != "read"
+    signature = semantic.registry.signatures.get(tool_name)
+    if signature is None or signature.effect is None:
+        return None
+    return signature.effect != "read"
+
+
+def _limit_guard() -> Any:
+    """Cumulative limits, or None when ``REMORA_LIMITS_FILE`` is unset.
+
+    The file is a JSON or YAML ``remora-cumulative-limits/v1`` policy
+    (``remora/enforcement/cumulative_limits.py``); ``REMORA_LIMITS_LEDGER``
+    names the SQLite file the reservations are kept in. One without the
+    other, or a malformed policy, refuses at startup: a limit that silently
+    does not apply would read as one that holds.
+    """
+    global _LIMIT_GUARD
+    path = _os.environ.get("REMORA_LIMITS_FILE", "").strip()
+    ledger = _os.environ.get("REMORA_LIMITS_LEDGER", "").strip()
+    if not path and not ledger:
+        return None
+    if not path or not ledger:
+        raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
+    if _LIMIT_GUARD is None or _LIMIT_GUARD[0] != (path, ledger):
+        import yaml
+
+        from remora.enforcement.cumulative_limits import (
+            LimitGuard,
+            LimitLedger,
+            LimitPolicy,
+        )
+
+        with open(path, encoding="utf-8") as handle:
+            policy = LimitPolicy.from_dict(yaml.safe_load(handle))
+        _LIMIT_GUARD = ((path, ledger),
+                        LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write))
+    return _LIMIT_GUARD[1]
+
+
+def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
+    """Refuse a call its cumulative limits cannot take.
+
+    409 before anything is decided or queued, so no reviewer is asked to
+    approve a call that could not run. Advisory only: the reservation at
+    dispatch (``GovernedToolDispatcher.bind_limit_guard``) is what holds.
+    """
+    guard = _limit_guard()
+    if guard is None or not guard.governs(req.tool_name):
+        return
+    refusal = guard.preview(tenant=tenant, principal=principal, tool_name=req.tool_name,
+                            arguments=req.arguments)
+    if refusal is None:
+        return
+    _CHAIN.append(tenant, {"event": "limit_refused", "actor": principal,
+                           "tool_name": req.tool_name, "detail": refusal,
+                           "stage": "assess"})
+    raise HTTPException(status_code=409, detail=refusal)
+
+
 _ADMISSION: Any = None
 _ADMISSION_KEY: tuple[str, str, int] | None = None
 
@@ -1640,6 +1724,9 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                     dispatcher.bind_binding_policy(policy)
                     dispatcher.bind_effect_policy(_effect_policy_check)
                 _bind_premise_checks(dispatcher)
+                limits = _limit_guard()
+                if limits is not None:
+                    dispatcher.bind_limit_guard(limits)
                 spec = _os.environ.get("REMORA_TOOL_REGISTRY_MODULE", "").strip()
                 if spec:
                     import importlib
@@ -1838,8 +1925,9 @@ def _downstream_ceiling(tool_name: str) -> Any:
 
 def _reset_tool_dispatcher() -> None:
     """Test hook: drop the cached dispatcher (e.g. after env changes)."""
-    global _DISPATCHER, _EFFECT_RESOLVER, _CAPABILITY_RESOLVER, _EFFECT_DOMAIN
+    global _DISPATCHER, _EFFECT_RESOLVER, _CAPABILITY_RESOLVER, _EFFECT_DOMAIN, _LIMIT_GUARD
     _DISPATCHER = None
+    _LIMIT_GUARD = None
     _EFFECT_DOMAIN = None
     _EFFECT_RESOLVER = None
     _CAPABILITY_RESOLVER = None
@@ -2196,6 +2284,7 @@ def assess(req: ToolCallRequest, request: Request) -> dict[str, Any]:
     api_mod._require_tenant_capability(role, tenant, "assess")
     _task_or_refuse(req)
     _delegation_or_refuse(req, tenant, principal)
+    _limits_or_refuse(req, tenant, principal)
     claim = None
     if req.idempotency_key:
         claim = _idempotency_claim(tenant, principal, req.idempotency_key, req)
@@ -2272,6 +2361,7 @@ from servers.semantic_shadow import (
 # and when REMORA_WS1_ADMISSION=atomic lacks a transactional backend or a skew.
 _ws1_gate()
 _admission()
+_limit_guard()
 
 _SEMANTIC_SHADOW = build_semantic_shadow_from_env(
     engine=_ENGINE, tool_description=_toolspec_description,
