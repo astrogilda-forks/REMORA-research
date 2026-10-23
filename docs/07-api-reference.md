@@ -721,7 +721,22 @@ from that value to where the plant ended up is charged, and anything beyond
 the reservation is logged as `dispatch.limit_charged_after_the_fact` and
 counts against later changes. Without such a report, a change in the last
 moment before the write is charged as reserved. Only a conditional write at
-the controller closes that window. `/assess`
+the controller closes that window.
+
+The limits are bound to the authority that sets them and to every decision
+made under them. `REMORA_LIMITS_TRUSTED_KEYS` lists the Ed25519 public keys of
+that authority. With it, `REMORA_LIMITS_FILE` must be a
+`remora-cumulative-limits-signed/v1` envelope signed by one of those keys
+(`scripts/sign_limit_policy.py`), so a REMORA host cannot write itself a
+larger budget. The digest of the limit policy is part of the policy identity
+(`limits_policy_hash`, `cumulative_limits` in the coverage block), so an ACCEPT
+token issued under one set of limits refuses under another. The assessment of
+a proposal records the digest too. An approval is refused with 409
+`limits_changed` on `/execute` and in the async worker when the limits it was
+given under were turned off, relaxed or replaced. Limits turned on after an
+approval apply at dispatch. `REMORA_REQUIRE_LIMITS=1` makes them mandatory:
+startup refuses without limits, without trusted keys, or with coverage other
+than `all_writes`. The OT pilot runs with it. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
 holds. A reservation is never returned and the ledger is per host. A

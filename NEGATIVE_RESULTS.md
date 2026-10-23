@@ -5844,6 +5844,16 @@ last read is charged from the value the controller reports it replaced, when
 the controller reports one. Without such a report that last window remains
 open, and a test pins it.
 
+The same review asked that a signed budget be bound to dispatch, not left to
+a local file. A test of that found a rollback gap. A payment approved while
+limits were on was executed after they were turned off, and ran: the review
+path re-decided under the policy in force and never compared the limits. The
+assessment now records the digest of the limit policy, and `/execute` and
+the async worker refuse such an approval as `limits_changed`. The digest is
+also part of the policy identity that ACCEPT tokens bind. Limit policies can
+be signed by the authority that sets them, and `REMORA_REQUIRE_LIMITS` makes
+signed limits with `all_writes` coverage mandatory, as the OT pilot now does.
+
 Limits: the ledger is SQLite on one host, and a reservation is never
 returned. The amount is the argument the deployment names, not what a rail
 settled. A change meter that is not observed tracks the values REMORA let
