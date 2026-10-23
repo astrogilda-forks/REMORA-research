@@ -2883,6 +2883,7 @@ def _dispatch_under_lease(
     capability_set: Any = None,
     report_lease: bool = False,
     flow_expected: tuple[int, str] | None = None,
+    not_after: datetime | None = None,
 ) -> dict[str, Any]:
     """Governed dispatch (see remora.execution.dispatch); binds this module's
     dispatcher and current policy bundle hash. Shared by /execute,
@@ -2977,6 +2978,7 @@ def _dispatch_under_lease(
             invocation_arguments=(
                 resolved_arguments if resolved_arguments not in (None, tool_call.arguments)
                 else None),
+            not_after=not_after,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):

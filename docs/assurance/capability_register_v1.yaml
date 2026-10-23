@@ -210,8 +210,19 @@ capabilities:
       - remora/enforcement/gate.py
       - tests/test_token_hardening.py
       - servers/execution_api.py
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -347,8 +358,19 @@ capabilities:
   - id: CAP-004
     name: "Tool-call payload binding (canonical hash, recomputed before execution)"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -428,8 +450,19 @@ capabilities:
   - id: CAP-005
     name: "Audit chain (hash-chained decision history)"
     status: PERSISTED_ATOMIC
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -526,8 +559,19 @@ capabilities:
   - id: CAP-007
     name: "Review queue with TTL-to-ABSTAIN and approval freshness re-gate"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -723,8 +767,19 @@ capabilities:
       - tests/test_effect_receipt_atomicity.py
       - tests/test_effect_record_endpoint.py
       - docs/deployment/authority-custody-evidence.md
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1013,8 +1068,19 @@ capabilities:
   - id: CAP-018
     name: "Task-bound authority and non-decaying loop safety on the execution API"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1104,8 +1170,19 @@ capabilities:
   - id: CAP-019
     name: "Evidence coverage verdicts on the evidence export"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1178,8 +1255,19 @@ capabilities:
   - id: CAP-020
     name: "Pre-dispatch premise checks: resolved effect, plan premises, procedure obligations"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1266,8 +1354,19 @@ capabilities:
   - id: CAP-021
     name: "Independent recorder: evidence captured outside the executing process"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1393,8 +1492,19 @@ capabilities:
   - id: CAP-023
     name: "Capability minimization: task-scoped capability sets enforced at assess, execution and dispatch"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1498,8 +1608,19 @@ capabilities:
   - id: CAP-024
     name: "Capability mediation for implementation effects, with an effect domain for strict deployments (NTA-2 phases 1 to 3)"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1816,8 +1937,19 @@ capabilities:
   - id: CAP-030
     name: "WS1 execution preconditions and monitor composition on the execution API (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and
@@ -1900,8 +2032,19 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: cefd90bd718f87e25f0f8e363a9d5c51c296b6c6
+    verified_at_sha: 91892354868e9be935ed6cd3f4329307badabaee
     verified_by: >-
+      re-audited 2026-10-23 at 9189235 (WS1-M4 PERMIT BEFORE THE SEND, opt-in), from cefd90b:
+      remora/execution/admission.py adds AtomicAdmission.permit, which repeats the admission check (receipts
+      at a fresh database instant, epochs under the tenant lock, principals) in a read-only transaction after
+      commit and before the lease is minted (INV-M4-03). remora/execution/service.py calls it on all three
+      paths; a refusal settles the intent REFUSED as permit_refused without minting a lease (M4-T14, M4-T16).
+      remora/execution/dispatch.py caps the lease expiry at the permit's not_after (earliest receipt
+      valid_until less twice the declared skew) and refuses to mint at or past it (permit_expired).
+      remora/verification/execution_gate.py exposes evidence_valid_until_ms. servers/execution_api.py passes
+      not_after through. Every permit records at_effect NOT_ESTABLISHED. With the mode unset no path changes.
+      Strictly narrowing. Tests: tests/test_atomic_admission.py (SQLite and Postgres),
+      tests/test_ws1_atomic_admission_route.py. Status, scope and caveats unchanged.
       re-audited 2026-10-23 at cefd90b (WS1-M4 AUDIT ROW IN THE ADMISSION TRANSACTION, opt-in), from 2efe206:
       remora/execution/admission.py enqueues an execution_admitted record in the audit outbox on the admission
       connection as its last step before commit; a failed enqueue refuses as audit_outbox_unavailable and

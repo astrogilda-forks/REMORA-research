@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from remora.enforcement.lease import (
+    DEFAULT_LEASE_TTL_SECONDS,
     ExecutionLease,
     LeaseRefused,
     ToolExecutionStateUnknown,
@@ -73,6 +74,7 @@ def dispatch_under_lease(
     report_lease: bool = False,
     result_commit: Callable[[Any], tuple[Any, dict[str, Any]]] | None = None,
     invocation_arguments: Any = None,
+    not_after: datetime | None = None,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -123,10 +125,17 @@ def dispatch_under_lease(
     ``tool_call.arguments``; the local dispatcher checks both forms and the
     tool receives these. A forwarded call ignores them: the executing domain
     resolves the handles in its own store.
+
+    ``not_after`` (WS1-M4, M4-T14) caps the expiry of a lease minted here at
+    the instant the evidence behind the admission stops holding. At or past
+    it, nothing is minted and the call is refused as ``permit_expired``.
     """
     tool_execution: dict[str, Any] = {"executed": False}
     if not gate_allowed:
         tool_execution["refusal_reason"] = "pep_denied"
+        return tool_execution
+    if not_after is not None and presented_lease is None and now >= not_after:
+        tool_execution["refusal_reason"] = "permit_expired"
         return tool_execution
     # A dispatcher is needed exactly when this process will execute locally,
     # which is when it is NOT going to forward. Forwarding happens only for a
@@ -158,6 +167,7 @@ def dispatch_under_lease(
                 plan=plan,
                 capability_set=capability_set,
                 surface_digest=surface_digest,
+                not_after=not_after,
             )
         except (LeaseRefused, ValueError, SigningUnavailable) as exc:
             # SigningUnavailable belongs here, and its absence was a live 500.
@@ -409,6 +419,7 @@ def _issue_local_lease(
     plan: PlanBinding | None = None,
     capability_set: EffectiveCapabilitySet | None = None,
     surface_digest: str = "",
+    not_after: datetime | None = None,
 ) -> ExecutionLease:
     execution_context = _execution_context(semantic)
     # ADR-D: the runtime this lease is granted for. An execution context names
@@ -422,6 +433,10 @@ def _issue_local_lease(
         from remora.enforcement.runtime_identity import current_runtime_identity_hash
 
         runtime_identity_hash = current_runtime_identity_hash()
+    expires_at = None
+    if not_after is not None:
+        expires_at = min(now + timedelta(seconds=DEFAULT_LEASE_TTL_SECONDS),
+                         not_after).isoformat()
     return ExecutionLease.issue(
             decision="accept",
             tenant_id=tenant,
@@ -431,6 +446,7 @@ def _issue_local_lease(
             target_environment=tool_call.target_environment,
             policy_bundle_hash=policy_bundle_hash,
             issued_at=now.isoformat(),
+            expires_at=expires_at,
             tool_contract_bundle_hash=semantic["tool_contract_bundle_hash"],
             intent_authority_hash=semantic["intent_authority_hash"],
             toolspec_hash=(toolspec or {}).get("hash", ""),
