@@ -18,8 +18,15 @@ one ``transaction_state`` for the tenant
    under lock;
 4. the grant spend, on the same connection;
 5. the dispatch intent, on the same connection;
-6. commit. Any refusal or fault before it rolls every step back, so the grant
-   stays unspent and no intent exists.
+6. the ``execution_admitted`` audit row, enqueued on the same connection in
+   the audit outbox (REM-047);
+7. commit. Any refusal or fault before it rolls every step back, so the grant
+   stays unspent, no intent exists and no audit row claims otherwise
+   (M4-T12).
+
+After commit the audit outbox is drained into the tenant chain. A crash
+between the commit and the drain leaves the row enqueued, and the next drain
+projects it, so an admission that committed always reaches the chain.
 
 No network or monitor call happens inside: the WS1 lookups ran before the
 transaction opened. Postgres is the reference backend and SQLite the
@@ -41,6 +48,7 @@ from typing import Any
 from remora.enforcement.gate import EnforcementResult
 from remora.errors import RemoraError
 from remora.execution.ports import Ws1OutcomePort
+from remora.governance import audit_outbox
 from remora.governance.authority_epochs import (
     MAX_CLOCK_SKEW_MS,
     AuthorityEpochs,
@@ -88,11 +96,15 @@ class AdmissionResult:
     db_time_ms: int
     authority_epochs: Mapping[str, tuple[int, bool]]
     claimed: Any = None
+    #: Key of the ``execution_admitted`` row the transaction enqueued, so the
+    #: ``execution_authorized`` entry written after commit joins to it.
+    audit_key: str = ""
 
     def audit_block(self) -> dict[str, Any]:
         return {"mode": "atomic", "db_time_ms": self.db_time_ms,
                 "authority_epochs": {k: {"epoch": e, "revoked": r}
-                                     for k, (e, r) in sorted(self.authority_epochs.items())}}
+                                     for k, (e, r) in sorted(self.authority_epochs.items())},
+                **({"audit_key": self.audit_key} if self.audit_key else {})}
 
 
 def db_now_ms(connection: Any, dialect: str) -> int:
@@ -106,7 +118,8 @@ class AtomicAdmission:
     def __init__(self, *, transaction: Callable[[str], Any],
                  connection: Callable[[], Any], epochs: AuthorityEpochs,
                  dialect: str, max_clock_skew_ms: int,
-                 revocations: Any = None) -> None:
+                 revocations: Any = None,
+                 drain: Callable[[str], Any] | None = None) -> None:
         if dialect not in DIALECTS:
             raise ValueError(f"atomic admission needs Postgres or SQLite, not {dialect!r}")
         if (isinstance(max_clock_skew_ms, bool) or not isinstance(max_clock_skew_ms, int)
@@ -120,6 +133,8 @@ class AtomicAdmission:
         #: same transaction. ``revoke-principal`` writes it under the same
         #: tenant lock, so a revocation and an admission are ordered.
         self._revocations = revocations
+        #: Projects committed audit-outbox rows into the chain, after commit.
+        self._drain = drain
         self._dialect = dialect
         self.max_clock_skew_ms = max_clock_skew_ms
         epochs.ensure_schema()
@@ -161,7 +176,8 @@ class AtomicAdmission:
               consume: Callable[[Any, str], EnforcementResult],
               record_intent: Callable[[], Any] | None = None,
               claim: Callable[[Any], Any] | None = None,
-              principals: Sequence[str] = ()) -> AdmissionResult:
+              principals: Sequence[str] = (),
+              audit: Mapping[str, Any] | None = None) -> AdmissionResult:
         """Check, claim, spend and record in one transaction, or raise.
 
         ``claim(connection)`` claims an intent that already exists, for the
@@ -174,7 +190,29 @@ class AtomicAdmission:
         ``principals`` are the identities whose authority the call rests on:
         the actor, a proposer a delegate acts for, the approver. Any of them
         revoked refuses as ``principal_revoked`` (M4-T03).
+        ``audit`` is the admission's audit record; it needs ``grant_jti``,
+        which keys it. It is enqueued as ``execution_admitted`` last, before
+        commit, and a failure to enqueue it refuses the whole admission as
+        ``audit_outbox_unavailable`` (M4-T12).
         """
+        result = self._admit(tenant, ws1=ws1, consume=consume,
+                             record_intent=record_intent, claim=claim,
+                             principals=principals, audit=audit)
+        if result.audit_key and self._drain is not None:
+            try:
+                self._drain(tenant)
+            except Exception:
+                # Committed and enqueued: the next drain projects the row.
+                # Failing the admission now would misreport a spent grant.
+                pass
+        return result
+
+    def _admit(self, tenant: str, *, ws1: Ws1OutcomePort | None,
+               consume: Callable[[Any, str], EnforcementResult],
+               record_intent: Callable[[], Any] | None,
+               claim: Callable[[Any], Any] | None,
+               principals: Sequence[str],
+               audit: Mapping[str, Any] | None) -> AdmissionResult:
         try:
             with self._transaction(tenant):
                 conn = self._open()
@@ -205,9 +243,34 @@ class AtomicAdmission:
                 if not gate_result.allowed:
                     raise AdmissionRefused(str(gate_result.reason))
                 intent = record_intent() if record_intent is not None else None
-                return AdmissionResult(gate_result, intent, now_ms, dict(epochs), claimed)
+                result = AdmissionResult(gate_result, intent, now_ms, dict(epochs), claimed)
+                if audit is not None:
+                    result = self._enqueue_audit(conn, tenant, result, audit)
+                return result
         except AuthorityEpochsUnavailable as exc:
             raise AdmissionRefused(exc.reason_code) from exc
+
+    def _enqueue_audit(self, conn: Any, tenant: str, result: AdmissionResult,
+                       audit: Mapping[str, Any]) -> AdmissionResult:
+        jti = str(audit.get("grant_jti") or "")
+        if not jti:
+            raise AdmissionRefused("admission_audit_unkeyed")
+        # One admission per grant: the spend above is single-use, so the jti
+        # names this event, and a replayed drain cannot append it twice.
+        key = audit_outbox.encode_key(tenant, "execution_admitted", jti)
+        row = result.intent if result.intent is not None else result.claimed
+        outbox_id = getattr(row, "outbox_id", None)
+        payload = {
+            **audit, "event": "execution_admitted",
+            **({"outbox_id": outbox_id} if outbox_id else {}),
+            "admission": result.audit_block(),
+        }
+        try:
+            audit_outbox.enqueue(conn, tenant=tenant, key=key, payload=payload)
+        except Exception as exc:
+            raise AdmissionRefused("audit_outbox_unavailable") from exc
+        return AdmissionResult(result.gate_result, result.intent, result.db_time_ms,
+                               result.authority_epochs, result.claimed, key)
 
     def _refuse_revoked(self, tenant: str, principals: Sequence[str]) -> None:
         wanted = sorted({p for p in principals if p and p.strip()})
