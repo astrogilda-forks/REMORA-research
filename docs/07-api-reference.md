@@ -688,7 +688,9 @@ the reason. `limit_exceeded` is the main one. `limit_undeclared` means no
 limit matches a meter. `limit_tool_unmetered` means a write tool has no meter
 under `all_writes`, and `limit_coverage_unknown` that neither its signed
 ToolSpec nor the deployment's semantic bundle says whether it writes. `limit_amount_invalid`, `limit_unit_invalid` and
-`limit_resource_invalid` reject an unreadable call. `limit_baseline_unknown`
+`limit_resource_invalid` reject an unreadable call, and
+`limit_invocation_differs` a flow-resolved invocation that would meter differently from
+the approved wire form. `limit_baseline_unknown`
 means a `change` resource has no known value. `limit_resource_busy` means
 another change to it has not settled. `limit_changed` means a limit was
 edited under an existing `limit_id`; declare a new id instead. The last two
@@ -747,12 +749,26 @@ than `all_writes`. No profile implies it; a deployment sets it. The OT pilot
 runs with it. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
-holds. A reservation is never returned and the ledger is per host. A
+holds. A reservation is given back only when the fence refused and the tool provably
+did not run; otherwise it is never returned. The ledger is per host. A
 `change` meter that is not observed tracks the values REMORA let through, not
 the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.
 [provenance/verified-prior-art-cumulative-limits-2026-10-23.md](../provenance/verified-prior-art-cumulative-limits-2026-10-23.md)
 lists the prior art these limits build on and what may not be claimed for them.
+
+**Other settings the API reads:** `REMORA_TOOLSPEC_REVOKED_IDENTITIES` is a
+comma-separated list of ToolSpec signing identities that are refused even when
+trusted (checked before trust, so revocation wins). `REMORA_EXECUTION_TIMEOUT_SECONDS`
+bounds a remote execution-domain call (default 120). `REMORA_RISK_PROFILE_PATH` and
+`REMORA_OPA_POLICY_PATH` replace the risk-profile file and name the OPA policy file;
+both enter the policy identity. `REMORA_PDP_SIGNING_KID` and `REMORA_LEASE_SIGNING_KID`
+set the key ids stamped on grants and leases. `REMORA_RETRIEVAL_TOP_K`,
+`REMORA_BASE_EVIDENCE_JSONL` and `REMORA_RUNTIME_EVIDENCE_JSONL` configure the
+assess surface's retrieval. `REMORA_SLO_LATENCY_P95_MS`,
+`REMORA_SLO_ESCALATION_RATE_MAX` and `REMORA_SLO_ORACLE_COST_PER_ASSESS_USD_MAX`
+set the SLO thresholds the metrics endpoint reports against (defaults 2000, 0.30,
+0.05).
 
 **Capability sets (WS8 Q8.2, opt-in):** with
 `REMORA_CAPABILITY_POLICY_FILE` naming a YAML or JSON capability policy,

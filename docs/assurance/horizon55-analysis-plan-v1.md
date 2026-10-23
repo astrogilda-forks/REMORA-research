@@ -78,8 +78,8 @@ could not have refused C. Replayed through REMORA's execution API, REMORA as
 shipped ran all three payments (NEGATIVE_RESULTS.md section 97). The owner then
 decided that REMORA must handle this, because the same pattern governs
 setpoints and ventilation in the planned pilot. Cumulative limits were added to
-REMORA's enforcement path in pull requests #1025 and #1033, outside this
-package and not under this plan. `enforce.py` adds part 2: the verified
+REMORA's enforcement path in pull requests #1025, #1033 and #1037, outside
+this package and not under this plan. `enforce.py` adds part 2: the verified
 payments and the signed budget replayed through REMORA's own decision path,
 with and without the limit. Its expected outcomes are pinned in `run.py`
 (`EXPECTED_ENFORCEMENT`). They were written after the mechanism was built and

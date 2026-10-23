@@ -3537,8 +3537,6 @@ topics:
 - docs_remora_architecture_html
 - docs_research_research_shelf_v1_yaml
 - docs_deployment_execution-quickstart_md
-- docs_assurance_statistical_analysis_plan_v4_md
-- docs_research_task_intent_authority_v1_md
 - docs_assurance_fasttrack_register_v1_yaml
 - docs_adr_authority_custody_and_lease_durability
 - docs_deployment_authority_custody_evidence
@@ -3551,7 +3549,6 @@ topics:
 - docs_assurance_prose_style_baseline_json
 - docs_assurance_credential_topology_yaml
 - docs_assurance_authority_state_topology_yaml
-- docs_architecture_adr_tainted_argument_floor_order_md
 - docs_design_remora-quality-program-v1_md
 - docs_assurance_results_manifest_v1_yaml
 - docs_assurance_ledger_binding_baseline_json
