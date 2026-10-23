@@ -119,6 +119,30 @@ def test_a_limit_added_after_a_reservation_refuses_its_retry(tmp_path):
     assert reserve(second, "pay", "A", amount=7000, cur="JPY") == cl.CHANGED
 
 
+@pytest.mark.parametrize("answer", ["moved", "raises"])
+def test_a_guard_whose_policy_is_no_longer_in_force_refuses(tmp_path, answer):
+    state = {"in_force": True}
+
+    def in_force():
+        if not state["in_force"] and answer == "raises":
+            raise OSError("policy file unreadable")
+        return state["in_force"]
+
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "l.db"), in_force=in_force)
+    assert reserve(guard, "pay", "A", amount=7000, cur="JPY") is None
+    state["in_force"] = False
+    assert guard.governs("unmetered")
+    assert reserve(guard, "pay", "B", amount=1, cur="JPY") == cl.POLICY_CHANGED
+    assert guard.preview(tenant="t", principal="p", tool_name="pay",
+                         arguments={"amount": 1, "cur": "JPY"}) == cl.POLICY_CHANGED
+    assert guard.fence("A") == cl.POLICY_CHANGED
+    assert guard.compare("pay", {"amount": 1, "cur": "JPY"},
+                         {"amount": 1, "cur": "JPY"}) == cl.POLICY_CHANGED
+    guard.release("A")           # what was reserved is still released, not stranded
+    state["in_force"] = True
+    assert reserve(guard, "pay", "C", amount=20000, cur="JPY") is None
+
+
 def test_movement_is_measured_from_the_last_value(guard):
     assert reserve(guard, "move", "1", unit="AHU-1", value=20.0) is None
     settle(guard, "1")

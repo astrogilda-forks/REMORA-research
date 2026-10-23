@@ -26,6 +26,7 @@ from tests.limits.harness import (  # noqa: E402
     assess,
     make_client,
     ran,
+    refused_at_dispatch,
     run,
 )
 from tests.limits.test_limits_payments import pay, policy  # noqa: E402
@@ -183,3 +184,94 @@ def test_the_async_worker_refuses_an_approval_whose_limits_changed(monkeypatch, 
     results = exec_mod.dispatch_pending_intents("acme", worker_id="w1")
     assert [r["tool_execution"]["refusal_reason"] for r in results] == ["limits_changed"]
     assert ran(tmp_path) == []
+
+
+# ── the policy enforced is the policy the grants name ────────────────────
+#
+# The dispatcher keeps the guard it was built with, while a grant binds the
+# digest of the policy file read when it is checked. A file replaced on the
+# same path without a restart must not leave the old budget enforced under
+# the new identity.
+
+
+def _swap(tmp_path, document):
+    (tmp_path / "limits.json").write_text(json.dumps(document))
+
+
+def _signed_client(monkeypatch, tmp_path):
+    trust(monkeypatch, AUTHORITY)
+    client = make_client(monkeypatch, tmp_path, signed(policy()))      # 20000
+    assert run(client, pay("A"))["executed"] is True
+    return client
+
+
+@pytest.mark.parametrize("replacement", ["smaller", "larger", "tampered", "stranger"])
+def test_a_policy_replaced_without_a_restart_refuses(monkeypatch, tmp_path, replacement):
+    client = _signed_client(monkeypatch, tmp_path)
+    document = {"smaller": signed(policy(max_=10000, limit_id="smaller")),
+                "larger": signed(policy(max_=10 ** 6, limit_id="larger")),
+                "tampered": signed(policy()),
+                "stranger": signed(policy(max_=10 ** 6), STRANGER)}[replacement]
+    if replacement == "tampered":
+        document["policy"]["limits"][0]["max"] = 10 ** 6
+    _swap(tmp_path, document)
+    # B fits the 20000 still held in memory; it must not run under it.
+    assert run(client, pay("B")) == {"stage": "assess", "status": 409,
+                                     "detail": "limit_policy_changed"}
+    assert [p["reference"] for p in ran(tmp_path)] == ["hs51-musubi-2-A"]
+
+
+def test_the_dispatcher_refuses_once_the_deployed_policy_moved(monkeypatch, tmp_path):
+    """The reservation at dispatch holds even where no earlier check runs."""
+    import servers.execution_api as exec_mod
+
+    _signed_client(monkeypatch, tmp_path)
+    guard = exec_mod._limit_guard()
+    _swap(tmp_path, signed(policy(max_=10000, limit_id="smaller")))
+    assert guard.governs("read_air_temperature")      # unmetered before: refused now
+    assert guard.reserve(tenant="acme", principal="employee-1", tool_name="transfer_payment",
+                         arguments=pay("B")["arguments"], operation_id="lease:x",
+                         request_hash="h") == cl.POLICY_CHANGED
+    assert guard.fence("lease:x") == cl.POLICY_CHANGED
+    assert guard.compare("transfer_payment", {}, {}) == cl.POLICY_CHANGED
+
+
+def test_changed_limit_settings_refuse_like_a_changed_file(monkeypatch, tmp_path):
+    client = _signed_client(monkeypatch, tmp_path)
+    trust(monkeypatch, AUTHORITY, STRANGER)
+    # The assessment builds a guard from the new settings; the dispatcher's
+    # guard was built from the old ones, and refuses.
+    assert refused_at_dispatch(run(client, pay("B")), "limit_policy_changed")
+    assert len(ran(tmp_path)) == 1
+
+
+def test_a_restart_enforces_the_replacement(monkeypatch, tmp_path):
+    client = _signed_client(monkeypatch, tmp_path)
+    _swap(tmp_path, signed(policy(max_=5000, limit_id="smaller")))
+    _reset()
+    assert run(client, pay("B"))["detail"] == "limit_exceeded"         # 7000 > 5000
+    assert len(ran(tmp_path)) == 1
+
+
+def test_the_original_policy_restored_runs_again(monkeypatch, tmp_path):
+    client = _signed_client(monkeypatch, tmp_path)
+    original = (tmp_path / "limits.json").read_bytes()
+    _swap(tmp_path, signed(policy(max_=10 ** 6, limit_id="larger")))
+    assert run(client, pay("B"))["detail"] == "limit_policy_changed"
+    (tmp_path / "limits.json").write_bytes(original)
+    assert run(client, pay("B"))["executed"] is True
+    assert run(client, pay("C"))["detail"] == "limit_exceeded"
+
+
+def test_signed_at_is_unsigned_metadata_bound_by_the_identity(monkeypatch, tmp_path):
+    """``signed_at`` is outside the signature; the file digest still covers it."""
+    import servers.api as api_mod
+
+    document = signed(policy())
+    document["signed_at"] = "1999-01-01T00:00:00Z"
+    assert cl.verify_signed_policy(document, [AUTHORITY.verification_key()])[0] == policy()
+    client = _signed_client(monkeypatch, tmp_path)
+    before = api_mod._policy_component_hashes()["limits_policy_hash"]
+    _swap(tmp_path, document)
+    assert api_mod._policy_component_hashes()["limits_policy_hash"] != before
+    assert run(client, pay("B"))["detail"] == "limit_policy_changed"

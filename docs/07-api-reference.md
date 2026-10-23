@@ -734,9 +734,17 @@ token issued under one set of limits refuses under another. The assessment of
 a proposal records the digest too. An approval is refused with 409
 `limits_changed` on `/execute` and in the async worker when the limits it was
 given under were turned off, relaxed or replaced. Limits turned on after an
-approval apply at dispatch. `REMORA_REQUIRE_LIMITS=1` makes them mandatory:
+approval apply at dispatch. The dispatcher enforces the policy it verified at
+startup, built from the same bytes it digested. When the file at
+`REMORA_LIMITS_FILE`, or the limit settings, change without a restart, every
+call refuses with `limit_policy_changed` at `/assess` and at dispatch, whether
+the new file is smaller, larger or fails verification. A restart verifies and
+enforces the new policy. The signature covers the `policy` block only:
+`signed_at` is unsigned metadata that no decision reads, though the digest
+covers it. `REMORA_REQUIRE_LIMITS=1` makes limits mandatory:
 startup refuses without limits, without trusted keys, or with coverage other
-than `all_writes`. The OT pilot runs with it. `/assess`
+than `all_writes`. No profile implies it; a deployment sets it. The OT pilot
+runs with it. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
 holds. A reservation is never returned and the ledger is per host. A
