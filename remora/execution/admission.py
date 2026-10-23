@@ -40,6 +40,7 @@ downstream effect lands (AUTHORIZED_AT_COMMIT only, ADR decision 6).
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -59,6 +60,8 @@ __all__ = ["DIALECTS", "AdmissionRefused", "AdmissionResult", "AtomicAdmission",
            "ClaimLost", "db_now_ms"]
 
 DIALECTS = ("postgres", "sqlite")
+
+_LOGGER = logging.getLogger(__name__)
 
 _NOW_SQL = {
     # clock_timestamp(), not now(): now() is the transaction's start, and the
@@ -204,7 +207,8 @@ class AtomicAdmission:
             except Exception:
                 # Committed and enqueued: the next drain projects the row.
                 # Failing the admission now would misreport a spent grant.
-                pass
+                _LOGGER.warning("audit outbox drain after admission failed for tenant %s",
+                                tenant, exc_info=True)
         return result
 
     def _admit(self, tenant: str, *, ws1: Ws1OutcomePort | None,
