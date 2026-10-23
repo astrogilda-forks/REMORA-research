@@ -131,41 +131,41 @@ def report(body: dict[str, Any]) -> str:
         "",
         "## Answer",
         "",
-        "Payment C took the buyer's spending to 21000 JPY-testnet against a signed budget of "
-        "20000.",
+        ("Payment C took the buyer's spending to 21000 JPY-testnet against a signed budget of "
+         "20000."),
         "",
-        "1. Reading the signed records, REMORA finds C over budget (`budget_compliance = "
-        "CONTRADICTED`) and A and B within it, with delegation scope established for all "
-        "three.",
-        "2. Run through REMORA's own execution path, C does not run once the budget is "
-        "declared to REMORA. It is refused before review, and refused again at dispatch "
-        "when all three payments were approved in advance. A and B run, and 14000 reaches "
-        "the payment tool.",
-        "3. Without a declared limit REMORA lets all three run (21000). Cumulative limits "
-        "were added to REMORA for this; before them it had no running total of what calls "
-        "spend (NEGATIVE_RESULTS.md section 97).",
+        ("1. Reading the signed records, REMORA finds C over budget (`budget_compliance = "
+         "CONTRADICTED`) and A and B within it, with delegation scope established for all "
+         "three."),
+        ("2. Run through REMORA's own execution path, C does not run once the budget is "
+         "declared to REMORA. It is refused before review, and refused again at dispatch "
+         "when all three payments were approved in advance. A and B run, and 14000 reaches "
+         "the payment tool."),
+        ("3. Without a declared limit REMORA lets all three run (21000). Cumulative limits "
+         "were added to REMORA for this; before them it had no running total of what calls "
+         "spend (NEGATIVE_RESULTS.md section 97)."),
         "",
-        "Where each part stands: the cumulative limits used in part 2 are on master "
-        "(#1025, merged). Measuring equipment movement from the plant (#1033) and binding "
-        "limits to a signing authority and to every approval (#1037) are open pull "
-        "requests, and part 2 does not depend on them.",
+        ("Where each part stands: the cumulative limits used in part 2 are on master "
+         "(#1025, merged). Measuring equipment movement from the plant (#1033) and binding "
+         "limits to a signing authority and to every approval (#1037) are open pull "
+         "requests, and part 2 does not depend on them."),
         "",
-        "Exploratory, retrospective and author-operated. The A/B/C records were public and "
-        "examined before this row was designed, so this is neither a holdout nor a "
-        "preregistered confirmation, and no independent verification is claimed "
-        f"(independence: `{body['independence']}`).",
+        ("Exploratory, retrospective and author-operated. The A/B/C records were public and "
+         "examined before this row was designed, so this is neither a holdout nor a "
+         "preregistered confirmation, and no independent verification is claimed "
+         f"(independence: `{body['independence']}`)."),
         "",
         "## What A, B and C are",
         "",
-        "Horizon Shield's #51 set 2 is a live run on 2026-10-22, recorded by MUSUBI in a "
-        "signed companion log. One buyer agent (`4c3b54ac…`) calls one responder service "
-        "(`7b1ada68…`, service `estimate-audit`) three times. The service audits a "
-        "construction estimate (exterior wall painting, scaffolding and pressure washing) "
-        "against the souba-db market-price dataset.",
+        ("Horizon Shield's #51 set 2 is a live run on 2026-10-22, recorded by MUSUBI in a "
+         "signed companion log. One buyer agent (`4c3b54ac…`) calls one responder service "
+         "(`7b1ada68…`, service `estimate-audit`) three times. The service audits a "
+         "construction estimate (exterior wall painting, scaffolding and pressure washing) "
+         "against the souba-db market-price dataset."),
         "",
-        "Every call is paid. The buyer holds one delegated credential from a root issuer "
-        "(`ced79be2…`), and the issuer signed a budget policy for it: at most 20000 "
-        "JPY-testnet in total. JPY-testnet is a simulated unit; no money moved.",
+        ("Every call is paid. The buyer holds one delegated credential from a root issuer "
+         "(`ced79be2…`), and the issuer signed a budget policy for it: at most 20000 "
+         "JPY-testnet in total. JPY-testnet is a simulated unit; no money moved."),
         "",
         "| Case | Occurrence | Price | Total after the call | Against the budget |",
         "|---|---|---|---|---|",
@@ -173,22 +173,22 @@ def report(body: dict[str, Any]) -> str:
         "| B | `hs51-musubi-2-B` | 7000 JPY-testnet | 14000 | within |",
         "| C | `hs51-musubi-2-C` | 7000 JPY-testnet | 21000 | over by 1000 |",
         "",
-        "Each call is fine on its own: the right caller, the right service, a capability "
-        "the credential grants, the advertised price. Only the running total is wrong. In "
-        "the live run C was executed anyway, and MUSUBI's settlement flagged it "
-        "afterwards (`budget_exceeded`). The question for #55 is what REMORA makes of the "
-        "same records, and whether REMORA would let C run.",
+        ("Each call is fine on its own: the right caller, the right service, a capability "
+         "the credential grants, the advertised price. Only the running total is wrong. In "
+         "the live run C was executed anyway, and MUSUBI's settlement flagged it "
+         "afterwards (`budget_exceeded`). The question for #55 is what REMORA makes of the "
+         "same records, and whether REMORA would let C run."),
         "",
         "## Part 1: reading the signed records",
         "",
-        f"Inputs: horizon-shield `{body['horizon_revision']}` (records) and "
-        f"`{body['dataset_revision']}` (souba-db 2.3.0), pinned in `inputs.lock.json` "
-        f"(SHA-256 `{body['input_lock_sha256']}`).",
+        (f"Inputs: horizon-shield `{body['horizon_revision']}` (records) and "
+         f"`{body['dataset_revision']}` (souba-db 2.3.0), pinned in `inputs.lock.json` "
+         f"(SHA-256 `{body['input_lock_sha256']}`)."),
         "",
-        f"Log: {body['log']['size']} entries, hash chain, operator and author signatures "
-        f"checked locally: {'verified' if body['log']['verified'] else 'NOT verified'}. "
-        "Bitcoin anchoring of the checkpoint was not checked "
-        "(`checkpoint_anchoring = NOT_ESTABLISHED`).",
+        (f"Log: {body['log']['size']} entries, hash chain, operator and author signatures "
+         f"checked locally: {'verified' if body['log']['verified'] else 'NOT verified'}. "
+         "Bitcoin anchoring of the checkpoint was not checked "
+         "(`checkpoint_anchoring = NOT_ESTABLISHED`)."),
         "",
         "| Claim | A | B | C |",
         "|---|---|---|---|",
@@ -217,8 +217,8 @@ def report(body: dict[str, Any]) -> str:
         "",
         "### Native reported (the producer's settlement) beside the REMORA assessment",
         "",
-        "| Case | native execution disposition | native payment reasons | remora "
-        "`native_delegation_scope` | remora `budget_compliance` |",
+        ("| Case | native execution disposition | native payment reasons | remora "
+         "`native_delegation_scope` | remora `budget_compliance` |"),
         "|---|---|---|---|---|",
     ]
     for case in claims.CASES:
@@ -232,12 +232,12 @@ def report(body: dict[str, Any]) -> str:
     else:
         budget = enf["signed_inputs"]["budget"]
         lines += [
-            "The three payments, the payer and payee, and the budget "
-            f"({budget['max_total']} {budget['unit']}, from the issuer-signed budget policy) "
-            "are taken from the verified log. Each payment goes through REMORA's execution "
-            "API: `/v1/execution/assess`, `/approve`, `/execute`, the governed dispatcher "
-            "and a sandboxed payment tool that records every call reaching it "
-            "(`enforce.py`, `enforcement.json`).",
+            ("The three payments, the payer and payee, and the budget "
+             f"({budget['max_total']} {budget['unit']}, from the issuer-signed budget policy) "
+             "are taken from the verified log. Each payment goes through REMORA's execution "
+             "API: `/v1/execution/assess`, `/approve`, `/execute`, the governed dispatcher "
+             "and a sandboxed payment tool that records every call reaching it "
+             "(`enforce.py`, `enforcement.json`)."),
             "",
             "REMORA as shipped, with no limit declared:",
             "",
@@ -247,38 +247,38 @@ def report(body: dict[str, Any]) -> str:
             "",
             *_pay_table(enf["runs"]["budget_declared"]),
             "",
-            "The same limit, with A, B and C all assessed and approved before any of them "
-            "executes. Only the reservation at dispatch can stop C here:",
+            ("The same limit, with A, B and C all assessed and approved before any of them "
+             "executes. Only the reservation at dispatch can stop C here:"),
             "",
             *_pay_table(enf["runs"]["budget_declared_approved_first"]),
             "",
-            "The limit is reserved in one transaction as the dispatcher's last check before "
-            "the call runs, so a payment approved earlier is still refused when the budget "
-            "has been spent since. It is keyed by the payer, not by a task the caller "
-            "chooses. The same mechanism caps setpoint movement and equipment starts "
-            "(`remora/enforcement/cumulative_limits.py`, CAP-031).",
+            ("The limit is reserved in one transaction as the dispatcher's last check before "
+             "the call runs, so a payment approved earlier is still refused when the budget "
+             "has been spent since. It is keyed by the payer, not by a task the caller "
+             "chooses. The same mechanism caps setpoint movement and equipment starts "
+             "(`remora/enforcement/cumulative_limits.py`, CAP-031)."),
             "",
         ]
     lines += [
         "## What this row does not establish",
         "",
-        "- Raw call bodies, B's audit bytes and acceptance records are not public; nothing "
-        "about them is inferred.",
-        "- A and C carry the same public audit bytes but name different request "
-        "occurrences; identical result bytes do not make them the same call.",
-        "- Part 1 is a retrospective count over signed payments. Part 2 is REMORA's "
-        "decision on a replay with a sandboxed tool, not on the live calls, which REMORA "
-        "was not in the path of.",
-        "- The limit holds only where a deployment declares it, on one host. It counts the "
-        "amount the call names, not what a rail settled.",
-        "- No physical effect, no runtime use of the dataset and no production, "
-        "certification or comparative security claim.",
+        ("- Raw call bodies, B's audit bytes and acceptance records are not public; nothing "
+         "about them is inferred."),
+        ("- A and C carry the same public audit bytes but name different request "
+         "occurrences; identical result bytes do not make them the same call."),
+        ("- Part 1 is a retrospective count over signed payments. Part 2 is REMORA's "
+         "decision on a replay with a sandboxed tool, not on the live calls, which REMORA "
+         "was not in the path of."),
+        ("- The limit holds only where a deployment declares it, on one host. It counts the "
+         "amount the call names, not what a rail settled."),
+        ("- No physical effect, no runtime use of the dataset and no production, "
+         "certification or comparative security claim."),
         "- Keys and the trust configuration come from the producer's own bundle.",
         "",
-        "Reproduce: `python integrations/horizon55/prepare.py` once (network), then "
-        "`python integrations/horizon55/run.py --check` and "
-        "`python integrations/horizon55/enforce.py --check` (offline). Interpreter, OS and "
-        "library versions of the run that wrote these files are in `reproduction.json`.",
+        ("Reproduce: `python integrations/horizon55/prepare.py` once (network), then "
+         "`python integrations/horizon55/run.py --check` and "
+         "`python integrations/horizon55/enforce.py --check` (offline). Interpreter, OS and "
+         "library versions of the run that wrote these files are in `reproduction.json`."),
         "",
     ]
     return "\n".join(lines)

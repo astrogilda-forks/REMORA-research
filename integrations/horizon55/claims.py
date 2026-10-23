@@ -323,8 +323,8 @@ def evaluate(inp: Inputs) -> dict[str, Any]:
             "the cumulative total of authenticated, signed payments on this lineage and unit, "
             "in log order, against the issuer-signed max_total",
             ["that money moved (the rail receipt is a digest)",
-             "that the budget was enforced before the payment: this is a retrospective count, "
-             "not a pre-dispatch decision", "anything about delegation scope"],
+             ("that the budget was enforced before the payment: this is a retrospective count, "
+              "not a pre-dispatch decision"), "anything about delegation scope"],
             "arithmetic over signed records; JPY-testnet is a simulated unit",
             ["payments not in this log did not happen on this lineage"],
             {"payment_reasons": native["payment_reasons"],
@@ -450,8 +450,8 @@ def evaluate(inp: Inputs) -> dict[str, Any]:
             case, "remora_dispatch_authority", occ, NOT_ESTABLISHED,
             ["no_remora_grant_lease_or_dispatch_record"], refs, "H55-R09", "none",
             "nothing",
-            ["that REMORA authorized or would have authorized this call: the records are the "
-             "producer's, not a REMORA decision"],
+            [("that REMORA authorized or would have authorized this call: the records are the "
+              "producer's, not a REMORA decision")],
             "no REMORA-native authority evidence exists for these calls"))
         results.append(_claim(
             case, "physical_effect", occ, NOT_ESTABLISHED,
