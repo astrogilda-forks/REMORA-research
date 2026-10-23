@@ -10,7 +10,8 @@
         "scale": 100,
         "unit": "engineering_units",
         "resource_argument": "loop",
-        "observed": true
+        "observed": true,
+        "previous_field": "old_setpoint"
       }
     ],
     "set_valve_position": [
@@ -20,7 +21,8 @@
         "argument": "position_pct",
         "unit": "pct",
         "resource_argument": "valve",
-        "observed": true
+        "observed": true,
+        "previous_field": "old_pct"
       }
     ],
     "acknowledge_alarm": [

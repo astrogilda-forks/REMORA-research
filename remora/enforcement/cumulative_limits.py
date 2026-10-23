@@ -77,6 +77,7 @@ RESOURCE_BUSY = "limit_resource_busy"
 CHANGED = "limit_changed"
 LEDGER_UNAVAILABLE = "limit_ledger_unavailable"
 OBSERVATION_UNAVAILABLE = "limit_observation_unavailable"
+STATE_CHANGED = "limit_state_changed"
 INVOCATION_DIFFERS = "limit_invocation_differs"
 
 KINDS = ("sum", "count", "change")
@@ -128,6 +129,9 @@ class Meter:
     unit_argument: str | None
     resource_argument: str | None
     observed: bool = False
+    #: A field of the tool's result that carries the value before the write,
+    #: as the controller reports it. Used to account for the actual movement.
+    previous_field: str | None = None
 
     @classmethod
     def from_dict(cls, tool: str, raw: Any) -> Meter:
@@ -150,6 +154,9 @@ class Meter:
         observed = raw.get("observed", False)
         if type(observed) is not bool or (observed and kind != "change"):
             raise LimitPolicyError(f"tool {tool!r}: observed is a boolean, on change meters only")
+        previous = raw.get("previous_field")
+        if previous is not None and not observed:
+            raise LimitPolicyError(f"tool {tool!r}: previous_field needs an observed meter")
         return cls(
             quantity=_text(raw.get("quantity"), f"tool {tool!r} quantity"), kind=kind,
             argument=argument, scale=_int(raw.get("scale", 1), "scale", 1),
@@ -159,7 +166,8 @@ class Meter:
                                                                     "unit_argument"),
             resource_argument=None if resource is None else _text(resource,
                                                                    "resource_argument"),
-            observed=observed)
+            observed=observed,
+            previous_field=None if previous is None else _text(previous, "previous_field"))
 
 
 @dataclass(frozen=True)
@@ -314,6 +322,11 @@ class LimitLedger:
                     amount INTEGER NOT NULL CHECK(amount >= 0), at REAL NOT NULL,
                     PRIMARY KEY(counter_key, operation_id)
                 );
+                CREATE TABLE IF NOT EXISTS limit_observation (
+                    operation_id TEXT NOT NULL, value_key TEXT NOT NULL,
+                    observed TEXT NOT NULL, charged INTEGER NOT NULL,
+                    PRIMARY KEY(operation_id, value_key)
+                );
                 CREATE TABLE IF NOT EXISTS limit_value (
                     value_key TEXT PRIMARY KEY, value INTEGER NOT NULL,
                     status TEXT NOT NULL CHECK(status IN ('settled','pending','unknown')),
@@ -392,6 +405,38 @@ class LimitLedger:
             conn.execute("UPDATE limit_value SET status=? WHERE operation_id=? "
                          "AND status='pending'", ("settled" if ok else "unknown", operation_id))
         return [(str(key), int(value)) for key, value in rows]
+
+    @staticmethod
+    def record_observation(conn: sqlite3.Connection, operation_id: str, value_key: str,
+                           observed: Decimal, charged: int) -> None:
+        conn.execute("INSERT OR IGNORE INTO limit_observation VALUES(?,?,?,?)",
+                     (operation_id, value_key, str(observed), charged))
+
+    def observations(self, operation_id: str) -> list[tuple[str, Decimal, int]]:
+        """(value key, value observed at reservation, amount charged) for one operation."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT value_key,observed,charged FROM limit_observation "
+                                "WHERE operation_id=?", (operation_id,)).fetchall()
+        return [(str(k), Decimal(str(v)), int(c)) for k, v, c in rows]
+
+    def charges(self, operation_id: str) -> list[tuple[str, int]]:
+        """(counter key, amount) this operation reserved."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT counter_key,amount FROM limit_reservation "
+                                "WHERE operation_id=?", (operation_id,)).fetchall()
+        return [(str(k), int(a)) for k, a in rows]
+
+    def release(self, operation_id: str) -> None:
+        """Return an operation's reservations. Only for a call that provably did not run."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM limit_reservation WHERE operation_id=?", (operation_id,))
+            conn.execute("DELETE FROM limit_observation WHERE operation_id=?", (operation_id,))
+
+    def debit(self, key: str, operation_id: str, amount: int, now: float) -> None:
+        """Charge movement found after the fact; it is not checked against the limit."""
+        with self._connect() as conn:
+            conn.execute("INSERT OR IGNORE INTO limit_reservation VALUES(?,?,?,?,?)",
+                         (key, operation_id, "after-the-fact", amount, now))
 
     def observe(self, value_key: str, value: int) -> None:
         """Replace a settled or unknown value with what was observed."""
@@ -478,13 +523,15 @@ class LimitGuard:
     def _plan(self, conn: sqlite3.Connection, *, tenant: str, principal: str,
               readings: list[Reading], operation_id: str, request_hash: str,
               now: float, observed: Mapping[int, Decimal] | None = None,
-              ) -> tuple[bool, list[tuple[Limit, str, int]], list[tuple[str, int, str]]]:
+              ) -> tuple[bool, list[tuple[Limit, str, int]], list[tuple[str, int, str]],
+                         list[tuple[str, Decimal, int]]]:
         """Charges and value updates for this call, checked against every limit.
 
         Returns (already reserved, charges, value updates). Raises ``_Refused``.
         """
         charges: list[tuple[Limit, str, int]] = []
         values: list[tuple[str, int, str]] = []
+        seen_at: list[tuple[str, Decimal, int]] = []
         for index, reading in enumerate(readings):
             m = reading.meter
             amount: int | None = reading.value
@@ -502,6 +549,7 @@ class LimitGuard:
                     # and one REMORA made is. Rounded up: never under-counted.
                     seen = (observed or {})[index]
                     amount = math.ceil(abs(reading.value - seen))
+                    seen_at.append((value_key, seen, amount))
                 values.append((value_key, reading.value, "observed"))
             elif m.kind == "change":
                 resource = reading.resource or ""
@@ -535,14 +583,14 @@ class LimitGuard:
             for (_, _, amount), prior in zip(charges, priors, strict=True):
                 if prior is None or prior[0] != request_hash or amount not in (-1, prior[1]):
                     raise _Refused(CHANGED)
-            return True, charges, values
+            return True, charges, values, seen_at
         if any(p is not None for p in priors) or any(a == -1 for _, _, a in charges):
             raise _Refused(CHANGED)
         # Each charge has its own counter: one meter per quantity, one quantity per limit.
         for lim, key, amount in charges:
             if self.ledger.used(conn, key, lim.binding, lim.window_seconds, now) + amount > lim.max:
                 raise _Refused(EXCEEDED)
-        return False, charges, values
+        return False, charges, values, seen_at
 
     def _run(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
              operation_id: str, request_hash: str, now: str | float | None,
@@ -566,7 +614,7 @@ class LimitGuard:
                     observed[index] = seen
             at = _epoch(now)
             with self.ledger.transaction() as conn:
-                done, charges, values = self._plan(
+                done, charges, values, seen_at = self._plan(
                     conn, tenant=tenant, principal=principal, readings=readings,
                     operation_id=operation_id, request_hash=request_hash, now=at,
                     observed=observed)
@@ -577,6 +625,9 @@ class LimitGuard:
                     for value_key, value, seed_id in values:
                         self.ledger.set_value(conn, value_key, value, "pending",
                                               operation_id, seed_id)
+                    for value_key, seen, amount in seen_at:
+                        self.ledger.record_observation(conn, operation_id, value_key, seen,
+                                                       amount)
         except _Refused as exc:
             return exc.reason
         except Exception:
@@ -617,7 +668,74 @@ class LimitGuard:
             return exc.reason
         return None if same else INVOCATION_DIFFERS
 
-    def settle(self, operation_id: str, ok: bool) -> list[dict[str, Any]]:
+    def _scale_of(self, quantity: str) -> int:
+        return next(m.scale for meters in self.policy.meters.values() for m in meters
+                    if m.quantity == quantity)
+
+    def fence(self, operation_id: str) -> str | None:
+        """Read each observed resource again just before the write.
+
+        None when every value is still the one the reservation was charged
+        from; otherwise the refusal, and the write must not happen. This
+        narrows the window between reading the plant and writing to it; it
+        cannot close it. Only a conditional write at the controller can.
+        """
+        for value_key, seen, _ in self.ledger.observations(operation_id):
+            tenant, quantity, resource = value_key.split("\x1f")
+            now_seen = self._observe(tenant, quantity, resource, self._scale_of(quantity))
+            if now_seen is None:
+                return OBSERVATION_UNAVAILABLE
+            if now_seen != seen:
+                return STATE_CHANGED
+        return None
+
+    def release(self, operation_id: str) -> None:
+        """Give back what a call reserved when the write provably did not happen.
+
+        The dispatcher calls this only after the fence refused, when the tool
+        was never invoked and the lease's nonce is spent, so the lease cannot
+        run later under the same reservation. Every other refusal after a
+        reservation keeps it: the same lease may be retried.
+        """
+        self.ledger.release(operation_id)
+
+    def _account(self, operation_id: str, result: Any, records: list[dict[str, Any]],
+                 now: float) -> None:
+        """Charge movement the controller reports beyond what was reserved.
+
+        ``previous_field`` in the tool's result is the value before the write,
+        as the controller saw it. If the move from there to where the plant
+        ended up is larger than the reservation (the plant changed between
+        the last read and the write), the difference is charged to every
+        counter this operation reserved for that quantity, without a limit
+        check: it has already happened. Later changes then meet the limit.
+        """
+        if not isinstance(result, Mapping):
+            return
+        fields = {m.quantity: m.previous_field for meters in self.policy.meters.values()
+                  for m in meters if m.previous_field}
+        limit_quantity = {lim.limit_id: lim.quantity for lim in self.policy.limits}
+        charged_at = {k: c for k, _, c in self.ledger.observations(operation_id)}
+        charges = self.ledger.charges(operation_id)
+        for record in records:
+            field = fields.get(record["quantity"])
+            previous = result.get(field) if field else None
+            if isinstance(previous, bool) or not isinstance(previous, int | float):
+                continue
+            scale = self._scale_of(record["quantity"])
+            ended = record["observed"] if record["observed"] is not None else record["target"]
+            actual = math.ceil(abs(Decimal(ended) - Decimal(str(previous)) * scale))
+            charged = charged_at.get("\x1f".join((record["tenant"], record["quantity"],
+                                                   record["resource"])), 0)
+            record["actual_movement"] = actual
+            if actual > charged:
+                record["charged_after"] = actual - charged
+                for key, _ in charges:
+                    if limit_quantity.get(key.split("\x1f", 1)[0]) == record["quantity"]:
+                        self.ledger.debit(key, f"{operation_id}#after", actual - charged, now)
+
+    def settle(self, operation_id: str, ok: bool, result: Any = None,
+               now: str | float | None = None) -> list[dict[str, Any]]:
         """Record whether the call ran, and for observed meters where the plant ended up.
 
         Returns one record per observed resource: the target REMORA let
@@ -636,11 +754,14 @@ class LimitGuard:
             if quantity not in scales:
                 continue
             seen = self._observe(tenant, quantity, resource, scales[quantity])
-            record: dict[str, Any] = {"quantity": quantity, "resource": resource,
-                                      "target": target, "observed": None, "reached": None}
+            record: dict[str, Any] = {"tenant": tenant, "quantity": quantity,
+                                      "resource": resource, "target": target,
+                                      "observed": None, "reached": None}
             if seen is not None:
                 observed_value = int(seen.to_integral_value())
                 self.ledger.observe(value_key, observed_value)
                 record.update(observed=observed_value, reached=seen == target)
             out.append(record)
+        if ok:
+            self._account(operation_id, result, out, _epoch(now))
         return out

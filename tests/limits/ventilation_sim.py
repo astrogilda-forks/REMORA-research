@@ -29,6 +29,9 @@ class AirHandlingUnit:
 UNITS: dict[str, AirHandlingUnit] = {}
 OBSERVER: dict[str, bool] = {"up": True}
 WRITES: list[dict[str, Any]] = []
+#: Run once, each right after an observation returns: an operator acting in
+#: the window between REMORA reading the plant and REMORA's write.
+AFTER_OBSERVE: list[Callable[[], None]] = []
 
 
 def reset() -> None:
@@ -36,6 +39,7 @@ def reset() -> None:
     UNITS.update({"AHU-1": AirHandlingUnit(19.0), "AHU-2": AirHandlingUnit(19.0)})
     OBSERVER["up"] = True
     WRITES.clear()
+    AFTER_OBSERVE.clear()
 
 
 def operator_set(unit: str, value: float) -> None:
@@ -49,15 +53,20 @@ def set_supply_air_setpoint(arguments: dict[str, Any]) -> dict[str, Any]:
     WRITES.append({"unit": arguments["unit"], "asked": arguments["value"], "mode": mode})
     if mode == "raise":
         raise RuntimeError("controller did not acknowledge the write")
+    previous = ahu.setpoint
     if mode == "apply":
         ahu.setpoint = min(max(float(arguments["value"]), ahu.low), ahu.high)
-    return {"acknowledged": True, "unit": arguments["unit"]}
+    # Controllers commonly report the value they replaced; previous_field reads it.
+    return {"acknowledged": True, "unit": arguments["unit"], "previous": previous}
 
 
 def observe_limit_value(tenant: str, quantity: str, resource: str) -> float:
     if not OBSERVER["up"]:
         raise ConnectionError("automation system unreachable")
-    return UNITS[resource].setpoint
+    value = UNITS[resource].setpoint
+    if AFTER_OBSERVE:
+        AFTER_OBSERVE.pop(0)()
+    return value
 
 
 def register_tools(register: Callable[[str, Callable[[Any], Any]], None]) -> None:

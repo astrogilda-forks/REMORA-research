@@ -33,12 +33,15 @@ LIMIT = {"limit_id": "supply-air-movement", "tenant": "acme",
          "window_seconds": 3600, "principal": "*", "resource": "*"}
 
 
-def policy(observed: bool) -> dict:
+def policy(observed: bool, previous_field: str | None = None) -> dict:
     meter = {"quantity": "setpoint_movement", "kind": "change", "argument": "value",
              "scale": 10, "unit": "degC", "resource_argument": "unit"}
+    if observed:
+        meter["observed"] = True
+    if previous_field:
+        meter["previous_field"] = previous_field
     body = {"schema": "remora-cumulative-limits/v1", "limits": [LIMIT],
-            "meters": {"set_supply_air_setpoint": [dict(meter, observed=True) if observed
-                                                   else meter]}}
+            "meters": {"set_supply_air_setpoint": [meter]}}
     if not observed:
         body["baselines"] = [{"tenant": "acme", "quantity": "setpoint_movement",
                               "resource": unit, "value": 19.0, "seed_id": "s1"}
@@ -52,8 +55,8 @@ def plant(monkeypatch, tmp_path):
 
     sim.reset()
 
-    def start(observed=True, observer=True):
-        (tmp_path / "limits.json").write_text(json.dumps(policy(observed)))
+    def start(observed=True, observer=True, previous_field=None):
+        (tmp_path / "limits.json").write_text(json.dumps(policy(observed, previous_field)))
         monkeypatch.setenv("REMORA_LIMITS_FILE", str(tmp_path / "limits.json"))
         monkeypatch.setenv("REMORA_LIMITS_LEDGER", str(tmp_path / "limits-ledger.db"))
         if observer:
@@ -190,3 +193,60 @@ def test_observed_meters_without_an_observer_refuse_at_startup(plant, monkeypatc
     exec_mod._reset_tool_dispatcher()
     with pytest.raises(ValueError, match="observe_limit_value"):
         exec_mod._limit_guard()
+
+
+# ── the window between reading the plant and writing to it (TOCTOU) ───────
+
+
+def _dispatch_only(monkeypatch):
+    """Skip the advisory assess check, so the observations are, in order: the
+    reservation's, the fence's just before the write, and the read-back."""
+    import servers.execution_api as exec_mod
+
+    monkeypatch.setattr(exec_mod, "_limits_or_refuse", lambda *a: None)
+
+
+def test_a_change_between_reservation_and_write_stops_the_write(plant, monkeypatch):
+    """REMORA reads 19.0, an operator sets 17.0, REMORA would write 19.5: 2.5
+    of movement charged as 0.5. The fence reads the plant again before the
+    write, sees it moved, and the write does not happen."""
+    client = plant()
+    _dispatch_only(monkeypatch)
+    sim.AFTER_OBSERVE.append(lambda: sim.operator_set("AHU-1", 17.0))
+    assert move(client, 19.5) == "limit_state_changed"
+    assert sim.WRITES == [] and sim.UNITS["AHU-1"].setpoint == 17.0
+    assert move(client, 19.0) == "ran"               # 2.0 from where the plant is now
+
+
+def test_a_change_after_the_fence_is_charged_from_the_controllers_report(plant, monkeypatch,
+                                                                          tmp_path):
+    """The operator acts after the fence read, in the last window before the
+    write. The controller reports the value it replaced (17.0), so the 2.5
+    actually moved is charged, and the next change meets the limit."""
+    client = plant(previous_field="previous")
+    _dispatch_only(monkeypatch)
+    sim.AFTER_OBSERVE.extend([lambda: None, lambda: sim.operator_set("AHU-1", 17.0)])
+    assert move(client, 19.5) == "ran"
+    conn = sqlite3.connect(tmp_path / "limits-ledger.db")
+    try:
+        charged = conn.execute("SELECT SUM(amount) FROM limit_reservation").fetchone()[0]
+    finally:
+        conn.close()
+    assert charged == 25                            # 0.5 reserved + 2.0 after the fact
+    assert move(client, 19.6) == "limit_exceeded"
+
+
+def test_without_a_controller_report_the_last_window_is_not_seen(plant, monkeypatch, tmp_path):
+    """The residual gap, pinned: with no previous value from the controller, a
+    change in the last window before the write is charged as reserved. Only
+    a conditional write at the controller closes this."""
+    client = plant()
+    _dispatch_only(monkeypatch)
+    sim.AFTER_OBSERVE.extend([lambda: None, lambda: sim.operator_set("AHU-1", 17.0)])
+    assert move(client, 19.5) == "ran"
+    conn = sqlite3.connect(tmp_path / "limits-ledger.db")
+    try:
+        charged = conn.execute("SELECT SUM(amount) FROM limit_reservation").fetchone()[0]
+    finally:
+        conn.close()
+    assert charged == 5
