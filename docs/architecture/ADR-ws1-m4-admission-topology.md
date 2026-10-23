@@ -7,7 +7,8 @@
   dispatch paths behind `REMORA_WS1_ADMISSION=atomic`, in slices. Slice 1
   covers the direct-ACCEPT path, slice 2a the approved-review path and the
   async worker, and slice 2b revocation at admission. Slice 3 adds the audit
-  row and slice 4 the permit before the send.
+  row and slice 4 the permit before the send. Slice 5 adds the rest of the
+  negative matrix as tests.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -355,7 +356,59 @@ receipts' expiry, their epochs read under lock, and the principals.
   bound, a lapse and a revocation between commit and permit on each path,
   and a revocation mid-send.
 
-Still open:
-- M4-T15 and T17 to T20.
-- The real Postgres matrix beyond the contention and ordering cases. M4.1
-  stays open until the SDD §5 gate is met.
+Still open after slice 4: see slice 5.
+
+## M4.1c slice 5, tests only (the rest of the matrix)
+
+`tests/test_ws1_m4_fault_matrix.py` runs the remaining rows through the real
+route under atomic admission, with faults injected at fixed points. No
+behaviour changed.
+
+- **M4-T15.** A dispatcher sends through the real one and then loses the
+  answer. The call settles `UNKNOWN`, and nothing retries it: not presenting
+  the grant again (`token_already_consumed`), not the worker, not the stale
+  sweep. This holds on the direct and the worker paths.
+- **M4-T17.** A required monitor that is down refuses the call, with the
+  grant unspent. A monitor that lies cannot put back evidence withdrawn
+  after the grant: hints naming authority, an answer for other evidence, or
+  a conflict code all leave the refusal. Calls stay within the monitor
+  budget. The exhaustive version is `tests/verification/test_authority_ceiling.py`.
+- **M4-T18.** If the source publishes a new revision while the resolver
+  answers, the stale receipt refuses (`authority_epoch_stale`). If the policy
+  bundle changes during the lookup, the call refuses on its context
+  (`context_mismatch`). The grant stays unspent in both cases.
+- **M4-T19.** A refused admission leaves no lease in the response or on the
+  chain. The executor refuses a lease with an altered field
+  (`signature_invalid`) and a lease presented for another call
+  (`tool_args_hash_mismatch`). Production completeness stays
+  NOT_ESTABLISHED. A component holding the authority's signing key can mint
+  a lease without admission. Only the custody split
+  ([ADR-A](ADR-authority-custody-and-lease-durability.md)) keeps the
+  executor from doing so, and no test shows that a deployment has no other
+  such component.
+- **M4-T20.** After a simulated restart, the gate, the admission, the
+  dispatcher and the outbox are rebuilt from durable state. A replayed grant
+  is refused as `token_already_consumed`, and its spent lease as
+  `nonce_already_consumed`.
+- **M4-T07, T08.** Swapping the arguments or the target refuses as
+  `binding_refused`, and swapping the actor as `context_mismatch`, each
+  before the grant is spent.
+
+### M4.1 matrix status
+
+| ID | Where | Caveat |
+|---|---|---|
+| T01, T02, T10, T11, T13 | `tests/test_atomic_admission.py` (SQLite, Postgres), route T02 | T13 covers an unreachable epoch store, not exhausted serialization retries |
+| T03, T04, T05 | `tests/test_atomic_admission.py`, `tests/test_ws1_atomic_admission_route.py` | |
+| T06 | `tests/test_atomic_admission.py`: eight threads on one grant, eight on one row | the SDD names 32 workers in 2 processes; not run at that size |
+| T07, T08, T09 | `tests/verification/test_evidence_receipts.py`; route swaps in `tests/test_ws1_m4_fault_matrix.py` | the route swaps run on SQLite only |
+| T12 | slice 3 | |
+| T14, T16 | slice 4 | T16 is labelled, not prevented: `at_effect` is NOT_ESTABLISHED |
+| T15, T17 to T20 | `tests/test_ws1_m4_fault_matrix.py` | SQLite only; T19 production completeness NOT_ESTABLISHED |
+
+Still open before the §5 gate closes M4.1:
+- The route-level rows run on SQLite. Postgres runs the admission rows only.
+- T06 at the SDD's size, and T13 for exhausted serialization retries.
+- The bounded model check of the invariants, keeping the non-atomic
+  counterexample.
+- Reproduction from a clean clone, and a second author's review.

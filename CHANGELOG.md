@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1-M4 negative matrix through the route (M4.1c slice 5, tests only)
+
+- `tests/test_ws1_m4_fault_matrix.py` covers M4-T07, T08, T15 and T17 to T20 under atomic admission: a dropped response stays `UNKNOWN` and is never retried, a failing or lying monitor supplies no authority, a source or policy revised mid-lookup refuses, an altered or misdirected lease is refused by the executor, and a grant or lease replayed after a restart is refused by the durable ledgers. The ADR's matrix table records what each row covers and what stays open.
+
 ### WS1-M4 permit before the send (M4.1c slice 4, opt-in)
 
 - Under `REMORA_WS1_ADMISSION=atomic`, each path checks the admitted call again just before the lease is minted, in a short transaction under the tenant lock (INV-M4-03). Evidence that lapsed, or a source or principal revoked after the admission committed, refuses the send (`permit_refused`), and the intent settles `REFUSED`. The lease expires no later than the evidence, less twice the declared skew. Each permit records `at_effect: NOT_ESTABLISHED`, because a revocation during the send is not seen (M4-T14, M4-T16).
