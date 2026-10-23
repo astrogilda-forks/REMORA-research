@@ -1222,7 +1222,7 @@ def _admission() -> Any:
             epochs=AuthorityEpochs(dsn=dsn, db_path=db_path,
                                    connection_provider=_ACTIVE_TX_CONNECTION.get),
             dialect="postgres" if dsn else "sqlite", max_clock_skew_ms=skew,
-            revocations=_revocation_store())
+            revocations=_revocation_store(), drain=drain_audit_outbox)
         _ADMISSION_KEY = key
     return _ADMISSION
 
