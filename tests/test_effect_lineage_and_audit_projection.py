@@ -38,6 +38,13 @@ CALL_HASH = "c" * 64
 AT = datetime.now(UTC) - timedelta(minutes=1)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_clock():
+    """Refreshed per test: an instant taken at collection ages with the session."""
+    global AT
+    AT = datetime.now(UTC) - timedelta(minutes=1)
+
+
 def _ev(name: str, **payload) -> dict:
     return {"event": name, "timestamp": AT.isoformat(),
             "payload": {"event": name, "proposal_id": "p-1", **payload}}

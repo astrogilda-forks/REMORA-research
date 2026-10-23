@@ -59,8 +59,26 @@ THRESHOLDS: dict[str, float] = {
     "remora/enforcement": 90.0,  # 90.67 measured 2026-08-26 on the first
     # union run (in-process + real-Postgres pass with --cov-append, #447);
     # was 85.88 when the Postgres adapters were unmeasured
-    "servers/api.py": 84.5,
+    "servers/api.py": 87.0,  # 89.06 in-process 2026-10-24
     "servers/execution_api.py": 93.0,
+    # Per-file floors for remora/execution (2026-10-24): the package floor let a
+    # 79 percent file hide behind a 95 percent average, which is the failure
+    # mode this script exists to prevent. Measured in-process, no Postgres.
+    "remora/execution/service.py": 93.5,  # 95.26
+    "remora/execution/admission.py": 95.0,  # 97.13
+    "remora/execution/dispatch.py": 97.0,  # 98.86
+    "remora/execution/projections.py": 97.0,  # 99.03
+    "remora/execution/review_service.py": 94.5,  # 96.40
+    "remora/execution/remote_dispatch.py": 92.5,  # 94.29
+    "remora/execution/invocation_evidence.py": 87.0,  # 88.64
+    "remora/execution/request_ref.py": 77.5,  # 79.12; the lowest-covered execution module
+    # Unfloored server modules, ratcheted from where they stand (2026-10-24).
+    "servers/mcp_remora.py": 57.0,  # 58.55; the largest thinly covered server surface
+    "servers/execution_identity.py": 77.0,  # 78.38
+    "servers/semantic_bundle_research.py": 79.0,  # 80.95
+    "servers/tool_registry_research.py": 89.0,  # 90.70
+    "servers/semantic_shadow.py": 90.0,  # 91.58
+    "servers/strict_json_ingress.py": 95.0,  # 96.46
 }
 
 #: Measurement scope (changed 2026-08-26). Until then the coverage job had no
@@ -81,7 +99,7 @@ THRESHOLDS: dict[str, float] = {
 #: dragged down by.
 FILE_THRESHOLDS: dict[str, float] = {
     # Postgres adapter branches are measured since the union run (#447).
-    "remora/enforcement/gate.py": 80.0,  # 80.42 on the union run (77.92 before)
+    "remora/enforcement/gate.py": 88.0,  # 90.32 in-process 2026-10-24 (80.42 union before)
     "remora/enforcement/outbox.py": 86.5,  # 87.23 on the union run (73.49 before:
     # the Postgres projector variants were only contract-tested without
     # instrumentation until #447)
@@ -94,8 +112,8 @@ FILE_THRESHOLDS: dict[str, float] = {
     # passes (tests/test_coverage_thresholds_gate.py).
     # ADR-B. Same shape as gate.py: the Postgres and D1 backend branches are
     # not reachable in this run, and the in-process logic around them is.
-    "remora/enforcement/nonce_store.py": 80.5,  # 80.67
-    "remora/enforcement/resolved_effect.py": 96.0,  # 96.30 measured 2026-09-28 (Q7.4)
+    "remora/enforcement/nonce_store.py": 86.0,  # 88.03 in-process 2026-10-24
+    "remora/enforcement/resolved_effect.py": 98.0,  # 100.00 in-process 2026-10-24
     # ADR-A. The uncovered remainder is the import-error path for the optional
     # 'cryptography' extra, which is exercised by monkeypatch rather than by
     # actually uninstalling the package mid-run.

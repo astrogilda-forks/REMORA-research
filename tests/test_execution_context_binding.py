@@ -221,7 +221,7 @@ def client(provider, monkeypatch, tmp_path):
     monkeypatch.delenv("REMORA_ASYNC_DISPATCH", raising=False)
     client, _state = _make_client(monkeypatch, tmp_path)
     monkeypatch.setattr(api, "context_provider", lambda: provider)
-    api._GATE = api.EnforcementGate(strict=True, audience=api.PEP_AUDIENCE)
+    monkeypatch.setattr(api, "_GATE", api.EnforcementGate(strict=True, audience=api.PEP_AUDIENCE))
     yield client
     api._reset_tool_dispatcher()
 

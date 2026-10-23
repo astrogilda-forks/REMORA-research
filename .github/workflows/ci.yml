@@ -331,6 +331,8 @@ jobs:
             tests/test_enforcement_ledgers_postgres.py \
             tests/flow/test_context_store.py \
             tests/test_atomic_admission.py \
+            tests/test_authority_epochs.py tests/test_crypto_v2_audit.py \
+            tests/test_audit_outbox_atomicity.py \
             -q -rs -k "postgres" | tee out.txt
           if grep -qiE "skipped|no tests ran" out.txt; then
             echo "ERROR: Postgres contract tests skipped despite service DSN" >&2

@@ -305,6 +305,7 @@ only_mutate = [
     "remora/enforcement/gate.py",
     "remora/enforcement/lease.py",
     "remora/enforcement/nonce_store.py",
+    "remora/enforcement/cumulative_limits.py",
 ]
 # The refusal tests import servers.api inside test functions, and api.py
 # hashes schemas/ files at import; both must exist in the mutants sandbox.
