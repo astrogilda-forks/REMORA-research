@@ -1,0 +1,185 @@
+# Author: Stian Skogbrott
+# SPDX-License-Identifier: BUSL-1.1
+"""Cumulative limits bound to the authority that sets them and to every grant.
+
+Three gaps a declared limit left open, pinned here:
+
+* the limit policy was unsigned deployment configuration, tied to no
+  authority (signed policies, REMORA_LIMITS_TRUSTED_KEYS);
+* an approval given while limits were on could be executed after they were
+  turned off or changed, and then ran unbounded (the limit policy is part of
+  the policy identity every grant and approval is bound to);
+* nothing made limits mandatory (REMORA_REQUIRE_LIMITS).
+"""
+from __future__ import annotations
+
+import json
+
+import pytest
+
+pytest.importorskip("fastapi")
+
+from remora.crypto import SignatureDomain, SigningKey  # noqa: E402
+from remora.enforcement import cumulative_limits as cl  # noqa: E402
+from tests.limits.harness import (  # noqa: E402
+    approve_and_execute,
+    assess,
+    make_client,
+    ran,
+    run,
+)
+from tests.limits.test_limits_payments import pay, policy  # noqa: E402
+from tests.limits.test_limits_ventilation import policy as ventilation_policy  # noqa: E402
+
+AUTHORITY = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+STRANGER = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+
+
+def signed(body, key=AUTHORITY):
+    return cl.sign_policy(body, key, "2026-10-23T00:00:00Z")
+
+
+def trust(monkeypatch, *keys):
+    monkeypatch.setenv("REMORA_LIMITS_TRUSTED_KEYS",
+                       ",".join(k.verification_key().public_bytes.hex() for k in keys))
+
+
+def _reset():
+    import servers.execution_api as exec_mod
+
+    exec_mod._reset_tool_dispatcher()
+
+
+# ── a grant is bound to the limits it was decided under ──────────────────
+
+
+def test_an_approval_does_not_outlive_the_limits_it_was_given_under(monkeypatch, tmp_path):
+    client = make_client(monkeypatch, tmp_path, policy())
+    run(client, pay("A"))
+    run(client, pay("B"))
+    item = assess(client, pay("C", amount=6000)).json()["review_item_id"]  # fits: 20000
+    for var in ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER"):
+        monkeypatch.delenv(var)                     # limits turned off after approval
+    _reset()
+    r = approve_and_execute(client, item, pay("C", amount=6000))
+    assert (r.status_code, r.json()["detail"]) == (409, "limits_changed")
+    assert [p["reference"] for p in ran(tmp_path)] == ["hs51-musubi-2-A", "hs51-musubi-2-B"]
+
+
+def test_an_approval_does_not_survive_a_raised_limit(monkeypatch, tmp_path):
+    client = make_client(monkeypatch, tmp_path, policy())
+    run(client, pay("A"))
+    item = assess(client, pay("B")).json()["review_item_id"]
+    (tmp_path / "limits.json").write_text(json.dumps(policy(max_=10 ** 6, limit_id="raised")))
+    _reset()
+    r = approve_and_execute(client, item, pay("B"))
+    assert (r.status_code, r.json()["detail"]) == (409, "limits_changed")
+    assert len(ran(tmp_path)) == 1
+
+
+def test_the_limit_policy_is_part_of_the_policy_identity(monkeypatch, tmp_path):
+    import servers.api as api_mod
+
+    make_client(monkeypatch, tmp_path, policy())
+    first = api_mod._policy_component_hashes()
+    assert first["limits_policy_hash"].startswith("sha256:")
+    (tmp_path / "limits.json").write_text(json.dumps(policy(max_=19999, limit_id="other")))
+    second = api_mod._policy_component_hashes()
+    assert second["policy_hash"] != first["policy_hash"]
+    monkeypatch.delenv("REMORA_LIMITS_FILE")
+    assert api_mod._policy_component_hashes()["limits_policy_hash"] is None
+    assert "cumulative_limits" in api_mod.policy_coverage_block()["covers"]
+
+
+# ── signed by the authority that sets the budgets ────────────────────────
+
+
+def test_a_signed_policy_from_a_trusted_authority_is_enforced(monkeypatch, tmp_path):
+    trust(monkeypatch, AUTHORITY)
+    client = make_client(monkeypatch, tmp_path, signed(policy()))
+    assert [run(client, pay(c)).get("executed") for c in "AB"] == [True, True]
+    assert run(client, pay("C"))["detail"] == "limit_exceeded"
+
+
+@pytest.mark.parametrize("case", ["tampered", "stranger", "unsigned", "signed_untrusted"])
+def test_a_policy_that_does_not_verify_refuses_at_startup(monkeypatch, tmp_path, case):
+    import servers.execution_api as exec_mod
+
+    document = signed(policy(), STRANGER if case == "stranger" else AUTHORITY)
+    if case == "tampered":
+        document["policy"]["limits"][0]["max"] = 10 ** 6
+    if case == "unsigned":
+        document = policy()
+    make_client(monkeypatch, tmp_path, document)
+    if case == "signed_untrusted":
+        monkeypatch.delenv("REMORA_LIMITS_TRUSTED_KEYS", raising=False)
+    else:
+        trust(monkeypatch, AUTHORITY)
+    _reset()
+    with pytest.raises(ValueError):
+        exec_mod._limit_guard()
+
+
+# ── mandatory ─────────────────────────────────────────────────────────────
+
+
+def _required(monkeypatch, tmp_path, document, keys=(AUTHORITY,)):
+    import servers.execution_api as exec_mod
+
+    if keys:
+        trust(monkeypatch, *keys)
+    make_client(monkeypatch, tmp_path, document)
+    monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")
+    _reset()
+    return exec_mod._limit_guard
+
+
+def test_required_limits_refuse_a_deployment_without_limits(monkeypatch, tmp_path):
+    guard = _required(monkeypatch, tmp_path, None)
+    with pytest.raises(ValueError, match="no cumulative limits"):
+        guard()
+
+
+def test_required_limits_refuse_an_unsigned_policy(monkeypatch, tmp_path):
+    guard = _required(monkeypatch, tmp_path, ventilation_policy(), keys=())
+    with pytest.raises(ValueError, match="TRUSTED_KEYS"):
+        guard()
+
+
+def test_required_limits_refuse_a_policy_that_lets_unmetered_writes_run(monkeypatch, tmp_path):
+    guard = _required(monkeypatch, tmp_path, signed(policy()))   # coverage listed
+    with pytest.raises(ValueError, match="all_writes"):
+        guard()
+
+
+def test_required_signed_all_writes_limits_run(monkeypatch, tmp_path):
+    guard = _required(monkeypatch, tmp_path, signed(ventilation_policy()))
+    assert guard().policy.coverage == "all_writes"
+
+
+def test_an_approval_from_before_limits_runs_under_the_limits_in_force(monkeypatch, tmp_path):
+    """The safe direction: limits turned on after approval apply at dispatch."""
+    client = make_client(monkeypatch, tmp_path, None)
+    item = assess(client, pay("A", amount=25000)).json()["review_item_id"]
+    (tmp_path / "limits.json").write_text(json.dumps(policy()))
+    monkeypatch.setenv("REMORA_LIMITS_FILE", str(tmp_path / "limits.json"))
+    monkeypatch.setenv("REMORA_LIMITS_LEDGER", str(tmp_path / "limits-ledger.db"))
+    _reset()
+    r = approve_and_execute(client, item, pay("A", amount=25000)).json()
+    assert r["tool_execution"]["refusal_reason"] == "limit_exceeded"
+    assert ran(tmp_path) == []
+
+
+def test_the_async_worker_refuses_an_approval_whose_limits_changed(monkeypatch, tmp_path):
+    import servers.execution_api as exec_mod
+
+    monkeypatch.setenv("REMORA_ASYNC_DISPATCH", "1")
+    client = make_client(monkeypatch, tmp_path, policy())
+    item = assess(client, pay("A")).json()["review_item_id"]
+    r = approve_and_execute(client, item, pay("A"))
+    assert r.status_code == 202, r.text
+    (tmp_path / "limits.json").write_text(json.dumps(policy(max_=10 ** 6, limit_id="raised")))
+    _reset()
+    results = exec_mod.dispatch_pending_intents("acme", worker_id="w1")
+    assert [r["tool_execution"]["refusal_reason"] for r in results] == ["limits_changed"]
+    assert ran(tmp_path) == []

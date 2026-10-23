@@ -25,6 +25,21 @@ from tests.test_toolspec_execution_wiring import _client  # noqa: E402
 PILOT = Path(__file__).resolve().parents[2] / "deploy" / "ot-pilot"
 
 
+def _compose_env(name):
+    for line in (PILOT / "docker-compose.yml").read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith(f"{name}:"):
+            return line.split(":", 1)[1].strip().strip('"')
+    raise KeyError(name)
+
+
+PILOT_KEY = _compose_env("REMORA_LIMITS_TRUSTED_KEYS")
+
+
+def shipped_policy():
+    """The policy inside the pilot's signed limits.json."""
+    return json.loads((PILOT / "limits.json").read_text(encoding="utf-8"))["policy"]
+
+
 @pytest.fixture()
 def pilot(monkeypatch, tmp_path):
     monkeypatch.syspath_prepend(str(PILOT))
@@ -33,7 +48,7 @@ def pilot(monkeypatch, tmp_path):
     saved = copy.deepcopy(ot_registry.PLANT)
     client = _client(monkeypatch, tmp_path)
 
-    def configure(limits=None):
+    def configure(limits=None, trusted_key=None):
         import servers.api as api_mod
         import servers.execution_api as exec_mod
 
@@ -47,6 +62,8 @@ def pilot(monkeypatch, tmp_path):
         monkeypatch.setenv("REMORA_LIMITS_FILE", str(path))
         monkeypatch.setenv("REMORA_LIMITS_LEDGER", str(tmp_path / "limits-ledger.db"))
         monkeypatch.setenv("REMORA_LIMITS_OBSERVER_MODULE", "ot_registry")
+        monkeypatch.setenv("REMORA_REQUIRE_LIMITS", _compose_env("REMORA_REQUIRE_LIMITS"))
+        monkeypatch.setenv("REMORA_LIMITS_TRUSTED_KEYS", trusted_key or PILOT_KEY)
         exec_mod._reset_semantic_bundle()
         exec_mod._reset_tool_dispatcher()
         return client
@@ -80,7 +97,7 @@ def run(client, p):
 def test_the_shipped_limits_file_loads_and_covers_every_pilot_write():
     from remora.enforcement.cumulative_limits import LimitPolicy
 
-    policy = LimitPolicy.from_dict(json.loads((PILOT / "limits.json").read_text()))
+    policy = LimitPolicy.from_dict(shipped_policy())
     sys.path.insert(0, str(PILOT))
     try:
         import ot_bundle
@@ -126,10 +143,15 @@ def test_valve_strokes_cannot_add_up(pilot):
 
 
 def test_a_write_tool_the_limits_forget_is_refused(pilot):
-    limits = json.loads((PILOT / "limits.json").read_text())
+    from remora.crypto import SignatureDomain, SigningKey
+    from remora.enforcement.cumulative_limits import sign_policy
+
+    limits = shipped_policy()
     del limits["meters"]["acknowledge_alarm"]
     limits["limits"] = [lim for lim in limits["limits"] if lim["quantity"] != "alarm_acks"]
-    client = pilot(limits)
+    key = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+    client = pilot(sign_policy(limits, key, "2026-10-23T00:00:00Z"),
+                   trusted_key=key.verification_key().public_bytes.hex())
     assert run(client, payload("acknowledge_alarm", "WO-1202",
                                alarm_id="LT-410-HI"))["detail"] == "limit_tool_unmetered"
     assert run(client, payload("read_sensor", "MON-ROUND", sensor_id="PT-101")) \
@@ -159,3 +181,11 @@ def test_the_pilot_observer_reads_the_plant():
     finally:
         sys.path.remove(str(PILOT))
         sys.modules.pop("ot_registry", None)
+
+
+def test_the_shipped_pilot_policy_is_signed_by_the_pilot_key_and_required(pilot):
+    import servers.execution_api as exec_mod
+
+    pilot()
+    assert exec_mod._limit_guard().policy.coverage == "all_writes"
+    assert _compose_env("REMORA_REQUIRE_LIMITS") == "1"

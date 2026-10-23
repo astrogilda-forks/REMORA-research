@@ -49,6 +49,7 @@ does not observe the plant or the payment rail.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import sqlite3
 import time
@@ -84,8 +85,52 @@ KINDS = ("sum", "count", "change")
 COVERAGES = ("listed", "all_writes")
 
 
+SIGNED_SCHEMA = "remora-cumulative-limits-signed/v1"
+
+
 class LimitPolicyError(ValueError):
     """The declared policy is malformed; the deployment must not start."""
+
+
+def canonical_policy_bytes(policy: Mapping[str, Any]) -> bytes:
+    """The bytes a limit-policy signature covers."""
+    return json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
+
+
+def sign_policy(policy: Mapping[str, Any], key: Any, signed_at: str) -> dict[str, Any]:
+    """Wrap ``policy`` in a signed envelope. Offline signer helper, not runtime.
+
+    ``key`` is a ``remora.crypto.SigningKey`` bound to the LIMIT_POLICY domain:
+    the authority that sets the budgets signs, and REMORA verifies with its
+    public key, so a REMORA host cannot write itself a larger budget.
+    """
+    from remora.crypto import SignatureDomain, sign
+
+    signature = sign(SignatureDomain.LIMIT_POLICY, canonical_policy_bytes(policy), key)
+    return {"schema": SIGNED_SCHEMA, "policy": dict(policy), "signed_at": signed_at,
+            "signature": signature.to_dict()}
+
+
+def verify_signed_policy(document: Any, keys: Any) -> tuple[dict[str, Any], str]:
+    """The policy and the signer's key id, or ``LimitPolicyError`` with the reason.
+
+    ``keys`` are ``remora.crypto.VerificationKey`` objects for the domain.
+    """
+    from remora.crypto import Signature, SignatureDomain, verify
+
+    if not isinstance(document, Mapping) or document.get("schema") != SIGNED_SCHEMA:
+        raise LimitPolicyError(f"limit policy is not a signed {SIGNED_SCHEMA!r} envelope")
+    policy, raw_signature = document.get("policy"), document.get("signature")
+    if not isinstance(policy, Mapping) or not isinstance(raw_signature, Mapping):
+        raise LimitPolicyError("signed limit policy needs a policy and a signature")
+    # A malformed block reads as empty fields, and verify refuses those.
+    signature = Signature.from_dict(raw_signature)
+    result = verify(SignatureDomain.LIMIT_POLICY, canonical_policy_bytes(policy), signature,
+                    list(keys))
+    if not result.ok:
+        raise LimitPolicyError(f"limit policy signature refused: {result.reason}")
+    return dict(policy), result.kid
 
 
 class _Refused(Exception):

@@ -504,3 +504,21 @@ def test_after_the_fact_charges_only_the_moved_quantity(tmp_path):
     guard.settle("1", ok=True, result={"previous": 17.0})
     after = [(k.split("\x1f")[0], a) for k, a in guard.ledger.charges("1#after")]
     assert after == [("seen", 20)]
+
+
+def test_a_signed_policy_verifies_only_as_signed():
+    from remora.crypto import SignatureDomain, SigningKey
+
+    key = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+    body = {"schema": cl.SCHEMA, "meters": METERS, "limits": LIMITS}
+    document = cl.sign_policy(body, key, "2026-10-23T00:00:00Z")
+    policy_out, kid = cl.verify_signed_policy(document, [key.verification_key()])
+    assert policy_out == body and kid == key.kid
+    other = SigningKey.generate({SignatureDomain.LIMIT_POLICY})
+    with pytest.raises(cl.LimitPolicyError, match="unknown_kid"):
+        cl.verify_signed_policy(document, [other.verification_key()])
+    for broken in (body, {"schema": cl.SIGNED_SCHEMA},
+                   {"schema": cl.SIGNED_SCHEMA, "policy": body, "signature": {"x": 1}},
+                   dict(document, policy=dict(body, coverage="all_writes"))):
+        with pytest.raises(cl.LimitPolicyError):
+            cl.verify_signed_policy(broken, [key.verification_key()])

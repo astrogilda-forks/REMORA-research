@@ -1348,9 +1348,17 @@ def _policy_component_hashes(
             opa_path = (_REPO_ROOT / opa_path).resolve()
         opa_policy_hash = _sha256_file(opa_path)
 
+    # Cumulative limits are policy: a grant decided under one set of limits
+    # must not be redeemed under another, or under none (a rollback that
+    # turned the limits off would otherwise let approved calls run unbounded).
+    limits_policy_hash = None
+    limits_env = os.getenv("REMORA_LIMITS_FILE", "").strip()
+    if limits_env:
+        limits_policy_hash = _sha256_file(Path(limits_env))
+
     parts = [v for v in (policy_engine_hash, risk_profile_hash, schema_hash,
                          tool_registry_hash, engine_mode_hash,
-                         opa_policy_hash) if v]
+                         opa_policy_hash, limits_policy_hash) if v]
     composite = None
     if parts:
         composite = "sha256:" + hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
@@ -1363,6 +1371,7 @@ def _policy_component_hashes(
         "tool_registry_hash": tool_registry_hash,
         "engine_mode_hash": engine_mode_hash,
         "opa_policy_hash": opa_policy_hash,
+        "limits_policy_hash": limits_policy_hash,
     }
 
 
@@ -1389,6 +1398,7 @@ _COVERAGE_COMPONENTS: tuple[tuple[str, str], ...] = (
     ("tool_registry", "tool_registry_hash"),
     ("engine_mode", "engine_mode_hash"),
     ("opa_policy", "opa_policy_hash"),
+    ("cumulative_limits", "limits_policy_hash"),
 )
 
 

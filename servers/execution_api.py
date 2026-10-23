@@ -755,6 +755,7 @@ def dispatch_pending_intents(tenant: str, *, worker_id: str) -> list[dict[str, A
             resolve_toolspec=_resolve_toolspec_unwrapped,
             policy_coverage=_policy_coverage,
             policy_bundle_hash=_current_policy_bundle_hash,
+            limits_policy_hash=_limits_policy_hash,
             rebuild_call=_rebuild_tool_call,
             assessed_record=_assessed_record,
             require_execution_context=context_required(),
@@ -1135,7 +1136,12 @@ def _limit_guard() -> Any:
     global _LIMIT_GUARD
     path = _os.environ.get("REMORA_LIMITS_FILE", "").strip()
     ledger = _os.environ.get("REMORA_LIMITS_LEDGER", "").strip()
+    required = _os.environ.get("REMORA_REQUIRE_LIMITS", "").strip().lower() in {
+        "1", "true", "yes", "on"}
     if not path and not ledger:
+        if required:
+            raise ValueError("REMORA_REQUIRE_LIMITS is set and no cumulative limits are "
+                             "configured (REMORA_LIMITS_FILE, REMORA_LIMITS_LEDGER)")
         return None
     if not path or not ledger:
         raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
@@ -1149,11 +1155,50 @@ def _limit_guard() -> Any:
         )
 
         with open(path, encoding="utf-8") as handle:
-            policy = LimitPolicy.from_dict(yaml.safe_load(handle))
+            document = yaml.safe_load(handle)
+        policy = LimitPolicy.from_dict(_verified_limit_policy(document, required))
+        if required and policy.coverage != "all_writes":
+            raise ValueError("REMORA_REQUIRE_LIMITS needs coverage all_writes: a write tool "
+                             "the policy does not meter must not run")
         _LIMIT_GUARD = ((path, ledger),
                         LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write,
                                    observer=_limit_observer()))
     return _LIMIT_GUARD[1]
+
+
+def _verified_limit_policy(document: Any, required: bool) -> Any:
+    """The limit policy to enforce, verified when a signer is trusted.
+
+    ``REMORA_LIMITS_TRUSTED_KEYS`` lists the Ed25519 public keys (hex or
+    base64, comma-separated) of the authority that sets the budgets. With
+    them, the file must be a signed envelope by one of those keys. Without
+    them, a signed envelope refuses (it cannot be checked) and a plain policy
+    is accepted only when ``REMORA_REQUIRE_LIMITS`` is off.
+    """
+    from remora.crypto import SignatureDomain, VerificationKey
+    from remora.enforcement.cumulative_limits import SIGNED_SCHEMA, verify_signed_policy
+
+    raw_keys = [k for k in _os.environ.get("REMORA_LIMITS_TRUSTED_KEYS", "").split(",")
+                if k.strip()]
+    signed = isinstance(document, dict) and document.get("schema") == SIGNED_SCHEMA
+    if not raw_keys:
+        if required:
+            raise ValueError("REMORA_REQUIRE_LIMITS needs REMORA_LIMITS_TRUSTED_KEYS: the "
+                             "limits must be signed by the authority that sets them")
+        if signed:
+            raise ValueError("the limit policy is signed and REMORA_LIMITS_TRUSTED_KEYS is "
+                             "unset, so its signature cannot be checked")
+        return document
+    keys = [VerificationKey.from_text(k, {SignatureDomain.LIMIT_POLICY}) for k in raw_keys]
+    policy, _kid = verify_signed_policy(document, keys)
+    return policy
+
+
+def _limits_policy_hash() -> str | None:
+    """The digest of the cumulative-limit policy in force, or None without one."""
+    from servers import api as api_mod
+
+    return api_mod._policy_component_hashes().get("limits_policy_hash")
 
 
 def _limit_observer() -> Any:
@@ -2404,6 +2449,7 @@ def _assess_proposal_with_loop_state(
         token_audience=PEP_AUDIENCE,
         token_ttl_seconds=EXECUTION_TOKEN_TTL_SECONDS,
         policy_bundle_hash=_current_policy_bundle_hash,
+        limits_policy_hash=_limits_policy_hash,
         loop_safety=_loop_safety_monitor(),
         capability_gate=(lambda proposal: _capability_block(proposal, principal, tenant))
         if _capability_resolver() is not None else None,
@@ -3064,6 +3110,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
             token_ttl_seconds=EXECUTION_TOKEN_TTL_SECONDS,
             policy_coverage=_policy_coverage,
             policy_bundle_hash=_current_policy_bundle_hash,
+            limits_policy_hash=_limits_policy_hash,
             async_dispatch=async_mode,
             transactional_append=chain_append_transactional,
             require_execution_context=context_required(),
