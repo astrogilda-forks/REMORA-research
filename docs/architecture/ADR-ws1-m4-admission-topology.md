@@ -4,10 +4,10 @@
   package M4.1a of the
   [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9. M4.1b
   (receipts and epochs) is implemented. M4.1c wires it into all three
-  dispatch paths behind `REMORA_WS1_ADMISSION=atomic`: slice 1 the
-  direct-ACCEPT path, slice 2a the approved-review path and the async worker,
-  slice 2b revocation at admission, slice 3 the audit row, slice 4 the
-  permit before the send.
+  dispatch paths behind `REMORA_WS1_ADMISSION=atomic`, in slices. Slice 1
+  covers the direct-ACCEPT path, slice 2a the approved-review path and the
+  async worker, and slice 2b revocation at admission. Slice 3 adds the audit
+  row and slice 4 the permit before the send.
 - Deciders: repository owner
 - Related: SDD §2.2 and §4, `docs/design/execution-lifecycle-outbox-v1.md`,
   [ADR: authority custody and lease durability](ADR-authority-custody-and-lease-durability.md),
@@ -348,10 +348,10 @@ receipts' expiry, their epochs read under lock, and the principals.
   `execution_result` entry. The test that revokes mid-send asserts the call
   runs and is labelled that way.
 - Tests: `tests/test_atomic_admission.py` (SQLite and Postgres) covers the
-  permit's bound, a lapse, evidence too close to expiry for the executor, a
-  source and a principal revoked after commit, an unreachable epoch store,
-  a permit that writes nothing, a revocation racing the permit, and a bound
-  already past. `tests/test_ws1_atomic_admission_route.py` covers the lease
+  permit's bound, a lapse, and evidence too close to expiry for the
+  executor. It also covers a source and a principal revoked after commit and
+  an unreachable epoch store. The rest are a permit that writes nothing, a
+  revocation racing the permit, and a bound already past. `tests/test_ws1_atomic_admission_route.py` covers the lease
   bound, a lapse and a revocation between commit and permit on each path,
   and a revocation mid-send.
 
