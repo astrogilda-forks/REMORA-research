@@ -1,7 +1,7 @@
 # ADR: WS1-M4 recovery scheduler on a Durable Object
 
-- Status: **proposed** (2026-10-22). Needs the owner's decision before any
-  code. Work package M4.5a of the
+- Status: **accepted** (2026-10-23, owner decision). Proposed 2026-10-22.
+  No code exists yet; implementation is work package M4.5a of the
   [WS1-M4 SDD](../design/ws1-m4-safe-autonomy-recovery-v0.2.md) §9.
 - Deciders: repository owner
 - Related: [ADR: WS1-M4 admission topology](ADR-ws1-m4-admission-topology.md),
