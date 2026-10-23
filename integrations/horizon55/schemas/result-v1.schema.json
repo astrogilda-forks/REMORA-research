@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/darklordVirtual/REMORA-research/blob/master/integrations/horizon55/schemas/result-v1.schema.json",
+  "title": "REMORA Horizon #55 row results v1",
+  "description": "Claim-by-claim verdicts over Horizon #51 set-2 cases A, B and C. NOT_ESTABLISHED is neither a pass nor a failure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "classification", "independence", "input_lock_sha256", "horizon_revision",
+               "dataset_revision", "inputs_not_prepared", "log", "anchoring", "results"],
+  "properties": {
+    "schema": {"const": "remora-h55-results-v1"},
+    "classification": {"type": "string"},
+    "independence": {"enum": ["L0_SELF_TEST", "AUTHOR_OPERATED"]},
+    "input_lock_sha256": {"$ref": "#/$defs/sha256"},
+    "horizon_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "dataset_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "inputs_not_prepared": {"type": "array", "items": {"type": "string"}},
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "problems", "size", "head", "request_sha256"],
+      "properties": {
+        "verified": {"type": "boolean"},
+        "problems": {"type": "array", "items": {"type": "string"}},
+        "size": {"type": "integer", "minimum": 0},
+        "head": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "request_sha256": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sha256"}}
+      }
+    },
+    "anchoring": {
+      "type": "object",
+      "required": ["claim_id", "verdict", "reason_codes", "does_not_establish", "native_reported"],
+      "properties": {
+        "claim_id": {"const": "checkpoint_anchoring"},
+        "verdict": {"$ref": "#/$defs/verdict"},
+        "reason_codes": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "does_not_establish": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "results": {"type": "array", "items": {"$ref": "#/$defs/result"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "verdict": {"enum": ["ESTABLISHED", "CONTRADICTED", "NOT_ESTABLISHED"]},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "claim_id", "evidence_subject", "verdict", "reason_codes", "evidence_refs",
+                   "rule_id", "observer_or_signer_role", "trust_basis", "assumptions", "establishes",
+                   "does_not_establish", "claim_ceiling", "native_reported"],
+      "properties": {
+        "case_id": {"enum": ["A", "B", "C"]},
+        "claim_id": {"enum": ["native_delegation_scope", "budget_compliance", "same_request_occurrence",
+                              "payment_execution_link", "audit_byte_identity", "dataset_byte_identity",
+                              "dataset_runtime_use", "receiver_accepted_result",
+                              "remora_dispatch_authority", "physical_effect"]},
+        "evidence_subject": {"type": "string"},
+        "verdict": {"$ref": "#/$defs/verdict"},
+        "reason_codes": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {"path": {"type": "string"}, "sha256": {"$ref": "#/$defs/sha256"},
+                           "seq": {"type": "integer"}, "entry_sha256": {"$ref": "#/$defs/sha256"}}
+          }
+        },
+        "rule_id": {"type": "string", "pattern": "^H55-R[0-9]{2}$"},
+        "observer_or_signer_role": {"type": "string"},
+        "trust_basis": {"type": "string"},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+        "establishes": {"type": "string"},
+        "does_not_establish": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "claim_ceiling": {"type": "string"},
+        "native_reported": {"type": ["object", "null"]}
+      }
+    }
+  }
+}

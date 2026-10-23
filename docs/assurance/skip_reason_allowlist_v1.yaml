@@ -77,6 +77,9 @@ entries:
   - pattern: "(thermodynamic eval|canonical ablation|thermo|ablation|canonical) artifacts? missing"
     class: artifact
     note: "Thermodynamic-framing artifacts; the framing was withdrawn from the paper (PR #227) and the artifacts are not committed."
+  - pattern: "dataset cache not prepared \\(python integrations/horizon55/prepare\\.py\\)"
+    class: artifact
+    note: "Horizon #55 row: the souba-db dataset has no established redistribution terms, so it is fetched into a git-ignored cache and never committed. Without it CI does not check the committed outputs or dataset byte identity; every other H55 test runs."
   - pattern: "grounding holdout not (built yet|yet evaluated)|manifest not present|episodes_sha256 not yet set"
     class: artifact
     note: "The grounding holdout is built by a script and not committed."
