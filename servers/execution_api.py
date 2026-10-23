@@ -1091,8 +1091,8 @@ def _ws1_gate() -> Any:
     return _WS1_GATE
 
 
-_LIMIT_GUARD: Any = None
-_LIMIT_GUARD_KEY: tuple[str, str] | None = None
+#: The guard and the (policy file, ledger) pair it was built from.
+_LIMIT_GUARD: tuple[tuple[str, str], Any] | None = None
 
 
 def _tool_is_write(tool_name: str) -> bool | None:
@@ -1132,14 +1132,14 @@ def _limit_guard() -> Any:
     other, or a malformed policy, refuses at startup: a limit that silently
     does not apply would read as one that holds.
     """
-    global _LIMIT_GUARD, _LIMIT_GUARD_KEY
+    global _LIMIT_GUARD
     path = _os.environ.get("REMORA_LIMITS_FILE", "").strip()
     ledger = _os.environ.get("REMORA_LIMITS_LEDGER", "").strip()
     if not path and not ledger:
         return None
     if not path or not ledger:
         raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
-    if _LIMIT_GUARD is None or _LIMIT_GUARD_KEY != (path, ledger):
+    if _LIMIT_GUARD is None or _LIMIT_GUARD[0] != (path, ledger):
         import yaml
 
         from remora.enforcement.cumulative_limits import (
@@ -1150,9 +1150,9 @@ def _limit_guard() -> Any:
 
         with open(path, encoding="utf-8") as handle:
             policy = LimitPolicy.from_dict(yaml.safe_load(handle))
-        _LIMIT_GUARD = LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write)
-        _LIMIT_GUARD_KEY = (path, ledger)
-    return _LIMIT_GUARD
+        _LIMIT_GUARD = ((path, ledger),
+                        LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write))
+    return _LIMIT_GUARD[1]
 
 
 def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
