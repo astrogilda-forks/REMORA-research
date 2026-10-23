@@ -84,7 +84,9 @@ jobs:
           # extras drive what gets installed. Filter out -e/comment lines that
           # pip rejects in a constraints file.
           grep -vE '^-e|^#|file://' requirements-lock.txt > /tmp/constraints.txt
-          pip install -e ".[dev,causal,api,security,postgres]" -c /tmp/constraints.txt
+          # otel and identity as in ci.yml: without them the tracing tests skip
+          # and the coverage union misses the custody hop (remote_dispatch._post).
+          pip install -e ".[dev,causal,api,security,postgres,identity,otel]" -c /tmp/constraints.txt
 
       - name: Lint (ruff)
         run: ruff check .
