@@ -1153,6 +1153,25 @@
         "title": "ExecutionPendingResponse",
         "type": "object"
       },
+      "ExecutionStopRequest": {
+        "description": "Stop or resume every new execution for the tenant (SDD unified\ncapability execution v1.1, P0 item 7; gate G10).\n\nThe flag is one durable authority-epoch subject per tenant. Stopping\nrefuses the authority's minting and every governed dispatch, with the\nnonce unspent; nothing already executed is touched and no evidence is\ndeleted. The reason goes on the chain with the operator.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "ExecutionStopRequest",
+        "type": "object"
+      },
       "FollowUpRequest": {
         "properties": {
           "follow_up_type": {
@@ -4087,6 +4106,90 @@
         ]
       }
     },
+    "/v1/execution/resume": {
+      "post": {
+        "description": "Lift the stop. Recorded as ``execution_resumed`` with the operator.",
+        "operationId": "resume_execution_v1_execution_resume_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionStopRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resume Execution V1 Execution Resume Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Execution for the tenant resumes."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No durable authority state."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The authority store did not answer; the flag did NOT change."
+          }
+        },
+        "summary": "Resume Execution",
+        "tags": [
+          "execution"
+        ]
+      }
+    },
     "/v1/execution/revoke-authority": {
       "post": {
         "description": "Revoke or reinstate an evidence source for WS1-M4 admission.\n\nAdvances the source's authority epoch under the tenant lock admission\ntakes, with its audit event in the same transaction. Either way the epoch\nmoves, so evidence read before the change no longer admits (INV-M4-02).\nSame capability as ``revoke-principal``. Only under\n``REMORA_WS1_ADMISSION=atomic``: without it nothing reads the epoch, and\nanswering \"revoked\" would claim an effect the deployment does not have.",
@@ -4220,6 +4323,142 @@
           }
         },
         "summary": "Revoke Principal",
+        "tags": [
+          "execution"
+        ]
+      }
+    },
+    "/v1/execution/stop": {
+      "get": {
+        "description": "Read the stop switch. The read capability, like the audit reader.",
+        "operationId": "execution_stop_status_v1_execution_stop_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Execution Stop Status V1 Execution Stop Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Whether execution for the tenant is stopped, and the epoch of the last change."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No durable authority state."
+          }
+        },
+        "summary": "Execution Stop Status",
+        "tags": [
+          "execution"
+        ]
+      },
+      "post": {
+        "description": "The operator's stop switch (SDD unified capability execution v1.1, P0\nitem 7; gate G10).\n\nWrites one durable flag for the tenant, the authority-epoch subject\n``execution:stop``, in the store the lease nonce ledger uses, with an\n``execution_stopped`` event in the same transaction. The governed\ndispatcher reads it before anything is spent, so a valid lease is\nrefused with its nonce unspent and runs after ``/resume`` if it has not\nexpired; the authority refuses to mint while stopped. Nothing that\nexecuted is touched and no evidence is deleted. A call past the nonce\nfinishes: effects cannot be undone. Same capability as\n``revoke-principal``.",
+        "operationId": "stop_execution_v1_execution_stop_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionStopRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Stop Execution V1 Execution Stop Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Execution for the tenant is stopped: the authority mints nothing and every governed dispatch refuses as execution_stopped, with its nonce unspent."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No durable authority state, so there is nothing an executor could read."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The authority store did not answer; the flag did NOT change."
+          }
+        },
+        "summary": "Stop Execution",
         "tags": [
           "execution"
         ]

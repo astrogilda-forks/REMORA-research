@@ -74,7 +74,10 @@ gates:
   mapping: CAP-007, CAP-008
   status: crit
   status_text: No pilot evidence
-  missing: Named operator, backups, alerting, stop switch
+  missing: >-
+    Named operator, backups, alerting (the stop switch exists since P0 item 7: POST
+    /v1/execution/stop, read by every governed dispatcher before anything is spent; an
+    operator drill on a deployment is pilot evidence, not yet produced)
 - id: G11
   name: External verification
   mapping: REM-021, REM-020

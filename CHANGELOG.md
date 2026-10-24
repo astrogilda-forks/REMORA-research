@@ -10,6 +10,13 @@ This file lists externally relevant changes by release. Fine-grained development
 - `scripts/check_capability_hooks.py` verifies every binding against the repository (the path exists, the symbol is defined, the route is served) and compares the register's primary hook with the atlas's `sdd_hook`; `tests/test_capability_hooks.py` is the P1 exit gate: a registered capability bound to no hook, route or test fails. `--json` prints the read-only join of register, hook, freshness classification and atlas assessment, with `mode` as `NOT_ESTABLISHED`.
 - Not in this slice: a capability activation manifest, its signature, an effective mode, startup validation against it, or `GET /v1/system/capabilities`. Where a deployment's mode lives is ADR-UE-03, an owner decision; the hook is recorded in the register as that ADR's default proposes. The atlas's judgement words beyond the vocabulary (REVIEW, EVIDENCE, INTEGRATION) are not hooks and are not carried over.
 
+### The operator's stop switch (SDD unified capability execution v1.1, P0 item 7; gate G10)
+
+- `POST /v1/execution/stop` and `/resume` (`review` capability) write one durable flag per tenant, the authority-epoch subject `execution:stop` in the store the lease nonce ledger uses, with `execution_stopped` or `execution_resumed` on the chain in the same transaction. `GET /v1/execution/stop` (`read`) returns the flag and the epoch.
+- While stopped the authority mints nothing (`execution_stopped`) and every `GovernedToolDispatcher` with a bound stop source refuses first of all its checks, before the nonce, the limit reservation and the recorder intent; a lease refused this way runs after the resume. A store that cannot answer refuses as `execution_stop_unverifiable`. The conformance executor binds the same source, and a process-split test stops a running executor, restarts it stopped, and runs the same lease after the resume.
+- A separate interpreter holding only the public verification key cannot mint a lease (`tests/conformance`), the in-process custody tests' claim shown across a process boundary.
+- Not a stop: `REMORA_STATE_ENDPOINT` alone has no epoch store, so a D1-only deployment has none and the routes answer 409. The stop is per tenant; a platform-wide stop is a loop over tenants. No latency figure is claimed beyond "before the next dispatch's checks".
+
 ### The lease signs the flow decision; the executor checks against it (IFC-06; SDD unified capability execution v1.1, P0 item 6)
 
 - `ExecutionLease` gains `flow_epoch`, `flow_digest` and `resolved_tool_call_hash`, signed only when set, so every lease issued before them verifies byte for byte as before. A lease minted under `REMORA_FLOW_CONTROL=1` carries the context epoch and verdict digest the authority judged and the canonical hash of the call with every handle resolved.
@@ -823,7 +830,6 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   docs/09-related-work.md gains §15 and §16 to anchor them.
 - The register's `updated` field moves to 2026-10-17.
 - PRF-043 records that the paper does not cite BFCL.
-
 
 ### Policy COMP-01 (meet composition, P-MONO)
 
