@@ -778,6 +778,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/execution/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Execution
+         * @description Lift the stop. Recorded as ``execution_resumed`` with the operator.
+         */
+        post: operations["resume_execution_v1_execution_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution/revoke-authority": {
         parameters: {
             query?: never;
@@ -824,6 +844,41 @@ export interface paths {
          *     chain would then show a self-cancelling authority with no second party.
          */
         post: operations["revoke_principal_v1_execution_revoke_principal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/execution/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Execution Stop Status
+         * @description Read the stop switch. The read capability, like the audit reader.
+         */
+        get: operations["execution_stop_status_v1_execution_stop_get"];
+        put?: never;
+        /**
+         * Stop Execution
+         * @description The operator's stop switch (SDD unified capability execution v1.1, P0
+         *     item 7; gate G10).
+         *
+         *     Writes one durable flag for the tenant, the authority-epoch subject
+         *     ``execution:stop``, in the store the lease nonce ledger uses, with an
+         *     ``execution_stopped`` event in the same transaction. The governed
+         *     dispatcher reads it before anything is spent, so a valid lease is
+         *     refused with its nonce unspent and runs after ``/resume`` if it has not
+         *     expired; the authority refuses to mint while stopped. Nothing that
+         *     executed is touched and no evidence is deleted. A call past the nonce
+         *     finishes: effects cannot be undone. Same capability as
+         *     ``revoke-principal``.
+         */
+        post: operations["stop_execution_v1_execution_stop_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1551,6 +1606,20 @@ export interface components {
             toolspec?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * ExecutionStopRequest
+         * @description Stop or resume every new execution for the tenant (SDD unified
+         *     capability execution v1.1, P0 item 7; gate G10).
+         *
+         *     The flag is one durable authority-epoch subject per tenant. Stopping
+         *     refuses the authority's minting and every governed dispatch, with the
+         *     nonce unspent; nothing already executed is touched and no evidence is
+         *     deleted. The reason goes on the chain with the operator.
+         */
+        ExecutionStopRequest: {
+            /** Reason */
+            reason?: string | null;
         };
         /** FollowUpRequest */
         FollowUpRequest: {
@@ -3563,6 +3632,77 @@ export interface operations {
             };
         };
     };
+    resume_execution_v1_execution_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecutionStopRequest"];
+            };
+        };
+        responses: {
+            /** @description Execution for the tenant resumes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No durable authority state. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The authority store did not answer; the flag did NOT change. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+        };
+    };
     revoke_authority_v1_execution_revoke_authority_post: {
         parameters: {
             query?: never;
@@ -3674,6 +3814,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execution_stop_status_v1_execution_stop_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether execution for the tenant is stopped, and the epoch of the last change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No durable authority state. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+        };
+    };
+    stop_execution_v1_execution_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecutionStopRequest"];
+            };
+        };
+        responses: {
+            /** @description Execution for the tenant is stopped: the authority mints nothing and every governed dispatch refuses as execution_stopped, with its nonce unspent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No durable authority state, so there is nothing an executor could read. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The authority store did not answer; the flag did NOT change. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };

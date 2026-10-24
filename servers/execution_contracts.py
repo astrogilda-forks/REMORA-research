@@ -391,6 +391,19 @@ class RevokeAuthorityRequest(BaseModel):
     reason: str | None = Field(None, max_length=512)
 
 
+class ExecutionStopRequest(BaseModel):
+    """Stop or resume every new execution for the tenant (SDD unified
+    capability execution v1.1, P0 item 7; gate G10).
+
+    The flag is one durable authority-epoch subject per tenant. Stopping
+    refuses the authority's minting and every governed dispatch, with the
+    nonce unspent; nothing already executed is touched and no evidence is
+    deleted. The reason goes on the chain with the operator.
+    """
+
+    reason: str | None = Field(None, max_length=512)
+
+
 class ContextMintRequest(BaseModel):
     """Mint a flow context (flow-control SDD v1.3 §3.2, §5.2).
 

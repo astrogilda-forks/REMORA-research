@@ -38,13 +38,22 @@ from typing import Any
 
 from remora.errors import RemoraError
 
-__all__ = ["MAX_CLOCK_SKEW_MS", "AuthorityEpochs", "AuthorityEpochsUnavailable"]
+__all__ = ["EXECUTION_STOP_SUBJECT", "MAX_CLOCK_SKEW_MS", "AuthorityEpochs",
+           "AuthorityEpochsUnavailable"]
 
 #: The largest clock skew a deployment may declare for admission. A larger
 #: value would let evidence count as fresh long after it lapsed, which is the
 #: hole admission closes; a deployment whose clocks drift further must fix its
 #: clocks (owner decision, ADR-ws1-m4-admission-topology).
 MAX_CLOCK_SKEW_MS = 5_000
+
+#: The operator's stop switch (SDD unified capability execution v1.1, P0 item
+#: 7, gate G10): one subject per tenant in this store. ``revoked`` is
+#: "stopped". The authority refuses to mint and every governed dispatcher
+#: refuses to run while it is set; a subject never advanced is not stopped.
+#: One name, imported by the server and by the conformance executor, so the
+#: two cannot drift apart.
+EXECUTION_STOP_SUBJECT = "execution:stop"
 
 _CREATE = (
     "CREATE TABLE IF NOT EXISTS authority_revision ("

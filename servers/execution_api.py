@@ -126,6 +126,7 @@ from servers.execution_contracts import (  # noqa: F401
     ExecutionGrant,
     ExecutionOutcome,
     ExecutionPendingResponse,
+    ExecutionStopRequest,
     GovernanceAction,
     LimitResolveRequest,
     LoopSafetyResetRequest,
@@ -1806,6 +1807,52 @@ def _lease_nonce_store() -> NonceStore | None:
     return DurableNonceStore(dsn=dsn, db_path=db_path, state_endpoint=endpoint)
 
 
+_STOP_EPOCHS: Any = None
+_STOP_EPOCHS_KEY: tuple[str, str] | None = None
+
+
+def _stop_epochs() -> Any:
+    """The authority-epoch store the stop switch lives in, or None without one.
+
+    SDD unified capability execution v1.1, P0 item 7 (gate G10). Built from
+    REMORA_PG_DSN or REMORA_CHAIN_DB, the two backends the store has, and
+    bound to the open state transaction so the flag and its audit event
+    commit together. The executing domain reads the same row from the same
+    store its nonce ledger uses. D1 (REMORA_STATE_ENDPOINT) has no
+    interactive transaction and no epoch store: a D1-only deployment has
+    no stop, the routes answer 409, and the dispatcher binds nothing.
+    """
+    global _STOP_EPOCHS, _STOP_EPOCHS_KEY
+    dsn = _os.environ.get("REMORA_PG_DSN", "").strip()
+    db_path = "" if dsn else _os.environ.get("REMORA_CHAIN_DB", "").strip()
+    if not (dsn or db_path):
+        return None
+    key = (dsn, db_path)
+    if _STOP_EPOCHS is None or _STOP_EPOCHS_KEY != key:
+        from remora.governance.authority_epochs import AuthorityEpochs
+
+        _STOP_EPOCHS = AuthorityEpochs(dsn=dsn, db_path=db_path,
+                                       connection_provider=_ACTIVE_TX_CONNECTION.get)
+        _STOP_EPOCHS_KEY = key
+    return _STOP_EPOCHS
+
+
+def _execution_stopped(tenant: str) -> bool:
+    """Whether the operator stopped execution for ``tenant``.
+
+    Raises when the store cannot answer; the callers refuse on that, they
+    do not guess. Without a durable store nothing can be stopped, and this
+    says so by returning False only after _stop_epochs() said there is none.
+    """
+    from remora.governance.authority_epochs import EXECUTION_STOP_SUBJECT
+
+    store = _stop_epochs()
+    if store is None:
+        return False
+    return bool(store.read((EXECUTION_STOP_SUBJECT,),
+                           tenant_id=tenant)[EXECUTION_STOP_SUBJECT][1])
+
+
 def _tool_dispatcher() -> GovernedToolDispatcher | None:
     """App-lifecycle dispatcher; None when no policy bundle hash exists."""
     global _DISPATCHER
@@ -1866,6 +1913,14 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                 limits = _limit_guard()
                 if limits is not None:
                     dispatcher.bind_limit_guard(limits)
+                # SDD unified capability execution v1.1, P0 item 7: the
+                # operator's stop switch, read before anything is spent.
+                # Bound only with a durable authority store; without one
+                # there is no stop, and the API reference says so. The
+                # module function is looked up at each call, so a test
+                # can make the store unreachable.
+                if _stop_epochs() is not None:
+                    dispatcher.bind_stop_source(lambda tenant: _execution_stopped(tenant))
                 spec = _os.environ.get("REMORA_TOOL_REGISTRY_MODULE", "").strip()
                 if spec:
                     import importlib
@@ -2946,6 +3001,116 @@ def revoke_principal(req: RevokePrincipalRequest, request: Request) -> dict[str,
     return {"principal": req.principal, "revoked_by": revoker, "status": "revoked"}
 
 
+@router.post("/stop", responses={
+    200: {"description": "Execution for the tenant is stopped: the authority "
+                         "mints nothing and every governed dispatch refuses "
+                         "as execution_stopped, with its nonce unspent."},
+    **_AUTH_RESPONSES,
+    409: {"model": ErrorDetail,
+          "description": "No durable authority state, so there is nothing "
+                         "an executor could read."},
+    503: {"model": ErrorDetail,
+          "description": "The authority store did not answer; the flag did "
+                         "NOT change."},
+})
+def stop_execution(req: ExecutionStopRequest, request: Request) -> dict[str, Any]:
+    """The operator's stop switch (SDD unified capability execution v1.1, P0
+    item 7; gate G10).
+
+    Writes one durable flag for the tenant, the authority-epoch subject
+    ``execution:stop``, in the store the lease nonce ledger uses, with an
+    ``execution_stopped`` event in the same transaction. The governed
+    dispatcher reads it before anything is spent, so a valid lease is
+    refused with its nonce unspent and runs after ``/resume`` if it has not
+    expired; the authority refuses to mint while stopped. Nothing that
+    executed is touched and no evidence is deleted. A call past the nonce
+    finishes: effects cannot be undone. Same capability as
+    ``revoke-principal``.
+    """
+    return _set_execution_stop(req, request, stopped=True)
+
+
+@router.post("/resume", responses={
+    200: {"description": "Execution for the tenant resumes."},
+    **_AUTH_RESPONSES,
+    409: {"model": ErrorDetail, "description": "No durable authority state."},
+    503: {"model": ErrorDetail,
+          "description": "The authority store did not answer; the flag did "
+                         "NOT change."},
+})
+def resume_execution(req: ExecutionStopRequest, request: Request) -> dict[str, Any]:
+    """Lift the stop. Recorded as ``execution_resumed`` with the operator."""
+    return _set_execution_stop(req, request, stopped=False)
+
+
+@router.get("/stop", responses={
+    200: {"description": "Whether execution for the tenant is stopped, and the "
+                         "epoch of the last change."},
+    **_AUTH_RESPONSES,
+    409: {"model": ErrorDetail, "description": "No durable authority state."},
+})
+def execution_stop_status(request: Request) -> dict[str, Any]:
+    """Read the stop switch. The read capability, like the audit reader."""
+    from remora.governance.authority_epochs import EXECUTION_STOP_SUBJECT
+
+    tenant, role, _principal = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "read")
+    store = _stop_epochs()
+    if store is None:
+        raise HTTPException(status_code=409, detail=_NO_STOP_STORE)
+    try:
+        epoch, stopped = store.read((EXECUTION_STOP_SUBJECT,),
+                                    tenant_id=tenant)[EXECUTION_STOP_SUBJECT]
+    except Exception as exc:
+        raise HTTPException(status_code=503,
+                            detail="authority store unavailable") from exc
+    return {"stopped": bool(stopped), "epoch": int(epoch)}
+
+
+_NO_STOP_STORE = ("execution stop needs durable authority state (REMORA_PG_DSN or "
+                  "REMORA_CHAIN_DB); nothing an executor could read exists here")
+
+
+def _set_execution_stop(req: ExecutionStopRequest, request: Request, *,
+                        stopped: bool) -> dict[str, Any]:
+    from uuid import uuid4
+
+    from remora.governance.authority_epochs import EXECUTION_STOP_SUBJECT
+
+    tenant, role, operator = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "review")
+    store = _stop_epochs()
+    if store is None:
+        raise HTTPException(status_code=409, detail=_NO_STOP_STORE)
+    event = "execution_stopped" if stopped else "execution_resumed"
+    # One key per change: every call moves the epoch, so no two are the same event.
+    key = _audit_outbox.encode_key(
+        tenant, event, EXECUTION_STOP_SUBJECT, operator, req.reason or "", uuid4().hex)
+    try:
+        with db_transaction_state(tenant):
+            epoch = store.advance(EXECUTION_STOP_SUBJECT, tenant_id=tenant, revoked=stopped)
+            chain_append_transactional(tenant, {
+                "event": event, "epoch": epoch, "stopped_by": operator,
+                "reason": req.reason or "",
+            }, key=key)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="authority store unavailable; the stop flag did NOT change and "
+                   "this call must be retried") from exc
+    try:
+        drain_audit_outbox(tenant)
+    except Exception:
+        # Committed and enqueued: the next drain projects the event.
+        _LOGGER.warning("audit outbox drain after an execution stop change failed "
+                        "for tenant %s", tenant, exc_info=True)
+    return {"stopped": stopped, "epoch": epoch, "stopped_by": operator}
+
+
 @router.post("/revoke-authority", responses={
     200: {"description": "The evidence source's authority epoch advanced; "
                          "receipts read before it no longer admit."},
@@ -3150,6 +3315,17 @@ def _dispatch_under_lease(
     (issue #45 gap 6). The span carries the proposal id as the tool-call id,
     so a trace joins the audit chain on the same key everything else uses.
     """
+    if presented_lease is None:
+        # P0 item 7: the authority mints nothing while the operator has
+        # stopped execution; a presented lease is judged by the dispatcher.
+        try:
+            stopped = _execution_stopped(tenant)
+        except Exception:
+            return {"executed": False, "refusal_reason": "execution_stop_unverifiable",
+                    "proposal_id": proposal_id}
+        if stopped:
+            return {"executed": False, "refusal_reason": "execution_stopped",
+                    "proposal_id": proposal_id}
     if presented_lease is None:
         # Q8.2, the fresh check of SDD §15: resolved again at the moment the
         # lease is minted, and signed into it.
