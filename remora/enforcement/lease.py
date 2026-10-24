@@ -251,6 +251,18 @@ class ExecutionLease:
     #: under (:mod:`remora.capabilities`). Signed only when set; the
     #: dispatcher requires the matching set and checks the tool against it.
     capability_digest: str = ""
+    #: IFC-06: the flow decision this authorization was granted under
+    #: (:mod:`remora.flow`): the context epoch and the verdict digest the
+    #: authority judged, and the canonical hash of the call with every flow
+    #: handle resolved to its value. Signed only when set, like the task
+    #: fields. The executor checks the live context against the epoch and
+    #: digest, and the arguments the tool is about to receive against the
+    #: resolved hash, so a label raised or a handle changed after the
+    #: grant stops the action. ``flow_epoch`` is read only when
+    #: ``flow_digest`` is set.
+    flow_epoch: int = 0
+    flow_digest: str = ""
+    resolved_tool_call_hash: str = ""
 
     @classmethod
     def issue(
@@ -278,6 +290,9 @@ class ExecutionLease:
         plan: PlanBinding | None = None,
         surface_digest: str = "",
         capability_set: EffectiveCapabilitySet | None = None,
+        flow_epoch: int | None = None,
+        flow_digest: str = "",
+        resolved_tool_call_hash: str = "",
     ) -> ExecutionLease:
         """Issue a lease for an ACCEPTED decision; refuse everything else.
 
@@ -351,6 +366,15 @@ class ExecutionLease:
             fields["capability_digest"] = capability_set.digest
         if execution_context is not None:
             fields["execution_context_hash"] = execution_context.digest()
+        # IFC-06: the epoch and the digest name one flow decision, so a
+        # lease carrying one without the other is refused here, not signed.
+        if (flow_epoch is None) != (not flow_digest):
+            raise ValueError("flow_epoch and flow_digest are set together or not at all")
+        if flow_digest:
+            fields["flow_epoch"] = int(flow_epoch)  # type: ignore[arg-type]
+            fields["flow_digest"] = flow_digest
+        if resolved_tool_call_hash:
+            fields["resolved_tool_call_hash"] = resolved_tool_call_hash
         task_event_fields: dict[str, Any] = dict(task_fields(task_identity))
         alg = _signing.issuer_algorithm()
         if alg is None:
@@ -474,6 +498,15 @@ class ExecutionLease:
             fields["capability_digest"] = self.capability_digest
         if self.execution_context_hash:
             fields["execution_context_hash"] = self.execution_context_hash
+        # The epoch is signed whenever it carries information (set, or
+        # non-zero), so a lease cannot be given an epoch its signature does
+        # not cover; verify() refuses the half binding that leaves.
+        if self.flow_digest or self.flow_epoch:
+            fields["flow_epoch"] = self.flow_epoch
+        if self.flow_digest:
+            fields["flow_digest"] = self.flow_digest
+        if self.resolved_tool_call_hash:
+            fields["resolved_tool_call_hash"] = self.resolved_tool_call_hash
         return fields
 
     def task_identity(self) -> "TaskIdentity | None":
@@ -673,6 +706,10 @@ class ExecutionLease:
             bound_task = self.task_identity()
         except (TypeError, ValueError):
             return LeaseVerificationResult(False, "task_identity_malformed")
+        # IFC-06: an epoch without the digest it belongs to names no flow
+        # decision; issue() never signs one, so it is a malformed lease.
+        if self.flow_epoch and not self.flow_digest:
+            return LeaseVerificationResult(False, "flow_binding_malformed")
         if task_identity is not None:
             if bound_task is None:
                 return LeaseVerificationResult(False, "task_unbound")
@@ -693,6 +730,7 @@ class ExecutionLease:
         "context_id", "task_id", "resolved_effect_hash", "plan_binding_hash",
         "surface_digest", "capability_digest",
         "execution_context_hash",
+        "flow_epoch", "flow_digest", "resolved_tool_call_hash",
     })
 
     @classmethod
@@ -1670,6 +1708,31 @@ class GovernedToolDispatcher:
                 executed=False, refusal_reason=verdict.reason,
                 proposal_id=proposal_id,
             )
+        # IFC-06: the arguments the tool is about to receive must be the call
+        # the authority judged with every handle resolved. verify() bound the
+        # wire form above; this binds the invocation form, so a handle whose
+        # value changed after the grant, or a resolution the authority never
+        # saw, refuses before anything is spent. A lease without the field
+        # is checked as before; the flow-enabled execution route refuses it
+        # itself (flow_lease_unbound).
+        if lease.resolved_tool_call_hash:
+            try:
+                resolved_hash = canonical_tool_call_hash(
+                    name=tool_name, arguments=invocation, tenant=tenant_id,
+                    target=target_environment or "")
+            except (TypeError, ValueError):
+                resolved_hash = ""
+            if not hmac.compare_digest(resolved_hash, lease.resolved_tool_call_hash):
+                governance_event(
+                    "dispatch.refused", level=logging.WARNING,
+                    reason="resolved_call_mismatch", tenant_id=tenant_id,
+                    tool_name=tool_name, proposal_id=proposal_id,
+                    grant_jti=lease.grant_jti,
+                )
+                return DispatchResult(
+                    executed=False, refusal_reason="resolved_call_mismatch",
+                    proposal_id=proposal_id,
+                )
         check: dict[str, Any] | None = None
         if lease.execution_context_hash or execution_context is not None or self._require_execution_context:
             from remora.enforcement.runtime_identity import (

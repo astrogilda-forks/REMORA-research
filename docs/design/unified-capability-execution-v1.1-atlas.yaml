@@ -1213,7 +1213,10 @@ capabilities:
     does: Resolved effect, plan premises and procedure obligations are checked against fresh reads.
     now: >-
       Everything is opt-in; the effect registry, audit reader and procedure trace are supplied by
-      the deployment and are not checked for correctness.
+      the deployment and are not checked for correctness. Since P0 item 6 the lease signs the
+      flow decision (context epoch, verdict digest, resolved call hash) and the executing domain
+      checks its live context and the tool's arguments against it (IFC-06); the check and the
+      dispatch are still two steps.
     necessity: Useful
     necessity_rationale: >-
       Necessary for tools whose state can change between approval and execution.

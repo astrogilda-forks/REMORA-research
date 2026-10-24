@@ -11,6 +11,13 @@ This file lists externally relevant changes by release. Fine-grained development
 - A separate interpreter holding only the public verification key cannot mint a lease (`tests/conformance`), the in-process custody tests' claim shown across a process boundary.
 - Not a stop: `REMORA_STATE_ENDPOINT` alone has no epoch store, so a D1-only deployment has none and the routes answer 409. The stop is per tenant; a platform-wide stop is a loop over tenants. No latency figure is claimed beyond "before the next dispatch's checks".
 
+### The lease signs the flow decision; the executor checks against it (IFC-06; SDD unified capability execution v1.1, P0 item 6)
+
+- `ExecutionLease` gains `flow_epoch`, `flow_digest` and `resolved_tool_call_hash`, signed only when set, so every lease issued before them verifies byte for byte as before. A lease minted under `REMORA_FLOW_CONTROL=1` carries the context epoch and verdict digest the authority judged and the canonical hash of the call with every handle resolved.
+- `/v1/execution/dispatch-leased` compares the live context against the epoch and digest in the signed lease. Until now it computed both itself a moment before the comparison, so a label raised or a handle changed after the authority's grant was invisible to the executing domain. A lease without a flow decision is refused as `flow_lease_unbound` while flow control is on.
+- `GovernedToolDispatcher` refuses an invocation whose canonical hash is not the lease's `resolved_tool_call_hash` as `resolved_call_mismatch`, before the nonce is spent; a non-zero `flow_epoch` without its digest verifies as `flow_binding_malformed`.
+- Tests: a handle whose value changed after the grant, a label raised after the grant, an unbound lease, and two dispatches in one context held inside the tool at once, of which exactly one result is released. Still open: the check and the dispatch are two steps; the losing call's effect happens and its result is withheld.
+
 ### Review admission re-verified with ledger and storage faults (NEGATIVE_RESULTS §98; SDD unified capability execution v1.1, P0 item 5)
 
 - Under `REMORA_WS1_ADMISSION=atomic`, a storage fault inside the admission transaction on `/v1/execution/execute` (a lost connection, a failed commit) is now a refusal, `admission_storage_unavailable`, on the same path as every other refused admission: `execution_admission_refused` and `execution_grant_withheld` on the chain, the minted grant spent, the item settled, no `execution_grant` in the response. It answered 500 and recorded nothing before; the grant was unspent and unreturned either way.
