@@ -327,7 +327,8 @@ jobs:
         # executors on one database never pass the limit, the same operation
         # runs once, and an unknown outcome resolves across executors.
         run: |
-          python -m pytest tests/test_execution_api.py tests/test_execution_outbox.py             tests/limits/test_limits_idempotency.py tests/limits/test_limits_postgres.py \
+          python -m pytest tests/test_execution_api.py tests/test_execution_outbox.py \
+            tests/limits/test_limits_idempotency.py tests/limits/test_limits_postgres.py \
             tests/test_postgres_outbox_fault_injection.py \
             tests/conformance/test_execution_boundary_process_split.py \
             tests/test_assess_idempotency_reservation.py \

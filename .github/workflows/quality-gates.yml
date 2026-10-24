@@ -190,12 +190,25 @@ jobs:
       - name: Postgres-backed tests, appended to the same coverage data
         # Second pass with the DSN set, --cov-append so the adapter branches
         # join the in-process numbers. If the DSN-gated tests skipped, the
-        # union claim is false, so a skip fails the job.
+        # union claim is false, so a skip fails the job. The list mirrors the
+        # postgres-contract job in ci.yml: a Postgres branch that only that
+        # job runs is unmeasured here and fails its module's coverage floor
+        # (the limit ledger did, 2026-10-24).
         env:
           REMORA_PG_DSN: postgresql://remora:remora@localhost:5432/remora_test
           REMORA_REQUIRE_SECURITY_EXTRA: "1"
         run: |
-          pytest -q -rs tests/test_execution_api.py tests/test_execution_outbox.py tests/test_postgres_outbox_fault_injection.py tests/conformance/test_execution_boundary_process_split.py tests/test_assess_idempotency_reservation.py tests/test_enforcement_ledgers_postgres.py tests/flow/test_context_store.py tests/test_atomic_admission.py tests/test_authority_epochs.py tests/test_crypto_v2_audit.py tests/test_audit_outbox_atomicity.py -k postgres             --cov --cov-branch --cov-append --cov-report=json:coverage.json | tee /tmp/pg.txt
+          pytest -q -rs tests/test_execution_api.py tests/test_execution_outbox.py \
+            tests/limits/test_limits_idempotency.py tests/limits/test_limits_postgres.py \
+            tests/test_postgres_outbox_fault_injection.py \
+            tests/conformance/test_execution_boundary_process_split.py \
+            tests/test_assess_idempotency_reservation.py \
+            tests/test_enforcement_ledgers_postgres.py \
+            tests/flow/test_context_store.py \
+            tests/test_atomic_admission.py \
+            tests/test_authority_epochs.py tests/test_crypto_v2_audit.py \
+            tests/test_audit_outbox_atomicity.py \
+            -k postgres --cov --cov-branch --cov-append --cov-report=json:coverage.json | tee /tmp/pg.txt
           if grep -qiE "skipped|no tests ran" /tmp/pg.txt; then
             echo "ERROR: Postgres tests skipped inside the coverage job" >&2; exit 1
           fi
