@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Capability hook inventory (SDD unified capability execution v1.1, phase P1, first slice)
+
+- Every entry of `docs/assurance/capability_register_v1.yaml` carries a `hook` block: `primary` from the SDD's eleven-value vocabulary, optional `secondary`, and `bound_at`, the code symbols, routes or tests where the capability binds, each one of the entry's own evidence paths so the freshness gate covers it.
+- `scripts/check_capability_hooks.py` verifies every binding against the repository (the path exists, the symbol is defined, the route is served) and compares the register's primary hook with the atlas's `sdd_hook`; `tests/test_capability_hooks.py` is the P1 exit gate: a registered capability bound to no hook, route or test fails. `--json` prints the read-only join of register, hook, freshness classification and atlas assessment, with `mode` as `NOT_ESTABLISHED`.
+- Not in this slice: a capability activation manifest, its signature, an effective mode, startup validation against it, or `GET /v1/system/capabilities`. Where a deployment's mode lives is ADR-UE-03, an owner decision; the hook is recorded in the register as that ADR's default proposes. The atlas's judgement words beyond the vocabulary (REVIEW, EVIDENCE, INTEGRATION) are not hooks and are not carried over.
+
 ### The lease signs the flow decision; the executor checks against it (IFC-06; SDD unified capability execution v1.1, P0 item 6)
 
 - `ExecutionLease` gains `flow_epoch`, `flow_digest` and `resolved_tool_call_hash`, signed only when set, so every lease issued before them verifies byte for byte as before. A lease minted under `REMORA_FLOW_CONTROL=1` carries the context epoch and verdict digest the authority judged and the canonical hash of the call with every handle resolved.
