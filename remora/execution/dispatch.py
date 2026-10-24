@@ -75,6 +75,7 @@ def dispatch_under_lease(
     result_commit: Callable[[Any], tuple[Any, dict[str, Any]]] | None = None,
     invocation_arguments: Any = None,
     not_after: datetime | None = None,
+    flow_binding: tuple[int, str, str] | None = None,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -129,6 +130,12 @@ def dispatch_under_lease(
     ``not_after`` (WS1-M4, M4-T14) caps the expiry of a lease minted here at
     the instant the evidence behind the admission stops holding. At or past
     it, nothing is minted and the call is refused as ``permit_expired``.
+
+    ``flow_binding`` (IFC-06) is the flow decision this call was judged
+    under: the context epoch, the verdict digest and the canonical hash of
+    the call with every handle resolved. It is signed into a lease minted
+    here, so the executing domain compares its live context and the
+    arguments it is about to run against what this authority judged.
     """
     tool_execution: dict[str, Any] = {"executed": False}
     if not gate_allowed:
@@ -168,6 +175,7 @@ def dispatch_under_lease(
                 capability_set=capability_set,
                 surface_digest=surface_digest,
                 not_after=not_after,
+                flow_binding=flow_binding,
             )
         except (LeaseRefused, ValueError, SigningUnavailable) as exc:
             # SigningUnavailable belongs here, and its absence was a live 500.
@@ -384,6 +392,7 @@ def issue_execution_lease(
     resolved_effect: ResolvedEffect | None = None,
     plan: PlanBinding | None = None,
     capability_set: EffectiveCapabilitySet | None = None,
+    flow_binding: tuple[int, str, str] | None = None,
 ) -> ExecutionLease:
     """Mint a lease. The authority domain's half of the custody split.
 
@@ -400,6 +409,7 @@ def issue_execution_lease(
         resolved_effect=resolved_effect,
         plan=plan,
         capability_set=capability_set,
+        flow_binding=flow_binding,
     )
 
 
@@ -420,6 +430,7 @@ def _issue_local_lease(
     capability_set: EffectiveCapabilitySet | None = None,
     surface_digest: str = "",
     not_after: datetime | None = None,
+    flow_binding: tuple[int, str, str] | None = None,
 ) -> ExecutionLease:
     execution_context = _execution_context(semantic)
     # ADR-D: the runtime this lease is granted for. An execution context names
@@ -460,6 +471,9 @@ def _issue_local_lease(
             execution_context=execution_context,
             runtime_identity_hash=runtime_identity_hash,
             surface_digest=surface_digest,
+            flow_epoch=flow_binding[0] if flow_binding is not None else None,
+            flow_digest=flow_binding[1] if flow_binding is not None else "",
+            resolved_tool_call_hash=flow_binding[2] if flow_binding is not None else "",
         )
 
 

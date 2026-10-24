@@ -59,12 +59,41 @@ def _context(executor) -> str:
     return r.json()["context_id"]
 
 
-def _lease(executor, call):
+def _binding(call) -> tuple[int, str, str]:
+    """What the authority signs into the lease (IFC-06): the flow decision it
+    judged at mint, and the hash of the call with every handle resolved. When
+    no decision can be judged (an unknown context or handle), a placeholder
+    binding, so that the executor's own check is what refuses."""
+    import servers.execution_api as exec_mod
+    from remora.policy.observation import PolicyObservation, canonical_tool_call_hash
+
+    def digest(arguments):
+        return canonical_tool_call_hash(
+            name=call["tool_name"], arguments=arguments, tenant="acme",
+            target=call.get("target_environment") or "")
+
+    tool_call = exec_mod.ToolCallRequest(**call)
+    token = exec_mod._FLOW_PRINCIPAL.set("employee-1")
+    try:
+        obs = exec_mod._with_flow(PolicyObservation(question="mint"), tool_call, "acme")
+        if obs.flow_status != "evaluated":
+            return 0, "0" * 64, digest(call["arguments"])
+        expected = (int(obs.flow_epoch), str(obs.flow_digest))
+        _refusal, _commit, resolved = exec_mod._flow_at_dispatch(
+            "acme", tool_call, expected, "p-mint")
+    finally:
+        exec_mod._FLOW_PRINCIPAL.reset(token)
+    return expected[0], expected[1], digest(
+        resolved if resolved is not None else call["arguments"])
+
+
+def _lease(executor, call, *, bound: bool = True):
     return issue_execution_lease(
         tenant="acme", principal="employee-1", tool_call=SimpleNamespace(**call),
         semantic=SEMANTIC, now=datetime.now(UTC), policy_bundle_hash=executor.bundle,
         task_identity=TaskIdentity.from_fields(
-            {"context_id": call["context_id"], "task_id": "task-1"}))
+            {"context_id": call["context_id"], "task_id": "task-1"}),
+        flow_binding=_binding(call) if bound else None)
 
 
 def _call(context_id):
@@ -158,3 +187,130 @@ def test_the_lease_still_binds_the_handle_form(executor):
     body = _post(executor, lease, call=_call_with(context_id, token)).json()
     assert body["tool_execution"]["executed"] is False
     assert executor.registry.CALLS == []
+
+
+# ── IFC-06: the lease carries the flow decision (SDD P0 item 6) ────────────
+#
+# Until this slice the executor computed its expected epoch and digest a
+# moment before comparing the context against them, so a label raised or a
+# handle changed after the authority's grant was invisible to it. The lease
+# now signs the epoch, the digest and the hash of the resolved call.
+
+def _handle_record(executor, context_id: str, value) -> tuple[str, str]:
+    import time
+
+    import servers.execution_api as exec_mod
+    from remora.flow.handles import HandleRecord, handle_token, new_handle_id
+
+    state = exec_mod._flow_contexts().load("acme", "employee-1", context_id)
+    hid = new_handle_id()
+    exec_mod._flow_handles().put_all([HandleRecord(
+        handle_id=hid, tenant_id="acme", context_id=context_id, value=value,
+        label=state.label, type_tag="text", created_by_proposal="p-src",
+        expires_at=time.time() + 600)])
+    return hid, handle_token(hid)
+
+
+def test_a_lease_without_a_flow_decision_is_refused_while_flow_is_on(executor):
+    call = _call(_context(executor))
+    body = _post(executor, _lease(executor, call, bound=False), call=call).json()
+    assert body["tool_execution"]["refusal_reason"] == "flow_lease_unbound"
+    assert executor.registry.CALLS == []
+
+
+def test_a_handle_whose_value_changed_after_the_grant_is_refused(executor):
+    """The authority judged and signed the call with the handle resolved to
+    "closed". The store then resolves it to another value; the tool must not
+    receive it. Before this slice the tool ran with the new value."""
+    import time
+
+    import servers.execution_api as exec_mod
+    from remora.flow.handles import HandleRecord
+
+    context_id = _context(executor)
+    hid, token = _handle_record(executor, context_id, "closed")
+    call = _call_with(context_id, token)
+    lease = _lease(executor, call)
+    state = exec_mod._flow_contexts().load("acme", "employee-1", context_id)
+    # The store refuses a second record under one handle id through its API,
+    # so the changed value is written to the backend directly: what a shared
+    # store another process writes to, or a replaced record, would look like.
+    exec_mod._flow_handles()._backend._records[("acme", hid)] = HandleRecord(
+        handle_id=hid, tenant_id="acme", context_id=context_id, value="open",
+        label=state.label, type_tag="text", created_by_proposal="p-src",
+        expires_at=time.time() + 600)
+    body = _post(executor, lease, call=call).json()
+    assert body["tool_execution"]["refusal_reason"] == "resolved_call_mismatch"
+    assert executor.registry.CALLS == []
+
+
+def test_a_label_raised_after_the_grant_refuses_before_the_tool_runs(executor):
+    """The context moved between the authority's decision and the dispatch;
+    the executor compares against the epoch and digest the lease signed."""
+    import servers.execution_api as exec_mod
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    lease = _lease(executor, call)
+    # A raise the flow still passes: the recipient and the model stay readers,
+    # so the executor's own verdict is clean and only the lease-bound epoch
+    # and digest can refuse. Before this slice the call executed.
+    exec_mod._flow_contexts().raise_label(
+        "acme", "employee-1", context_id,
+        Label({USER, MODEL, "ext://work-orders.example"}, Integrity.TRUSTED))
+    body = _post(executor, lease, call=call).json()
+    assert body["tool_execution"]["refusal_reason"] == "flow_epoch_changed", body
+    assert executor.registry.CALLS == []
+
+
+def test_two_dispatches_in_one_context_release_exactly_one_result(executor):
+    """IFC-06's race: two leases judged at the same epoch, both past the
+    pre-dispatch check and inside the tool at once (a barrier holds them
+    there). The first commit raises the context label; the second finds the
+    epoch moved and withholds its result. Both effects happened, both calls
+    count as executed, and exactly one result reaches the agent under the
+    decision it was made for. The check and the dispatch are still not one
+    transaction; this pins what the commit guarantees instead."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    import servers.execution_api as exec_mod
+
+    # The result is rendered by value under a label above the fresh context's,
+    # so a committed result raises the context (the work-order flow above
+    # renders by handle and raises nothing).
+    raising = parse_flow({
+        "provider": "tcb",
+        "arguments": {"work_order_id": {"kind": "text"}, "status": {"kind": "text"}},
+        "sources": {"default_integrity": "TRUSTED", "fields": [
+            {"path": "$", "return_mode": "BY_VALUE", "type": "object",
+             "readers": {"static": [USER, MODEL, "ext://work-orders.example"]}},
+            {"path": "$.status", "return_mode": "BY_VALUE", "type": "string",
+             "readers": {"static": [USER, MODEL, "ext://work-orders.example"]}},
+            {"path": "$.work_order", "return_mode": "BY_VALUE", "type": "string",
+             "readers": {"static": [USER, MODEL, "ext://work-orders.example"]}}]},
+        "sink": {"recipients": {"static": ["ext://work-orders.example"]},
+                 "payload_args": ["status"]}})
+    executor.monkeypatch.setattr(exec_mod, "_flow_spec",
+                                 lambda tool: raising if tool == CALL["tool_name"] else None)
+    context_id = _context(executor)
+    calls = [dict(_call(context_id), arguments={"work_order_id": f"WO-{i}", "status": "closed"})
+             for i in (1, 2)]
+    leases = [_lease(executor, call) for call in calls]
+    assert leases[0].flow_epoch == leases[1].flow_epoch
+    barrier = threading.Barrier(2, timeout=15)
+    executor.registry.BEFORE_CALL.append(lambda _arguments: barrier.wait())
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            bodies = list(pool.map(
+                lambda pair: _post(executor, pair[0], call=pair[1]).json(), zip(leases, calls)))
+    finally:
+        executor.registry.BEFORE_CALL.clear()
+    executions = [body["tool_execution"] for body in bodies]
+    assert [e["executed"] for e in executions] == [True, True], bodies
+    assert len(executor.registry.CALLS) == 2
+    released = [e for e in executions if "result" in e]
+    withheld = [e for e in executions
+                if e.get("result_withheld") == "flow_epoch_changed_during_dispatch"]
+    assert (len(released), len(withheld)) == (1, 1), executions
+    assert "result" not in withheld[0]

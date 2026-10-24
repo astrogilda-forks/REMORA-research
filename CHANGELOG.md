@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### The lease signs the flow decision; the executor checks against it (IFC-06; SDD unified capability execution v1.1, P0 item 6)
+
+- `ExecutionLease` gains `flow_epoch`, `flow_digest` and `resolved_tool_call_hash`, signed only when set, so every lease issued before them verifies byte for byte as before. A lease minted under `REMORA_FLOW_CONTROL=1` carries the context epoch and verdict digest the authority judged and the canonical hash of the call with every handle resolved.
+- `/v1/execution/dispatch-leased` compares the live context against the epoch and digest in the signed lease. Until now it computed both itself a moment before the comparison, so a label raised or a handle changed after the authority's grant was invisible to the executing domain. A lease without a flow decision is refused as `flow_lease_unbound` while flow control is on.
+- `GovernedToolDispatcher` refuses an invocation whose canonical hash is not the lease's `resolved_tool_call_hash` as `resolved_call_mismatch`, before the nonce is spent; a non-zero `flow_epoch` without its digest verifies as `flow_binding_malformed`.
+- Tests: a handle whose value changed after the grant, a label raised after the grant, an unbound lease, and two dispatches in one context held inside the tool at once, of which exactly one result is released. Still open: the check and the dispatch are two steps; the losing call's effect happens and its result is withheld.
+
 ### Cumulative limits: a shared Postgres ledger (SDD unified capability execution v1.1, P0 item 8)
 
 - `REMORA_LIMITS_LEDGER` may name a PostgreSQL DSN (`postgresql://...` or a libpq `key=value` string) instead of a SQLite file. Every ledger transaction takes one advisory lock, so two executors reserving against the same limit are serialized as one host's `BEGIN IMMEDIATE` transactions were; the schema is created on first open under the same lock. `tests/limits/test_limits_postgres.py` runs two executors on one database in the `postgres-contract` job: the sum never passes the limit, the same operation runs once, an unknown outcome resolves across executors.

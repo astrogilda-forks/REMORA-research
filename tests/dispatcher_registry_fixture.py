@@ -13,11 +13,16 @@ from typing import Any, Callable
 
 CALLS: list[Any] = []
 RAISE: dict[str, bool] = {"update_work_order": False}
+#: A test may install a callable that runs inside the tool, before the call
+#: is recorded: a barrier here holds two dispatches inside the tool at once.
+BEFORE_CALL: list[Callable[[dict], None]] = []
 
 
 def _update_work_order(arguments: dict) -> dict:
     if RAISE.get("update_work_order"):
         raise RuntimeError("downstream system unavailable")
+    for hook in BEFORE_CALL:
+        hook(arguments)
     CALLS.append(arguments)
     return {"work_order": arguments.get("order"), "status": "rescheduled"}
 
