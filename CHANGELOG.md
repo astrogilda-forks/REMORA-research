@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### ADR-UE-03 proposed: capability activation manifest, hook in the register, mode in the manifest (SDD unified capability execution v1.1 §13)
+
+- `docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md` (DOC-412, status proposed) records the options, the proposed default (the primary hook as a register fact, the requested mode in a signed per-deployment manifest whose digest is pinned into the lease), the particulars the owner must confirm (key custody, whether the digest enters the policy identity, the flag migration rule) and the slices that follow acceptance. It decides nothing by itself and changes no path.
+
 ### Capability hook inventory (SDD unified capability execution v1.1, phase P1, first slice)
 
 - Every entry of `docs/assurance/capability_register_v1.yaml` carries a `hook` block: `primary` from the SDD's eleven-value vocabulary, optional `secondary`, and `bound_at`, the code symbols, routes or tests where the capability binds, each one of the entry's own evidence paths so the freshness gate covers it.
