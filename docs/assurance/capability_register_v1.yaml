@@ -2181,8 +2181,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: 0c9dbb742eb1cf740b641d16dfa2ca50c6dd8985
+    verified_at_sha: 4f545368304acde0bce4495dac63637c731cdfaf
     verified_by: >-
+      re-audited 2026-10-24 at 4f54536 (SHARED POSTGRES LIMIT LEDGER, opt-in), from 0c9dbb7: remora/enforcement/cumulative_limits.py: LimitLedger takes a PostgreSQL DSN as well as a SQLite path; one serialized transaction per reservation on both (BEGIN IMMEDIATE, or pg_advisory_xact_lock), schema and additive columns created on first open under the lock, upserts as ON CONFLICT DO NOTHING on both dialects; the guard, the refusal codes and every decision path are unchanged. remora/toolcall/runtime_profile.py: controlled_pilot refuses a SQLite limit ledger when REMORA_PG_DSN is set. Strictly narrowing. Tests: tests/limits/test_limits_postgres.py (two executors on one database), tests/limits/test_limits_idempotency.py on both backends, tests/test_runtime_profile.py. Status and scope unchanged; CAP-031's caveat says hosts share a limit only when they share the Postgres ledger, tested in CI and on no multi-host deployment.
       re-audited 2026-10-24 at 0c9dbb7 (LINT), from bc3cc7d: remora/enforcement/cumulative_limits.py changes only a comment (an unused noqa directive removed); no behaviour changed. Status, scope and caveats unchanged.
       re-audited 2026-10-24 at bc3cc7d (LEDGER-FIRST LIMIT RESOLUTION RECORD, opt-in), from 064c4ed: servers/execution_api.py: the limits routes project resolved limit operations to the chain through _record_limit_resolutions (append_once keyed by the operation, then audit_recorded in the ledger) instead of one append after the ledger commit; GET /limits/unresolved runs the same sweep, and the resolve response carries audit_recorded. remora/enforcement/cumulative_limits.py: limit_operation gains evidence_ref, reason, resolved_at and audit_recorded (added on open to older ledgers), resolve writes them, and the guard exposes unrecorded_resolutions and mark_recorded. No decision, reservation or release path changed; the record arrives late instead of being lost (SDD unified capability execution v1.1, P0 item 4, one host). Tests: tests/limits/test_limits_resolve_route.py, tests/limits/test_limits_idempotency.py. Status and scope unchanged; CAP-031's caveat says the chain can lag the ledger until the next limits call.
       re-audited 2026-10-24 at 064c4ed (LIMIT FLAG RENAMED, LITERAL ENVIRONMENT READS), from 71182d4: servers/execution_api.py: _limit_settings reads REMORA_REQUIRE_LIMITS and REMORA_REQUIRE_IDEMPOTENCY (the flag introduced at 71182d4, renamed from a name the credential-topology scanner read as a key) with literal keys instead of through a helper; remora/toolcall/runtime_profile.py names the renamed flag in the controlled_pilot check. No behaviour changed and the flag was in no deployment. Status, scope and caveats unchanged.
@@ -2256,9 +2257,11 @@ capabilities:
       - remora/execution/service.py
       - servers/api.py
     caveat: >-
-      Off by default and enabled in no deployment here. The limits hold on
-      one host: the ledger is SQLite, two hosts with separate ledgers do not
-      share a limit, and no Postgres backend exists. A reservation is
+      Off by default and enabled in no deployment here. The ledger is a SQLite
+      file on one host or a PostgreSQL database every executor shares (one
+      advisory lock per transaction); hosts share a limit only when they share
+      the Postgres ledger, which is tested with two executors on one database
+      in CI and on no multi-host deployment. A reservation is
       returned only when the call provably did not run (fence refusal,
       ToolDidNotExecute from the adapter, lease expired before the tool
       started, or a reviewer's resolution); a call whose outcome is unknown

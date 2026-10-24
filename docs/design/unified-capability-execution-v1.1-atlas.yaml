@@ -30,13 +30,13 @@ gates:
   mapping: Additional condition (CAP-031)
   status: warn
   status_text: §97 items closed on one host (P0 1–3)
-  missing: Shared ledger (P0 8), prospective measurement; P0 4 closed as a ledger-first repair protocol
+  missing: Prospective measurement; P0 4 closed as a ledger-first repair protocol, P0 8 as a Postgres ledger tested with two executors in CI
 - id: G04
   name: Shared state
   mapping: Additional condition
-  status: crit
-  status_text: LimitLedger is SQLite only
-  missing: Postgres ledger; two-node test; activation proven
+  status: warn
+  status_text: Postgres LimitLedger exists; two-executor test in CI
+  missing: Activation on a multi-host deployment; the other Postgres stores proven together
 - id: G05
   name: Roles and keys
   mapping: REM-022, REM-023, CAP-009
@@ -1862,22 +1862,25 @@ capabilities:
       Signed sum, count and change limits per principal or resource; reserve → begin → settle
       before dispatch; an idempotency key per tool.
     now: >-
-      Opt-in, SQLite on one host, no Postgres. At source_revision six pilot blockers; P0 items
+      Opt-in; SQLite on one host or a shared Postgres database. At source_revision six pilot blockers; P0 items
       1 to 3 are closed in this PR: the reviewer's evidence is checked by a deployment-owned
       evidence module before anything is released (without a module everything is held),
       ToolDidNotExecute frees a reservation only from a source the signed policy names,
       REMORA_REQUIRE_IDEMPOTENCY requires an idempotency key per metered write tool, and
       controlled_pilot requires signed mandatory limits. P0 item 4 is closed as a repair
       protocol: the ledger records the resolution first and an idempotent sweep appends the
-      chain record. Remaining: the local ledger (P0 8).
+      chain record. P0 item 8: the ledger takes a Postgres DSN and serializes every
+      transaction with one advisory lock; two executors on one database are tested in CI.
+      Remaining: activation on a multi-host deployment.
     necessity: Critical
     necessity_rationale: For a payment-like pilot this is the main control.
     sdd_hook: PRE_DISPATCH / EXECUTION / EFFECT
     sdd_mode: ENFORCE, mandatory in the bounded write pilot
     sdd_change: >-
-      Postgres LimitLedger. Delivered: SDK list_unresolved and resolve_unknown, evidence
-      checking, named non_execution sources, the key requirement, the profile binding and
-      the ledger-first resolution record with its idempotent chain sweep (P0 1 to 4).
+      Delivered: SDK list_unresolved and resolve_unknown, evidence checking, named
+      non_execution sources, the key requirement, the profile binding, the ledger-first
+      resolution record with its idempotent chain sweep, and the Postgres LimitLedger
+      (P0 1 to 4 and 8). Remaining: a multi-host deployment that runs it.
     reachable_rung: ENFORCED_PRODUCTION
     reachable_rung_text: >-
       ENFORCED_PRODUCTION in one pilot after a shared ledger and the closed §97 items.
