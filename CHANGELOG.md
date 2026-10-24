@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Review admission re-verified with ledger and storage faults (NEGATIVE_RESULTS §98; SDD unified capability execution v1.1, P0 item 5)
+
+- Under `REMORA_WS1_ADMISSION=atomic`, a storage fault inside the admission transaction on `/v1/execution/execute` (a lost connection, a failed commit) is now a refusal, `admission_storage_unavailable`, on the same path as every other refused admission: `execution_admission_refused` and `execution_grant_withheld` on the chain, the minted grant spent, the item settled, no `execution_grant` in the response. It answered 500 and recorded nothing before; the grant was unspent and unreturned either way.
+- `tests/test_review_admission_grant_withheld.py` runs every case on SQLite and on Postgres in a schema of its own, in the `postgres-contract` and coverage CI jobs, and adds the two cases the §98 repair stated without testing: the consumed-grant ledger fails on the withholding spend (`spent: false`, no grant returned) and the transaction fails at commit.
+- Still open: §98 stays open until atomic admission runs outside the author's tests; nothing here is an independent run.
+
 ### Cumulative limits: a shared Postgres ledger (SDD unified capability execution v1.1, P0 item 8)
 
 - `REMORA_LIMITS_LEDGER` may name a PostgreSQL DSN (`postgresql://...` or a libpq `key=value` string) instead of a SQLite file. Every ledger transaction takes one advisory lock, so two executors reserving against the same limit are serialized as one host's `BEGIN IMMEDIATE` transactions were; the schema is created on first open under the same lock. `tests/limits/test_limits_postgres.py` runs two executors on one database in the `postgres-contract` job: the sum never passes the limit, the same operation runs once, an unknown outcome resolves across executors.
