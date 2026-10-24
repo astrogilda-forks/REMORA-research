@@ -55,10 +55,24 @@ Bitcoin anchoring of the checkpoint is not checked. `checkpoint_anchoring` is
 See [`artifacts/interop/horizon55/REPORT.md`](../../artifacts/interop/horizon55/REPORT.md)
 and `results.json` beside it. In short: delegation scope is established for
 all three cases. The budget is within its bound after A (7000 of 20000) and
-B (14000), and contradicted after C (21000). B's audit bytes are not public,
-so its audit and dataset identity are `NOT_ESTABLISHED`. Runtime dataset use,
-receiver acceptance, REMORA dispatch authority and physical effect are
-`NOT_ESTABLISHED` for every case.
+B (14000), and contradicted after C (21000). In the frozen row B's audit
+bytes were not public, so its audit and dataset identity are
+`NOT_ESTABLISHED` there. Runtime dataset use, receiver acceptance, REMORA
+dispatch authority and physical effect are `NOT_ESTABLISHED` for every case.
+
+## Evidence extension: B's audit bytes
+
+Horizon Shield published B's audit bytes on 2026-10-24 at
+`c824cbe61a383e57f1d9d15fea962a79f5b6bbd5` (branch
+`evidence/hs51-set2-audit-b`, a descendant of the frozen revision). They are
+vendored at `inputs/pilot51/set2/audit_B.json` and pinned by their own lock,
+`audit-b/inputs.lock.json`. The frozen lock, the frozen table (`EXPECTED`)
+and `results.json` are not changed. `run.py` evaluates the row a second time
+with those bytes added and writes `audit-b/results.json`, checked against
+`EXPECTED_AUDIT_B`. Only B's audit and dataset byte identity move, to
+`ESTABLISHED`. B's audit is of a different estimate from A and C's (its
+`fixture_sha256` names bytes that are not public), and byte identity is not
+runtime use.
 
 ## Part 2: REMORA's own engine
 
@@ -81,8 +95,8 @@ python integrations/horizon55/run.py --check # offline: inputs, verdicts, output
 python integrations/horizon55/enforce.py --check  # offline: REMORA's engine on A, B and C
 ```
 
-`run.py --write` rewrites `results.json`, `REPORT.md`, `SHA256SUMS` and
-`reproduction.json`. Two runs give byte-identical `results.json` and
+`run.py --write` rewrites `results.json`, `audit-b/results.json`,
+`REPORT.md`, `SHA256SUMS` and `reproduction.json`. Two runs give byte-identical `results.json` and
 `REPORT.md`. `reproduction.json` records the interpreter, OS and
 `cryptography` version and is excluded from the byte-identity check. Tests:
 `pytest tests/test_horizon55_*.py`.
@@ -100,6 +114,7 @@ python integrations/horizon55/enforce.py --check  # offline: REMORA's engine on 
 | H55-T06 removed entry | `test_t06_a_removed_entry_is_not_silently_accepted` |
 | H55-T07 strict JSON | `test_t07_*` |
 | H55-T08 B without audit bytes | `test_t08_*` |
+| B-audit extension | `tests/test_horizon55_audit_b.py` |
 | H55-T10 dataset bytes | `test_t10_*` (two need the prepared cache) |
 | H55-T11 altered native settlement | `test_t11_*` |
 | H55-T12 receipt mapped to a REMORA grant | `test_t12_*` |
