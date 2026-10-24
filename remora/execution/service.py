@@ -1107,6 +1107,19 @@ def execute_approved_item(
             return _claim_lost()
         except RemoraError as exc:
             admission_refusal = _admission_reason(exc)
+        except Exception:
+            # A storage fault inside the transaction (a lost connection, a
+            # failed commit) is not a refusal the admission could name, and
+            # it propagated as a 500 that recorded nothing. The rollback left
+            # the grant unspent all the same, so the fault takes the refusal
+            # path below: refused on the chain, grant withheld, item settled.
+            # The driver's error is logged, not reported, so the response
+            # reasons stay the bounded set (SDD unified capability execution
+            # v1.1, P0 item 5).
+            admission_refusal = "admission_storage_unavailable"
+            logger.error("admission storage fault on the review path for tenant %s",
+                         tenant, exc_info=True)
+        if admission_refusal is not None:
             chain.append(tenant, {
                 "event": "execution_admission_refused",
                 "proposal_id": proposal_id,

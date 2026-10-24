@@ -5940,7 +5940,17 @@ What remains open:
 <!-- finding-status: open -->
 
 **Status:** repaired with route tests (`tests/test_review_admission_grant_withheld.py`).
-Open until atomic admission runs outside the author's own tests.
+Re-verified 2026-10-24 (SDD unified capability execution v1.1, P0 item 5). The
+same route tests run on SQLite and on Postgres in a schema of their own, in the
+`postgres-contract` and coverage CI jobs, which fail on a skip. Two cases were
+added that the first repair stated and did not test. In the first, the
+consumed-grant ledger fails on the withholding spend: the chain records
+`spent: false` and no grant is returned. In the second, the admission
+transaction fails at commit with a driver error.
+That second case answered 500 and recorded nothing; it now takes the refusal
+path as `admission_storage_unavailable`, with the grant spent and withheld and
+the item settled. Open until atomic admission runs outside the author's own
+tests: every case here is still an author-written scenario.
 
 An audit of the execution path with probe tests found this under
 `REMORA_WS1_ADMISSION=atomic`, with WS1 mode off or shadow. On the review path
