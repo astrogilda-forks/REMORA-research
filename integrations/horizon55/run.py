@@ -7,7 +7,8 @@ Reads only local bytes: the vendored inputs, the git-ignored dataset cache
 and the lock. Never touches the network.
 
     python integrations/horizon55/run.py --json      # results to stdout
-    python integrations/horizon55/run.py --write     # results.json, REPORT.md, SHA256SUMS
+    python integrations/horizon55/run.py --write     # results.json, REPORT.md, SHA256SUMS,
+                                                     # audit-b/results.json
     python integrations/horizon55/run.py --check     # exit 0 only if everything agrees
 
 ``--check`` exits non-zero on a hash mismatch, a disclosure finding, an
@@ -30,7 +31,7 @@ sys.path.insert(0, str(HERE))
 import canon  # noqa: E402
 import check_inputs  # noqa: E402
 import claims  # noqa: E402
-from prepare import CACHE, INPUTS, LOCK  # noqa: E402
+from prepare import AUDIT_B_LOCK, CACHE, INPUTS, LOCK  # noqa: E402
 
 OUT = LOCK.parent
 E, C, N = claims.ESTABLISHED, claims.CONTRADICTED, claims.NOT_ESTABLISHED
@@ -49,23 +50,47 @@ EXPECTED: dict[str, dict[str, str]] = {
           "dataset_runtime_use": N, "receiver_accepted_result": N,
           "remora_dispatch_authority": N, "physical_effect": N},
 }
+#: The B-audit extension (``audit-b/``): the frozen inputs plus B's audit bytes,
+#: published 2026-10-24. Written after those bytes were published and their
+#: digest compared with B's signed receipt, before the row ran on them. Only B's
+#: two byte-identity claims may move; the frozen table above stays the test of
+#: the frozen inputs.
+EXPECTED_AUDIT_B: dict[str, dict[str, str]] = {
+    case: {**table, **({"audit_byte_identity": E, "dataset_byte_identity": E}
+                       if case == "B" else {})}
+    for case, table in EXPECTED.items()}
+AUDIT_B_OUT = "audit-b/results.json"
 INDEPENDENCE = "AUTHOR_OPERATED"
+CLASSIFICATION = ("exploratory, retrospective, author-operated; not a holdout, not "
+                  "preregistered, not an independent or external evaluation")
 
 
-def build(inputs: Path = INPUTS, cache: Path = CACHE, lock_path: Path = LOCK) -> dict[str, Any]:
+def build(inputs: Path = INPUTS, cache: Path = CACHE, lock_path: Path = LOCK,
+          extension_lock: Path | None = None) -> dict[str, Any]:
+    """The frozen row, or with ``extension_lock`` the row over the frozen inputs plus
+    the extension's vendored audits."""
     lock = check_inputs.load_lock(lock_path)
     sources = check_inputs.check_sources(lock, inputs, cache)
+    extra: list[str] = []
+    classification, pinned_lock, revision = CLASSIFICATION, lock_path, lock["horizon_revision"]
+    if extension_lock is not None:
+        extension = check_inputs.load_lock(extension_lock)
+        sources += check_inputs.check_sources(extension, inputs, cache)
+        extra = [s["local_path"] for s in extension["sources"] if s["vendored"]]
+        classification = (f"evidence extension of the frozen row (inputs.lock.json SHA-256 "
+                          f"{canon.sha256_hex(lock_path.read_bytes())}, unchanged) with B's "
+                          f"audit bytes; {CLASSIFICATION}")
+        pinned_lock, revision = extension_lock, extension["horizon_revision"]
     bad = [s for s in sources if s["status"] not in ("ok", "not_prepared")]
     if bad:
         return {"error": "input_check_failed", "sources": bad}
-    evaluated = claims.evaluate(claims.load_inputs(inputs, cache, lock))
+    evaluated = claims.evaluate(claims.load_inputs(inputs, cache, lock, extra))
     return {
         "schema": "remora-h55-results-v1",
-        "classification": "exploratory, retrospective, author-operated; not a holdout, not "
-                          "preregistered, not an independent or external evaluation",
+        "classification": classification,
         "independence": INDEPENDENCE,
-        "input_lock_sha256": canon.sha256_hex(lock_path.read_bytes()),
-        "horizon_revision": lock["horizon_revision"],
+        "input_lock_sha256": canon.sha256_hex(pinned_lock.read_bytes()),
+        "horizon_revision": revision,
         "dataset_revision": lock["dataset_revision"],
         "inputs_not_prepared": [s["role"] for s in sources if s["status"] == "not_prepared"],
         "log": evaluated["log"],
@@ -74,10 +99,11 @@ def build(inputs: Path = INPUTS, cache: Path = CACHE, lock_path: Path = LOCK) ->
     }
 
 
-def disagreements(body: dict[str, Any]) -> list[dict[str, str]]:
+def disagreements(body: dict[str, Any],
+                  expected: dict[str, dict[str, str]] = EXPECTED) -> list[dict[str, str]]:
     out = []
     got = {(r["case_id"], r["claim_id"]): r["verdict"] for r in body.get("results", [])}
-    for case, table in EXPECTED.items():
+    for case, table in expected.items():
         for claim, want in table.items():
             have = got.get((case, claim))
             if have != want:
@@ -123,7 +149,13 @@ def _pay_table(run: dict[str, Any]) -> list[str]:
     return lines
 
 
-def report(body: dict[str, Any]) -> str:
+def _audit_summary(relative: str) -> tuple[str, int, int]:
+    """(fixture SHA-256, line count, total) of a vendored audit file."""
+    audit = canon.loads((INPUTS / relative).read_bytes())
+    return audit["fixture_sha256"], len(audit["lines"]), audit["total"]
+
+
+def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None) -> str:
     rows = {(r["case_id"], r["claim_id"]): r for r in body["results"]}
     enf = enforcement()
     lines = [
@@ -149,6 +181,12 @@ def report(body: dict[str, Any]) -> str:
          "(#1025). So are measuring equipment movement from the plant (#1033) and binding "
          "limits to a signing authority and to every approval (#1037). Part 2 uses only "
          "the limit itself; it does not depend on the other two."),
+        "",
+        ("Evidence added since: Horizon Shield published B's audit bytes on 2026-10-24. "
+         "They match the digest B's execution receipt signs, so B's audit and dataset byte "
+         "identity are established in a separate, pinned extension (`audit-b/`, below). "
+         "The frozen inputs and verdicts are unchanged, and no verdict on the budget "
+         "moves."),
         "",
         ("Exploratory, retrospective and author-operated. The A/B/C records were public and "
          "examined before this row was designed, so this is neither a holdout nor a "
@@ -213,7 +251,8 @@ def report(body: dict[str, Any]) -> str:
                      f"`{a['native_reported']['response_sha256']}` |")
     lines += [
         "",
-        "A and C name the same response bytes under different request digests.",
+        ("A and C name the same response bytes under different request digests. B's "
+         "receipt names other bytes."),
         "",
         "### Native reported (the producer's settlement) beside the REMORA assessment",
         "",
@@ -226,6 +265,34 @@ def report(body: dict[str, Any]) -> str:
         lines.append(f"| {case} | `{d['native_reported']['execution_disposition']}` | "
                      f"`{b['native_reported']['payment_reasons']}` | {d['verdict']} | "
                      f"{b['verdict']} |")
+    if audit_b is not None:
+        ext = {(r["case_id"], r["claim_id"]): r for r in audit_b["results"]}
+        moved = [(k, rows[k]["verdict"], ext[k]["verdict"]) for k in sorted(rows)
+                 if rows[k]["verdict"] != ext[k]["verdict"]]
+        b_fixture, b_lines, b_total = _audit_summary("pilot51/set2/audit_B.json")
+        ac_fixture, ac_lines, ac_total = _audit_summary("rehearsal/live_smoke/audit.json")
+        lines += [
+            "",
+            "### Evidence extension: B's audit bytes (2026-10-24)",
+            "",
+            (f"Horizon Shield `{audit_b['horizon_revision']}` (branch "
+             "`evidence/hs51-set2-audit-b`) adds `pilot51/set2/audit_B.json`, pinned in "
+             f"`audit-b/inputs.lock.json` (SHA-256 `{audit_b['input_lock_sha256']}`). The "
+             "commit descends from the frozen revision and changes no file this row reads. "
+             "The row runs again on the frozen inputs plus those bytes "
+             "(`audit-b/results.json`); the frozen results above stay as they were."),
+            "",
+            "| Case | Claim | Frozen | With B's audit | Reason |",
+            "|---|---|---|---|---|",
+            *[f"| {k[0]} | `{k[1]}` | {old} | {new} | "
+              f"`{', '.join(ext[k]['reason_codes'])}` |" for k, old, new in moved],
+            "",
+            (f"No other verdict changes. B's audit is of a different estimate from the one "
+             f"A and C name: {b_lines} lines totalling {b_total} against {ac_lines} lines "
+             f"totalling {ac_total}, with fixture `{b_fixture[:12]}…` where A and C have "
+             f"`{ac_fixture[:12]}…`. B's fixture bytes are not public, so what B was asked "
+             "to audit is not checked here."),
+        ]
     lines += ["", "## Part 2: does REMORA let C run?", ""]
     if enf is None:
         lines += ["Not run: `enforcement.json` is missing.", ""]
@@ -262,8 +329,10 @@ def report(body: dict[str, Any]) -> str:
     lines += [
         "## What this row does not establish",
         "",
-        ("- Raw call bodies, B's audit bytes and acceptance records are not public; nothing "
-         "about them is inferred."),
+        ("- Raw call bodies, acceptance records and the estimate B's audit names are not "
+         "public; nothing about them is inferred."),
+        ("- Byte identity shows which dataset bytes an audit names. It does not show that "
+         "the service read them at run time (`dataset_runtime_use = NOT_ESTABLISHED`)."),
         ("- A and C carry the same public audit bytes but name different request "
          "occurrences; identical result bytes do not make them the same call."),
         ("- Part 1 is a retrospective count over signed payments. Part 2 is REMORA's "
@@ -284,10 +353,24 @@ def report(body: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def stable_outputs(body: dict[str, Any]) -> dict[str, bytes]:
-    return {"results.json": json.dumps(body, indent=1, sort_keys=True, ensure_ascii=False)
-            .encode("utf-8") + b"\n",
-            "REPORT.md": report(body).encode("utf-8")}
+def _json(body: dict[str, Any]) -> bytes:
+    return json.dumps(body, indent=1, sort_keys=True, ensure_ascii=False).encode("utf-8") + b"\n"
+
+
+def stable_outputs(body: dict[str, Any],
+                   audit_b: dict[str, Any] | None = None) -> dict[str, bytes]:
+    out = {"results.json": _json(body), "REPORT.md": report(body, audit_b).encode("utf-8")}
+    if audit_b is not None:
+        out[AUDIT_B_OUT] = _json(audit_b)
+    return out
+
+
+def stable_inputs() -> dict[str, bytes]:
+    """The locks and the enforcement record SHA256SUMS covers beside the outputs."""
+    return {"inputs.lock.json": LOCK.read_bytes(),
+            **({"audit-b/inputs.lock.json": AUDIT_B_LOCK.read_bytes()}
+               if AUDIT_B_LOCK.is_file() else {}),
+            **({"enforcement.json": ENFORCEMENT.read_bytes()} if ENFORCEMENT.is_file() else {})}
 
 
 def sha256sums(files: dict[str, bytes]) -> bytes:
@@ -295,7 +378,7 @@ def sha256sums(files: dict[str, bytes]) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def reproduction(body: dict[str, Any]) -> bytes:
+def reproduction(outputs: dict[str, bytes]) -> bytes:
     import cryptography
 
     record = {"schema": "remora-h55-reproduction-v1",
@@ -305,7 +388,7 @@ def reproduction(body: dict[str, Any]) -> bytes:
               "python": platform.python_version(), "implementation": platform.python_implementation(),
               "os": platform.system(), "cryptography": cryptography.__version__,
               "network_during_run": False,
-              "outputs_sha256": {k: canon.sha256_hex(v) for k, v in stable_outputs(body).items()},
+              "outputs_sha256": {k: canon.sha256_hex(v) for k, v in outputs.items()},
               "note": "environment fields vary by machine and are excluded from byte-identity "
                       "checks"}
     return json.dumps(record, indent=1, sort_keys=True).encode("utf-8") + b"\n"
@@ -322,32 +405,40 @@ def main(argv: list[str] | None = None) -> int:
     if "error" in body:
         print(json.dumps(body, indent=1, sort_keys=True))
         return 2
-    outputs = stable_outputs(body)
+    audit_b = build(extension_lock=AUDIT_B_LOCK) if AUDIT_B_LOCK.is_file() else None
+    if audit_b is not None and "error" in audit_b:
+        print(json.dumps(audit_b, indent=1, sort_keys=True))
+        return 2
+    outputs = stable_outputs(body, audit_b)
     if args.json:
         sys.stdout.write(outputs["results.json"].decode("utf-8"))
         return 0
+    stable = {**outputs, **stable_inputs()}
     if args.write:
-        stable = {**outputs, "inputs.lock.json": LOCK.read_bytes(),
-                  **({"enforcement.json": ENFORCEMENT.read_bytes()}
-                     if ENFORCEMENT.is_file() else {})}
         for name, data in outputs.items():
+            (OUT / name).parent.mkdir(parents=True, exist_ok=True)
             (OUT / name).write_bytes(data)
         (OUT / "SHA256SUMS").write_bytes(sha256sums(stable))
-        (OUT / "reproduction.json").write_bytes(reproduction(body))
+        (OUT / "reproduction.json").write_bytes(reproduction(outputs))
         print(json.dumps({"written": sorted([*outputs, "SHA256SUMS", "reproduction.json"])}))
         return 0
     problems: list[dict[str, Any]] = []
-    if body["inputs_not_prepared"]:
-        problems.append({"error": "inputs_not_prepared", "roles": body["inputs_not_prepared"],
+    not_prepared = sorted({*body["inputs_not_prepared"],
+                           *(audit_b["inputs_not_prepared"] if audit_b else [])})
+    if not_prepared:
+        problems.append({"error": "inputs_not_prepared", "roles": not_prepared,
                          "fix": "python integrations/horizon55/prepare.py"})
     problems += [{"error": "unexpected_verdict", **d} for d in disagreements(body)]
+    if audit_b is None:
+        problems.append({"error": "audit_b_extension_missing", "file": "audit-b/inputs.lock.json"})
+    else:
+        problems += [{"error": "unexpected_verdict", "run": "audit-b", **d}
+                     for d in disagreements(audit_b, EXPECTED_AUDIT_B)]
     for name, data in outputs.items():
         path = OUT / name
         if not path.is_file() or path.read_bytes() != data:
             problems.append({"error": "committed_output_differs", "file": name})
     problems += enforcement_disagreements(enforcement())
-    stable = {**outputs, "inputs.lock.json": LOCK.read_bytes(),
-              **({"enforcement.json": ENFORCEMENT.read_bytes()} if ENFORCEMENT.is_file() else {})}
     if not (OUT / "SHA256SUMS").is_file() or (OUT / "SHA256SUMS").read_bytes() != sha256sums(stable):
         problems.append({"error": "committed_output_differs", "file": "SHA256SUMS"})
     leaks = check_inputs.disclosure_findings()

@@ -1,0 +1,1523 @@
+{
+ "anchoring": {
+  "claim_id": "checkpoint_anchoring",
+  "does_not_establish": [
+   "Bitcoin block inclusion of the checkpoint",
+   "seen_block ordering of receipts and payments"
+  ],
+  "native_reported": {
+   "anchor_block_time": 1792632805,
+   "anchor_depth": 9,
+   "anchor_height": 972551,
+   "as_of": 1792627866,
+   "head": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+   "size": 13,
+   "verified": true
+  },
+  "reason_codes": [
+   "anchor_verification_not_implemented"
+  ],
+  "verdict": "NOT_ESTABLISHED"
+ },
+ "classification": "evidence extension of the frozen row (inputs.lock.json SHA-256 1a423378f20b6f4d18f33558da72bd966035d72571bf89b9c277ce1172150bf8, unchanged) with B's audit bytes; exploratory, retrospective, author-operated; not a holdout, not preregistered, not an independent or external evaluation",
+ "dataset_revision": "5b22c203248b0149cd0456f77d32feb887f48ee0",
+ "horizon_revision": "c824cbe61a383e57f1d9d15fea962a79f5b6bbd5",
+ "independence": "AUTHOR_OPERATED",
+ "input_lock_sha256": "d35ee963273587caaa07f8c460f72d13dc6d2bbe92044e4242545e37b877e466",
+ "inputs_not_prepared": [],
+ "log": {
+  "head": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+  "problems": [],
+  "request_sha256": {
+   "A": "329a112eec9250ea574c4720db74333302a515808be1b0a4b54793e93f2a6fd6",
+   "B": "c13a8c64ec5135dab706963c7204c5adb30c12efa8b1d56b9c0900b4fbb32ccc",
+   "C": "a5650ab747a92d6b164c1753c731a419f197521691fa29af9a7b86a49f6a2a5f"
+  },
+  "size": 13,
+  "verified": true
+ },
+ "results": [
+  {
+   "assumptions": [
+    "the bundle's root issuer key is the delegating principal"
+   ],
+   "case_id": "A",
+   "claim_ceiling": "delegation structure of one recorded call, under the bundle's own trust configuration",
+   "claim_id": "native_delegation_scope",
+   "does_not_establish": [
+    "cA2A verify_chain semantics beyond the published credential fields",
+    "revocations or policies outside this log",
+    "that the work was performed",
+    "anything about the budget (see budget_compliance)"
+   ],
+   "establishes": "the recorded call used a credential signed by the bundle's root issuer, its capability is in the credential's scope, and caller and responder are those the request names",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": {
+    "execution_disposition": "within_delegation"
+   },
+   "observer_or_signer_role": "holder (use), responder (receipt), root issuer (credential)",
+   "reason_codes": [
+    "all_delegation_predicates_checked"
+   ],
+   "rule_id": "H55-R01",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [
+    "payments not in this log did not happen on this lineage"
+   ],
+   "case_id": "A",
+   "claim_ceiling": "arithmetic over signed records; JPY-testnet is a simulated unit",
+   "claim_id": "budget_compliance",
+   "does_not_establish": [
+    "that money moved (the rail receipt is a digest)",
+    "that the budget was enforced before the payment: this is a retrospective count, not a pre-dispatch decision",
+    "anything about delegation scope"
+   ],
+   "establishes": "the cumulative total of authenticated, signed payments on this lineage and unit, in log order, against the issuer-signed max_total",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    },
+    {
+     "entry_sha256": "6c627d368f522c796d12a3ad38234e4b9de22f59c30010fd3fc4b7bdba03fabc",
+     "path": "pilot51/set2/log/entries/000_budget.json",
+     "seq": 0,
+     "sha256": "6c627d368f522c796d12a3ad38234e4b9de22f59c30010fd3fc4b7bdba03fabc"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": {
+    "payment_budgets": [
+     {
+      "hop": 0,
+      "limit": 20000,
+      "total": 7000,
+      "unit": "JPY-testnet"
+     }
+    ],
+    "payment_reasons": []
+   },
+   "observer_or_signer_role": "payer (payment), issuer (budget policy)",
+   "reason_codes": [
+    "cumulative_total_7000_within_20000"
+   ],
+   "rule_id": "H55-R02",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "binding of signed records to one request occurrence",
+   "claim_id": "same_request_occurrence",
+   "does_not_establish": [
+    "that the raw request bodies are the ones described (they are not public)"
+   ],
+   "establishes": "the use, payment, execution receipt and criteria commitment all name the SHA-256 of this case's request occurrence, distinct from the other cases'",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "holder, payer, responder, buyer",
+   "reason_codes": [
+    "use_payment_receipt_criteria_name_this_request"
+   ],
+   "rule_id": "H55-R03",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "ordering and naming in a signed, operator-sequenced log",
+   "claim_id": "payment_execution_link",
+   "does_not_establish": [
+    "that the rail settled the payment",
+    "that the result was correct"
+   ],
+   "establishes": "a signed payment for this request was logged before the signed execution receipt and names the same caller and responder",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "payer, responder",
+   "reason_codes": [
+    "payment_logged_before_its_execution"
+   ],
+   "rule_id": "H55-R04",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "byte identity only",
+   "claim_id": "audit_byte_identity",
+   "does_not_establish": [
+    "that this request, and not another with the same result, produced those bytes",
+    "that the audit's content is correct"
+   ],
+   "establishes": "public audit bytes whose SHA-256 equals the response_sha256 the responder signed for this request",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    },
+    {
+     "path": "rehearsal/live_smoke/audit.json",
+     "sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": {
+    "response_sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+   },
+   "observer_or_signer_role": "responder (receipt)",
+   "reason_codes": [
+    "public_bytes_match_signed_response_sha256"
+   ],
+   "rule_id": "H55-R05",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "byte identity of a stated digest",
+   "claim_id": "dataset_byte_identity",
+   "does_not_establish": [
+    "that the deployed service consumed those bytes (see dataset_runtime_use)"
+   ],
+   "establishes": "the dataset digest the audit states equals the SHA-256 of the souba-db bytes pinned at the dataset revision",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    },
+    {
+     "path": "rehearsal/live_smoke/audit.json",
+     "sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "responder (audit content)",
+   "reason_codes": [
+    "dataset_bytes_match_audit_digest_and_pin"
+   ],
+   "rule_id": "H55-R06",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "not establishable from records alone",
+   "claim_id": "dataset_runtime_use",
+   "does_not_establish": [
+    "that the remote runtime read the dataset bytes"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    },
+    {
+     "path": "rehearsal/live_smoke/audit.json",
+     "sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_observation_of_runtime_inputs"
+   ],
+   "rule_id": "H55-R07",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "criteria commitments exist; no acceptance record is public",
+   "claim_id": "receiver_accepted_result",
+   "does_not_establish": [
+    "that the buyer's checker accepted the result"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "checker",
+   "reason_codes": [
+    "acceptance_records_not_public"
+   ],
+   "rule_id": "H55-R08",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "no REMORA-native authority evidence exists for these calls",
+   "claim_id": "remora_dispatch_authority",
+   "does_not_establish": [
+    "that REMORA authorized or would have authorized this call: the records are the producer's, not a REMORA decision"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_remora_grant_lease_or_dispatch_record"
+   ],
+   "rule_id": "H55-R09",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "A",
+   "claim_ceiling": "signed statements are not observations of effects",
+   "claim_id": "physical_effect",
+   "does_not_establish": [
+    "any effect in the world from the audit or the payment"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853",
+     "path": "pilot51/set2/log/entries/001_criteria_A.json",
+     "seq": 1,
+     "sha256": "436624f3c804ab763a23170948aa6aa8905b8d60fb7904855fada377fdc26853"
+    },
+    {
+     "entry_sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4",
+     "path": "pilot51/set2/log/entries/004_use_A.json",
+     "seq": 4,
+     "sha256": "b2235a419754c244cbdba990a568f43145920be5d733fc072f6ec9bc5713c4e4"
+    },
+    {
+     "entry_sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1",
+     "path": "pilot51/set2/log/entries/005_payment_A.json",
+     "seq": 5,
+     "sha256": "68d9df8c7fc40375f6085ec3984ed5938d3f67ccf744583e27461734ea8418d1"
+    },
+    {
+     "entry_sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d",
+     "path": "pilot51/set2/log/entries/006_receipt_A.json",
+     "seq": 6,
+     "sha256": "75cf9584536caf8326a9f2ad968f415a0b1ea0c86d4ee7d857ded01a88f03f3d"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-A",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_independent_effect_observation"
+   ],
+   "rule_id": "H55-R10",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [
+    "the bundle's root issuer key is the delegating principal"
+   ],
+   "case_id": "B",
+   "claim_ceiling": "delegation structure of one recorded call, under the bundle's own trust configuration",
+   "claim_id": "native_delegation_scope",
+   "does_not_establish": [
+    "cA2A verify_chain semantics beyond the published credential fields",
+    "revocations or policies outside this log",
+    "that the work was performed",
+    "anything about the budget (see budget_compliance)"
+   ],
+   "establishes": "the recorded call used a credential signed by the bundle's root issuer, its capability is in the credential's scope, and caller and responder are those the request names",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": {
+    "execution_disposition": "within_delegation"
+   },
+   "observer_or_signer_role": "holder (use), responder (receipt), root issuer (credential)",
+   "reason_codes": [
+    "all_delegation_predicates_checked"
+   ],
+   "rule_id": "H55-R01",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [
+    "payments not in this log did not happen on this lineage"
+   ],
+   "case_id": "B",
+   "claim_ceiling": "arithmetic over signed records; JPY-testnet is a simulated unit",
+   "claim_id": "budget_compliance",
+   "does_not_establish": [
+    "that money moved (the rail receipt is a digest)",
+    "that the budget was enforced before the payment: this is a retrospective count, not a pre-dispatch decision",
+    "anything about delegation scope"
+   ],
+   "establishes": "the cumulative total of authenticated, signed payments on this lineage and unit, in log order, against the issuer-signed max_total",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    },
+    {
+     "entry_sha256": "6c627d368f522c796d12a3ad38234e4b9de22f59c30010fd3fc4b7bdba03fabc",
+     "path": "pilot51/set2/log/entries/000_budget.json",
+     "seq": 0,
+     "sha256": "6c627d368f522c796d12a3ad38234e4b9de22f59c30010fd3fc4b7bdba03fabc"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": {
+    "payment_budgets": [
+     {
+      "hop": 0,
+      "limit": 20000,
+      "total": 14000,
+      "unit": "JPY-testnet"
+     }
+    ],
+    "payment_reasons": []
+   },
+   "observer_or_signer_role": "payer (payment), issuer (budget policy)",
+   "reason_codes": [
+    "cumulative_total_14000_within_20000"
+   ],
+   "rule_id": "H55-R02",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "binding of signed records to one request occurrence",
+   "claim_id": "same_request_occurrence",
+   "does_not_establish": [
+    "that the raw request bodies are the ones described (they are not public)"
+   ],
+   "establishes": "the use, payment, execution receipt and criteria commitment all name the SHA-256 of this case's request occurrence, distinct from the other cases'",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "holder, payer, responder, buyer",
+   "reason_codes": [
+    "use_payment_receipt_criteria_name_this_request"
+   ],
+   "rule_id": "H55-R03",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "ordering and naming in a signed, operator-sequenced log",
+   "claim_id": "payment_execution_link",
+   "does_not_establish": [
+    "that the rail settled the payment",
+    "that the result was correct"
+   ],
+   "establishes": "a signed payment for this request was logged before the signed execution receipt and names the same caller and responder",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "payer, responder",
+   "reason_codes": [
+    "payment_logged_before_its_execution"
+   ],
+   "rule_id": "H55-R04",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "byte identity only",
+   "claim_id": "audit_byte_identity",
+   "does_not_establish": [
+    "that this request, and not another with the same result, produced those bytes",
+    "that the audit's content is correct"
+   ],
+   "establishes": "public audit bytes whose SHA-256 equals the response_sha256 the responder signed for this request",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    },
+    {
+     "path": "pilot51/set2/audit_B.json",
+     "sha256": "40bc2a46f428b2cc5000e9d5e896adac218ebe3c2b76f78ba29afebf97887aea"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": {
+    "response_sha256": "40bc2a46f428b2cc5000e9d5e896adac218ebe3c2b76f78ba29afebf97887aea"
+   },
+   "observer_or_signer_role": "responder (receipt)",
+   "reason_codes": [
+    "public_bytes_match_signed_response_sha256"
+   ],
+   "rule_id": "H55-R05",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "byte identity of a stated digest",
+   "claim_id": "dataset_byte_identity",
+   "does_not_establish": [
+    "that the deployed service consumed those bytes (see dataset_runtime_use)"
+   ],
+   "establishes": "the dataset digest the audit states equals the SHA-256 of the souba-db bytes pinned at the dataset revision",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    },
+    {
+     "path": "pilot51/set2/audit_B.json",
+     "sha256": "40bc2a46f428b2cc5000e9d5e896adac218ebe3c2b76f78ba29afebf97887aea"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "responder (audit content)",
+   "reason_codes": [
+    "dataset_bytes_match_audit_digest_and_pin"
+   ],
+   "rule_id": "H55-R06",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "not establishable from records alone",
+   "claim_id": "dataset_runtime_use",
+   "does_not_establish": [
+    "that the remote runtime read the dataset bytes"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    },
+    {
+     "path": "pilot51/set2/audit_B.json",
+     "sha256": "40bc2a46f428b2cc5000e9d5e896adac218ebe3c2b76f78ba29afebf97887aea"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_observation_of_runtime_inputs"
+   ],
+   "rule_id": "H55-R07",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "criteria commitments exist; no acceptance record is public",
+   "claim_id": "receiver_accepted_result",
+   "does_not_establish": [
+    "that the buyer's checker accepted the result"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "checker",
+   "reason_codes": [
+    "acceptance_records_not_public"
+   ],
+   "rule_id": "H55-R08",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "no REMORA-native authority evidence exists for these calls",
+   "claim_id": "remora_dispatch_authority",
+   "does_not_establish": [
+    "that REMORA authorized or would have authorized this call: the records are the producer's, not a REMORA decision"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_remora_grant_lease_or_dispatch_record"
+   ],
+   "rule_id": "H55-R09",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "B",
+   "claim_ceiling": "signed statements are not observations of effects",
+   "claim_id": "physical_effect",
+   "does_not_establish": [
+    "any effect in the world from the audit or the payment"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a",
+     "path": "pilot51/set2/log/entries/002_criteria_B.json",
+     "seq": 2,
+     "sha256": "26dff5978799083855ebe699d7ef07d2b44fe5bb12c122315badd016e7a5cc3a"
+    },
+    {
+     "entry_sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470",
+     "path": "pilot51/set2/log/entries/007_use_B.json",
+     "seq": 7,
+     "sha256": "154bfccf555262b6c575b389d6838edb82dca7d2b6740eefa9143be6e670a470"
+    },
+    {
+     "entry_sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e",
+     "path": "pilot51/set2/log/entries/008_payment_B.json",
+     "seq": 8,
+     "sha256": "a20489646d7b5906db1fdd7a30d0be0b451752afa6bf8d1afef0d3369c99d53e"
+    },
+    {
+     "entry_sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b",
+     "path": "pilot51/set2/log/entries/009_receipt_B.json",
+     "seq": 9,
+     "sha256": "5e28e5866cbe2cbc7c4447f286e934c70b6c8dfbb80f719ce3be1c1560db311b"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-B",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_independent_effect_observation"
+   ],
+   "rule_id": "H55-R10",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [
+    "the bundle's root issuer key is the delegating principal"
+   ],
+   "case_id": "C",
+   "claim_ceiling": "delegation structure of one recorded call, under the bundle's own trust configuration",
+   "claim_id": "native_delegation_scope",
+   "does_not_establish": [
+    "cA2A verify_chain semantics beyond the published credential fields",
+    "revocations or policies outside this log",
+    "that the work was performed",
+    "anything about the budget (see budget_compliance)"
+   ],
+   "establishes": "the recorded call used a credential signed by the bundle's root issuer, its capability is in the credential's scope, and caller and responder are those the request names",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": {
+    "execution_disposition": "within_delegation"
+   },
+   "observer_or_signer_role": "holder (use), responder (receipt), root issuer (credential)",
+   "reason_codes": [
+    "all_delegation_predicates_checked"
+   ],
+   "rule_id": "H55-R01",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [
+    "payments not in this log did not happen on this lineage"
+   ],
+   "case_id": "C",
+   "claim_ceiling": "arithmetic over signed records; JPY-testnet is a simulated unit",
+   "claim_id": "budget_compliance",
+   "does_not_establish": [
+    "that money moved (the rail receipt is a digest)",
+    "that the budget was enforced before the payment: this is a retrospective count, not a pre-dispatch decision",
+    "anything about delegation scope"
+   ],
+   "establishes": "the cumulative total of authenticated, signed payments on this lineage and unit, in log order, against the issuer-signed max_total",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    },
+    {
+     "entry_sha256": "6c627d368f522c796d12a3ad38234e4b9de22f59c30010fd3fc4b7bdba03fabc",
+     "path": "pilot51/set2/log/entries/000_budget.json",
+     "seq": 0,
+     "sha256": "6c627d368f522c796d12a3ad38234e4b9de22f59c30010fd3fc4b7bdba03fabc"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": {
+    "payment_budgets": [
+     {
+      "hop": 0,
+      "limit": 20000,
+      "total": 21000,
+      "unit": "JPY-testnet"
+     }
+    ],
+    "payment_reasons": [
+     "budget_exceeded"
+    ]
+   },
+   "observer_or_signer_role": "payer (payment), issuer (budget policy)",
+   "reason_codes": [
+    "cumulative_total_21000_exceeds_20000"
+   ],
+   "rule_id": "H55-R02",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "CONTRADICTED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "binding of signed records to one request occurrence",
+   "claim_id": "same_request_occurrence",
+   "does_not_establish": [
+    "that the raw request bodies are the ones described (they are not public)"
+   ],
+   "establishes": "the use, payment, execution receipt and criteria commitment all name the SHA-256 of this case's request occurrence, distinct from the other cases'",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "holder, payer, responder, buyer",
+   "reason_codes": [
+    "use_payment_receipt_criteria_name_this_request"
+   ],
+   "rule_id": "H55-R03",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "ordering and naming in a signed, operator-sequenced log",
+   "claim_id": "payment_execution_link",
+   "does_not_establish": [
+    "that the rail settled the payment",
+    "that the result was correct"
+   ],
+   "establishes": "a signed payment for this request was logged before the signed execution receipt and names the same caller and responder",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "payer, responder",
+   "reason_codes": [
+    "payment_logged_before_its_execution"
+   ],
+   "rule_id": "H55-R04",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "byte identity only",
+   "claim_id": "audit_byte_identity",
+   "does_not_establish": [
+    "that this request, and not another with the same result, produced those bytes",
+    "that the audit's content is correct"
+   ],
+   "establishes": "public audit bytes whose SHA-256 equals the response_sha256 the responder signed for this request",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    },
+    {
+     "path": "rehearsal/live_smoke/audit.json",
+     "sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": {
+    "response_sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+   },
+   "observer_or_signer_role": "responder (receipt)",
+   "reason_codes": [
+    "public_bytes_match_signed_response_sha256"
+   ],
+   "rule_id": "H55-R05",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "byte identity of a stated digest",
+   "claim_id": "dataset_byte_identity",
+   "does_not_establish": [
+    "that the deployed service consumed those bytes (see dataset_runtime_use)"
+   ],
+   "establishes": "the dataset digest the audit states equals the SHA-256 of the souba-db bytes pinned at the dataset revision",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    },
+    {
+     "path": "rehearsal/live_smoke/audit.json",
+     "sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "responder (audit content)",
+   "reason_codes": [
+    "dataset_bytes_match_audit_digest_and_pin"
+   ],
+   "rule_id": "H55-R06",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "not establishable from records alone",
+   "claim_id": "dataset_runtime_use",
+   "does_not_establish": [
+    "that the remote runtime read the dataset bytes"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    },
+    {
+     "path": "rehearsal/live_smoke/audit.json",
+     "sha256": "c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_observation_of_runtime_inputs"
+   ],
+   "rule_id": "H55-R07",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "criteria commitments exist; no acceptance record is public",
+   "claim_id": "receiver_accepted_result",
+   "does_not_establish": [
+    "that the buyer's checker accepted the result"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "checker",
+   "reason_codes": [
+    "acceptance_records_not_public"
+   ],
+   "rule_id": "H55-R08",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "no REMORA-native authority evidence exists for these calls",
+   "claim_id": "remora_dispatch_authority",
+   "does_not_establish": [
+    "that REMORA authorized or would have authorized this call: the records are the producer's, not a REMORA decision"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_remora_grant_lease_or_dispatch_record"
+   ],
+   "rule_id": "H55-R09",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  },
+  {
+   "assumptions": [],
+   "case_id": "C",
+   "claim_ceiling": "signed statements are not observations of effects",
+   "claim_id": "physical_effect",
+   "does_not_establish": [
+    "any effect in the world from the audit or the payment"
+   ],
+   "establishes": "nothing",
+   "evidence_refs": [
+    {
+     "entry_sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14",
+     "path": "pilot51/set2/log/entries/003_criteria_C.json",
+     "seq": 3,
+     "sha256": "4ad98a413f8de0bae6ed6cb3c75ee031a9079af13b1f33caba0607e691285e14"
+    },
+    {
+     "entry_sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079",
+     "path": "pilot51/set2/log/entries/010_use_C.json",
+     "seq": 10,
+     "sha256": "c198c77ac3aa3664662b507369fa6a0cabb1d5ab189038a1c0c8c6fc3f819079"
+    },
+    {
+     "entry_sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e",
+     "path": "pilot51/set2/log/entries/011_payment_C.json",
+     "seq": 11,
+     "sha256": "3a4eaa6b730ad13ff05116dec0e7dc5e3df5d894df4770f99d78ad41e378302e"
+    },
+    {
+     "entry_sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823",
+     "path": "pilot51/set2/log/entries/012_receipt_C.json",
+     "seq": 12,
+     "sha256": "746eba10245043374a7845e40877685568f724b268e83de4a9fb9c7bf075f823"
+    }
+   ],
+   "evidence_subject": "hs51-musubi-2-C",
+   "native_reported": null,
+   "observer_or_signer_role": "none",
+   "reason_codes": [
+    "no_independent_effect_observation"
+   ],
+   "rule_id": "H55-R10",
+   "trust_basis": "keys and trust configuration taken from the frozen public bundle, published by the same author as the records; no independent key provenance",
+   "verdict": "NOT_ESTABLISHED"
+  }
+ ],
+ "schema": "remora-h55-results-v1"
+}

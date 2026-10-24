@@ -10,6 +10,8 @@ Payment C took the buyer's spending to 21000 JPY-testnet against a signed budget
 
 Where each part stands: the cumulative limits used in part 2 are on master (#1025). So are measuring equipment movement from the plant (#1033) and binding limits to a signing authority and to every approval (#1037). Part 2 uses only the limit itself; it does not depend on the other two.
 
+Evidence added since: Horizon Shield published B's audit bytes on 2026-10-24. They match the digest B's execution receipt signs, so B's audit and dataset byte identity are established in a separate, pinned extension (`audit-b/`, below). The frozen inputs and verdicts are unchanged, and no verdict on the budget moves.
+
 Exploratory, retrospective and author-operated. The A/B/C records were public and examined before this row was designed, so this is neither a holdout nor a preregistered confirmation, and no independent verification is claimed (independence: `AUTHOR_OPERATED`).
 
 ## What A, B and C are
@@ -53,7 +55,7 @@ Log: 13 entries, hash chain, operator and author signatures checked locally: ver
 | B | `hs51-musubi-2-B` | `c13a8c64ec5135dab706963c7204c5adb30c12efa8b1d56b9c0900b4fbb32ccc` | `40bc2a46f428b2cc5000e9d5e896adac218ebe3c2b76f78ba29afebf97887aea` |
 | C | `hs51-musubi-2-C` | `a5650ab747a92d6b164c1753c731a419f197521691fa29af9a7b86a49f6a2a5f` | `c2920477d95a8e48f16cc2df49ec58a02cd9b422db491206446e7a5be21937f5` |
 
-A and C name the same response bytes under different request digests.
+A and C name the same response bytes under different request digests. B's receipt names other bytes.
 
 ### Native reported (the producer's settlement) beside the REMORA assessment
 
@@ -62,6 +64,17 @@ A and C name the same response bytes under different request digests.
 | A | `within_delegation` | `[]` | ESTABLISHED | ESTABLISHED |
 | B | `within_delegation` | `[]` | ESTABLISHED | ESTABLISHED |
 | C | `within_delegation` | `['budget_exceeded']` | ESTABLISHED | CONTRADICTED |
+
+### Evidence extension: B's audit bytes (2026-10-24)
+
+Horizon Shield `c824cbe61a383e57f1d9d15fea962a79f5b6bbd5` (branch `evidence/hs51-set2-audit-b`) adds `pilot51/set2/audit_B.json`, pinned in `audit-b/inputs.lock.json` (SHA-256 `d35ee963273587caaa07f8c460f72d13dc6d2bbe92044e4242545e37b877e466`). The commit descends from the frozen revision and changes no file this row reads. The row runs again on the frozen inputs plus those bytes (`audit-b/results.json`); the frozen results above stay as they were.
+
+| Case | Claim | Frozen | With B's audit | Reason |
+|---|---|---|---|---|
+| B | `audit_byte_identity` | NOT_ESTABLISHED | ESTABLISHED | `public_bytes_match_signed_response_sha256` |
+| B | `dataset_byte_identity` | NOT_ESTABLISHED | ESTABLISHED | `dataset_bytes_match_audit_digest_and_pin` |
+
+No other verdict changes. B's audit is of a different estimate from the one A and C name: 2 lines totalling 792000 against 3 lines totalling 837000, with fixture `1f75bcabc350…` where A and C have `c2ed811e1d4b…`. B's fixture bytes are not public, so what B was asked to audit is not checked here.
 
 ## Part 2: does REMORA let C run?
 
@@ -98,7 +111,8 @@ The limit is reserved in one transaction as the dispatcher's last check before t
 
 ## What this row does not establish
 
-- Raw call bodies, B's audit bytes and acceptance records are not public; nothing about them is inferred.
+- Raw call bodies, acceptance records and the estimate B's audit names are not public; nothing about them is inferred.
+- Byte identity shows which dataset bytes an audit names. It does not show that the service read them at run time (`dataset_runtime_use = NOT_ESTABLISHED`).
 - A and C carry the same public audit bytes but name different request occurrences; identical result bytes do not make them the same call.
 - Part 1 is a retrospective count over signed payments. Part 2 is REMORA's decision on a replay with a sandboxed tool, not on the live calls, which REMORA was not in the path of.
 - The limit holds only where a deployment declares it, on one host. It counts the amount the call names, not what a rail settled.

@@ -15,7 +15,11 @@ its redistribution terms are not established, so it is fetched into a
 git-ignored cache and pinned by digest only.
 
     python integrations/horizon55/prepare.py --write-lock   # first freeze
-    python integrations/horizon55/prepare.py                # fetch and check against the lock
+    python integrations/horizon55/prepare.py                # fetch and check against the locks
+
+The frozen lock is never rewritten for later evidence. B's audit bytes,
+published after the row first ran, are a separate extension with its own
+lock (``AUDIT_B_LOCK``, ``--write-audit-b-lock``).
 """
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ import json
 import sys
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -38,6 +43,12 @@ ROOT = HERE.parents[1]
 INPUTS = ROOT / "artifacts" / "interop" / "horizon55" / "inputs"
 CACHE = HERE / ".cache"
 LOCK = ROOT / "artifacts" / "interop" / "horizon55" / "inputs.lock.json"
+#: Evidence extension: B's audit bytes, published 2026-10-24 on the horizon-shield
+#: branch evidence/hs51-set2-audit-b. The commit descends from HORIZON_REF and, in
+#: the companion directory, adds audit_B.json and changes only a sidecar control
+#: this row does not read, so every frozen input is unchanged at it.
+AUDIT_B_REF = "c824cbe61a383e57f1d9d15fea962a79f5b6bbd5"
+AUDIT_B_LOCK = LOCK.parent / "audit-b" / "inputs.lock.json"
 
 ENTRY_NAMES = ("000_budget", "001_criteria_A", "002_criteria_B", "003_criteria_C", "004_use_A",
                "005_payment_A", "006_receipt_A", "007_use_B", "008_payment_B", "009_receipt_B",
@@ -71,6 +82,12 @@ SOURCES: tuple[tuple[str, str, str, str, bool], ...] = (
 )
 
 
+AUDIT_B_SOURCES: tuple[tuple[str, str, str, str, bool], ...] = (
+    ("set2_audit_b", AUDIT_B_REF, f"{BASE}/pilot51/set2/audit_B.json",
+     "pilot51/set2/audit_B.json", True),
+)
+
+
 def _fetch(revision: str, path: str) -> bytes:
     url = f"https://raw.githubusercontent.com/{REPO}/{revision}/{path}"
     with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310 - fixed https host
@@ -81,48 +98,80 @@ def local_path(vendored: bool, relative: str) -> Path:
     return (INPUTS if vendored else CACHE) / relative
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--write-lock", action="store_true",
-                        help="freeze: write inputs.lock.json from the fetched bytes")
-    args = parser.parse_args(argv)
-    lock = None if args.write_lock else json.loads(LOCK.read_text(encoding="utf-8"))
+def _prepare(sources: tuple[tuple[str, str, str, str, bool], ...], lock_path: Path,
+             write: bool) -> list[dict[str, Any]] | dict[str, str]:
+    """Fetch ``sources``, check them against ``lock_path`` unless writing it; the records."""
+    lock = None if write else json.loads(lock_path.read_text(encoding="utf-8"))
     pinned = {s["role"]: s for s in lock["sources"]} if lock else {}
     records = []
-    for role, revision, upstream, relative, vendored in SOURCES:
+    for role, revision, upstream, relative, vendored in sources:
         data = _fetch(revision, upstream)
         digest = canon.sha256_hex(data)
         if lock is not None:
             want = pinned[role]
             if (want["sha256"], want["bytes"]) != (digest, len(data)):
-                print(json.dumps({"error": "pinned_bytes_mismatch", "role": role}))
-                return 2
+                return {"error": "pinned_bytes_mismatch", "role": role}
         target = local_path(vendored, relative)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         records.append({"role": role, "revision": revision, "upstream_path": upstream,
                         "local_path": relative, "vendored": vendored, "bytes": len(data),
                         "sha256": digest})
-    if args.write_lock:
-        body = {
-            "schema": "remora-h55-inputs-lock-v1",
-            "upstream_repository": f"https://github.com/{REPO}",
-            "horizon_revision": HORIZON_REF,
-            "dataset_revision": DATASET_REF,
-            "license": {"spdx": "MIT", "role": "license",
-                        "applies_to": "every vendored file (Horizon Shield repository LICENSE)"},
-            "dataset_terms": ("not established: compiled from third-party market sources "
-                              "(souba-db _meta.sources); fetched into a local cache, never "
-                              "vendored"),
-            "required_occurrences": ["hs51-musubi-2-A", "hs51-musubi-2-B", "hs51-musubi-2-C"],
-            "known_gaps": ["raw set-2 call bodies are not public",
-                           "the audit bytes for B are not public",
-                           "acceptance records of the live run are not public"],
-            "sources": records,
-        }
-        LOCK.parent.mkdir(parents=True, exist_ok=True)
-        LOCK.write_bytes(canon.jcs(body) + b"\n")
-    print(json.dumps({"fetched": len(records), "lock_written": args.write_lock}))
+    return records
+
+
+def _write_lock(path: Path, body: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(canon.jcs(body) + b"\n")
+
+
+def _lock_body(revision: str, occurrences: list[str], gaps: list[str],
+               records: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "schema": "remora-h55-inputs-lock-v1",
+        "upstream_repository": f"https://github.com/{REPO}",
+        "horizon_revision": revision,
+        "dataset_revision": DATASET_REF,
+        "license": {"spdx": "MIT", "role": "license",
+                    "applies_to": "every vendored file (Horizon Shield repository LICENSE)"},
+        "dataset_terms": ("not established: compiled from third-party market sources "
+                          "(souba-db _meta.sources); fetched into a local cache, never "
+                          "vendored"),
+        "required_occurrences": occurrences,
+        "known_gaps": gaps,
+        "sources": records,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--write-lock", action="store_true",
+                        help="freeze: write inputs.lock.json from the fetched bytes")
+    parser.add_argument("--write-audit-b-lock", action="store_true",
+                        help="freeze the B-audit extension: write audit-b/inputs.lock.json")
+    args = parser.parse_args(argv)
+    fetched = 0
+    for sources, lock_path, write in ((SOURCES, LOCK, args.write_lock),
+                                      (AUDIT_B_SOURCES, AUDIT_B_LOCK, args.write_audit_b_lock)):
+        records = _prepare(sources, lock_path, write)
+        if isinstance(records, dict):
+            print(json.dumps(records))
+            return 2
+        fetched += len(records)
+        if write and lock_path == LOCK:
+            _write_lock(LOCK, _lock_body(
+                HORIZON_REF, ["hs51-musubi-2-A", "hs51-musubi-2-B", "hs51-musubi-2-C"],
+                ["raw set-2 call bodies are not public",
+                 "the audit bytes for B are not public",
+                 "acceptance records of the live run are not public"], records))
+        elif write:
+            _write_lock(AUDIT_B_LOCK, _lock_body(
+                AUDIT_B_REF, ["hs51-musubi-2-B"],
+                ["raw set-2 call bodies are not public",
+                 "the estimate B's audit names (its fixture_sha256) is not public",
+                 "acceptance records of the live run are not public"], records))
+    print(json.dumps({"fetched": fetched, "lock_written": args.write_lock,
+                      "audit_b_lock_written": args.write_audit_b_lock}))
     return 0
 
 

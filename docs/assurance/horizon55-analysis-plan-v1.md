@@ -87,6 +87,23 @@ tested on the same sequence, so part 2 shows the mechanism works on the case it
 was built for. It is not a measurement of how often it refuses legitimate
 calls.
 
+## Evidence extension: B's audit bytes (2026-10-24)
+
+After the row was published, Horizon Shield published B's audit bytes at
+`c824cbe61a383e57f1d9d15fea962a79f5b6bbd5` (1101 bytes, SHA-256
+`40bc2a46f428b2cc5000e9d5e896adac218ebe3c2b76f78ba29afebf97887aea`, the
+`response_sha256` B's execution receipt signs). The commit descends from the
+frozen revision and changes no file the row reads. The frozen lock, `EXPECTED`
+and `results.json` stay as they were: they are the record of what the frozen
+inputs carry. The bytes enter through a second lock,
+`audit-b/inputs.lock.json`, and a second run, `audit-b/results.json`, checked
+against `EXPECTED_AUDIT_B`. That table is the frozen one with B's
+`audit_byte_identity` and `dataset_byte_identity` set to `ESTABLISHED`. It was
+written after the bytes were published and their digest compared with the
+receipt, before the row ran on them, so it records a prediction from a known
+digest, not a blind one. No other verdict may move. B's audit names a fixture
+(`1f75bcab…`) that is not public, so the estimate B audited is not checked.
+
 ## Out of scope
 
 No live calls, payments, cloud tokens or network access during `run.py` or

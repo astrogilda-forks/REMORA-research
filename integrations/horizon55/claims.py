@@ -18,7 +18,7 @@ separate claims and are never combined.
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,14 +60,21 @@ class Inputs:
     lock_dataset_sha256: str
 
 
-def load_inputs(inputs_dir: Path, cache_dir: Path, lock: Mapping[str, Any]) -> Inputs:
+def load_inputs(inputs_dir: Path, cache_dir: Path, lock: Mapping[str, Any],
+                extra_audits: Sequence[str] = ()) -> Inputs:
+    """The frozen inputs; ``extra_audits`` adds audit files of an evidence extension.
+
+    An extra audit is keyed by its own SHA-256 like the public A/C audit, so it
+    counts only for a receipt that signed exactly those bytes.
+    """
     entry_dir = inputs_dir / SET2 / "log" / "entries"
     paths = sorted(entry_dir.glob("*.json"))
-    audit_path = inputs_dir / "rehearsal" / "live_smoke" / "audit.json"
     audits = {}
-    if audit_path.is_file():
-        data = audit_path.read_bytes()
-        audits[canon.sha256_hex(data)] = ("rehearsal/live_smoke/audit.json", data)
+    for relative in ("rehearsal/live_smoke/audit.json", *extra_audits):
+        audit_path = inputs_dir / relative
+        if audit_path.is_file():
+            data = audit_path.read_bytes()
+            audits[canon.sha256_hex(data)] = (relative, data)
     dataset_src = next(s for s in lock["sources"] if s["role"] == "dataset_souba_db")
     dataset_path = cache_dir / dataset_src["local_path"]
     dataset = (("souba-db.json (cache)", dataset_path.read_bytes())
