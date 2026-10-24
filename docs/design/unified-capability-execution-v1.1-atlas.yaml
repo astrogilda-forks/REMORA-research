@@ -1,0 +1,1870 @@
+# Capability atlas for docs/design/unified-capability-execution-v1.1.md (proposal).
+# Rendered by scripts/generate_capability_atlas.py into
+# docs/design/unified-capability-execution-v1.1-atlas.html. register_at_source copies
+# the capability register at source_revision; the register stays authoritative.
+# Everything under assessment is judgement, not register status.
+schema: remora-capability-atlas/v1
+sdd: docs/design/unified-capability-execution-v1.1.md
+source_revision: d94eecf916dda6ee7cd8598e100a2ee64b690958
+date: '2026-10-24'
+language: nb
+statement: >-
+  Vurderingsgrunnlag for gjennomføring av SDD v1.1. register_at_source er en kopi av registerets
+  felt ved source_revision, ikke en ny kilde; capability_register_v1.yaml er autoritativ.
+  assessment er vurdering, ikke registerstatus.
+gates:
+- id: G01
+  navn: Register
+  kobling: Tilleggskrav
+  status: crit
+  status_tekst: Ikke implementert
+  mangler: Manifest, hooks, API, SDK og tester for alle 32
+- id: G02
+  navn: Kjerneautoritet
+  kobling: CAP-003, CAP-004
+  status: warn
+  status_tekst: Internt implementert
+  mangler: Host-nivå-bevis; §98 kjørt uavhengig
+- id: G03
+  navn: Grensesemantikk
+  kobling: Tilleggskrav (CAP-031)
+  status: crit
+  status_tekst: Tre §97-punkter åpne
+  mangler: Nøkkel påkrevd, kontrollert reviewer-bevis, ToolDidNotExecute
+- id: G04
+  navn: Delt tilstand
+  kobling: Tilleggskrav
+  status: crit
+  status_tekst: LimitLedger kun SQLite
+  mangler: Postgres-ledger; to-node-test; aktivering bevist
+- id: G05
+  navn: Rolle og nøkler
+  kobling: REM-022, REM-023, CAP-009
+  status: warn
+  status_tekst: REM-023 pågår
+  mangler: IdP, reviewer-separasjon, beskyttede nøkler, rotasjon
+- id: G06
+  navn: Effekt
+  kobling: Tilleggskrav
+  status: warn
+  status_tekst: Delvis
+  mangler: Autoritativ observasjon og avstemmingstest
+- id: G07
+  navn: Ekstern flate
+  kobling: Tilleggskrav
+  status: crit
+  status_tekst: NOT_ESTABLISHED
+  mangler: Observatør i navngitt ekstern host (CAP-022)
+- id: G08
+  navn: SDK
+  kobling: Tilleggskrav
+  status: warn
+  status_tekst: Driftsporter finnes
+  mangler: vNext, paritetstester, migreringsguide
+- id: G09
+  navn: Leverandørkjede
+  kobling: Tilleggskrav
+  status: warn
+  status_tekst: SBOM og Sigstore finnes
+  mangler: Container, byte-reproduserbarhet, trusselmodell
+- id: G10
+  navn: Driftsmodell
+  kobling: CAP-007, CAP-008
+  status: crit
+  status_tekst: Mangler pilotbevis
+  mangler: Navngitt operatør, backup, varsling, stoppbryter
+- id: G11
+  navn: Ekstern verifikasjon
+  kobling: REM-021, REM-020
+  status: crit
+  status_tekst: REM-021 ikke startet
+  mangler: Uavhengig menneskelig gjennomgang
+- id: G12
+  navn: Kommersielt og juridisk
+  kobling: PRODUCT_PACKAGING.md
+  status: crit
+  status_tekst: CONTROLLED_PILOT tilbys ikke
+  mangler: Pilotavtale, DPA, lisensiert pakke
+repair_order:
+- nr: 1
+  arbeid: >-
+    Stopp ubekreftet frigivelse av budsjett. Håndter både ToolDidNotExecute og reviewerens
+    executed=false.
+  akseptanse: Uten kontrollerbar dokumentasjon beholdes reservasjonen som ukjent.
+  kapabiliteter:
+  - CAP-031
+- nr: 2
+  arbeid: Krev stabil operasjonsnøkkel for relevante skriveverktøy.
+  akseptanse: Samme forretningsoperasjon gjennom nye forslag utføres ikke på nytt.
+  kapabiliteter:
+  - CAP-031
+- nr: 3
+  arbeid: Gjør signerte limits og nødvendig dekning obligatorisk i skrivepilotprofilen.
+  akseptanse: Manglende nøkkel, signatur eller meter gir oppstartsnekt eller avslag.
+  kapabiliteter:
+  - CAP-031
+  - CAP-017
+- nr: 4
+  arbeid: Gjør limits-avklaring og audit transaksjonelt konsistente.
+  akseptanse: Krasj mellom ledger-endring og kjedepost gir ingen permanent udokumentert budsjettfrigivelse.
+  kapabiliteter:
+  - CAP-031
+  - CAP-005
+- nr: 5
+  arbeid: Etterprøv §98-reparasjonen og atomisk admission.
+  akseptanse: Avvist review lekker ingen brukbar grant, også når ugyldiggjøring eller lagring
+    feiler.
+  kapabiliteter:
+  - CAP-007
+  - CAP-003
+- nr: 6
+  arbeid: Fullfør flow-binding, flow-race og friskhetskontrakt (IFC-06 pågår; IFC-11 og IFC-12
+    ikke startet).
+  akseptanse: >-
+    Kontrollerte argumenter samsvarer med faktisk input; endret autoritet eller flow stopper
+    handlingen innen erklært kontrakt.
+  kapabiliteter:
+  - CAP-030
+  - CAP-020
+- nr: 7
+  arbeid: Verifiser credential-topologi og stoppmekanisme.
+  akseptanse: Agent og tool worker kan ikke omgå executor; verify-only kan ikke signere.
+  kapabiliteter:
+  - CAP-024
+  - CAP-017
+  - CAP-003
+  - CAP-013
+- nr: 8
+  arbeid: Bygg delt LimitLedger før flerhost-aktivering.
+  akseptanse: To executorer deler budsjett og operasjonsnøkler uten dobbeltforbruk.
+  kapabiliteter:
+  - CAP-031
+capabilities:
+- id: CAP-001
+  register_at_source:
+    name: Decision engine (hard guards -> conditional gates -> trust routing)
+    status: WIRED_API_PATH
+    code:
+    - remora/policy/decision_engine.py
+    - servers/api.py
+    tests:
+    - tests/test_rem017_policy_mutations.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - SHADOW_PILOT≥WIRED_API_PATH
+    - PRODUCTION≥EXTERNALLY_VERIFIED
+  assessment:
+    navn: Beslutningsmotor
+    klasse: 'Kjerne: autoritet'
+    formaal: 'Gir én deterministisk beslutning per forslag: ACCEPT, VERIFY, ABSTAIN eller
+      ESCALATE.'
+    gjor: >-
+      Harde vakter kjører først, deretter betingede porter og til slutt tillitsruting. Ingen
+      modell eller monitor kan overstyre en hard vakt.
+    naa: >-
+      Koblet via /v1/assess (kun beslutning) og /v1/execution/* (full tilstandsmaskin med
+      håndhevelse). Beslutningssporet med regel-IDer eksponeres ikke som eget API.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: >-
+      All autoritet starter her. SHADOW_PILOT krever WIRED_API_PATH, og PRODUCTION krever
+      EXTERNALLY_VERIFIED.
+    sdd_hook: POLICY
+    sdd_modus: ENFORCE
+    sdd_endring: >-
+      Beslutningsspor og regel-IDer gjennom foreslått capability-trace; decision_trace i SDK-ens
+      AssessmentResult.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: >-
+      ENFORCED_PRODUCTION innenfor én pilotkonfigurasjon. EXTERNALLY_VERIFIED krever REM-021
+      og ligger utenfor SDD-en.
+    risiko:
+      sannsynlighet: L
+      konsekvens: H
+      tekst: >-
+        En feil regel gir feil ACCEPT for en hel verktøyklasse. Mutasjonstester (REM-017)
+        og invariantkontrollen (CAP-015) gjør dette mindre sannsynlig.
+    reversering:
+      grad: Middels
+      tekst: >-
+        Policyversjonen pinnes og signeres; tilbakerulling skjer til forrige signerte policy,
+        ikke ved kodeendring i drift.
+    sikkerhet: >-
+      Deterministiske vakter dominerer, invariantsjekk feiler lukket til ESCALATE, og mutasjonstester
+      dreper hver vakt som fjernes.
+    litteratur:
+    - kilde: RES-005 Verktøysikkerhet og agent-guardrails
+      referanse: idéfamilie, ingen enkeltkilde
+      rolle: implemented_and_tested
+    - kilde: RES-023 Semantisk autoritet for verktøyruting
+      referanse: intern design (SAP v5/v6)
+      rolle: implemented_and_tested
+    - kilde: SHELF-002 Sample, Predict, then Proceed
+      referanse: arXiv 2506.02918
+      rolle: ADOPTED
+    - kilde: AgentSpec
+      referanse: arXiv 2503.18666
+      rolle: positioning_only
+    forutsetter:
+    - CAP-004
+- id: CAP-002
+  register_at_source:
+    name: OPA/Rego delegation with full input parity and monotone floors
+    status: WIRED_REFERENCE_PATH
+    code:
+    - remora/policy/opa_adapter.py
+    - scripts/opa_conformance.py
+    tests:
+    - tests/test_opa_parity.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: OPA/Rego-delegering
+    klasse: Policy-interop
+    formaal: Lar en kunde uttrykke policy i OPA/Rego uten å svekke REMORAs eget gulv.
+    gjor: >-
+      Sender full input til OPA med paritet mot Python-gulvet. Svaret kan bare gjøre beslutningen
+      strengere (monotont gulv).
+    naa: >-
+      CI-portet konformitet; ikke eksponert gjennom REST-API-et. Ingen PolicyProvider-registry
+      finnes; nærmeste søm er DecisionProvider.
+    nodvendighet: Valgfri
+    nodvendighet_begrunnelse: Nyttig for kunder som allerede bruker OPA, men ingen pilotprofil
+      krever den.
+    sdd_hook: POLICY
+    sdd_modus: SHADOW → betinget ENFORCE
+    sdd_endring: Server-side plugin via DecisionProvider, signert og pinnet bundle, paritetsattest.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH i SHADOW; ENFORCE først etter paritetsbevis på frosne
+      og adversarielle tilfeller.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: >-
+        Paritetsavvik mellom Rego og Python gir ulik beslutning. Det monotone gulvet begrenser
+        feilen til for strenge beslutninger.
+    reversering:
+      grad: Lett
+      tekst: Slås av ved å fjerne bundlen; Python-gulvet står alene som før.
+    sikkerhet: Rego kan aldri senke gulvet; tidsavbrudd eller feil i OPA gir avslag, ikke
+      ACCEPT.
+    litteratur:
+    - kilde: PDP/PEP-mønsteret (XACML, OPA)
+      referanse: 'PROV-05: kjent mønster'
+      rolle: positioning_only
+    forutsetter:
+    - CAP-001
+- id: CAP-003
+  register_at_source:
+    name: Signed PDP->PEP token (mandatory expiry, jti one-time consumption, audience, max
+      age)
+    status: WIRED_API_PATH
+    code:
+    - remora/enforcement/gate.py
+    - remora/enforcement/token.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_enforcement_ledgers_postgres.py
+    - tests/test_token_hardening.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - CONTROLLED_PILOT≥WIRED_API_PATH
+    - LIMITED_ENFORCEMENT≥ENFORCED_PRODUCTION
+  assessment:
+    navn: Signert PDP→PEP-token
+    klasse: 'Kjerne: autoritet'
+    formaal: >-
+      Fører en beslutning fra PDP til håndhevelsespunktet som en engangs, utløpende og mottakerbundet
+      autorisasjon.
+    gjor: Token med påkrevd utløp, audience og maksalder; jti forbrukes én gang.
+    naa: >-
+      Grant-format v3 er Ed25519; en prosess med bare REMORA_PDP_VERIFY_KEYS_ED25519 kan innløse
+      grants, men ikke utstede dem. HMAC (v1/v2) er eldre migreringsmodus og avvises når Ed25519
+      er konfigurert, med mindre REMORA_PDP_ACCEPT_HMAC er eksplisitt aktivert (1, true, yes
+      eller on). Registerets forbehold beskriver fortsatt HMAC og henger etter koden. jti
+      lagres varig (pep_consumed) bare med REMORA_PG_DSN eller REMORA_CHAIN_DB, ellers i prosess.
+      Registerets forbehold sier at ingen test starter en ny tolk; en relevant prosessrestart-test
+      er heller ikke identifisert i denne gjennomgangen.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: CONTROLLED_PILOT krever WIRED_API_PATH; LIMITED_ENFORCEMENT
+      krever ENFORCED_PRODUCTION.
+    sdd_hook: PRE_DISPATCH
+    sdd_modus: ENFORCE
+    sdd_endring: >-
+      Grant-/jti-status i resultatet, SDK-typer SingleUseGrant/GrantStatus; delt backend obligatorisk;
+      ingen klient-mint.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: >-
+      ENFORCED_PRODUCTION i pilot, forutsatt delt ledger og v3 med verify-only-prosess i utførelsesdomenet.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: >-
+        Gjenbruk av et token gir dobbel utførelse. Kjører utsteder og innløser i samme prosess
+        med privat nøkkel, er splitten bare ett domene. NEGATIVE_RESULTS §98 viste at et usatt
+        grant kunne returneres på review-stien; reparert, men åpent til uavhengig kjøring.
+    reversering:
+      grad: Vanskelig
+      tekst: Brukte tokens må forbli brukt. En tilbakerulling sletter aldri pep_consumed-rader.
+    sikkerhet: >-
+      Ed25519 v3 med verify-only innløser, HMAC-nedgradering avvist, engangs-jti i varig ledger,
+      utløp, audience og maksalder; grant holdes tilbake når admission nekter (§98-reparasjonen).
+    litteratur:
+    - kilde: Signerte autorisasjonstokens, XACML PDP/PEP
+      referanse: PROV-05
+      rolle: positioning_only
+    - kilde: Engangs-nonce og replay-ledgere
+      referanse: 'PROV-14: klassisk'
+      rolle: positioning_only
+    forutsetter:
+    - CAP-017
+    - CAP-005
+- id: CAP-004
+  register_at_source:
+    name: Tool-call payload binding (canonical hash, recomputed before execution)
+    status: WIRED_API_PATH
+    code:
+    - remora/policy/observation.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_execution_api.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - CONTROLLED_PILOT≥WIRED_API_PATH
+    - LIMITED_ENFORCEMENT≥ENFORCED_PRODUCTION
+  assessment:
+    navn: Payload-binding
+    klasse: 'Kjerne: autoritet'
+    formaal: Sikrer at autorisasjonen gjelder nøyaktig ett kall med nøyaktig disse argumentene.
+    gjor: >-
+      Kanonisk hash av verktøynavn og alle argumenter, beregnet på nytt rett før utførelse.
+      ExecutionLease binder 16 felt.
+    naa: >-
+      /v1/execution/assess hasher fulle argumenter; legacy /v1/assess beholder sammendragsbinding.
+      SDK-ens ToolCall mangler tenant, principal og digester.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: CONTROLLED_PILOT krever WIRED_API_PATH; LIMITED_ENFORCEMENT
+      krever ENFORCED_PRODUCTION.
+    sdd_hook: PRE_DISPATCH
+    sdd_modus: ENFORCE
+    sdd_endring: >-
+      Lease-bundet identitet eksponert i attestasjon og SDK; differensialtester av kanonisering
+      Python/TypeScript.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION i pilot.
+    risiko:
+      sannsynlighet: L
+      konsekvens: H
+      tekst: >-
+        Avvik i kanonisering (Unicode, duplikatnøkler, tall) mellom to parsere kan la et byttet
+        argument passere.
+    reversering:
+      grad: Vanskelig
+      tekst: Skal aldri slås av i en pilot; en endring i kanonisering er en ny kontraktsversjon.
+    sikkerhet: Gjenberegning ved dispatch, 16-felts lease, differensialtester på tvers av
+      språk.
+    litteratur:
+    - kilde: Eksakt kallbinding
+      referanse: PROV-03; AEGIS arXiv 2603.12621 (crosswalk)
+      rolle: positioning_only
+    - kilde: Kanonisk JSON
+      referanse: RFC 8785; PROV-13
+      rolle: positioning_only
+    - kilde: Proof-Carrying Agent Actions
+      referanse: arXiv 2606.04104
+      rolle: positioning_only
+    forutsetter: []
+- id: CAP-005
+  register_at_source:
+    name: Audit chain (hash-chained decision history)
+    status: PERSISTED_ATOMIC
+    code:
+    - remora/governance/tenant_chain.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_execution_api.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - SHADOW_PILOT≥PERSISTED_ATOMIC
+    - PRODUCTION≥ENFORCED_PRODUCTION
+  assessment:
+    navn: Revisjonskjede
+    klasse: Bevis og revisjon
+    formaal: Gir en manipuleringsevident, hash-kjedet beslutningshistorikk per tenant.
+    gjor: >-
+      Hver hendelse kjedes til forrige; verifisering finnes som /v1/audit/chain/verify og
+      /v1/execution/audit/verify.
+    naa: >-
+      PERSISTED_ATOMIC med REMORA_CHAIN_DB (SQLite) eller REMORA_PG_DSN (Postgres FOR UPDATE);
+      standard er i prosess. Aktivering i en deployment er ikke påstått.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: SHADOW_PILOT krever PERSISTED_ATOMIC; PRODUCTION krever ENFORCED_PRODUCTION
+      og REM-025.
+    sdd_hook: AUDIT
+    sdd_modus: ENFORCE + EVIDENCE_ONLY
+    sdd_endring: Tenant- og sjekkpunktkobling; tester med to skrivere, krasj under append,
+      fork og rekkefølge.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION med Postgres i pilot; ekstern forankring (REM-025)
+      er egen jobb.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: >-
+        Kjeden beviser ikke fullstendighet: en operatør kan undertrykke en hendelse før append.
+        Uten DSN går historikken tapt ved omstart.
+    reversering:
+      grad: Vanskelig
+      tekst: Data er append-only og skal ikke reverseres. Konfigurasjonen kan endres, men
+        gamle poster beholdes.
+    sikkerhet: FOR UPDATE i Postgres, signerte poster (CAP-017), verifiseringsendepunkter.
+    litteratur:
+    - kilde: Tamper-evident logging
+      referanse: Crosby & Wallach 2009; RFC 6962 (PROV-01)
+      rolle: positioning_only
+    - kilde: 'SHELF-026 AIREP: per-decision evidence'
+      referanse: arXiv 2608.21363
+      rolle: PARTIAL
+    - kilde: Auditable Agents
+      referanse: arXiv 2604.05485 (ikke i repo)
+      rolle: absent
+    forutsetter:
+    - CAP-017
+- id: CAP-006
+  register_at_source:
+    name: A2A delegation envelope (principal-bound keys, attenuation, replay, payload binding)
+    status: WIRED_REFERENCE_PATH
+    code:
+    - remora/governance/a2a_envelope.py
+    - scripts/demo_industrial_maintenance.py
+    tests:
+    - tests/test_a2a_envelope.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: A2A-delegering
+    klasse: 'Interop: autoritet'
+    formaal: Lar én agent delegere en innsnevret del av sin autoritet til en annen.
+    gjor: Konvolutt med principal-bundne nøkler, attenuasjon, replay-vern og payload-binding.
+    naa: Symmetrisk HMAC-referanse; produksjon krever JWS/COSE og tillitsankre.
+    nodvendighet: Valgfri
+    nodvendighet_begrunnelse: Første pilot trenger den ikke; ADR-UE-06 foreslår SHADOW til
+      en asymmetrisk modell er akseptert.
+    sdd_hook: AUTHORITY_INPUT
+    sdd_modus: SHADOW → betinget ENFORCE
+    sdd_endring: Utsteder-tillitsregister, attenuasjon og delegasjonslinje; asymmetrisk signatur
+      før ENFORCE.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH i SHADOW; ENFORCE bare med akseptert asymmetrisk
+      tillitsmodell.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: Aktivert med HMAC deler alle parter samme nøkkel og kan forfalske delegeringer.
+    reversering:
+      grad: Lett
+      tekst: >-
+        Av som standard. Avvist delegering gir aldri en alternativ tillatelse; direkte autoritet
+        er bare gyldig hvis den valideres selvstendig.
+    sikkerhet: Bare delmengde-delegering, replay- og audience-sjekk; ingen ENFORCE før asymmetrisk
+      signatur.
+    litteratur:
+    - kilde: Objektkapabiliteter, macaroons
+      referanse: PROV-06/PROV-10
+      rolle: positioning_only
+    - kilde: CaMeL
+      referanse: arXiv 2503.18813
+      rolle: positioning_only
+    - kilde: RES-012 Oppgavebundet autoritet
+      referanse: Yan, arXiv 2608.27443
+      rolle: implemented_and_tested
+    forutsetter:
+    - CAP-023
+    - CAP-018
+- id: CAP-007
+  register_at_source:
+    name: Review queue with TTL-to-ABSTAIN and approval freshness re-gate
+    status: WIRED_API_PATH
+    code:
+    - remora/governance/review_queue.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_delegated_execution_and_approval_policy.py
+    - tests/test_review_path_audit_r3.py
+    - tests/test_review_path_binding.py
+    - tests/test_review_queue.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - CONTROLLED_PILOT≥WIRED_API_PATH
+    - LIMITED_ENFORCEMENT≥PERSISTED_ATOMIC
+  assessment:
+    navn: Gjennomgangskø
+    klasse: 'Kjerne: menneske'
+    formaal: Lar et menneske godkjenne eller avvise før en ikke-ACCEPT-beslutning kan utføres.
+    gjor: >-
+      Kø med TTL til ABSTAIN og ny ferskhetsport ved godkjenning: endret intensjon, aktør
+      eller ToolSpec ugyldiggjør.
+    naa: >-
+      approve/reject og SDK finnes; list-endepunkt finnes ikke. SQLite er omstartsbevist,
+      Postgres-grenen er ikke kontrakttestet. §98 (åpen).
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: >-
+      CONTROLLED_PILOT krever menneskelig godkjenning på hvert ikke-accept og WIRED_API_PATH;
+      LIMITED_ENFORCEMENT krever PERSISTED_ATOMIC.
+    sdd_hook: POLICY / REVIEW
+    sdd_modus: ENFORCE
+    sdd_endring: List-endepunkt, separat reviewer-credential, to-personsregel, Postgres-kontrakttest.
+    oppnaelig_niva: PERSISTED_ATOMIC
+    oppnaelig_niva_tekst: PERSISTED_ATOMIC med Postgres-kontrakttest; ENFORCED_PRODUCTION
+      etter pilotdrift.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: >-
+        Selvgodkjenning eller lekket grant ved avslått admission (§98). En godkjenning av
+        en allerede endret handling.
+    reversering:
+      grad: Middels
+      tekst: Kø-poster kan avvises og utløpe; godkjente og utførte handlinger kan ikke trekkes
+        tilbake.
+    sikkerhet: Fersk re-gate, reviewer ≠ initiator, grant holdes tilbake og brukes når admission
+      nekter.
+    litteratur:
+    - kilde: 'SHELF-027 AID-Guard: revalidering ved commit'
+      referanse: arXiv 2608.21159
+      rolle: UNEVALUATED
+    - kilde: TOCTOU og re-autorisering
+      referanse: PROV-04
+      rolle: positioning_only
+    forutsetter:
+    - CAP-009
+    - CAP-003
+- id: CAP-008
+  register_at_source:
+    name: Degradation ladder G0-G4 with tamper-evident transition log
+    status: WIRED_REFERENCE_PATH
+    code:
+    - remora/governance/degradation.py
+    - scripts/remora_hook.py
+    tests:
+    - tests/test_degradation_ladder.py
+    - tests/test_hook_production_profile.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - CONTROLLED_PILOT≥WIRED_REFERENCE_PATH
+  assessment:
+    navn: Degraderingsstige G0–G4
+    klasse: Drift og sikkerhet
+    formaal: Reduserer privilegier trinnvis når avhengigheter svikter.
+    gjor: >-
+      G0–G4 med manipuleringsevident overgangslogg; G4 tillater bare positivt kjente lese-
+      og ikke-aktuerende typer.
+    naa: Hook håndhever G4 i produksjonsprofilen; ingen langlevd recorder-prosess er deployet.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: CONTROLLED_PILOT krever WIRED_REFERENCE_PATH.
+    sdd_hook: OPS / POLICY
+    sdd_modus: SHADOW → begrenset ENFORCE
+    sdd_endring: Degraderingsmodus og signerte overgangsgrunner på readiness-API; sentral
+      helse.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH med readiness-integrasjon.
+    risiko:
+      sannsynlighet: L
+      konsekvens: M
+      tekst: En feil i gjenopprettingen kan gi stille re-autorisering når en avhengighet kommer
+        tilbake.
+    reversering:
+      grad: Lett
+      tekst: Moduser er konfigurasjon; heving krever eksplisitt beslutning, aldri automatikk.
+    sikkerhet: Default-deny allowlist (_G4_ALLOWED_TYPES), ingen automatisk heving etter gjenoppretting.
+    litteratur:
+    - kilde: Simplex-arkitektur og fail-safe-design
+      referanse: prior-art for CAP-031-notatet
+      rolle: positioning_only
+    forutsetter:
+    - CAP-016
+- id: CAP-009
+  register_at_source:
+    name: RBAC (nine-role capability matrix, credential-bound audit identity)
+    status: WIRED_API_PATH
+    code:
+    - servers/api.py
+    tests:
+    - tests/test_rbac_isolation.py
+    - tests/test_rbac_role_contract.py
+    artifacts: []
+    docs: []
+    negative_results:
+    - 8
+    release_profile_requirements:
+    - CONTROLLED_PILOT≥WIRED_API_PATH
+  assessment:
+    navn: RBAC og revisjonsidentitet
+    klasse: 'Kjerne: identitet'
+    formaal: Avgjør hvem som får gjøre hva, og knytter hver revisjonspost til en credential.
+    gjor: Ni-rollers kapabilitetsmatrise; tenant-isolasjon; credential-bundet identitet.
+    naa: Symmetriske bearer-tokens; OIDC/MFA er veikart. REM-022 er DONE, REM-023 IN_PROGRESS.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: CONTROLLED_PILOT krever WIRED_API_PATH og at REM-023 er ferdig.
+    sdd_hook: ADMISSION / REVIEW
+    sdd_modus: ENFORCE
+    sdd_endring: OIDC workload-identitet, MFA for høyrisiko-godkjenning, token provider i
+      SDK.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION etter REM-023 og en verifisert IdP-integrasjon.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: Rolleforveksling, tenant-lekkasje eller kompromittert bearer-token gir uautorisert
+        godkjenning.
+    reversering:
+      grad: Middels
+      tekst: Roller kan trekkes tilbake (revoke-principal); utførte handlinger står.
+    sikkerhet: Kryss-tenant gir 404, egen operasjon kan ikke godkjennes, isolasjonstester.
+    litteratur:
+    - kilde: RES-009 Enterprise governance
+      referanse: idéfamilie
+      rolle: reference_design
+    - kilde: Separation of duties
+      referanse: klassisk
+      rolle: positioning_only
+    forutsetter: []
+- id: CAP-010
+  register_at_source:
+    name: Shared-engine concurrency safety (request-local cancellation, locked correlation
+      reads)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/correlation.py
+    - remora/engine.py
+    tests:
+    - tests/test_concurrency_rem036.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Samtidighetssikkerhet
+    klasse: Drift og sikkerhet
+    formaal: Holder den delte motoren korrekt under parallelle forespørsler.
+    gjor: Forespørselslokal kansellering og låste korrelasjonslesninger.
+    naa: Bibliotek; race-testet med 60 fan-outs og 100 korrelasjonstråder; ingen produksjonslast
+      målt.
+    nodvendighet: Nyttig
+    nodvendighet_begrunnelse: Trengs der oracle-runtime brukes; påvirker ikke autoritetsledgere.
+    sdd_hook: OPS / ADVISORY
+    sdd_modus: Aktiv bare der den kalles
+    sdd_endring: Ta i bruk i valgfri oracle-runtime, eksponere samtidighetsmodus og lastmetrikker.
+    oppnaelig_niva: WIRED_REFERENCE_PATH
+    oppnaelig_niva_tekst: WIRED_REFERENCE_PATH der oracle-runtime brukes.
+    risiko:
+      sannsynlighet: L
+      konsekvens: L
+      tekst: En race kan blande korrelasjonsdata mellom forespørsler; den gir ikke autoritet.
+    reversering:
+      grad: Lett
+      tekst: Ren kodeendring uten persistent tilstand.
+    sikkerhet: Trådsikkerhet i bibliotek; kryss-prosess-sikkerhet ligger i ledgerne, ikke
+      her.
+    litteratur: []
+    forutsetter: []
+- id: CAP-011
+  register_at_source:
+    name: OTel GenAI telemetry (gen_ai.* + remora.* spans, pinned schema)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/observability/otel.py
+    tests:
+    - tests/test_otel.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements:
+    - SHADOW_PILOT≥IMPLEMENTED_LIBRARY
+  assessment:
+    navn: OpenTelemetry GenAI
+    klasse: Observabilitet
+    formaal: Gir spor (spans) for drift og feilsøking.
+    gjor: gen_ai.* og remora.* spans med pinnet skjema.
+    naa: >-
+      Execution har allerede tracing: den styrte dispatchen lager et GenAI-span, og custody-hoppet
+      bærer W3C traceparent, med tester i tests/test_tracing_structural.py. Collector, alarmer
+      og operativ dekning mangler. Registerets «instrumentation helpers» henger etter.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: SHADOW_PILOT krever IMPLEMENTED_LIBRARY; drift av en pilot trenger
+      spor.
+    sdd_hook: OPS
+    sdd_modus: EVIDENCE_ONLY
+    sdd_endring: Spans i utførelse, SDK-forespørsels-IDer, outbox, review og avstemming; collector-eksempler.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH som EVIDENCE_ONLY.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: Tokens eller personopplysninger i span-attributter.
+    reversering:
+      grad: Lett
+      tekst: Eksport kan slås av uten å påvirke beslutninger.
+    sikkerhet: Redaksjon, ingen hemmeligheter i attributter; spor er ikke bevis for effekt.
+    litteratur:
+    - kilde: OpenTelemetry GenAI semantic conventions
+      referanse: standard
+      rolle: positioning_only
+    forutsetter: []
+- id: CAP-012
+  register_at_source:
+    name: AROMER cross-domain transfer measurement (abstract harm-prior backoff)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/aromer/evals/cross_domain_transfer.py
+    - remora/aromer/world_model/domain_prior.py
+    - scripts/run_cross_domain_transfer.py
+    tests:
+    - tests/test_cross_domain_transfer.py
+    artifacts:
+    - results/aromer_cross_domain_transfer_v1.json
+    docs: []
+    negative_results:
+    - 16
+    release_profile_requirements: []
+  assessment:
+    navn: AROMER tverrdomene
+    klasse: Forskning
+    formaal: Måler offline om skadepriorer overføres mellom domener.
+    gjor: Leave-one-domain-out over det kuraterte korpuset med abstrakt backoff.
+    naa: >-
+      Offline 83.8% overføringsnøyaktighet; ikke den levende worker-porten. Live er TRANSFER_UNMEASURED
+      (NEGATIVE_RESULTS §16).
+    nodvendighet: Forskning
+    nodvendighet_begrunnelse: Gir ingen autoritet og trengs ikke i pilot (ADR-UE-07).
+    sdd_hook: ADVISORY
+    sdd_modus: OFFLINE / SHADOW
+    sdd_endring: >-
+      Offline-artefakt og driftdashbord via assurance-endepunkt; eventuelt skygge-scoring
+      på samtykkede testdata.
+    oppnaelig_niva: IMPLEMENTED_LIBRARY
+    oppnaelig_niva_tekst: Forblir IMPLEMENTED_LIBRARY/SHADOW; ingen autoritetsheving i første
+      pilot.
+    risiko:
+      sannsynlighet: L
+      konsekvens: H
+      tekst: Feiltolket som autoritet kunne en lært prior senke et avslag. INV-02 forbyr det.
+    reversering:
+      grad: Lett
+      tekst: Offline-verktøy; kan fjernes fra pilotprofilen uten følger.
+    sikkerhet: 'INV-02: ingen modellautoritet; lærte forslag krever signert policyoppdatering.'
+    litteratur:
+    - kilde: AROMER
+      referanse: intern; NEGATIVE_RESULTS §16
+      rolle: library_only
+    forutsetter: []
+- id: CAP-013
+  register_at_source:
+    name: Governed tool dispatch (lease-bound, app-side credentials, deployment-config registry)
+    status: WIRED_API_PATH
+    code:
+    - remora/enforcement/lease.py
+    - remora/enforcement/lease_signing.py
+    - remora/enforcement/nonce_store.py
+    - remora/execution/projections.py
+    - remora/governance/effect_receipt.py
+    - remora/governance/tenant_chain.py
+    - servers/execution_api.py
+    - servers/tool_registry_research.py
+    tests:
+    - tests/test_effect_receipt_atomicity.py
+    - tests/test_effect_record_endpoint.py
+    - tests/test_enforcement_ledgers_postgres.py
+    - tests/test_execution_api.py
+    - tests/test_lease_authority_custody.py
+    - tests/test_lease_nonce_durability.py
+    - tests/test_tool_registry_research.py
+    artifacts: []
+    docs:
+    - docs/deployment/authority-custody-evidence.md
+    negative_results:
+    - 47
+    - 48
+    release_profile_requirements: []
+  assessment:
+    navn: Styrt verktøydispatch
+    klasse: 'Kjerne: utførelse'
+    formaal: Den eneste veien fra autorisasjon til effekt.
+    gjor: >-
+      Lease-bundet dispatch med credentials på applikasjonssiden, registry fra deployment,
+      outbox og strukturert utfall.
+    naa: >-
+      Utfall REFUSED/UNKNOWN/FAILED/SUCCEEDED (NEGATIVE_RESULTS §48); FAILED kan ikke nås
+      på synkron sti. UNKNOWN prøves aldri på nytt; outboxen avstemmer foreldede dispatcher
+      til UNKNOWN.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: Uten den finnes ingen kontrollert skrivevei. REM-024 (PEP) er
+      IN_PROGRESS.
+    sdd_hook: EXECUTION
+    sdd_modus: ENFORCE
+    sdd_endring: >-
+      SDK submit/poll på eksisterende DispatchOutcome og PendingExecution; krasjtester før,
+      under og etter dispatch; skann etter alternative stier.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: >-
+      ENFORCED_PRODUCTION i pilot; uavhengig interception-validering (REM-030) trengs for
+      LIMITED_ENFORCEMENT.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: >-
+        En annen prosess med egne credentials omgår dispatcheren. UNKNOWN behandlet som ikke-utført
+        gir dobbel effekt.
+    reversering:
+      grad: Vanskelig
+      tekst: Utførte effekter kan ikke angres. En stoppbryter hindrer nye handlinger uten
+        å slette bevis.
+    sikkerhet: Lease, nonce, durable outbox, aldri retry av UNKNOWN, reconcile_stale som bare
+      setter UNKNOWN.
+    litteratur:
+    - kilde: RES-012 Task-bound authority
+      referanse: Yan, arXiv 2608.27443
+      rolle: implemented_and_tested
+    - kilde: AEGIS pre-execution mediator
+      referanse: arXiv 2603.12621
+      rolle: positioning_only
+    - kilde: LlamaFirewall
+      referanse: arXiv 2505.03574 (PROV-07)
+      rolle: positioning_only
+    forutsetter:
+    - CAP-003
+    - CAP-004
+    - CAP-005
+    - CAP-017
+- id: CAP-014
+  register_at_source:
+    name: Declared-effect consistency (expected_effect_matches tri-state authority)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/policy/decision_engine.py
+    - remora/toolcall/routing/effect_prediction.py
+    - remora/toolcall/routing/tool_contract.py
+    tests:
+    - tests/test_effect_prediction.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Deklarert-effekt-konsistens
+    klasse: Policy
+    formaal: Avviser kall der verktøyets deklarerte effekt motsier forespørselen.
+    gjor: >-
+      Avviser leseforespørsel betjent av muterende verktøy og omvendt; strammer et muterende
+      verktøy uten state_delta fra SUPPORTED til UNKNOWN.
+    naa: I motorens betingede porter og rutingsevaluering, ikke /v1/assess. Diskriminering
+      er ikke målt.
+    nodvendighet: Nyttig
+    nodvendighet_begrunnelse: Fanger en klasse feil billig, men treffsikkerheten er ukjent.
+    sdd_hook: POLICY
+    sdd_modus: VERIFY → betinget ENFORCE (bare negativ)
+    sdd_endring: Binde ved pre-dispatch; eksponere mismatch mot unknown med bevislenke.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH; ingen treffsikkerhetspåstand før måling.
+    risiko:
+      sannsynlighet: M
+      konsekvens: L
+      tekst: Kan bare stramme. Falske avslag reduserer nytte; ingen nøyaktighet kan siteres.
+    reversering:
+      grad: Lett
+      tekst: None endrer ingenting, så å slå av fjerner bare innstramming.
+    sikkerhet: Bare etablert False utløser; ukjent konverteres aldri til match.
+    litteratur:
+    - kilde: SHELF-001 ToolGuardian
+      referanse: arXiv 2607.21835
+      rolle: ADOPTED
+    - kilde: SHELF-002 Sample, Predict, then Proceed
+      referanse: arXiv 2506.02918
+      rolle: ADOPTED
+    - kilde: SHELF-012 Agent-C temporal constraints
+      referanse: arXiv 2512.23738
+      rolle: PARTIAL
+    forutsetter:
+    - CAP-001
+- id: CAP-015
+  register_at_source:
+    name: Runtime invariant enforcement (CORE_INVARIANTS evaluated on every decision)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/policy/decision_engine.py
+    - remora/policy/invariants.py
+    tests:
+    - tests/test_runtime_invariant_enforcement.py
+    artifacts: []
+    docs:
+    - NEGATIVE_RESULTS.md
+    negative_results:
+    - 40
+    release_profile_requirements: []
+  assessment:
+    navn: Kjøretidsinvarianter
+    klasse: Assurance
+    formaal: Fanger at harde vakter og deklarerte invarianter har drevet fra hverandre.
+    gjor: CORE_INVARIANTS sjekkes på hver bygget beslutning og feiler lukket til INVARIANT_VIOLATION_ESCALATE.
+    naa: Runtime-kaller siden 2026-08-20 (før det kun testfixture; §40). Registrert som IMPLEMENTED_LIBRARY.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Billig sikkerhetsnett mot regresjon i beslutningsmotoren.
+    sdd_hook: POLICY / ASSURANCE
+    sdd_modus: ENFORCE som invariantkontroll
+    sdd_endring: Versjon og brudd i capability-trace; ny test som fjerner en vakt og krever
+      invariantfeil.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: Plausibelt WIRED_API_PATH etter registerreview; selve kallet finnes
+      allerede.
+    risiko:
+      sannsynlighet: L
+      konsekvens: M
+      tekst: >-
+        Falsk trygghet hvis invariantene ikke dekker vaktene; verify_invariants=False finnes
+        og må låses i pilot.
+    reversering:
+      grad: Lett
+      tekst: Kan bare gjøre strengere; å slå av fjerner et sikkerhetsnett.
+    sikkerhet: Fail-closed til ESCALATE med navngitt invariant i revisjonsforklaringen.
+    litteratur:
+    - kilde: RES-023 Semantisk autoritet
+      referanse: intern
+      rolle: implemented_and_tested
+    - kilde: NEGATIVE_RESULTS §40
+      referanse: drift mellom vakter og invarianter
+      rolle: record
+    forutsetter:
+    - CAP-001
+- id: CAP-016
+  register_at_source:
+    name: Structured governance events (operational logging in the safety core)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/enforcement/gate.py
+    - remora/observability/events.py
+    - remora/policy/decision_engine.py
+    tests:
+    - tests/test_governance_events.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Styringshendelser
+    klasse: Observabilitet
+    formaal: 'Operasjonell logg fra sikkerhetskjernen: hva prosessen gjorde.'
+    gjor: Strukturerte hendelser fra policy, enforcement og execution.
+    naa: Bibliotek; kjernen hadde null loggere før 2026-08-20.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Hendelseshåndtering i en pilot krever operasjonelle logger.
+    sdd_hook: OPS / AUDIT
+    sdd_modus: EVIDENCE_ONLY
+    sdd_endring: >-
+      Hendelser i alle beslutnings-, godkjennings-, dispatch-, avslags-, gjenopprettings-,
+      limits- og føderasjonsstier.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH som EVIDENCE_ONLY.
+    risiko:
+      sannsynlighet: M
+      konsekvens: L
+      tekst: Personopplysninger i logger; logger forveksles med signert bevis.
+    reversering:
+      grad: Lett
+      tekst: Loggnivå og eksport er konfigurasjon.
+    sikkerhet: PII-redaksjon; revisjonskjeden er governance-posten, loggen er bare drift.
+    litteratur: []
+    forutsetter:
+    - CAP-011
+- id: CAP-017
+  register_at_source:
+    name: Production fail-closed on signing keys
+    status: WIRED_API_PATH
+    code:
+    - servers/api.py
+    tests:
+    - tests/test_audit_chain_integrity.py
+    artifacts: []
+    docs:
+    - docs/deployment/execution-quickstart.md
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Fail-closed signeringsnøkler
+    klasse: 'Kjerne: nøkler'
+    formaal: Hindrer at produksjon starter uten signeringsnøkler.
+    gjor: >-
+      REMORA_ENVELOPE_SIGNING_KEY og REMORA_PDP_SIGNING_KEY er produksjonsforutsetninger;
+      serveren nekter oppstart uten dem.
+    naa: >-
+      Før 2026-08-20 startet produksjon uten nøkler og skrev signature: null. Signering er
+      ulik per objekt: grants har Ed25519 (v3, verify-only), leases har Ed25519 med HMAC avvist
+      med mindre REMORA_LEASE_ACCEPT_HMAC er eksplisitt aktivert, og audit-konvolutter signeres
+      med HMAC. Registerets «Symmetric HMAC only» henger etter for grants og leases. Sikker
+      nøkkelfordeling i en deployment er ikke dokumentert.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: Uten signatur er revisjonskjeden manipuleringsevident bare i
+      navnet.
+    sdd_hook: ADMISSION / OPS
+    sdd_modus: ENFORCE
+    sdd_endring: Readiness som viser signer, custody, trust pins og rotasjon; aldri privat
+      nøkkelmateriale i API.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION; KMS/HSM-custody må etableres per deployment.
+    risiko:
+      sannsynlighet: L
+      konsekvens: H
+      tekst: >-
+        Kompromittert nøkkel. Audit-HMAC lar den som kan verifisere også signere; grants og
+        leases har asymmetrisk alternativ.
+    reversering:
+      grad: Middels
+      tekst: Nøkkelrotasjon med dokumentert livssyklus; gamle signaturer beholdes for verifisering.
+    sikkerhet: Oppstartsnekt, custody-split mellom autoritets- og utførelsesdomene.
+    litteratur:
+    - kilde: Key custody og separation of duty
+      referanse: 'PROV-15: klassisk'
+      rolle: positioning_only
+    forutsetter: []
+- id: CAP-018
+  register_at_source:
+    name: Task-bound authority and non-decaying loop safety on the execution API
+    status: WIRED_API_PATH
+    code:
+    - remora/execution/service.py
+    - remora/governance/delegation.py
+    - remora/governance/loop_safety.py
+    - remora/governance/task_identity.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_delegated_execution_and_approval_policy.py
+    - tests/test_loop_safety.py
+    - tests/test_review_path_audit_r3.py
+    - tests/test_review_path_binding.py
+    - tests/test_task_bound_lease_and_envelope.py
+    - tests/test_task_identity_server_path.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Oppgavebundet autoritet og loop-sikkerhet
+    klasse: 'Kjerne: autoritet'
+    formaal: Binder autoritet til én oppgave og holder sikkerhetstilstand som ikke avtar over
+      iterasjoner.
+    gjor: >-
+      Oppgaveidentitet i lease og konvolutt; teller avslag, verktøybytter, autoritetsprober
+      og irreversible effekter.
+    naa: Oppgavefelt er valgfrie uten REMORA_REQUIRE_TASK_IDENTITY; loop-terskler er ukalibrerte
+      standarder.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Nødvendig for skriveverktøy i Tier C; lesing kan gå i skygge.
+    sdd_hook: AUTHORITY_INPUT / PRE_DISPATCH
+    sdd_modus: ENFORCE på skriving; skygge på lesing
+    sdd_endring: Obligatorisk oppgaveidentitet for høyrisiko; kalibrering på holdt-ut godartet
+      last.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION for skriveverktøy etter kalibrering.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: Ukalibrerte terskler blokkerer for mye eller for lite; skade fordelt over legitime
+        enkelthandlinger.
+    reversering:
+      grad: Middels
+      tekst: Kravet kan slås av via flagg, men loop-tilstand nullstilles ikke stille.
+    sikkerhet: Oppgave i lease, varig loop-lager, reset bare via eget endepunkt.
+    litteratur:
+    - kilde: RES-012 Task-bound authority
+      referanse: Yan, arXiv 2608.27443
+      rolle: implemented_and_tested
+    - kilde: SHELF-031 Safety Does Not Compose
+      referanse: arXiv 2608.27141
+      rolle: ADOPTED
+    - kilde: Distributed Attacks in Persistent-State AI Control
+      referanse: arXiv 2607.02514 (ikke i repo)
+      rolle: absent
+    forutsetter:
+    - CAP-013
+- id: CAP-019
+  register_at_source:
+    name: Evidence coverage verdicts on the evidence export
+    status: WIRED_API_PATH
+    code:
+    - remora/governance/evidence_coverage.py
+    - servers/execution_api.py
+    tests:
+    - tests/capabilities/test_success_established.py
+    - tests/test_evidence_coverage.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Bevisdekning
+    klasse: Bevis og revisjon
+    formaal: Sier om de navngitte bevistypene finnes og er intakte.
+    gjor: COMPLETE, AUTHENTIC_BUT_INCOMPLETE, TAMPERED eller INCONCLUSIVE i /proposals/{id}/evidence.
+    naa: Koblet; to kontrakter definert. Dekning sier ikke om en effektobservasjon var korrekt.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Gjør manglende bevis synlig i pilotens bevispakke.
+    sdd_hook: AUDIT
+    sdd_modus: EVIDENCE_ONLY + admission-vern
+    sdd_endring: SDK-typer og capability-trace med eksisterende CoverageStatus.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH (finnes) med SDK-dekning.
+    risiko:
+      sannsynlighet: M
+      konsekvens: L
+      tekst: Dekning tolket som sannhet; en kontrakt er bare så fullstendig som forfatteren
+        gjorde den.
+    reversering:
+      grad: Lett
+      tekst: Ren lesesti.
+    sikkerhet: TAMPERED og INCONCLUSIVE skjules ikke for kunden.
+    litteratur:
+    - kilde: RES-014 Evidence completeness
+      referanse: intern (WS7 Q7.3)
+      rolle: implemented_and_tested
+    - kilde: SHELF-038 Silence Is Endorsement
+      referanse: arXiv 2609.20211
+      rolle: UNEVALUATED
+    forutsetter:
+    - CAP-005
+    - CAP-021
+- id: CAP-020
+  register_at_source:
+    name: 'Pre-dispatch premise checks: resolved effect, plan premises, procedure obligations'
+    status: WIRED_API_PATH
+    code:
+    - remora/enforcement/lease.py
+    - remora/enforcement/resolved_effect.py
+    - remora/governance/plan_binding.py
+    - remora/governance/procedure.py
+    - scripts/generate_resolved_effect_fixtures.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_plan_binding.py
+    - tests/test_procedure_contracts.py
+    - tests/test_resolved_effect_binding.py
+    - tests/test_ws7_server_path.py
+    artifacts:
+    - artifacts/resolved_effect/fixtures_v1.json
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Premissjekker før dispatch
+    klasse: Pre-dispatch
+    formaal: Stopper en handling når en premiss har endret seg mellom vurdering og utførelse.
+    gjor: Løst effekt, planpremisser og prosedyreforpliktelser sjekkes mot ferske lesninger.
+    naa: >-
+      Alt er opt-in; effektregister, revisjonsleser og prosedyrespor leveres av deployment
+      og sjekkes ikke for korrekthet.
+    nodvendighet: Nyttig
+    nodvendighet_begrunnelse: Nødvendig for verktøy der tilstand kan endres mellom godkjenning
+      og utførelse.
+    sdd_hook: PRE_DISPATCH
+    sdd_modus: SHADOW → betinget ENFORCE
+    sdd_endring: Uavhengig kildefestede kontrollører, ikke-transitiv fullføringslogikk.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH med ENFORCE per verktøy.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: En feil leverandørleser gir falsk trygghet; utledet avhengighet kan ikke autorisere.
+    reversering:
+      grad: Lett
+      tekst: Hver sjekk slås av per verktøy.
+    sikkerhet: Fail-closed når leseren feiler; planen signeres inn i lease.
+    litteratur:
+    - kilde: RES-015 Closed-world resolution (SHELF-033)
+      referanse: Iyer, arXiv 2609.19425
+      rolle: implemented_and_tested
+    - kilde: RES-016 PlanFence (SHELF-032)
+      referanse: Chen m.fl., arXiv 2609.03340
+      rolle: implemented_and_tested
+    - kilde: RES-018 ContractEval (SHELF-035)
+      referanse: Singh m.fl., arXiv 2609.09458
+      rolle: implemented_and_tested
+    - kilde: SHELF-036 Symbolic temporal supervision
+      referanse: arXiv 2609.18128
+      rolle: PARTIAL
+    forutsetter:
+    - CAP-013
+- id: CAP-021
+  register_at_source:
+    name: 'Independent recorder: evidence captured outside the executing process'
+    status: WIRED_API_PATH
+    code:
+    - remora/audit/recorder.py
+    - remora/enforcement/lease.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_independent_recorder.py
+    - tests/test_ws7_server_path.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Uavhengig recorder
+    klasse: Bevis og revisjon
+    formaal: Fanger bevis utenfor prosessen som utfører handlingen.
+    gjor: >-
+      Append-only lager i egen prosess; intensjon skrives før nonce; recorder_unavailable
+      feiler lukket for obligatoriske verktøy.
+    naa: >-
+      Referanseimplementasjon; separasjonen er bare så sterk som OS-grensen deployment konfigurerer.
+      Kvitteringer avslører, men forhindrer ikke.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Kreves der piloten påstår uavhengig bevis.
+    sdd_hook: AUDIT / EFFECT
+    sdd_modus: SHADOW → betinget EVIDENCE_ONLY
+    sdd_endring: Recorder-helse på readiness; SDK-visning av kvitteringer; eget tillitsdomene.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH på separat host; varig uavhengig sink overlapper
+      REM-025.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: Merket uavhengig selv om samme administrator kan forfalske eller undertrykke.
+    reversering:
+      grad: Lett
+      tekst: Av betyr bare at ingen uavhengighet påstås.
+    sikkerhet: Fail-closed, kvitteringer med confirm, intensjon før effekt.
+    litteratur:
+    - kilde: RES-017 LLM Agents Can Easily Tamper With Their Own Traces (SHELF-030)
+      referanse: Qin m.fl., arXiv 2609.30266
+      rolle: implemented_and_tested
+    forutsetter:
+    - CAP-005
+- id: CAP-022
+  register_at_source:
+    name: 'Runtime surface reference path: surface binding, closure identity, issuer scope,
+      durable evidence'
+    status: WIRED_REFERENCE_PATH
+    code:
+    - remora/enforcement/lease.py
+    - remora/toolcall/credential_issuer.py
+    - remora/toolcall/signed_surface_runtime.py
+    - remora/toolcall/surface_evaluation.py
+    - remora/toolcall/surface_runtime.py
+    - scripts/measure_surface_binding_shadow.py
+    tests:
+    - tests/test_callable_closure_digest.py
+    - tests/test_credential_issuer_scope.py
+    - tests/test_surface_evidence_durability.py
+    - tests/test_surface_lease_binding.py
+    artifacts:
+    - artifacts/runtime_surface/surface_binding_shadow_v1.json
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Kjøretidsflate
+    klasse: Autoritet og drift
+    formaal: Observerer hvilke verktøy og credentials en runtime faktisk tilbyr.
+    gjor: Flatebinding, closure-identitet, utstederomfang og varig bevis.
+    naa: >-
+      Bare referanseruntime; global flatefullstendighet er NOT_ESTABLISHED til observatøren
+      kjører i en navngitt ekstern host.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: G07 (ekstern flate) kan ikke bli grønn uten den.
+    sdd_hook: AUTHORITY_INPUT / OPS
+    sdd_modus: Bare SHADOW til ekstern host-bevis
+    sdd_endring: Attestert plugin i ekstern host som rapporterer verktøy, closure-digest og
+      credential-stier.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH i SHADOW; den globale egenskapen kan forbli NOT_ESTABLISHED.
+    risiko:
+      sannsynlighet: H
+      konsekvens: H
+      tekst: En ukjent bypass-rute med direkte credentials gjør alle andre garantier lokale.
+    reversering:
+      grad: Lett
+      tekst: Observasjon uten autoritet.
+    sikkerhet: Closure-digest og utstederomfang; porten løftes aldri automatisk.
+    litteratur:
+    - kilde: RES-013 Observed runtime surface
+      referanse: intern
+      rolle: implemented_and_tested
+    - kilde: Assurance case-disiplin
+      referanse: Kelly 1998 (PROV-09)
+      rolle: positioning_only
+    forutsetter:
+    - CAP-013
+    - CAP-024
+- id: CAP-023
+  register_at_source:
+    name: 'Capability minimization: task-scoped capability sets enforced at assess, execution
+      and dispatch'
+    status: WIRED_API_PATH
+    code:
+    - remora/capabilities/constraints.py
+    - remora/capabilities/delegation.py
+    - remora/capabilities/model.py
+    - remora/capabilities/projector.py
+    - remora/capabilities/resolver.py
+    - remora/capabilities/resource.py
+    - remora/capabilities/revocation.py
+    - remora/enforcement/lease.py
+    - remora/execution/service.py
+    - servers/execution_api.py
+    tests:
+    - tests/capabilities/test_capability_constraints.py
+    - tests/capabilities/test_capability_delegation.py
+    - tests/capabilities/test_capability_enforcement.py
+    - tests/capabilities/test_capability_projection.py
+    - tests/capabilities/test_capability_resource.py
+    - tests/capabilities/test_capability_revocation.py
+    - tests/capabilities/test_capability_server_path.py
+    - tests/capabilities/test_capability_set.py
+    - tests/test_conformance_non_transitivity.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Kapabilitetsminimering
+    klasse: 'Kjerne: autoritet'
+    formaal: Gir hver oppgave bare de verktøyene den trenger.
+    gjor: >-
+      Oppgaveavgrensede kapabilitetssett håndheves ved assess, utførelse og dispatch; projeksjon
+      via GET /v1/execution/capabilities.
+    naa: >-
+      Opt-in; oppgavetypen deklareres av kaller og snevrer bare inn. Krever en intensjonskilde
+      for å bli autoritativ.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: Kontrollerte skriveverktøy i Tier C skal ha minimerte sett.
+    sdd_hook: ADMISSION / POLICY / PRE_DISPATCH
+    sdd_modus: ENFORCE for kontrollerte skriveverktøy
+    sdd_endring: Obligatorisk signert, oppgaveavgrenset sett; SDK-forklaringer på avslag.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION for pilotens skriveverktøy.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: Uten autoritativ intensjonskilde kan kaller velge en bredere oppgavetype.
+    reversering:
+      grad: Lett
+      tekst: Uten policy oppfører API-et seg som før; piloten skal ikke tillate det.
+    sikkerhet: Bare delmengde-delegering, revokasjonsepoker, server-side håndhevelse uansett
+      klient.
+    litteratur:
+    - kilde: RES-020 Capability minimization
+      referanse: intern design (WS8)
+      rolle: implemented_and_tested
+    - kilde: Progent (SHELF-009)
+      referanse: arXiv 2504.11703
+      rolle: positioning_only
+    - kilde: CaMeL
+      referanse: arXiv 2503.18813
+      rolle: positioning_only
+    forutsetter:
+    - CAP-009
+    - CAP-018
+- id: CAP-024
+  register_at_source:
+    name: >-
+      Capability mediation for implementation effects, with an effect domain for strict deployments
+      (NTA-2 phases 1 to 3)
+    status: WIRED_API_PATH
+    code:
+    - remora/capabilities/ceiling.py
+    - remora/capabilities/resource.py
+    - remora/enforcement/capability_mediator.py
+    - remora/enforcement/custody.py
+    - remora/enforcement/effect_capability.py
+    - remora/enforcement/effect_client.py
+    - remora/enforcement/effect_domain.py
+    - remora/enforcement/effect_graph.py
+    - remora/enforcement/execution_context.py
+    - remora/enforcement/lease.py
+    - remora/toolcall/toolspec.py
+    - servers/execution_api.py
+    tests:
+    - tests/capabilities/test_capability_mediation.py
+    - tests/capabilities/test_dispatcher_mediation.py
+    - tests/capabilities/test_effect_domain.py
+    - tests/capabilities/test_effect_domain_server.py
+    - tests/capabilities/test_effect_graph.py
+    - tests/capabilities/test_mediation_server_path.py
+    - tests/conformance/test_custody_effect_domain.py
+    - tests/test_conformance_non_transitivity.py
+    - tests/test_toolspec_downstream.py
+    artifacts: []
+    docs: []
+    negative_results:
+    - 63
+    release_profile_requirements: []
+  assessment:
+    navn: Effektmediering og credential-isolasjon
+    klasse: 'Kjerne: utførelse'
+    formaal: Holder et verktøys nestede effekter innenfor autoriteten som ble gitt.
+    gjor: >-
+      Mediator per registrert verktøy; tre-domene-split fjerner deklarerte effekt-credentials
+      fra verktøyets prosess.
+    naa: >-
+      Opt-in; forskningsregistret registrerer ingen. I to-domene-split kjører mediatoren i
+      verktøyets prosess og kan omgås med direkte credentials (§63).
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Kreves for strenge skriveverktøy i Tier C.
+    sdd_hook: EXECUTION / EFFECT
+    sdd_modus: Betinget ENFORCE med custody-bevis
+    sdd_endring: Streng mediert topologi for registrerte effektverktøy i pilot.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION for registrerte verktøy i tre-domene-split.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: Udeklarerte credentials i verktøyprosessen; nestet effekt utenfor autoritet.
+    reversering:
+      grad: Middels
+      tekst: Topologien kan rulles tilbake, men det gjenåpner credential-eksponeringen.
+    sikkerhet: Tre-domene custody, effektgraf, nekt eller karantene ved forsøk på direkte
+      tilgang.
+    litteratur:
+    - kilde: RES-024 Authority-preserving effect mediation (NTA-2)
+      referanse: intern design
+      rolle: implemented_and_tested
+    - kilde: Non-transitivity of authority
+      referanse: PROV-10; CaMeL, Progent
+      rolle: positioning_only
+    forutsetter:
+    - CAP-013
+    - CAP-023
+    - CAP-017
+- id: CAP-META
+  register_at_source:
+    name: Metatesting of the evidence regime (audit gates are mutation-tested)
+    status: IMPLEMENTED_LIBRARY
+    code: []
+    tests:
+    - tests/meta/test_divergence.py
+    - tests/meta/test_register_evidences.py
+    artifacts: []
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Metatesting av bevisregimet
+    klasse: Assurance
+    formaal: Holder registeret ærlig ved å mutasjonsteste revisjonsportene.
+    gjor: Tester som feiler når en påstand, test eller kildepinne endres uten at registeret
+      følger.
+    naa: Dekker grunnleggende påstandsparsing og strukturelt bevis, ikke all prosa.
+    nodvendighet: Nødvendig
+    nodvendighet_begrunnelse: Uten den kan modenhet drive oppover uten bevis.
+    sdd_hook: ASSURANCE / OPS
+    sdd_modus: EVIDENCE_ONLY (CI + lese-API)
+    sdd_endring: Dekning, mutasjonsscore og påstandsdrift i foreslått /v1/assurance/coverage.
+    oppnaelig_niva: IMPLEMENTED_LIBRARY
+    oppnaelig_niva_tekst: Forblir CI-kontroll; et lese-API kan aldri sette assurance-grad.
+    risiko:
+      sannsynlighet: L
+      konsekvens: M
+      tekst: Prosa som overdriver fanges ikke automatisk.
+    reversering:
+      grad: Lett
+      tekst: CI-endring.
+    sikkerhet: Ingen endepunkt kan sette assurance-grad.
+    litteratur:
+    - kilde: RES-021 Mutation analysis
+      referanse: DeMillo, Lipton & Sayward 1978
+      rolle: library_only
+    forutsetter: []
+- id: CAP-025
+  register_at_source:
+    name: >-
+      Evidence admission for sufficiency premises (CoSAI §7.4: visibility, coverage, vantage,
+      binding, prior commitment)
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/evidence/admission/admission.py
+    - remora/evidence/admission/canonical.py
+    - remora/evidence/admission/models.py
+    - remora/evidence/admission/reasons.py
+    tests:
+    - tests/test_evidence_admission_adversarial.py
+    - tests/test_evidence_admission_coverage_trust.py
+    - tests/test_evidence_admission_isolation.py
+    - tests/test_evidence_admission_models.py
+    - tests/test_evidence_admission_processing.py
+    artifacts: []
+    docs:
+    - docs/design/evidence-admission-v1.md
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Evidence admission
+    klasse: Bevis og revisjon
+    formaal: Avgjør om et innsendt bevis kan brukes som premiss.
+    gjor: >-
+      CoSAI §7.4-premisser: synlighet, dekning, ståsted, binding og forhåndsforpliktelse;
+      skiller feilformet input fra fakta.
+    naa: 'Bare bibliotek: ingenting i runtime leser en EvidenceAdmission.'
+    nodvendighet: Nyttig
+    nodvendighet_begrunnelse: Trengs når piloten tar imot eksterne observasjoner.
+    sdd_hook: ADMISSION / EVIDENCE
+    sdd_modus: SHADOW → EVIDENCE_ONLY, aldri rå autoritet
+    sdd_endring: Avgrenset, skjemabevisst inntak med produsent, ståsted og binding.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH som EVIDENCE_ONLY.
+    risiko:
+      sannsynlighet: M
+      konsekvens: M
+      tekst: '''Admitted'' tolket som at premissen er sann eller at observatøren er uavhengig.'
+    reversering:
+      grad: Lett
+      tekst: Bibliotek; inntaket kan stenges.
+    sikkerhet: Grensede payloads, skjemaavhengige parsere, ingen autoritet.
+    litteratur:
+    - kilde: CoSAI §7.4 premisser
+      referanse: docs/design/evidence-admission-v1.md
+      rolle: design
+    - kilde: SHELF-038 Silence Is Endorsement
+      referanse: arXiv 2609.20211
+      rolle: UNEVALUATED
+    forutsetter:
+    - CAP-019
+- id: CAP-026
+  register_at_source:
+    name: >-
+      Federation Bridge: native federation envelope, transport capability declarations, loss-aware
+      claim projection and projection records
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/federation/canonical.py
+    - remora/federation/capabilities.py
+    - remora/federation/evidence.py
+    - remora/federation/lifecycle.py
+    - remora/federation/models.py
+    - remora/federation/projection.py
+    tests:
+    - tests/test_federation_bridge.py
+    artifacts: []
+    docs:
+    - docs/interop/FEDERATION_BRIDGE.md
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Federation Bridge
+    klasse: Føderasjon
+    formaal: Fører REMORA-bevis over til andre systemers formater uten å skjule tap.
+    gjor: Nativ konvolutt, transportdeklarasjoner og tapsbevisst projeksjon.
+    naa: Bare bibliotek; kaller bygger og signerer konvolutten selv.
+    nodvendighet: Valgfri
+    nodvendighet_begrunnelse: Interop, ikke en forutsetning for pilot.
+    sdd_hook: FEDERATION
+    sdd_modus: EVIDENCE_ONLY
+    sdd_endring: Server-side bridge og SDK federation.export/read.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH som EVIDENCE_ONLY.
+    risiko:
+      sannsynlighet: M
+      konsekvens: L
+      tekst: Projeksjonstap tolket som full påstand.
+    reversering:
+      grad: Lett
+      tekst: Ingen effekt på beslutninger.
+    sikkerhet: Et føderasjonsresultat gir aldri autoritet.
+    litteratur:
+    - kilde: Federation-kontrakten
+      referanse: docs/interop/FEDERATION_BRIDGE.md
+      rolle: design
+    forutsetter:
+    - CAP-005
+- id: CAP-027
+  register_at_source:
+    name: >-
+      federation-port/v0 adapter: REMORA authorization evidence verified inside an unmodified
+      federation-port runtime
+    status: WIRED_REFERENCE_PATH
+    code:
+    - remora/federation/transports/federation_port_v0.py
+    - scripts/build_federation_port_v0_fixtures.py
+    tests:
+    - tests/test_federation_bridge.py
+    artifacts:
+    - artifacts/interop/federation-port-v0/capabilities.yaml
+    - artifacts/interop/federation-port-v0/fixtures.json
+    - artifacts/interop/federation-port-v0/projection-map.yaml
+    docs: []
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: federation-port v0-adapter
+    klasse: Føderasjon
+    formaal: Viser at REMORA-bevis kan verifiseres i en uendret federation-port-runtime.
+    gjor: Adapter og fixtures signert med publiserte testnøkler i lokal runtime med simulert
+      refusjon.
+    naa: Produsentskrevet; uavhengighet NOT_ESTABLISHED til en annen part reproduserer.
+    nodvendighet: Valgfri
+    nodvendighet_begrunnelse: Interop-demonstrasjon.
+    sdd_hook: FEDERATION / INTEGRATION
+    sdd_modus: SHADOW / REFERENCE til ekstern operatør
+    sdd_endring: Separat versjonert valgfri pakke; installasjons- og verifiseringsstatus i
+      API.
+    oppnaelig_niva: WIRED_REFERENCE_PATH
+    oppnaelig_niva_tekst: WIRED_REFERENCE_PATH til ekstern reproduksjon.
+    risiko:
+      sannsynlighet: L
+      konsekvens: L
+      tekst: Testnøkler forveksles med produksjonsnøkler.
+    reversering:
+      grad: Lett
+      tekst: Valgfri adapter.
+    sikkerhet: Testnøkkel-isolasjon; den smale påstanden er eksplisitt.
+    litteratur: []
+    forutsetter:
+    - CAP-026
+- id: CAP-028
+  register_at_source:
+    name: >-
+      Federation report-specific binding: subject, evidence selection and native result signed
+      with each Federation result
+    status: IMPLEMENTED_LIBRARY
+    code:
+    - remora/federation/evidence.py
+    - remora/federation/results.py
+    - remora/federation/subjects.py
+    tests:
+    - tests/test_federation_bridge.py
+    - tests/test_federation_report_selection.py
+    artifacts: []
+    docs:
+    - docs/interop/FEDERATION_BRIDGE.md
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Rapportspesifikke signerte resultater
+    klasse: Føderasjon
+    formaal: Binder et føderasjonsresultat til ett subjekt, ett bevisutvalg og én nativ dom.
+    gjor: Signert resultat per rapport; feil subjekt, ekstra eller tvetydig rapport avvises.
+    naa: Bibliotek og testnivå; LATE-tilfellene er lokale syntetiske reproduksjoner.
+    nodvendighet: Valgfri
+    nodvendighet_begrunnelse: Interop.
+    sdd_hook: FEDERATION / AUDIT
+    sdd_modus: EVIDENCE_ONLY
+    sdd_endring: Server-API og typet SDK-kvittering.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH som EVIDENCE_ONLY.
+    risiko:
+      sannsynlighet: L
+      konsekvens: M
+      tekst: Resultatet bærer verifikatorens dom, ikke bevis for at verifikatoren er korrekt.
+    reversering:
+      grad: Lett
+      tekst: Lesesti.
+    sikkerhet: Signatur og digest per rapport; claim ceiling følger med.
+    litteratur: []
+    forutsetter:
+    - CAP-026
+- id: CAP-029
+  register_at_source:
+    name: >-
+      federation-port/v0 report-result component: a new action gated on REMORA's native result
+      for one explicitly requested report
+    status: WIRED_REFERENCE_PATH
+    code:
+    - scripts/build_federation_port_v0_fixtures.py
+    tests:
+    - tests/test_federation_bridge.py
+    - tests/test_federation_report_selection.py
+    artifacts:
+    - artifacts/interop/federation-port-v0/projection-map.yaml
+    - artifacts/interop/federation-port-v0/report-results.json
+    docs:
+    - docs/interop/FEDERATION_BRIDGE.md
+    negative_results: []
+    release_profile_requirements: []
+  assessment:
+    navn: Report-result-port
+    klasse: Føderasjon
+    formaal: Lar en ny handling avhenge av REMORAs dom på én eksplisitt forespurt rapport.
+    gjor: Kan bare snevre inn en ny handling.
+    naa: Fixtures med testnøkler; sjekker en tidligere rapport, aldri effekten som utføres
+      nå.
+    nodvendighet: Valgfri
+    nodvendighet_begrunnelse: Interop.
+    sdd_hook: FEDERATION / POLICY
+    sdd_modus: SHADOW → valgfri hard-negativ port
+    sdd_endring: Eksplisitt requested-report-regel i ToolSpec.
+    oppnaelig_niva: WIRED_REFERENCE_PATH
+    oppnaelig_niva_tekst: WIRED_REFERENCE_PATH; hard-negativ bare etter egen spesifikasjon.
+    risiko:
+      sannsynlighet: L
+      konsekvens: M
+      tekst: En gammel rapport fremmet til autoritet for en ny handling.
+    reversering:
+      grad: Lett
+      tekst: Valgfri regel.
+    sikkerhet: Kan bare snevre inn; gammel rapport kan ikke bli autoritet.
+    litteratur: []
+    forutsetter:
+    - CAP-028
+- id: CAP-030
+  register_at_source:
+    name: WS1 execution preconditions and monitor composition on the execution API (opt-in)
+    status: WIRED_API_PATH
+    code:
+    - remora/decision_providers/composition_adapter.py
+    - remora/execution/service.py
+    - remora/verification/check.py
+    - remora/verification/compose.py
+    - remora/verification/execution_gate.py
+    - remora/verification/planner.py
+    - servers/execution_api.py
+    tests:
+    - tests/test_ws1_execution_binding.py
+    - tests/test_ws1_grounding.py
+    - tests/test_ws1_task_budget.py
+    - tests/verification/test_architecture_boundary.py
+    - tests/verification/test_authority_ceiling.py
+    - tests/verification/test_ws1_cost_modes.py
+    - tests/verification/test_ws1_typed_uncertainty.py
+    artifacts:
+    - artifacts/ws1/study_b_holdout_v1.json
+    - artifacts/ws1/study_c_holdout_v1.json
+    docs:
+    - docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md
+    negative_results:
+    - 93
+    release_profile_requirements: []
+  assessment:
+    navn: WS1-forutsetninger og monitorkomposisjon
+    klasse: Rådgivende
+    formaal: >-
+      Lar en lært monitor begrense en beslutning eller prioritere et registrert oppslag, aldri
+      gi autoritet.
+    gjor: Utførelsesforutsetninger og monitorkomposisjon på /v1/execution bak REMORA_WS1_MODE.
+    naa: >-
+      Av som standard. IFC-bevis sjekkes bare som navngitt, ikke som sant. Ingen kalibrert
+      monitorprofil. Studie B tapte nytte (§95), studie C hentet den tilbake på syntetisk
+      domene (§96).
+    nodvendighet: Forskning
+    nodvendighet_begrunnelse: SHADOW i første pilot; ingen nyttepåstand er registrert.
+    sdd_hook: ADVISORY / PRE_DISPATCH
+    sdd_modus: SHADOW først; ENFORCE bare på validerte forutsetninger
+    sdd_endring: Ordnet ResolutionPlan i SDK; aldri monitorstemmer som grants.
+    oppnaelig_niva: WIRED_API_PATH
+    oppnaelig_niva_tekst: WIRED_API_PATH i SHADOW; ENFORCE krever en ny sjekk av IFC-premissene.
+    risiko:
+      sannsynlighet: M
+      konsekvens: H
+      tekst: En monitor gitt autoritet, eller IFC-premisser antatt sanne fordi de er navngitt.
+    reversering:
+      grad: Lett
+      tekst: Av som standard.
+    sikkerhet: >-
+      Monitor kan bare begrense; REVIEW lukkes bare av godkjenning i navngitt rolle; GRANT-forutsetning
+      er avslag.
+    litteratur:
+    - kilde: WS1-design (#953)
+      referanse: docs/design/ws1-deterministic-authorization-learned-monitoring-v1.md
+      rolle: design
+    - kilde: AI Control
+      referanse: Greenblatt m.fl., arXiv 2312.06942
+      rolle: implemented_line (bibliotek)
+    - kilde: AgentDojo
+      referanse: arXiv 2406.13352; NEGATIVE_RESULTS §93
+      rolle: adapter, ikke full kjøring
+    forutsetter:
+    - CAP-001
+    - CAP-007
+- id: CAP-031
+  register_at_source:
+    name: Cumulative limits per principal or resource, reserved before dispatch (opt-in)
+    status: WIRED_API_PATH
+    code:
+    - deploy/ot-pilot/docker-compose.yml
+    - deploy/ot-pilot/limits.json
+    - deploy/ot-pilot/ot_registry.py
+    - remora/enforcement/cumulative_limits.py
+    - remora/enforcement/lease.py
+    - remora/execution/service.py
+    - scripts/sign_limit_policy.py
+    - servers/api.py
+    - servers/execution_api.py
+    tests:
+    - tests/limits/harness.py
+    - tests/limits/registry.py
+    - tests/limits/test_limits_binding.py
+    - tests/limits/test_limits_idempotency.py
+    - tests/limits/test_limits_observed_ventilation.py
+    - tests/limits/test_limits_ot_pilot.py
+    - tests/limits/test_limits_payments.py
+    - tests/limits/test_limits_resolve_route.py
+    - tests/limits/test_limits_unit.py
+    - tests/limits/test_limits_ventilation.py
+    - tests/limits/ventilation_sim.py
+    artifacts: []
+    docs: []
+    negative_results:
+    - 97
+    release_profile_requirements: []
+  assessment:
+    navn: Kumulative grenser
+    klasse: 'Kjerne: budsjett'
+    formaal: Stopper en serie handlinger som hver for seg er lov, men sammen overskrider et
+      budsjett.
+    gjor: >-
+      Signerte sum-, count- og change-grenser per principal eller ressurs; reserve → begin
+      → settle før dispatch; idempotensnøkkel per verktøy.
+    naa: >-
+      Opt-in, SQLite på én host, ingen Postgres. Seks pilotblokkere: lokal ledger, ukontrollert
+      reviewer-bevis, kjede-append utenfor transaksjon, dobbelt trekk uten nøkkel, reservasjonen
+      kan frigjøres selv om effekten skjedde dersom adapteren feilaktig hevder ToolDidNotExecute,
+      og usignert policy godtas med mindre REMORA_REQUIRE_LIMITS er eksplisitt aktivert.
+    nodvendighet: Kritisk
+    nodvendighet_begrunnelse: For en betalingslignende pilot er dette hovedkontrollen.
+    sdd_hook: PRE_DISPATCH / EXECUTION / EFFECT
+    sdd_modus: ENFORCE obligatorisk i avgrenset skrivepilot
+    sdd_endring: >-
+      Postgres-LimitLedger, SDK for limits/unresolved og limits/resolve, resolusjon og kjede-append
+      i én transaksjon.
+    oppnaelig_niva: ENFORCED_PRODUCTION
+    oppnaelig_niva_tekst: ENFORCED_PRODUCTION i én pilot etter delt ledger og lukkede §97-punkter.
+    risiko:
+      sannsynlighet: H
+      konsekvens: H
+      tekst: >-
+        Dobbel belastning, budsjett frigjort for en handling som faktisk skjedde, overskridelse
+        på tvers av hosts.
+    reversering:
+      grad: Vanskelig
+      tekst: >-
+        Historikken slettes ikke. En reservasjon kan frigjøres gjennom en dokumentert avklaring
+        når det er etablert at effekten ikke skjedde; en tilbakerulling av konfigurasjon frigjør
+        aldri budsjett.
+    sikkerhet: Signert policy, idempotensnøkkel, reviewer ≠ betaler, UNKNOWN holder budsjettet
+      til avklaring.
+    litteratur:
+    - kilde: Prior art for kumulative grenser
+      referanse: >-
+        provenance/verified-prior-art-cumulative-limits-2026-10-23.md: Schneider 2000, edit
+        automata 2005, UCON_ABC 2004, escrow 1986, leases 1989, Simplex, shielding 2018
+      rolle: PRIOR_ART_OVERLAP
+    - kilde: NEGATIVE_RESULTS §97
+      referanse: tre åpne punkter
+      rolle: record
+    forutsetter:
+    - CAP-013
+    - CAP-005
+    - CAP-007
+    - CAP-017

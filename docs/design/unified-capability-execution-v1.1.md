@@ -9,6 +9,7 @@
 | Supersedes | 1.0-draft (source revision `58ca22d46ace1ee82b6a741fdd29d4823d5fe07f`) |
 | Source register | `docs/assurance/capability_register_v1.yaml` |
 | Change control | Any implementation requires reviewed, gated PRs and evidence updates. |
+| Atlas | [`unified-capability-execution-v1.1-atlas.html`](unified-capability-execution-v1.1-atlas.html), generated from [`unified-capability-execution-v1.1-atlas.yaml`](unified-capability-execution-v1.1-atlas.yaml) by `scripts/generate_capability_atlas.py` |
 
 Status: proposed specification. This is not an implementation report, a security certification, or permission to turn on 32 enforcement mechanisms. All MUST/SHOULD requirements below are targets for new work and need tests and sign-off.
 
@@ -863,7 +864,7 @@ Do not attempt a single 32-capability mega-PR. Each milestone below must be inde
 
 ### P0 repair order
 
-The six CAP-031 gaps in §5 and `NEGATIVE_RESULTS.md` §97 and §98 come first. Each item has a binary acceptance criterion.
+The six CAP-031 gaps in §5 and `NEGATIVE_RESULTS.md` §97 and §98 come first. Each item has a binary acceptance criterion. The same order is kept machine-readable as `repair_order` in the atlas YAML, with the capabilities each item touches.
 
 | Order | Work | Acceptance criterion |
 |---|---|---|
@@ -877,6 +878,16 @@ The six CAP-031 gaps in §5 and `NEGATIVE_RESULTS.md` §97 and §98 come first. 
 | 8 | Build the shared `LimitLedger` before multi-host activation. | Two executors share budget and operation keys without double spending. |
 
 Freeze one named configuration and one harmless tool set. Close items 1 to 7 before any privileged write; item 8 is required before more than one host. A single host narrows the first pilot; it does not replace the other items. The manifest, readiness and capability trace then add visibility over existing mechanisms. Research, evidence and interop components get an honest operational place, and none gains authority to reach "32/32 integrated".
+
+### Working from the SDD and the atlas
+
+The SDD states the requirements; the atlas records, per capability, the assessment the work starts from: necessity, proposed hook and mode, reachable rung, risk, reversibility, dependencies and literature. Its `register_at_source` block copies the register at `d94eecf9`; the register stays authoritative. A PR that implements part of this SDD does three things:
+
+1. It names the CAP IDs and the repair-order item it closes, and meets that item's acceptance criterion.
+2. It updates the affected atlas entries in the YAML and regenerates the page with `python scripts/generate_capability_atlas.py`.
+3. It runs `python scripts/generate_capability_atlas.py --drift` and reconciles every reported difference against the register.
+
+`tests/test_capability_atlas.py` refuses unknown or cyclic dependencies, missing code or test paths, a reachable rung below the registered one, `EXTERNALLY_VERIFIED` as an SDD target and a stale page. The dependency graph is a relation map; the implementation order is the repair order and §10.
 
 ### Proposed PR naming / acceptance templates
 
@@ -1028,6 +1039,7 @@ v1.0 is superseded, not erased. Each row records what v1.0 said and what v1.1 sa
 | CAP-011, CAP-017 | Instrumentation helpers only; no signing-mode detail | Existing dispatch span and custody-hop trace context named; grant, lease and audit signing modes separated |
 | INV-04 | Atomic re-check at dispatch | Scoped to REMORA's own authority state; the external effect is not atomic with it |
 | §10 | P0 as one paragraph | P0 repair order 1 to 8 with acceptance criteria |
+| Atlas | None | Capability atlas (YAML and generated page) with `scripts/generate_capability_atlas.py` and `tests/test_capability_atlas.py`; §10 says how implementation PRs use it |
 | §9.3 | PILOT-T01..T20 | Marked new; overlaps mapped to existing tests |
 
 End of SDD v1.1 (proposed).

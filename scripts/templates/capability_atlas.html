@@ -1,0 +1,521 @@
+<title>REMORA Kapabilitetsatlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column with a wide explorer band; register ledger look, ladder rungs as the one recurring visual. */
+:root{
+  --bg:#f6f8f8; --surface:#fbfcfc; --sunk:#edf1f1; --line:#d5dddc; --line-strong:#b4c0bf;
+  --fg:#13201f; --fg2:#43524f; --fg3:#66746f;
+  --accent:#0d6b62; --accent-ink:#0a564f; --accent-soft:#dcecea;
+  --r1:#86b6ef; --r2:#5598e7; --r3:#2a78d6; --r4:#1c5cab; --r5:#104281; --r6:#0b2a52;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --good-bg:#e4f4e4; --warn-bg:#fdf2d6; --serious-bg:#fbe8e0; --crit-bg:#f8e1e1;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1514; --surface:#121a19; --sunk:#18211f; --line:#26322f; --line-strong:#3a4845;
+  --fg:#e2ebe9; --fg2:#b3c1bd; --fg3:#8a9a96;
+  --accent:#4fc1b4; --accent-ink:#7fd6cb; --accent-soft:#16302d;
+  --r1:#184f95; --r2:#256abf; --r3:#3987e5; --r4:#6da7ec; --r5:#9ec5f4; --r6:#cde2fb;
+  --good-bg:#12301a; --warn-bg:#33290d; --serious-bg:#3a2218; --crit-bg:#3a1818;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1514; --surface:#121a19; --sunk:#18211f; --line:#26322f; --line-strong:#3a4845;
+  --fg:#e2ebe9; --fg2:#b3c1bd; --fg3:#8a9a96;
+  --accent:#4fc1b4; --accent-ink:#7fd6cb; --accent-soft:#16302d;
+  --r1:#184f95; --r2:#256abf; --r3:#3987e5; --r4:#6da7ec; --r5:#9ec5f4; --r6:#cde2fb;
+  --good-bg:#12301a; --warn-bg:#33290d; --serious-bg:#3a2218; --crit-bg:#3a1818;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+a{color:var(--accent-ink)}
+a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;letter-spacing:.005em;margin:0}
+h1{font-size:clamp(30px,5vw,46px);line-height:1.05;font-weight:700}
+h2{font-size:26px;line-height:1.15;font-weight:600}
+h3{font-size:18px;font-weight:600}
+p{margin:0}
+.prose{max-width:68ch;display:grid;gap:12px;color:var(--fg)}
+.prose p{color:var(--fg2)}
+.mono{font-family:var(--f-mono);font-size:.88em}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3)}
+.muted{color:var(--fg3)}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+
+/* header */
+header.top{border-bottom:1px solid var(--line);background:var(--surface)}
+header.top .wrap{padding-block:36px 28px;display:grid;gap:18px}
+.lede{max-width:70ch;color:var(--fg2);font-size:17px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--f-mono);font-size:12.5px;color:var(--fg3)}
+.meta b{color:var(--fg2);font-weight:500}
+
+/* nav */
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;scrollbar-width:thin}
+nav.toc a{flex:none;font-size:13px;text-decoration:none;color:var(--fg2);padding:5px 10px;border-radius:6px;white-space:nowrap}
+nav.toc a:hover{background:var(--sunk);color:var(--fg)}
+
+section{padding-block:44px;border-bottom:1px solid var(--line)}
+section > .wrap{display:grid;gap:22px}
+.sechead{display:grid;gap:6px}
+.secnum{font-family:var(--f-mono);font-size:12px;color:var(--accent-ink)}
+
+/* summary tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:4px;align-content:start}
+.tile .big{font-family:var(--f-display);font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .lbl{font-size:13.5px;color:var(--fg2)}
+.findings{display:grid;gap:10px;max-width:76ch;padding:0;margin:0;list-style:none;counter-reset:f}
+.findings li{display:grid;grid-template-columns:28px 1fr;gap:8px;color:var(--fg2)}
+.findings li::before{counter-increment:f;content:counter(f);font-family:var(--f-mono);font-size:12px;color:var(--accent-ink);padding-top:3px}
+.findings b{color:var(--fg);font-weight:600}
+
+/* status pills */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;padding:2px 9px 2px 7px;border-radius:999px;white-space:nowrap;color:var(--fg);border:1px solid var(--line)}
+.pill i{width:8px;height:8px;border-radius:50%;flex:none;font-style:normal}
+.st-good{background:var(--good-bg)} .st-good i{background:var(--good)}
+.st-warn{background:var(--warn-bg)} .st-warn i{background:var(--warn)}
+.st-serious{background:var(--serious-bg)} .st-serious i{background:var(--serious)}
+.st-crit{background:var(--crit-bg)} .st-crit i{background:var(--crit)}
+.st-none{background:var(--sunk)} .st-none i{background:var(--fg3)}
+.rung{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11.5px;color:var(--fg2);white-space:nowrap}
+.rung s{width:10px;height:10px;border-radius:2px;flex:none;text-decoration:none}
+
+/* ladder */
+.ladder{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.lrow{display:grid;grid-template-columns:minmax(150px,210px) 1fr 1fr;border-top:1px solid var(--line)}
+.lrow:first-child{border-top:0}
+.lrow.head{background:var(--sunk);font-size:12.5px;color:var(--fg2);font-weight:500}
+.lrow > div{padding:10px 12px;min-width:0}
+.lrow > div + div{border-left:1px solid var(--line)}
+.lname{display:grid;gap:2px}
+.lname .rung{font-size:11px}
+.lname span.n{font-size:13px;color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-family:var(--f-mono);font-size:11.5px;padding:2px 7px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.chip:hover{border-color:var(--line-strong)}
+.chip s{width:7px;height:7px;border-radius:2px;text-decoration:none}
+.chip.moved{border-color:var(--accent);background:var(--accent-soft)}
+.count{font-family:var(--f-mono);font-size:11px;color:var(--fg3);margin-left:4px}
+@media (max-width:640px){.lrow{grid-template-columns:1fr}.lrow > div + div{border-left:0;border-top:1px dashed var(--line)}.lrow.head{display:none}.lrow > div[data-col]::before{content:attr(data-col);display:block;font-size:11px;color:var(--fg3);margin-bottom:4px}}
+
+/* explorer */
+.filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.fgroup{display:grid;gap:4px}
+.fgroup label{font-size:12px;color:var(--fg3)}
+select,input[type=search]{font:inherit;font-size:14px;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:7px;padding:6px 9px;min-width:0}
+input[type=search]{width:min(260px,100%)}
+.resultline{font-size:13px;color:var(--fg3)}
+.caplist{display:grid;gap:8px}
+details.cap{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+details.cap[open]{border-color:var(--line-strong)}
+details.cap > summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:6px 14px;align-items:center;padding:12px 14px}
+details.cap > summary::-webkit-details-marker{display:none}
+.cid{font-family:var(--f-mono);font-size:12.5px;color:var(--accent-ink);font-weight:500}
+.ctitle{display:grid;gap:2px;min-width:0}
+.ctitle b{font-weight:600}
+.ctitle span{font-size:13px;color:var(--fg3)}
+.cbadges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+@media (max-width:720px){details.cap > summary{grid-template-columns:1fr}.cbadges{justify-content:flex-start}}
+.cbody{border-top:1px solid var(--line);padding:16px 14px 18px;display:grid;gap:16px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 22px}
+.field{display:grid;gap:4px;min-width:0}
+.field h4{margin:0;font-size:11.5px;font-family:var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);font-weight:500}
+.field p,.field li{color:var(--fg2);font-size:14px}
+.field ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.assess{border-left:3px solid var(--accent);padding-left:12px}
+.tag{font-family:var(--f-mono);font-size:10.5px;color:var(--fg3);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:4px;white-space:nowrap}
+.files{display:flex;flex-wrap:wrap;gap:4px}
+.files code{font-size:11.5px}
+.deplinks{display:flex;flex-wrap:wrap;gap:5px}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+thead th{border-top:0;background:var(--sunk);font-size:12.5px;font-weight:500;color:var(--fg2)}
+td{color:var(--fg2)}
+td:first-child{color:var(--fg)}
+.num{font-variant-numeric:tabular-nums}
+
+/* risk matrix */
+.rmwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.rm{display:grid;grid-template-columns:28px repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto) 26px;gap:6px}
+.rm .ax{font-size:11.5px;color:var(--fg3);display:flex;align-items:center;justify-content:center}
+.rm .ay{writing-mode:vertical-rl;transform:rotate(180deg)}
+.rcell{border:1px solid var(--line);border-radius:8px;padding:8px;min-height:84px;display:grid;align-content:start;gap:6px;background:var(--surface)}
+.rcell .lab{display:flex;justify-content:space-between;gap:6px;align-items:center}
+.rcell.lvl-H{background:var(--crit-bg)} .rcell.lvl-M{background:var(--warn-bg)} .rcell.lvl-L{background:var(--good-bg)}
+
+/* misc */
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;align-content:start}
+.card ul{margin:0;padding-left:18px;display:grid;gap:5px;color:var(--fg2);font-size:14px}
+.note{font-size:13px;color:var(--fg3);max-width:76ch}
+.mermaidbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+footer{padding-block:32px 48px;color:var(--fg3);font-size:13px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+html{scroll-behavior:smooth}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="eyebrow">Rapport · REMORA-research · SDD v1.1</div>
+  <h1>REMORA Kapabilitetsatlas</h1>
+  <p class="lede">Alle 32 registrerte kapabiliteter: hva de gjør, hvor modne de er, hva som avhenger av hva, og hva som endres hvis SDD v1.1 for samlet kapabilitetsutførelse innføres. Registerfakta og vurderinger er holdt atskilt: vurderinger er merket <span class="tag">vurdering</span>.</p>
+  <div class="meta">
+    <span><b>Kilde</b> master <a href="https://github.com/darklordVirtual/REMORA-research/tree/d94eecf916dda6ee7cd8598e100a2ee64b690958">d94eecf9</a></span>
+    <span><b>SDD</b> <a href="https://github.com/darklordVirtual/REMORA-research/pull/1053">darklordVirtual/REMORA-research#1053</a></span>
+    <span><b>Dato</b> 2026-10-24</span>
+    <span><b>Gjeldende profil</b> SHADOW_PILOT</span>
+    <span><b>Data</b> docs/design/unified-capability-execution-v1.1-atlas.yaml</span>
+  </div>
+</div></header>
+
+<nav class="toc" aria-label="Innhold"><div class="wrap">
+  <a href="#sammendrag">Sammendrag</a><a href="#modenhet">Modenhet</a><a href="#utforsker">Kapabiliteter</a><a href="#avhengigheter">Avhengigheter</a><a href="#endring">Hva endres</a><a href="#niva">Oppnåelig nivå</a><a href="#pilot">Pilotklarhet</a><a href="#sdk">SDK</a><a href="#resultat">Forventet resultat</a><a href="#reversering">Reversering</a><a href="#risiko">Risiko</a><a href="#sikkerhet">Sikkerhet</a><a href="#kilder">Kilder</a>
+</div></nav>
+
+<section id="sammendrag"><div class="wrap">
+  <div class="sechead"><span class="secnum">01</span><h2>Sammendrag</h2></div>
+  <div class="tiles">
+    <div class="tile"><span class="big">32</span><span class="lbl">registrerte kapabiliteter (CAP-001 til CAP-031 og CAP-META)</span></div>
+    <div class="tile"><span class="big">0</span><span class="lbl">på ENFORCED_PRODUCTION eller EXTERNALLY_VERIFIED i dag</span></div>
+    <div class="tile"><span class="big">SHADOW_PILOT</span><span class="lbl">gjeldende releaseprofil: tillatt nivå, ikke bevis på en operativ pilot. CONTROLLED_PILOT tilbys ikke</span></div>
+    <div class="tile"><span class="big" id="t-crit">–</span><span class="lbl">kapabiliteter vurdert som kritiske for en kontrollert pilot <span class="tag">vurdering</span></span></div>
+  </div>
+  <ol class="findings">
+    <li><span><b>REMORA er sterkere enn SDD v1.0 ga inntrykk av.</b> CAP-015, CAP-019 og CAP-021 har allerede runtime-kallere, de fleste autoritetslagre har Postgres-backend, og release-workflowen kan lage SBOM og Sigstore-attestasjon. SDD v1.1 beskriver disse som utvidelser, ikke nytt arbeid. At workflowen finnes, beviser ikke at en bestemt release er bygget og verifisert.</span></li>
+    <li><span><b>Kontrollert pilot er NO-GO i dag.</b> Den eksisterende porten krever REM-021 (uavhengig menneskelig gjennomgang, ikke startet) og REM-023 (RBAC-oppfølging, pågår). CAP-031 har seks åpne pilotblokkere, og den kumulative ledgeren finnes bare på én host.</span></li>
+    <li><span><b>Implementering alene gir ikke CONTROLLED_PILOT.</b> Høyeste realistiske nivå er CONTROLLED_PILOT for én navngitt konfigurasjon, og det krever i tillegg uavhengig menneskelig review (REM-021) og deploymentbevis. LIMITED_ENFORCEMENT krever i tillegg REM-024 og REM-030 og driftsbevis. PRODUCTION krever ekstern verifikasjon (CAP-001 EXTERNALLY_VERIFIED) og ligger utenfor SDD-en. <span class="tag">vurdering</span></span></li>
+    <li><span><b>Største enkeltrisiko er en ukjent bypass-rute.</b> Kjøretidsflatens fullstendighet (CAP-022) er NOT_ESTABLISHED; en prosess med egne credentials gjør alle andre garantier lokale. <span class="tag">vurdering</span></span></li>
+    <li><span><b>Aktivering må beskrives per kapabilitet og profil.</b> I den støttede, håndhevende execution-konfigurasjonen inngår token, payload-binding og dispatch i stien; vedvarende audit, streng signaturkontroll og faktisk isolasjon avhenger fortsatt av konfigurasjon. Andre kapabiliteter er opt-in bak flagg eller policy. Utførte handlinger, brukte tokens og kjedeposter kan ikke rulles tilbake. Budsjetthistorikk slettes ikke; en reservasjon kan bare frigjøres gjennom dokumentert avklaring når det er etablert at effekten ikke skjedde.</span></li>
+    <li><span><b>Neste arbeid er CAP-031 og én sikker konfigurasjon, før alle 32 bygges ut i API og SDK.</b> Se reparasjonsrekkefølgen under pilotklarhet. <span class="tag">vurdering</span></span></li>
+    <li><span><b>Forskningskomponentene skal ikke få autoritet.</b> AROMER (CAP-012) og WS1-monitoren (CAP-030) blir mer nyttige når bevis og feilmoduser er synlige i API-et, og farligere hvis de behandles som autoritet.</span></li>
+  </ol>
+</div></section>
+
+<section id="modenhet"><div class="wrap">
+  <div class="sechead"><span class="secnum">02</span><h2>Modenhetsstigen</h2>
+  <p class="prose"><span>Registeret bruker seks trinn. Venstre kolonne er registerets status ved <code>d94eecf9</code>. Høyre kolonne er hvor hver kapabilitet potensielt kan stå etter full SDD-implementering og en gjennomført pilot <span class="tag">vurdering</span>. Uthevede brikker flytter seg. Klikk en brikke for detaljer.</span></p></div>
+  <div class="ladder" id="ladder" role="table" aria-label="Modenhet i dag og potensielt"></div>
+  <p class="note">ENFORCED_PRODUCTION betyr håndhevet i en faktisk deployment med driftsbevis. EXTERNALLY_VERIFIED krever en uavhengig part (REM-021, REM-030) og kan ikke oppnås gjennom SDD-arbeid alene; derfor er det tomt i begge kolonner.</p>
+</div></section>
+
+<section id="utforsker"><div class="wrap">
+  <div class="sechead"><span class="secnum">03</span><h2>Alle 32 kapabiliteter</h2>
+  <p class="prose"><span>Hver rad åpner formål, funksjon, modenhet med registerets forbehold, nødvendighet, SDD-endring, oppnåelig nivå, risiko, reversering, sikkerhet og hva som avhenger av hva: kode, tester, artefakter, litteratur og andre kapabiliteter.</span></p></div>
+  <div class="filters" role="search">
+    <div class="fgroup"><label for="f-q">Søk</label><input type="search" id="f-q" placeholder="ID, navn, fil eller kilde"></div>
+    <div class="fgroup"><label for="f-klasse">Klasse</label><select id="f-klasse"><option value="">Alle</option></select></div>
+    <div class="fgroup"><label for="f-nod">Nødvendighet</label><select id="f-nod"><option value="">Alle</option></select></div>
+    <div class="fgroup"><label for="f-mod">Modenhet i dag</label><select id="f-mod"><option value="">Alle</option></select></div>
+    <div class="fgroup"><label for="f-risk">Risiko</label><select id="f-risk"><option value="">Alle</option><option value="H">Høy</option><option value="M">Middels</option><option value="L">Lav</option></select></div>
+  </div>
+  <div class="resultline" id="resultline" aria-live="polite"></div>
+  <div class="caplist" id="caplist"></div>
+</div></section>
+
+<section id="avhengigheter"><div class="wrap">
+  <div class="sechead"><span class="secnum">04</span><h2>Avhengigheter mellom kapabiliteter</h2>
+  <p class="prose"><span>Et relasjonskart over kjeden fra beslutning til effekt. En pil fra A til B betyr at B forutsetter A <span class="tag">vurdering</span>. Kartet er ikke en implementeringsrekkefølge; den står i reparasjonsrekkefølgen under pilotklarhet. Kode-, test- og artefaktavhengigheter står under hver kapabilitet.</span></p></div>
+  <div class="mermaidbox"><pre class="mermaid">__MERMAID__</pre></div>
+  <div class="tbl"><table><thead><tr><th>Kapabilitet</th><th>Antall som forutsetter den</th><th>Brukes av</th></tr></thead><tbody id="fanin"></tbody></table></div>
+  <p class="note">Delte kodefiler forklarer hvorfor endringer sprer seg: <code>servers/execution_api.py</code> er nevnt som bevis for <span id="hub-api"></span> kapabiliteter og <code>remora/enforcement/lease.py</code> for <span id="hub-lease"></span>. Endringer der krever bred regresjonstesting.</p>
+</div></section>
+
+<section id="endring"><div class="wrap">
+  <div class="sechead"><span class="secnum">05</span><h2>Hvordan REMORA endres hvis SDD-en innføres</h2></div>
+  <div class="tbl"><table><thead><tr><th>Område</th><th>I dag (d94eecf9)</th><th>Etter SDD v1.1</th></tr></thead><tbody>
+    <tr><td>Aktivering</td><td>I den støttede, håndhevende execution-konfigurasjonen inngår token, payload-binding og dispatch i stien; vedvarende audit, streng signaturkontroll og isolasjon avhenger av konfigurasjon. Andre kapabiliteter slås på med egne miljøflagg eller policy. Ingen samlet oversikt over hva som er aktivt i en deployment.</td><td>Et signert Capability Activation Manifest per deployment. Serveren beregner effektiv modus fra profil, verifiserte premisser og signert ønsket modus; kalleren har null autoritet over modus.</td></tr>
+    <tr><td>Sporbarhet per kall</td><td>Beslutning, grunner og bevis kan leses, men ikke hvilke kapabiliteter som faktisk kjørte.</td><td>Et uforanderlig capability-trace per forslag med NOT_RUN, UNAVAILABLE, SHADOW_RESULT, ENFORCED og ERROR. En kapabilitet som ikke ble nådd registreres aldri som bestått.</td></tr>
+    <tr><td>Oppdagelse</td><td><code>remora-capabilities-v1.yaml</code> på repo-nivå og <code>GET /v1/execution/capabilities</code> for agenter.</td><td><code>GET /v1/system/capabilities</code> som slår sammen register, deklarasjon og manifest; <code>/v1/system/readiness</code> med blokkeringsgrunner.</td></tr>
+    <tr><td>Kumulative grenser</td><td>SQLite på én host, opt-in, tre åpne §97-punkter.</td><td>Postgres-ledger delt mellom executors; policy uten idempotensnøkkel avvises; REMORA_REQUIRE_LIMITS del av profilen; resolusjon og kjede i én transaksjon.</td></tr>
+    <tr><td>UNKNOWN-utfall</td><td>Outboxen setter foreldede dispatcher til UNKNOWN; bare en reviewer kan avklare limits-operasjoner.</td><td>Avklaring fra autoritativ observasjon (rail eller anlegg), aldri fri tekst fra reviewer alene.</td></tr>
+    <tr><td>Pilotport</td><td>CONTROLLED_PILOT i <code>release_profiles_v1.yaml</code>: REM-020..023 og CAP-stigen.</td><td>Samme port, med G01–G12 lagt til som tilleggskrav gjennom egne gjennomgåtte endringer.</td></tr>
+    <tr><td>SDK</td><td>Sync- og async-klient, typede feil, API-snapshot; ingen limits-, trace- eller review-liste-metoder.</td><td>Rollebaserte grupper, typede utfall på eksisterende enums, limits- og gjenopprettingsmetoder, token provider, kontrakt-først-transport.</td></tr>
+    <tr><td>Forskningskomponenter</td><td>Bibliotek eller av som standard.</td><td>Synlige i API-et som OFFLINE, SHADOW eller EVIDENCE_ONLY; aldri autoritet.</td></tr>
+  </tbody></table></div>
+</div></section>
+
+<section id="niva"><div class="wrap">
+  <div class="sechead"><span class="secnum">06</span><h2>Nivå som potensielt nås ved full implementering</h2>
+  <p class="prose"><span>Profilene i <code>release_profiles_v1.yaml</code> bygger på hverandre. Tabellen viser hva hver profil krever, status i dag og om SDD-arbeidet kan lukke kravet.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Profil</th><th>Krav</th><th>I dag</th><th>Med full SDD <span class="tag">vurdering</span></th></tr></thead><tbody>
+    <tr><td><b>RESEARCH_REFERENCE</b></td><td>REM-014, REM-019</td><td><span class="pill st-good"><i></i>Oppfylt</span></td><td>Uendret</td></tr>
+    <tr><td><b>SHADOW_PILOT</b></td><td>CAP-001 WIRED_API_PATH, CAP-005 PERSISTED_ATOMIC, CAP-011 IMPLEMENTED_LIBRARY</td><td><span class="pill st-good"><i></i>Gjeldende profil</span></td><td>Uendret; alle 32 blir synlige og ærlig klassifisert</td></tr>
+    <tr><td><b>CONTROLLED_PILOT</b></td><td>REM-020, REM-021, REM-022, REM-023; CAP-003/004/007/009 WIRED_API_PATH; CAP-008 WIRED_REFERENCE_PATH</td><td><span class="pill st-crit"><i></i>Blokkert: REM-021, REM-023</span></td><td><span class="pill st-warn"><i></i>Mulig</span> for én navngitt konfigurasjon. Krever i tillegg til implementering at REM-021 og REM-023 lukkes, at G-portene består og at deploymentbevis finnes</td></tr>
+    <tr><td><b>LIMITED_ENFORCEMENT</b></td><td>REM-024, REM-030; CAP-003/004 ENFORCED_PRODUCTION; CAP-007 PERSISTED_ATOMIC</td><td><span class="pill st-crit"><i></i>Blokkert</span></td><td><span class="pill st-serious"><i></i>Mulig senere</span> etter pilotdrift og uavhengig validering av interception</td></tr>
+    <tr><td><b>PRODUCTION</b></td><td>REM-025, REM-031, alle P0–P3; CAP-001 EXTERNALLY_VERIFIED; CAP-005 ENFORCED_PRODUCTION</td><td><span class="pill st-crit"><i></i>Blokkert</span></td><td><span class="pill st-none"><i></i>Utenfor SDD-en</span> krever ekstern verifikasjon og compliance-pakke</td></tr>
+  </tbody></table></div>
+  <p class="note">REM-status ved d94eecf9: REM-020 DONE, REM-021 NOT_STARTED, REM-022 DONE, REM-023 IN_PROGRESS, REM-024 IN_PROGRESS, REM-025 NOT_STARTED, REM-030 NOT_STARTED, REM-031 NOT_STARTED.</p>
+</div></section>
+
+<section id="pilot"><div class="wrap">
+  <div class="sechead"><span class="secnum">07</span><h2>Klarhet til pilot</h2>
+  <p class="prose"><span>SHADOW_PILOT er gjeldende releaseprofil. Det viser tillatt modenhetsnivå, ikke at en skyggepilot faktisk er i drift. Tier C (kontrollert håndhevelse) er ikke klar. Portene under er SDD-ens G01–G12, koblet til eksisterende krav.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Port</th><th>Kobling</th><th>Status ved d94eecf9</th><th>Hva som mangler</th></tr></thead><tbody id="gates"></tbody></table></div>
+  <div class="two">
+    <div class="card"><h3>Umiddelbar NO-GO</h3><ul>
+      <li>kjent ikke-mediert skriverute</li><li>usignert ToolSpec eller muterbar tillatende policy</li><li>foreldet eller manglende delt budsjett-ledger med flere hosts</li><li>privilegieeskalering gjennom en forskningskomponent</li><li>stille retry av ukjent betaling eller effekt</li><li>falsk uavhengighetsmerking av bevis</li><li>manglende tilbakerullings- eller stopprosedyre</li>
+    </ul></div>
+    <div class="card"><h3>Anbefalt vei videre</h3><ul>
+      <li>Frys én navngitt konfigurasjon og ett ufarlig verktøysett.</li>
+      <li>Start REM-021 parallelt; fullfør REM-023.</li>
+      <li>Lukk punkt 1–7 under før privilegerte skrivehandlinger; krev punkt 8 før flere hosts. Én host snevrer inn første pilot, men erstatter ikke de øvrige kravene.</li>
+      <li>Innfør deretter manifest, readiness og capability-trace som synlighet over eksisterende mekanismer.</li>
+      <li>Første kanari er et lese- eller ikke-aktuerende verktøy.</li>
+    </ul></div>
+  </div>
+  <h3 id="reparasjon">Reparasjonsrekkefølge</h3>
+  <div class="tbl"><table><thead><tr><th>#</th><th>Arbeid</th><th>Akseptansekriterium</th></tr></thead><tbody id="repair"></tbody></table></div>
+  <p class="note">Kilder: NEGATIVE_RESULTS §97 og §98, ruten <code>POST /v1/execution/limits/resolve</code> og <code>docs/design/derived-information-flow-control-v1-status.md</code>. Rekkefølgen står også i SDD v1.1 §10.</p>
+</div></section>
+
+<section id="sdk"><div class="wrap">
+  <div class="sechead"><span class="secnum">08</span><h2>Hvordan SDK-en kan forbedres</h2>
+  <p class="prose"><span>SDK-en (<code>remora.sdk</code>, pakken <code>remora-assurance</code> 0.12.0) har i dag <code>RemoraClient</code> og <code>AsyncRemoraClient</code> med assess, execute, execute_accepted, approve, reject, export_evidence og verify_audit_chain, typede feil, <code>verify_effect</code> og et offentlig API-snapshot sjekket i CI. Prioritert rekkefølge under er en <span class="tag">vurdering</span>.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>#</th><th>Forbedring</th><th>Hvorfor</th><th>Bygger på</th></tr></thead><tbody>
+    <tr><td class="num">1</td><td>Wrappere for <code>limits/unresolved</code> og <code>limits/resolve</code></td><td>Serverrutene finnes; operatører må ellers bruke rå HTTP for UNKNOWN-avklaring.</td><td>CAP-031</td></tr>
+    <tr><td class="num">2</td><td>Typede utfall: <code>DispatchOutcome</code> og <code>EffectStatus</code> i resultatene</td><td>Skiller "sendt" fra "effekt verifisert"; hindrer at UNKNOWN leses som feil.</td><td>CAP-013, CAP-019</td></tr>
+    <tr><td class="num">3</td><td>Feilkonvolutt med <code>retryable=false</code> for UNKNOWN</td><td>Ingen SDK-retry av en handling som kan ha skjedd.</td><td>UnknownExecutionStateError</td></tr>
+    <tr><td class="num">4</td><td><code>decision_trace</code> og capability-trace</td><td>Viser hvilke kapabiliteter som faktisk kjørte.</td><td>CAP-001, ny trace-rute</td></tr>
+    <tr><td class="num">5</td><td>Review-liste og separat reviewer-klient</td><td>Godkjennere trenger en kø; egen credential hindrer selvgodkjenning.</td><td>CAP-007, CAP-009</td></tr>
+    <tr><td class="num">6</td><td>Token provider med OIDC-test</td><td>Erstatter statiske bearer-tokens i pilot.</td><td>CAP-009</td></tr>
+    <tr><td class="num">7</td><td>Rollebaserte grupper (<code>execution</code>, <code>reviews</code>, <code>limits</code>, <code>evidence</code>, <code>diagnostics</code>)</td><td>Operatørmetoder tilbys ikke til uprivilegerte agenter.</td><td>Server-RBAC uendret</td></tr>
+    <tr><td class="num">8</td><td><code>await_result()</code> som poller uten å sende på nytt</td><td>Asynkron 202 betyr autorisert, ikke utført.</td><td>PendingExecution</td></tr>
+    <tr><td class="num">9</td><td>Generert transport fra <code>schemas/openapi.json</code></td><td>Gjenbruk av eksisterende TypeScript-generering og drift-port.</td><td>quality-gates.yml</td></tr>
+    <tr><td class="num">10</td><td>En <code>pilot</code>-extra og ren installasjonstest</td><td>Én installasjonsprofil for pilot; finnes ikke i dag.</td><td>pyproject.toml, ci.yml</td></tr>
+  </tbody></table></div>
+  <p class="note">Eksisterende navn beholdes: <code>close()</code>/<code>aclose()</code>, <code>PendingExecution</code>, <code>ResolutionPlan</code>, <code>export_evidence</code> og <code>verify_audit_chain</code> finnes allerede og skal dokumenteres, ikke legges til på nytt.</p>
+</div></section>
+
+<section id="resultat"><div class="wrap">
+  <div class="sechead"><span class="secnum">09</span><h2>Forventet resultat</h2>
+  <p class="prose"><span>Målene er SDD-ens prosjektmål, ikke dagens fakta. Kolonnen til høyre er en <span class="tag">vurdering</span> av hvor realistiske de er.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Mål</th><th>Realisme</th></tr></thead><tbody>
+    <tr><td>32/32 med signert manifestoppføring, API/SDK-oppdagelse, hook eller begrunnet OFFLINE/EVIDENCE_ONLY, eier og tester</td><td><span class="pill st-good"><i></i>Høy</span> mest inventar- og kontraktsarbeid</td></tr>
+    <tr><td>Hver håndhevende kapabilitet med ekte HTTP-positivtest, adversariell negativtest, drept mutasjon og degradert-avhengighet-resultat</td><td><span class="pill st-warn"><i></i>Middels</span> mye finnes; krever systematisk gjennomgang</td></tr>
+    <tr><td>Alle publiserte SDK-metoder med operationId, sync/async-paritet, typede feil og installasjonseksempel</td><td><span class="pill st-good"><i></i>Høy</span></td></tr>
+    <tr><td>0 kjente autoritetsbypass i pilotens verktøy- og credential-flate</td><td><span class="pill st-serious"><i></i>Lav til middels</span> avhenger av CAP-022 i ekstern host</td></tr>
+    <tr><td>0 automatiske retries av UNKNOWN</td><td><span class="pill st-good"><i></i>Høy</span> allerede designprinsipp i outbox</td></tr>
+    <tr><td>0 falskt hevede påstandsnivåer</td><td><span class="pill st-good"><i></i>Høy</span> CAP-META og registergatene</td></tr>
+    <tr><td>Reproduserbar release med container, signert manifest og gjenopprettingsøvelse</td><td><span class="pill st-warn"><i></i>Middels</span> SBOM og attestasjon finnes; container og byte-reproduserbarhet mangler</td></tr>
+  </tbody></table></div>
+</div></section>
+
+<section id="reversering"><div class="wrap">
+  <div class="sechead"><span class="secnum">10</span><h2>Mulighet for reversering</h2></div>
+  <div class="two">
+    <div class="card"><h3>Kan reverseres</h3><ul>
+      <li>Aktivering: opt-in-kapabiliteter kan slås av via flagg eller policy. Token, payload-binding og dispatch er del av den støttede håndhevende execution-konfigurasjonen og slås ikke av der; konfigurasjonsavhengige deler (vedvarende audit, streng signatur, isolasjon) kan endres, men bare med stopp av privilegerte handlinger først. Med manifestet blir modus en signert, versjonert verdi.</li>
+      <li>Moduser: ENFORCE kan senkes til SHADOW uten datatap, men da forsvinner beskyttelsen. Stopp privilegerte handlinger før en slik nedgradering.</li>
+      <li>Topologi: Postgres kan byttes tilbake til SQLite bare for teknisk gjennomgang på én host, aldri i en flerhost-pilot.</li>
+      <li>SDK: tilleggsmetoder; eksisterende metoder beholdes gjennom migrering.</li>
+    </ul></div>
+    <div class="card"><h3>Kan ikke reverseres</h3><ul>
+      <li>Utførte effekter i verktøy, rail eller anlegg.</li>
+      <li>Brukte tokens og lease-nonces: forblir brukt.</li>
+      <li>Revisjonskjedens poster: append-only.</li>
+      <li>Budsjetthistorikken: slettes ikke. UNKNOWN-reservasjoner holdes til en dokumentert avklaring har etablert om effekten skjedde; først da kan en reservasjon frigjøres.</li>
+    </ul></div>
+  </div>
+  <p class="prose"><span>Tilbakerulling etter SDD-en: stopp nye skrivinger, behold revisjon og UNKNOWN-reservasjoner, tøm avstemminger, og behold nøyaktig gammel signert policy, ToolSpec og skjema for rekonstruksjon. En tilbakerulling sletter aldri brukte grants og behandler aldri en uobservert handling som ikke utført.</span></p>
+  <div class="tbl"><table><thead><tr><th>Fase</th><th>Innhold</th><th>Reversering <span class="tag">vurdering</span></th></tr></thead><tbody>
+    <tr><td>P0 Sikkerhetslukking</td><td>§97-punkter, REMORA_REQUIRE_LIMITS i profil, §98, REM-021/023</td><td><span class="pill st-good"><i></i>Lett</span> strengere regler; kan løsnes, men bør ikke</td></tr>
+    <tr><td>P1 Inventar og manifest</td><td>Manifest, hook-register, lese-API</td><td><span class="pill st-good"><i></i>Lett</span> tilleggskontrakt</td></tr>
+    <tr><td>P2 Utførelsessubstrat</td><td>Postgres-LimitLedger, avklaring av UNKNOWN</td><td><span class="pill st-warn"><i></i>Middels</span> skjemamigrering må være toveis; data beholdes</td></tr>
+    <tr><td>P3 Kjernepolicy</td><td>Én håndhevende sti for kjernekapabilitetene</td><td><span class="pill st-warn"><i></i>Middels</span> moduser kan senkes</td></tr>
+    <tr><td>P4 Effekt og bevis</td><td>Effektbevis, uavhengig recorder</td><td><span class="pill st-good"><i></i>Lett</span> bevisstier</td></tr>
+    <tr><td>P5–P6 Interop, forskning, observabilitet</td><td>Adaptere, SHADOW-monitorer, telemetri</td><td><span class="pill st-good"><i></i>Lett</span></td></tr>
+    <tr><td>P7 SDK</td><td>vNext</td><td><span class="pill st-good"><i></i>Lett</span> additiv</td></tr>
+    <tr><td>P8 Pakking</td><td>Container, reproduserbarhet, runbooks</td><td><span class="pill st-good"><i></i>Lett</span></td></tr>
+    <tr><td>P9 Pilotaktivering</td><td>Kanari og stoppregler</td><td><span class="pill st-crit"><i></i>Delvis</span> nye handlinger kan stoppes; utførte står</td></tr>
+  </tbody></table></div>
+</div></section>
+
+<section id="risiko"><div class="wrap">
+  <div class="sechead"><span class="secnum">11</span><h2>Risikovurdering</h2>
+  <p class="prose"><span>Hver kapabilitet er plassert etter sannsynlighet for at noe går galt og konsekvens hvis det gjør det, gitt SDD-ens tiltenkte modus <span class="tag">vurdering</span>. Høy konsekvens følger nesten alltid av at kapabiliteten står på autoritets- eller effektstien.</span></p></div>
+  <div class="rmwrap"><div class="rm" id="rm" aria-label="Risikomatrise"></div></div>
+  <div class="two">
+    <div class="card"><h3>Tverrgående risikoer</h3><ul>
+      <li><b>Bypass utenfor PEP:</b> en prosess med direkte credentials. Tiltak: CAP-022 i ekstern host, CAP-024 tre-domene, egress-kontroll.</li>
+      <li><b>Lokal tilstand i flerhost:</b> SQLite-ledger delt mellom hosts gir overskridelse. Tiltak: Postgres og NO-GO uten delt ledger.</li>
+      <li><b>UNKNOWN behandlet som ikke-utført:</b> dobbel effekt. Tiltak: aldri retry; avklaring bare fra autoritativ kilde.</li>
+      <li><b>Modell gitt autoritet:</b> monitor eller AROMER senker et avslag. Tiltak: INV-02, SHADOW-modus.</li>
+      <li><b>Falsk uavhengighet:</b> samme administrator eier recorder og executor. Tiltak: eget tillitsdomene, ærlig merking.</li>
+      <li><b>Symmetriske nøkler der de fortsatt brukes:</b> A2A-konvolutten (CAP-006) og audit-signering er HMAC, og grants godtar HMAC bare når REMORA_PDP_ACCEPT_HMAC er eksplisitt aktivert, eller når ingen Ed25519-nøkkel er konfigurert. Grants (v3) og leases har Ed25519. Tiltak: verify-only i utførelsesdomenet, HMAC avvist i pilot, dokumentert nøkkelfordeling.</li>
+    </ul></div>
+    <div class="card"><h3>Risiko ved selve innføringen <span class="tag">vurdering</span></h3><ul>
+      <li>Et nytt manifest blir en fjerde katalog hvis det gjentar register og deklarasjon. SDD v1.1 begrenser det til deployment-felt.</li>
+      <li>Endringer i <code>servers/execution_api.py</code> og <code>lease.py</code> berører mange kapabiliteter samtidig.</li>
+      <li>G-portene kan oppfattes som et alternativ til REM-kravene. SDD v1.1 sier at de bare kan legges til gjennom egne endringer.</li>
+      <li>Kalenderrisiko: REM-021 krever en uavhengig person og kan ikke løses med kode.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="sikkerhet"><div class="wrap">
+  <div class="sechead"><span class="secnum">12</span><h2>Hvordan sikkerheten ivaretas</h2>
+  <p class="prose"><span>SDD-en låser tolv invarianter. De bygger på mekanismer som allerede finnes, og gjør dem obligatoriske i pilotprofilen.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Invariant</th><th>Krav</th><th>Bærende kapabiliteter</th></tr></thead><tbody>
+    <tr><td class="mono">INV-01</td><td>Én PEP: privilegerte effekter går bare gjennom godkjent executor</td><td>CAP-013, CAP-024</td></tr>
+    <tr><td class="mono">INV-02</td><td>Ingen modellautoritet: monitorer, orakler, AROMER kan ikke senke et avslag eller mynte et grant</td><td>CAP-001, CAP-012, CAP-030</td></tr>
+    <tr><td class="mono">INV-03</td><td>Eksakt handling: tenant, principal, oppgave, mål, ToolSpec, argumenter, policy, kapabilitetssett og grenser er bundet</td><td>CAP-004, CAP-018, CAP-023, CAP-031</td></tr>
+    <tr><td class="mono">INV-04</td><td>Ferskhet (foreslått krav): REMORAs egen autoritetstilstand sjekkes på nytt ved dispatch. Lokal admission kan være atomisk; ekstern effekt er ikke atomisk med autoritetsdatabasen</td><td>CAP-003, CAP-007, CAP-020</td></tr>
+    <tr><td class="mono">INV-05</td><td>Ukjent er ikke negativt: ingen blind replay av UNKNOWN</td><td>CAP-013, CAP-031</td></tr>
+    <tr><td class="mono">INV-06</td><td>Varig på tvers av workers</td><td>CAP-003, CAP-005, CAP-031</td></tr>
+    <tr><td class="mono">INV-07</td><td>Bevis er ikke autoritet</td><td>CAP-019, CAP-025, CAP-026..029</td></tr>
+    <tr><td class="mono">INV-08</td><td>Nedgraderingsresistent aktivering: manglende premiss nekter oppstart</td><td>CAP-017, manifest</td></tr>
+    <tr><td class="mono">INV-09</td><td>Tenant-separasjon gjennom les, list, eksport og cache</td><td>CAP-009</td></tr>
+    <tr><td class="mono">INV-10</td><td>Testbare påstander; foreldet bevis kan ikke heve en release</td><td>CAP-META, CAP-015</td></tr>
+    <tr><td class="mono">INV-11</td><td>Hver effektpåstand navngir observatør, ståsted og metode</td><td>CAP-021, CAP-022</td></tr>
+    <tr><td class="mono">INV-12</td><td>Private signeringsnøkler holdes utenfor klient og executor der custody krever det</td><td>CAP-017, CAP-024</td></tr>
+  </tbody></table></div>
+  <div class="two">
+    <div class="card"><h3>Lag på lag</h3><ul>
+      <li>Autentisering og RBAC (CAP-009)</li><li>Deterministisk beslutning med invarianter (CAP-001, CAP-015)</li><li>Minimert kapabilitetssett og oppgavebinding (CAP-023, CAP-018)</li><li>Menneskelig godkjenning med fersk re-gate (CAP-007)</li><li>Engangstoken og eksakt kall (CAP-003, CAP-004)</li><li>Premisser, grenser og lease ved dispatch (CAP-020, CAP-031, CAP-013)</li><li>Mediert effekt i eget domene (CAP-024)</li><li>Bevis i kjede og utenfor prosess (CAP-005, CAP-021)</li>
+    </ul></div>
+    <div class="card"><h3>Hva sikkerheten ikke dekker</h3><ul>
+      <li>Korrekthet av modellens intensjon.</li><li>Synlighet i alle host-stier uten ekstern observatør.</li><li>Uavhengig bevis for fysisk effekt basert på produsentens egne logger.</li><li>Ekte finansiell clearing eller regulatorisk sertifisering.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="kilder"><div class="wrap">
+  <div class="sechead"><span class="secnum">13</span><h2>Kilder og forbehold</h2></div>
+  <div class="prose">
+    <p>Registerfakta er hentet ved <code>d94eecf9</code> fra <code>docs/assurance/capability_register_v1.yaml</code> (status, bevisfiler, forbehold), <code>docs/assurance/release_profiles_v1.yaml</code>, <code>docs/assurance/remediation_register.yaml</code>, <code>docs/research/research_control_matrix_v1.yaml</code>, <code>docs/research/research_shelf_v1.yaml</code> og <code>NEGATIVE_RESULTS.md</code>. Kode-, test- og artefaktlistene per kapabilitet er registerets egne bevislenker; for CAP-031 er <code>tests/limits/test_limits_idempotency.py</code> og <code>test_limits_resolve_route.py</code> lagt til fordi de finnes på master etter #1052.</p>
+    <p>Alt merket <span class="tag">vurdering</span> er analyse, ikke registerstatus: nødvendighet, risiko, reversering, oppnåelig nivå og avhengighetene mellom kapabiliteter. Litteraturkoblinger bruker registerets ordforråd: <code>implemented_and_tested</code> og <code>ADOPTED</code> betyr kode bygget på kilden; <code>positioning_only</code> betyr at kilden posisjonerer eller argumenteres mot, ikke at REMORA gjør det samme. Tall fra eksterne artikler er forfatternes egne.</p>
+    <p>Rapporten er laget med AI-assistanse og er ikke bevis i seg selv. Ingen testsuite eller deployment ble kjørt for den.</p>
+    <p><b>Revisjon 2 (2026-10-24), etter AI-assistert dokument- og kildekontroll mot d94eecf9.</b> Kontrollen var ikke uavhengig menneskelig review eller runtime-verifikasjon. Rettet: CAP-003 beskrev grants som bare HMAC (v3 er Ed25519 med verify-only innløser); CAP-017 sa «bare symmetrisk HMAC» (signering skilt per grant, lease og audit); CAP-011 omtalte bare instrumenteringshjelpere (execution har dispatch-span og custody-hop med tester); «nesten alle opt-in» erstattet med aktivering per kapabilitet; «Tier S er i drift» erstattet med releaseprofil som tillatt nivå; «SDD-en alene kan gi CONTROLLED_PILOT» presisert; INV-04 merket som foreslått krav; tre gjensidige koblinger i avhengighetskartet fjernet (CAP-001/CAP-015, CAP-018/CAP-023, CAP-004/CAP-013); avhengighetsdataene ble kontrollert uten sykler da siden ble bygget, men byggesteget er scripts/generate_capability_atlas.py og kartet merket som relasjonskart; nedgradering fra ENFORCE til SHADOW og avvist delegering presisert. Reparasjonsrekkefølgen er lagt til. Registerets forbehold for CAP-003, CAP-011 og CAP-017 henger etter koden og bør oppdateres i en egen registerendring.</p>
+    <p><b>Revisjon 3 (2026-10-24), etter ny AI-assistert kontroll.</b> Presisert: kontrollen i revisjon 2 var ikke uavhengig; budsjettreservasjoner kan frigjøres gjennom dokumentert avklaring, mens historikken beholdes; kjernekontrollene er avgrenset til den støttede håndhevende konfigurasjonen; HMAC-flaggene virker bare når de er eksplisitt aktivert; CAP-031-gapet gjelder tillit til adapterens ToolDidNotExecute; påstanden om sykelavvisning i byggesteget og fraværspåstanden om prosessrestart-test er avgrenset til hva som er dokumentert.</p>
+  </div>
+</div></section>
+
+<footer><div class="wrap">REMORA Kapabilitetsatlas · kilde d94eecf9 · SDD v1.1 (forslag, ikke implementert)</div></footer>
+
+<script>
+const CAPS = __DATA__;
+const GATES = __GATES__;
+const REPAIR = __REPAIR__;
+const LADDER = ["IMPLEMENTED_LIBRARY","WIRED_REFERENCE_PATH","WIRED_API_PATH","PERSISTED_ATOMIC","ENFORCED_PRODUCTION","EXTERNALLY_VERIFIED"];
+const LADDER_NO = {IMPLEMENTED_LIBRARY:"Bibliotek",WIRED_REFERENCE_PATH:"Referansesti",WIRED_API_PATH:"API-sti",PERSISTED_ATOMIC:"Atomisk persistert",ENFORCED_PRODUCTION:"Håndhevet i produksjon",EXTERNALLY_VERIFIED:"Eksternt verifisert"};
+const rc = s => `var(--r${LADDER.indexOf(s)+1})`;
+const RISK = {H:"Høy",M:"Middels",L:"Lav"};
+const SC = {H:3,M:2,L:1};
+const lvl = c => {const s=SC[c.risiko.p]*SC[c.risiko.k]; return s>=6?"H":s>=3?"M":"L";};
+const NODCLS = {"Kritisk":"st-crit","Nødvendig":"st-serious","Nyttig":"st-warn","Valgfri":"st-none","Forskning":"st-none"};
+const RCLS = {H:"st-crit",M:"st-warn",L:"st-good"};
+const esc = s => String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const byId = Object.fromEntries(CAPS.map(c=>[c.id,c]));
+const usedBy = {}; CAPS.forEach(c=>c.deps.forEach(d=>(usedBy[d]=usedBy[d]||[]).push(c.id)));
+
+document.getElementById("t-crit").textContent = CAPS.filter(c=>c.nod==="Kritisk").length;
+
+/* ladder */
+(function(){
+  const el=document.getElementById("ladder");
+  let h=`<div class="lrow head" role="row"><div role="columnheader">Trinn</div><div role="columnheader">I dag (register)</div><div role="columnheader">Potensielt etter full SDD</div></div>`;
+  [...LADDER].reverse().forEach(r=>{
+    const now=CAPS.filter(c=>c.status===r), fut=CAPS.filter(c=>c.maal===r);
+    const chip=(c,moved)=>`<button type="button" class="chip${moved?" moved":""}" data-go="${c.id}" title="${esc(c.navn)}"><s style="background:${rc(r)}"></s>${c.id}</button>`;
+    h+=`<div class="lrow" role="row"><div class="lname" role="cell"><span class="rung"><s style="background:${rc(r)}"></s>${LADDER.indexOf(r)+1}. ${r}</span><span class="n">${LADDER_NO[r]}</span></div>
+      <div role="cell" data-col="I dag"><div class="chips">${now.map(c=>chip(c,false)).join("")||'<span class="muted">ingen</span>'}<span class="count">${now.length}</span></div></div>
+      <div role="cell" data-col="Potensielt"><div class="chips">${fut.map(c=>chip(c,c.maal!==c.status)).join("")||'<span class="muted">ingen</span>'}<span class="count">${fut.length}</span></div></div></div>`;
+  });
+  el.innerHTML=h;
+})();
+
+/* explorer */
+const list=document.getElementById("caplist");
+function files(arr){return arr.length?`<div class="files">${arr.map(f=>`<code>${esc(f)}</code>`).join("")}</div>`:'<p class="muted">ingen registrert</p>';}
+function capHTML(c){
+  const L=lvl(c);
+  return `<details class="cap" id="${c.id}" data-id="${c.id}">
+  <summary><span class="cid">${c.id}</span><span class="ctitle"><b>${esc(c.navn)}</b><span>${esc(c.klasse)} · ${esc(c.registerNavn)}</span></span>
+  <span class="cbadges"><span class="rung"><s style="background:${rc(c.status)}"></s>${c.status}</span><span class="pill ${NODCLS[c.nod]}"><i></i>${c.nod}</span><span class="pill ${RCLS[L]}"><i></i>Risiko ${RISK[L].toLowerCase()}</span></span></summary>
+  <div class="cbody">
+    <div class="cgrid">
+      <div class="field"><h4>Formål</h4><p>${esc(c.formaal)}</p></div>
+      <div class="field"><h4>Hva den gjør</h4><p>${esc(c.gjor)}</p></div>
+      <div class="field"><h4>Modenhet i dag</h4><p><span class="rung"><s style="background:${rc(c.status)}"></s>${c.status}</span></p><p>${esc(c.naa)}</p>${c.ladder.length?`<p class="muted">Profilkrav: ${c.ladder.map(esc).join(", ")}</p>`:""}</div>
+    </div>
+    <div class="cgrid">
+      <div class="field assess"><h4>Nødvendighet <span class="tag">vurdering</span></h4><p><span class="pill ${NODCLS[c.nod]}"><i></i>${c.nod}</span></p><p>${esc(c.nodBegr)}</p></div>
+      <div class="field"><h4>Endring med SDD v1.1</h4><p><span class="mono">hook ${esc(c.hook)} · modus ${esc(c.modus)}</span></p><p>${esc(c.sdd)}</p></div>
+      <div class="field assess"><h4>Oppnåelig nivå <span class="tag">vurdering</span></h4><p><span class="rung"><s style="background:${rc(c.maal)}"></s>${c.maal}</span></p><p>${esc(c.maalTekst)}</p></div>
+    </div>
+    <div class="cgrid">
+      <div class="field assess"><h4>Risiko <span class="tag">vurdering</span></h4><p><span class="pill ${RCLS[L]}"><i></i>${RISK[L]}</span> <span class="muted">sannsynlighet ${RISK[c.risiko.p].toLowerCase()}, konsekvens ${RISK[c.risiko.k].toLowerCase()}</span></p><p>${esc(c.risiko.tekst)}</p></div>
+      <div class="field assess"><h4>Reversering <span class="tag">vurdering</span></h4><p><b>${esc(c.rev.grad)}.</b> ${esc(c.rev.tekst)}</p></div>
+      <div class="field"><h4>Sikkerhet</h4><p>${esc(c.sikkerhet)}</p></div>
+    </div>
+    <div class="cgrid">
+      <div class="field"><h4>Kode (${c.code.length})</h4>${files(c.code)}</div>
+      <div class="field"><h4>Tester (${c.tests.length})</h4>${files(c.tests)}</div>
+      <div class="field"><h4>Artefakter og dokumenter</h4>${files(c.artifacts.concat(c.docs))}${c.nr.length?`<p class="muted">NEGATIVE_RESULTS: ${c.nr.map(n=>"§"+n).join(", ")}</p>`:""}</div>
+    </div>
+    <div class="cgrid">
+      <div class="field"><h4>Litteratur og forskningsgrunnlag</h4>${c.lit.length?`<ul>${c.lit.map(l=>`<li>${esc(l[0])} <span class="muted">(${esc(l[1])})</span> <span class="tag">${esc(l[2])}</span></li>`).join("")}</ul>`:'<p class="muted">Ingen registrert kilde; ingeniørarbeid uten forskningsforankring.</p>'}</div>
+      <div class="field"><h4>Forutsetter <span class="tag">vurdering</span></h4>${c.deps.length?`<div class="deplinks">${c.deps.map(d=>`<button type="button" class="chip" data-go="${d}"><s style="background:${rc(byId[d].status)}"></s>${d}</button>`).join("")}</div>`:'<p class="muted">ingen</p>'}</div>
+      <div class="field"><h4>Forutsettes av</h4>${(usedBy[c.id]||[]).length?`<div class="deplinks">${usedBy[c.id].map(d=>`<button type="button" class="chip" data-go="${d}"><s style="background:${rc(byId[d].status)}"></s>${d}</button>`).join("")}</div>`:'<p class="muted">ingen</p>'}</div>
+    </div>
+  </div></details>`;
+}
+list.innerHTML=CAPS.map(capHTML).join("");
+const fill=(id,vals)=>{const s=document.getElementById(id);vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;s.appendChild(o);});};
+fill("f-klasse",[...new Set(CAPS.map(c=>c.klasse))].sort());
+fill("f-nod",["Kritisk","Nødvendig","Nyttig","Valgfri","Forskning"]);
+fill("f-mod",LADDER.filter(r=>CAPS.some(c=>c.status===r)));
+function apply(){
+  const q=document.getElementById("f-q").value.trim().toLowerCase(), k=document.getElementById("f-klasse").value, n=document.getElementById("f-nod").value, m=document.getElementById("f-mod").value, r=document.getElementById("f-risk").value;
+  let shown=0;
+  CAPS.forEach(c=>{
+    const hay=[c.id,c.navn,c.registerNavn,c.formaal,...c.code,...c.tests,...c.lit.map(l=>l.join(" "))].join(" ").toLowerCase();
+    const ok=(!q||hay.includes(q))&&(!k||c.klasse===k)&&(!n||c.nod===n)&&(!m||c.status===m)&&(!r||lvl(c)===r);
+    document.getElementById(c.id).hidden=!ok; if(ok)shown++;
+  });
+  document.getElementById("resultline").textContent=`Viser ${shown} av ${CAPS.length}`;
+}
+["f-q","f-klasse","f-nod","f-mod","f-risk"].forEach(id=>document.getElementById(id).addEventListener("input",apply));
+apply();
+function go(id){
+  ["f-q","f-klasse","f-nod","f-mod","f-risk"].forEach(i=>document.getElementById(i).value="");apply();
+  const d=document.getElementById(id); if(!d)return; d.open=true; d.scrollIntoView({block:"start"}); d.querySelector("summary").focus({preventScroll:true});
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b){e.preventDefault();go(b.dataset.go);}});
+if(/^#CAP-[0-9A-Z]+$/.test(location.hash))setTimeout(()=>go(location.hash.slice(1)),0);
+
+/* fan-in */
+document.getElementById("fanin").innerHTML=Object.entries(usedBy).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).slice(0,10)
+  .map(([id,u])=>`<tr><td><button type="button" class="chip" data-go="${id}"><s style="background:${rc(byId[id].status)}"></s>${id}</button> ${esc(byId[id].navn)}</td><td class="num">${u.length}</td><td>${u.join(", ")}</td></tr>`).join("");
+document.getElementById("hub-api").textContent=CAPS.filter(c=>c.code.includes("servers/execution_api.py")).length;
+document.getElementById("hub-lease").textContent=CAPS.filter(c=>c.code.includes("remora/enforcement/lease.py")).length;
+
+/* gates */
+const GCLS={crit:"st-crit",warn:"st-warn",good:"st-good",none:"st-none"};
+document.getElementById("gates").innerHTML=GATES.map(g=>`<tr><td><b class="mono">${g[0]}</b> ${esc(g[1])}</td><td>${esc(g[2])}</td><td><span class="pill ${GCLS[g[3]]}"><i></i>${esc(g[4])}</span></td><td>${esc(g[5])}</td></tr>`).join("");
+
+/* repair order */
+document.getElementById("repair").innerHTML=REPAIR.map(r=>`<tr><td class="num">${r.nr}</td><td>${esc(r.arbeid)}</td><td>${esc(r.akseptanse)}</td></tr>`).join("");
+
+/* risk matrix */
+(function(){
+  const el=document.getElementById("rm"); let h="";
+  ["H","M","L"].forEach(k=>{
+    h+=`<div class="ax ay">${k==="H"?"Konsekvens høy":k==="M"?"middels":"lav"}</div>`;
+    ["L","M","H"].forEach(p=>{
+      const cs=CAPS.filter(c=>c.risiko.p===p&&c.risiko.k===k); const s=SC[p]*SC[k]; const L=s>=6?"H":s>=3?"M":"L";
+      h+=`<div class="rcell lvl-${L}"><div class="lab"><span class="pill ${RCLS[L]}"><i></i>${RISK[L]}</span><span class="count">${cs.length}</span></div><div class="chips">${cs.map(c=>`<button type="button" class="chip" data-go="${c.id}" title="${esc(c.navn)}">${c.id}</button>`).join("")}</div></div>`;
+    });
+  });
+  h+=`<div></div><div class="ax">Sannsynlighet lav</div><div class="ax">middels</div><div class="ax">høy</div>`;
+  el.innerHTML=h;
+})();
+</script>
