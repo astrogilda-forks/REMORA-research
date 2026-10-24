@@ -494,7 +494,7 @@ class LimitLedger:
         present = {row[1] for row in conn.execute("PRAGMA table_info(limit_operation)")}
         for name, declaration in cls._ADDED_COLUMNS:
             if name not in present:
-                conn.execute(f"ALTER TABLE limit_operation ADD COLUMN {name} {declaration}")  # noqa: S608 - fixed names
+                conn.execute(f"ALTER TABLE limit_operation ADD COLUMN {name} {declaration}")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
