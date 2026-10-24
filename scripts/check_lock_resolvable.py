@@ -51,6 +51,7 @@ EXTRA_SETS: tuple[str, ...] = (
     "dev,causal,api,security,identity",
     "dev,causal,api,security,identity,otel",
     "dev,causal,api,security,postgres",
+    "dev,causal,api,security,postgres,identity,otel",  # the quality-gates coverage job
     "dev,nli",
     "docs",
     "agentharm",
