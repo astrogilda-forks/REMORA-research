@@ -1245,6 +1245,41 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "LimitResolveRequest": {
+        "description": "Settle a cumulative-limit operation whose outcome is unknown.\n\n``executed`` is what the rail or the plant says happened, checked by the\nreviewer outside REMORA; ``evidence_ref`` names where (a rail statement,\na controller log, a ticket). ``False`` returns the reservation, ``True``\nkeeps it and settles the operation.",
+        "properties": {
+          "evidence_ref": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Evidence Ref",
+            "type": "string"
+          },
+          "executed": {
+            "title": "Executed",
+            "type": "boolean"
+          },
+          "operation_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "executed",
+          "evidence_ref",
+          "reason"
+        ],
+        "title": "LimitResolveRequest",
+        "type": "object"
+      },
       "LoopSafetyResetRequest": {
         "description": "Start a context's loop safety count again, under a named policy decision.\n\n``policy_ref`` names the decision that authorised the reset (a review item,\ndecision envelope or ticket id). The earlier events stay in the store and\nthe reset itself is appended to the tenant chain, so a reset can always be\ntraced to the person and the decision behind it.",
         "properties": {
@@ -3016,6 +3051,144 @@
           }
         },
         "summary": "Execute Accepted",
+        "tags": [
+          "execution"
+        ]
+      }
+    },
+    "/v1/execution/limits/resolve": {
+      "post": {
+        "description": "Resolve an unknown outcome from what the rail or plant reports.\n\nA reviewer, never the principal the operation was charged to, states\nwhether the call executed and names the evidence. ``executed=false``\nreturns the reservation, so a legitimate retry is no longer refused;\n``executed=true`` keeps it and makes a duplicate refuse. The decision is\nappended to the tenant chain with the reviewer, the evidence and the\nreason. REMORA does not check the evidence; the reviewer answers for it.",
+        "operationId": "limits_resolve_v1_execution_limits_resolve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Limits Resolve V1 Execution Limits Resolve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The operation is settled; a reservation was returned or kept."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No limits, or no such operation."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The operation's outcome is not unknown, or the reviewer is the principal it was charged to."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Limits Resolve",
+        "tags": [
+          "execution"
+        ]
+      }
+    },
+    "/v1/execution/limits/unresolved": {
+      "get": {
+        "description": "The reservations held because a tool's outcome is unknown, oldest first.\n\nEach holds budget until a reviewer resolves it against the rail or plant\n(``POST /limits/resolve``). Reviewer capability, as for resolving.",
+        "operationId": "limits_unresolved_v1_execution_limits_unresolved_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Limits Unresolved V1 Execution Limits Unresolved Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Limit operations of this tenant whose outcome is unknown."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "Role lacks the required capability for this tenant."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "No cumulative limits are configured."
+          }
+        },
+        "summary": "Limits Unresolved",
         "tags": [
           "execution"
         ]
