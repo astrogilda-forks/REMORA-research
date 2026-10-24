@@ -27,14 +27,21 @@ jobs:
   test:
     name: pytest (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # CI budget 2026-10-24: the suite (12,564 tests) takes 14 to 20 minutes per
+    # version on the hosted runners and three legs ended as "cancelled" (timed
+    # out) under the former 15-minute budget. 25 minutes leaves headroom; a
+    # leg that needs more is a finding, not a budget to raise again.
+    timeout-minutes: 25
 
     strategy:
       fail-fast: false
       matrix:
-        # 3.14 is the environment pinned in paper/remora_paper.md §16 — the
-        # published environment must be CI-tested (2026-07-02 review finding).
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        # A pull request runs the full suite on one version; a push to master
+        # runs all four, so every merged commit is still verified on every
+        # supported interpreter, including 3.14, the environment pinned in
+        # paper/remora_paper.md §16 (2026-07-02 review finding). 3.12 is the
+        # version the other jobs use and the inventory job downloads.
+        python-version: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.11", "3.12", "3.13", "3.14"]') }}
 
     steps:
       - name: Checkout
