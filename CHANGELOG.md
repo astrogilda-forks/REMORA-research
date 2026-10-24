@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### ADR-UE-03 proposed: capability activation manifest, hook in the register, mode in the manifest (SDD unified capability execution v1.1 §13)
+
+- `docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md` (DOC-412, status proposed) records the options, the proposed default (the primary hook as a register fact, the requested mode in a signed per-deployment manifest whose digest is pinned into the lease), the particulars the owner must confirm (key custody, whether the digest enters the policy identity, the flag migration rule) and the slices that follow acceptance. It decides nothing by itself and changes no path.
+
 ### The operator's stop switch (SDD unified capability execution v1.1, P0 item 7; gate G10)
 
 - `POST /v1/execution/stop` and `/resume` (`review` capability) write one durable flag per tenant, the authority-epoch subject `execution:stop` in the store the lease nonce ledger uses, with `execution_stopped` or `execution_resumed` on the chain in the same transaction. `GET /v1/execution/stop` (`read`) returns the flag and the epoch.
