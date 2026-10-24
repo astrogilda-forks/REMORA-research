@@ -41,6 +41,8 @@ import json
 import os
 import sys
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -174,6 +176,7 @@ class _Api:
         import payment_tool
 
         payment_tool.REACHED.clear()
+        payment_tool.FAIL_NEXT.clear()
         self.exec_mod = exec_mod
         self.client = TestClient(api_mod.app)
 
@@ -257,9 +260,9 @@ def _approved_first(work: Path, seq: dict[str, Any], limits: dict[str, Any]) -> 
             "limit_refused_on_chain": api.chain_events().count("limit_refused")}
 
 
-def build() -> dict[str, Any]:
-    seq = signed_sequence()
-    limits = _limit_policy(seq)
+@contextmanager
+def isolated() -> Iterator[None]:
+    """Leave the process as it was: the replay also runs inside the test suite."""
     saved = dict(os.environ)
     import servers.api as api_mod
     import servers.execution_api as exec_mod
@@ -268,19 +271,9 @@ def build() -> dict[str, Any]:
                "_enforce_review_approval_role")
     saved_api = {name: getattr(api_mod, name) for name in patched}
     saved_chain = exec_mod._CHAIN
-    runs: dict[str, Any] = {}
     try:
-        for name, fn, policy in (("remora_as_shipped", _sequential, None),
-                                 ("budget_declared", _sequential, limits),
-                                 ("budget_declared_approved_first", _approved_first, limits)):
-            with tempfile.TemporaryDirectory() as work:
-                result = fn(Path(work), seq, policy)  # type: ignore[operator]
-            total = sum(p["amount"] for p in seq["payments"]
-                        if p["occurrence_id"] in result["reached_tool"])
-            runs[name] = {**result, "total_reached_tool": total,
-                          "within_budget": total <= seq["budget"]["max_total"]}
+        yield
     finally:
-        # Leave the process as it was: this also runs inside the test suite.
         os.environ.clear()
         os.environ.update(saved)
         for name, value in saved_api.items():
@@ -292,6 +285,22 @@ def build() -> dict[str, Any]:
         exec_mod._reset_tool_dispatcher()
         exec_mod._reset_outbox()
         exec_mod._reset_toolspec_bundle()
+
+
+def build() -> dict[str, Any]:
+    seq = signed_sequence()
+    limits = _limit_policy(seq)
+    runs: dict[str, Any] = {}
+    with isolated():
+        for name, fn, policy in (("remora_as_shipped", _sequential, None),
+                                 ("budget_declared", _sequential, limits),
+                                 ("budget_declared_approved_first", _approved_first, limits)):
+            with tempfile.TemporaryDirectory() as work:
+                result = fn(Path(work), seq, policy)  # type: ignore[operator]
+            total = sum(p["amount"] for p in seq["payments"]
+                        if p["occurrence_id"] in result["reached_tool"])
+            runs[name] = {**result, "total_reached_tool": total,
+                          "within_budget": total <= seq["budget"]["max_total"]}
     return {
         "schema": "remora-h55-enforcement-v1",
         "question": "Does REMORA's own engine let payment C run past the signed budget?",

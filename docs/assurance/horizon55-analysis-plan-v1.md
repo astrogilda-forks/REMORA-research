@@ -55,6 +55,26 @@ Tests H55-T00 to T17 are in `tests/test_horizon55_inputs.py`,
 The mutations are the author's own controls. They are not external
 adversarial coverage and are not counted as such.
 
+P1 controls, added 2026-10-24 after the row was published, are of the same
+kind:
+
+- `tests/test_horizon55_log_adversarial.py` covers the signed records:
+  - a genuine payment entry replayed at the end or duplicated in place;
+  - reordered entries, including B moved after C, which would otherwise put C
+    within the budget;
+  - a log truncated before C;
+  - a tampered checkpoint;
+  - a replayed entry whose position fields were rewritten;
+  - a bundle copy of the log that disagrees with the files.
+
+  None of them verifies, and none establishes a claim.
+- `tests/test_horizon55_enforcement_adversarial.py` runs part 2 under
+  concurrency, repeated execution, duplicate proposals, tool failures before
+  and after the payment, restarts and every order.
+
+  With the dispatcher's reservation disabled, 11 of its 12 tests fail. The
+  twelfth checks that a grant is spent once.
+
 ## Deviations and findings during implementation
 
 The mutation tests were written after the baseline verdicts were known. Two
