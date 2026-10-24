@@ -32,7 +32,7 @@ Each call is fine on its own: the right caller, the right service, a capability 
 
 Inputs: horizon-shield `b85029de8d22c5246886f4f50ede03da0f54dfcf` (records) and `5b22c203248b0149cd0456f77d32feb887f48ee0` (souba-db 2.3.0), pinned in `inputs.lock.json` (SHA-256 `1a423378f20b6f4d18f33558da72bd966035d72571bf89b9c277ce1172150bf8`).
 
-Log: 13 entries, hash chain, operator and author signatures checked locally: verified. Bitcoin anchoring of the checkpoint was not checked (`checkpoint_anchoring = NOT_ESTABLISHED`).
+Log: 13 entries, hash chain, operator and author signatures checked locally: verified. The frozen row did not check the checkpoint's Bitcoin anchor (`checkpoint_anchoring = NOT_ESTABLISHED` in `results.json`); it is checked separately below.
 
 | Claim | A | B | C |
 |---|---|---|---|
@@ -75,6 +75,17 @@ Horizon Shield `c824cbe61a383e57f1d9d15fea962a79f5b6bbd5` (branch `evidence/hs51
 | B | `dataset_byte_identity` | NOT_ESTABLISHED | ESTABLISHED | `dataset_bytes_match_audit_digest_and_pin` |
 
 No other verdict changes. B's audit is of a different estimate from the one A and C name: 2 lines totalling 792000 against 3 lines totalling 837000, with fixture `1f75bcabc350…` where A and C have `c2ed811e1d4b…`. B's fixture bytes are not public, so what B was asked to audit is not checked here.
+
+### The checkpoint's Bitcoin anchor, checked independently (2026-10-24)
+
+`anchor.py` parses `checkpoint.stamp.ots` from its binary format and replays every path to a Bitcoin attestation. It does not use the producer's proof summary or header view. `checkpoint.stamp` is byte-identical to the signed checkpoint (SHA-256 `afd5d289c7a289083be56849a73b9f9bef51877c9d6122cf507a6a1ca6115e31`), which covers all 13 entries. The attested headers were fetched from blockstream.info and mempool.space and kept only where both gave the same block id and bytes (`anchoring/headers.json`). Offline, each must hash to that id, meet its own proof-of-work target, declare at least 2^64 work and link to its predecessor. Its Merkle root must equal the commitment the proof computes.
+
+| Block | Block id | Block time (UTC, miner-declared) | Result |
+|---|---|---|---|
+| 972551 | `…ba62bdbe608c8f69` | 2026-10-22 01:33 | verified |
+| 972552 | `…46db60a59c842cb1` | 2026-10-22 01:39 | verified |
+
+`checkpoint_anchoring = ESTABLISHED` (`bitcoin_attestation_verified_against_pinned_header`, `anchoring/anchoring.json`). 4 further attestations are pending calendar entries and decide nothing. The log as signed, including C's payment, was therefore committed to Bitcoin by block 972551. This rests on two explorers agreeing at fetch time and on proof of work, not on a node of ours. It does not show that the block is in the best chain now, nor when each entry was seen relative to the block.
 
 ## Part 2: does REMORA let C run?
 

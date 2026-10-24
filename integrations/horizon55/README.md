@@ -47,8 +47,33 @@ policy engine, custody, dispatcher or verification semantics.
 | Budget | cumulative sum of authenticated payments on one lineage and unit, in log order, against the issuer-signed `max_total` |
 | Bytes | the public audit against the signed `response_sha256`, and the dataset against the digest the audit states and the pin |
 
-Bitcoin anchoring of the checkpoint is not checked. `checkpoint_anchoring` is
-`NOT_ESTABLISHED`, and no verdict depends on it.
+The frozen row does not check the checkpoint's Bitcoin anchor:
+`checkpoint_anchoring` is `NOT_ESTABLISHED` in `results.json`, and no claim
+verdict depends on it.
+
+## Anchoring, checked separately (P2)
+
+`anchor.py` parses `checkpoint.stamp.ots` from its binary format with its own
+parser and replays every path to a Bitcoin attestation. It does not use the
+producer's proof summary or header view. The steps are:
+
+1. `prepare.py --anchor-headers` asks blockstream.info and mempool.space for
+   the attested headers and the one before them. It keeps a header only when
+   both explorers return the same block id and bytes, and writes
+   `anchoring/headers.json`.
+2. Offline, each header must hash to that id and meet its own proof-of-work
+   target. The target must declare at least 2^64 work, and the header must
+   link to its predecessor.
+3. The header's Merkle root must equal the commitment the proof computes.
+
+Result (`anchoring/anchoring.json`): both attestations, blocks 972551 and
+972552, verify. `checkpoint_anchoring` is `ESTABLISHED` there. The signed
+checkpoint covers all 13 entries, so C's payment was committed to Bitcoin by
+block 972551.
+
+This rests on two explorers agreeing at fetch time and on proof of work, not
+on a node of ours. It does not show that the block is in the best chain now,
+nor when each entry was seen relative to the block.
 
 ## Result
 
@@ -93,9 +118,11 @@ what it tests. The limits themselves are `remora/enforcement/cumulative_limits.p
 python integrations/horizon55/prepare.py     # once, networked: fetch and check against the lock
 python integrations/horizon55/run.py --check # offline: inputs, verdicts, outputs, disclosure gate
 python integrations/horizon55/enforce.py --check  # offline: REMORA's engine on A, B and C
+python integrations/horizon55/anchor.py --check   # offline: the checkpoint's Bitcoin anchor
 ```
 
 `run.py --write` rewrites `results.json`, `audit-b/results.json`,
+`anchoring/anchoring.json`,
 `REPORT.md`, `SHA256SUMS` and `reproduction.json`. Two runs give byte-identical `results.json` and
 `REPORT.md`. `reproduction.json` records the interpreter, OS and
 `cryptography` version and is excluded from the byte-identity check. Tests:
@@ -117,6 +144,7 @@ python integrations/horizon55/enforce.py --check  # offline: REMORA's engine on 
 | B-audit extension | `tests/test_horizon55_audit_b.py` |
 | P1: replayed, duplicated, reordered, truncated log | `tests/test_horizon55_log_adversarial.py` |
 | P1: concurrency, crashes, retries, restarts | `tests/test_horizon55_enforcement_adversarial.py` |
+| P2: the Bitcoin anchor, checked independently | `tests/test_horizon55_anchoring.py` |
 | H55-T10 dataset bytes | `test_t10_*` (two need the prepared cache) |
 | H55-T11 altered native settlement | `test_t11_*` |
 | H55-T12 receipt mapped to a REMORA grant | `test_t12_*` |

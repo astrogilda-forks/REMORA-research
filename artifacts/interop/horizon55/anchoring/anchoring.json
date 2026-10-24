@@ -1,0 +1,51 @@
+{
+ "attestations": [
+  {
+   "kind": "pending",
+   "uri": "https://alice.btc.calendar.opentimestamps.org"
+  },
+  {
+   "block_hash": "000000000000000000018b01af33d28370bdf9912718cc5eba62bdbe608c8f69",
+   "block_time": 1792632805,
+   "commitment": "830a724f00903e5bd448a5a57aeeecae43979e8fa5fea527bbcf5179e8ca2f2b",
+   "height": 972551,
+   "kind": "bitcoin",
+   "problems": []
+  },
+  {
+   "kind": "pending",
+   "uri": "https://finney.calendar.eternitywall.com"
+  },
+  {
+   "block_hash": "00000000000000000001d93656f68863db9a58b17943210346db60a59c842cb1",
+   "block_time": 1792633193,
+   "commitment": "822db8e2e0916731da72166749c741a299b1c352eb4a400dfee276f4753cce49",
+   "height": 972552,
+   "kind": "bitcoin",
+   "problems": []
+  },
+  {
+   "kind": "pending",
+   "uri": "https://bob.btc.calendar.opentimestamps.org"
+  },
+  {
+   "kind": "pending",
+   "uri": "https://btc.calendar.catallaxy.com"
+  }
+ ],
+ "checkpoint_sha256": "afd5d289c7a289083be56849a73b9f9bef51877c9d6122cf507a6a1ca6115e31",
+ "claim_id": "checkpoint_anchoring",
+ "classification": "author-run check of a public proof; not independent",
+ "does_not_establish": [
+  "that the block is in the best chain now",
+  "seen_block ordering of log entries relative to the block",
+  "anything about an entry beyond what the signed checkpoint covers"
+ ],
+ "earliest_verified_height": 972551,
+ "reason_codes": [
+  "bitcoin_attestation_verified_against_pinned_header"
+ ],
+ "schema": "remora-h55-anchoring-v1",
+ "trust_basis": "headers from two block explorers with different operators, kept only when both gave the same block id; proof of work and linkage checked offline; no node of ours",
+ "verdict": "ESTABLISHED"
+}

@@ -28,6 +28,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+import anchor  # noqa: E402
 import canon  # noqa: E402
 import check_inputs  # noqa: E402
 import claims  # noqa: E402
@@ -60,6 +61,11 @@ EXPECTED_AUDIT_B: dict[str, dict[str, str]] = {
                        if case == "B" else {})}
     for case, table in EXPECTED.items()}
 AUDIT_B_OUT = "audit-b/results.json"
+#: P2: the checkpoint's Bitcoin anchor, checked by ``anchor.py`` against headers
+#: pinned from two explorers. Written after the proof was parsed, before the
+#: headers were fetched. The frozen results keep NOT_ESTABLISHED.
+EXPECTED_ANCHORING = E
+ANCHORING_OUT = "anchoring/anchoring.json"
 INDEPENDENCE = "AUTHOR_OPERATED"
 CLASSIFICATION = ("exploratory, retrospective, author-operated; not a holdout, not "
                   "preregistered, not an independent or external evaluation")
@@ -155,7 +161,44 @@ def _audit_summary(relative: str) -> tuple[str, int, int]:
     return audit["fixture_sha256"], len(audit["lines"]), audit["total"]
 
 
-def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None) -> str:
+def _anchoring_lines(anchoring: dict[str, Any]) -> list[str]:
+    import datetime as dt
+
+    rows = [a for a in anchoring["attestations"] if a["kind"] == "bitcoin"]
+    pending = sum(a["kind"] == "pending" for a in anchoring["attestations"])
+    return [
+        "",
+        "### The checkpoint's Bitcoin anchor, checked independently (2026-10-24)",
+        "",
+        ("`anchor.py` parses `checkpoint.stamp.ots` from its binary format and replays every "
+         "path to a Bitcoin attestation. It does not use the producer's proof summary or "
+         "header view. `checkpoint.stamp` is byte-identical to the signed checkpoint "
+         f"(SHA-256 `{anchoring['checkpoint_sha256']}`), which covers all 13 entries. The "
+         "attested headers were fetched from blockstream.info and mempool.space and kept "
+         "only where both gave the same block id and bytes (`anchoring/headers.json`). "
+         "Offline, each must hash to that id, meet its own proof-of-work target, declare at "
+         f"least 2^{anchor.MIN_WORK_BITS} work and link to its predecessor. Its Merkle root "
+         "must equal the commitment the proof computes."),
+        "",
+        "| Block | Block id | Block time (UTC, miner-declared) | Result |",
+        "|---|---|---|---|",
+        *[f"| {a['height']} | `…{a['block_hash'][-16:]}` | "
+          f"{dt.datetime.fromtimestamp(a['block_time'], dt.UTC):%Y-%m-%d %H:%M} | "
+          f"{'verified' if not a['problems'] else ', '.join(a['problems'])} |" for a in rows],
+        "",
+        (f"`checkpoint_anchoring = {anchoring['verdict']}` "
+         f"(`{', '.join(anchoring['reason_codes'])}`, `anchoring/anchoring.json`). "
+         f"{pending} further attestations are pending calendar entries and decide nothing. "
+         "The log as signed, including C's payment, was therefore committed to Bitcoin by "
+         f"block {anchoring['earliest_verified_height']}. This rests on two explorers "
+         "agreeing at fetch time and on proof of work, not on a node of ours. It does not "
+         "show that the block is in the best chain now, nor when each entry was seen "
+         "relative to the block."),
+    ]
+
+
+def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None,
+           anchoring: dict[str, Any] | None = None) -> str:
     rows = {(r["case_id"], r["claim_id"]): r for r in body["results"]}
     enf = enforcement()
     lines = [
@@ -225,8 +268,9 @@ def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None) -> str:
         "",
         (f"Log: {body['log']['size']} entries, hash chain, operator and author signatures "
          f"checked locally: {'verified' if body['log']['verified'] else 'NOT verified'}. "
-         "Bitcoin anchoring of the checkpoint was not checked "
-         "(`checkpoint_anchoring = NOT_ESTABLISHED`)."),
+         "The frozen row did not check the checkpoint's Bitcoin anchor "
+         "(`checkpoint_anchoring = NOT_ESTABLISHED` in `results.json`); it is checked "
+         "separately below."),
         "",
         "| Claim | A | B | C |",
         "|---|---|---|---|",
@@ -293,6 +337,8 @@ def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None) -> str:
              f"`{ac_fixture[:12]}…`. B's fixture bytes are not public, so what B was asked "
              "to audit is not checked here."),
         ]
+    if anchoring is not None:
+        lines += _anchoring_lines(anchoring)
     lines += ["", "## Part 2: does REMORA let C run?", ""]
     if enf is None:
         lines += ["Not run: `enforcement.json` is missing.", ""]
@@ -369,11 +415,14 @@ def _json(body: dict[str, Any]) -> bytes:
     return json.dumps(body, indent=1, sort_keys=True, ensure_ascii=False).encode("utf-8") + b"\n"
 
 
-def stable_outputs(body: dict[str, Any],
-                   audit_b: dict[str, Any] | None = None) -> dict[str, bytes]:
-    out = {"results.json": _json(body), "REPORT.md": report(body, audit_b).encode("utf-8")}
+def stable_outputs(body: dict[str, Any], audit_b: dict[str, Any] | None = None,
+                   anchoring: dict[str, Any] | None = None) -> dict[str, bytes]:
+    out = {"results.json": _json(body),
+           "REPORT.md": report(body, audit_b, anchoring).encode("utf-8")}
     if audit_b is not None:
         out[AUDIT_B_OUT] = _json(audit_b)
+    if anchoring is not None:
+        out[ANCHORING_OUT] = anchor.render(anchoring)
     return out
 
 
@@ -382,6 +431,8 @@ def stable_inputs() -> dict[str, bytes]:
     return {"inputs.lock.json": LOCK.read_bytes(),
             **({"audit-b/inputs.lock.json": AUDIT_B_LOCK.read_bytes()}
                if AUDIT_B_LOCK.is_file() else {}),
+            **({"anchoring/headers.json": anchor.HEADERS.read_bytes()}
+               if anchor.HEADERS.is_file() else {}),
             **({"enforcement.json": ENFORCEMENT.read_bytes()} if ENFORCEMENT.is_file() else {})}
 
 
@@ -421,7 +472,8 @@ def main(argv: list[str] | None = None) -> int:
     if audit_b is not None and "error" in audit_b:
         print(json.dumps(audit_b, indent=1, sort_keys=True))
         return 2
-    outputs = stable_outputs(body, audit_b)
+    anchoring = anchor.evaluate() if anchor.HEADERS.is_file() else None
+    outputs = stable_outputs(body, audit_b, anchoring)
     if args.json:
         sys.stdout.write(outputs["results.json"].decode("utf-8"))
         return 0
@@ -446,6 +498,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         problems += [{"error": "unexpected_verdict", "run": "audit-b", **d}
                      for d in disagreements(audit_b, EXPECTED_AUDIT_B)]
+    if anchoring is None:
+        problems.append({"error": "anchor_headers_missing", "file": "anchoring/headers.json",
+                         "fix": "python integrations/horizon55/prepare.py --anchor-headers"})
+    elif anchoring["verdict"] != EXPECTED_ANCHORING:
+        problems.append({"error": "unexpected_verdict", "run": "anchoring",
+                         "expected": EXPECTED_ANCHORING, "got": anchoring["verdict"]})
     for name, data in outputs.items():
         path = OUT / name
         if not path.is_file() or path.read_bytes() != data:
