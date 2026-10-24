@@ -877,6 +877,7 @@ class GovernedToolDispatcher:
         self._effect_domain: Any = None
         self._capability_state: Callable[[str, Any], Any] | None = None
         self._capability_epochs: Any = None
+        self._stop_source: Callable[[str], bool] | None = None
         self._effect_resolver: "EffectResolver | None" = None
         self._revisions: "RevisionReader | None" = None
         self._recorder: "RecorderClient | None" = None
@@ -1131,6 +1132,29 @@ class GovernedToolDispatcher:
         self._surface_observer = observer
         self._surface_enforced = enforce
         self._surface_digest_required = require_digest
+
+    def bind_stop_source(self, source: Callable[[str], bool]) -> None:
+        """Read the operator's stop switch at dispatch (SDD unified capability
+        execution v1.1, P0 item 7).
+
+        ``source(tenant_id)`` is True while execution for the tenant is
+        stopped. It is the first of the checks between verification and the
+        nonce, so a stopped executor spends nothing: no nonce, no limit
+        reservation, no recorder intent. A lease refused here is still
+        usable once execution resumes, if it has not expired. A source that
+        raises refuses as ``execution_stop_unverifiable``: nothing runs on
+        a flag that could not be read.
+        """
+        self._stop_source = source
+
+    def _stop_refusal(self, tenant_id: str) -> str | None:
+        if self._stop_source is None:
+            return None
+        try:
+            stopped = bool(self._stop_source(tenant_id))
+        except Exception:
+            return "execution_stop_unverifiable"
+        return "execution_stopped" if stopped else None
 
     def _durability_refusal(self) -> str | None:
         """A strict profile never relies on the in-process nonce ledger.
@@ -1707,7 +1731,8 @@ class GovernedToolDispatcher:
         # consumed, so a rejected runtime does not burn a single-use nonce and
         # turn an authorization failure into an unknown-state incident.
         runtime_refusal = (
-            self._durability_refusal()
+            self._stop_refusal(tenant_id)
+            or self._durability_refusal()
             or self._policy_refusal(lease)
             or self._capability_refusal(lease, tool_name, tenant_id,
                                      target_environment or "", capability_set, now,

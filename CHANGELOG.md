@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### The operator's stop switch (SDD unified capability execution v1.1, P0 item 7; gate G10)
+
+- `POST /v1/execution/stop` and `/resume` (`review` capability) write one durable flag per tenant, the authority-epoch subject `execution:stop` in the store the lease nonce ledger uses, with `execution_stopped` or `execution_resumed` on the chain in the same transaction. `GET /v1/execution/stop` (`read`) returns the flag and the epoch.
+- While stopped the authority mints nothing (`execution_stopped`) and every `GovernedToolDispatcher` with a bound stop source refuses first of all its checks, before the nonce, the limit reservation and the recorder intent; a lease refused this way runs after the resume. A store that cannot answer refuses as `execution_stop_unverifiable`. The conformance executor binds the same source, and a process-split test stops a running executor, restarts it stopped, and runs the same lease after the resume.
+- A separate interpreter holding only the public verification key cannot mint a lease (`tests/conformance`), the in-process custody tests' claim shown across a process boundary.
+- Not a stop: `REMORA_STATE_ENDPOINT` alone has no epoch store, so a D1-only deployment has none and the routes answer 409. The stop is per tenant; a platform-wide stop is a loop over tenants. No latency figure is claimed beyond "before the next dispatch's checks".
+
 ### Cumulative limits: a shared Postgres ledger (SDD unified capability execution v1.1, P0 item 8)
 
 - `REMORA_LIMITS_LEDGER` may name a PostgreSQL DSN (`postgresql://...` or a libpq `key=value` string) instead of a SQLite file. Every ledger transaction takes one advisory lock, so two executors reserving against the same limit are serialized as one host's `BEGIN IMMEDIATE` transactions were; the schema is created on first open under the same lock. `tests/limits/test_limits_postgres.py` runs two executors on one database in the `postgres-contract` job: the sum never passes the limit, the same operation runs once, an unknown outcome resolves across executors.

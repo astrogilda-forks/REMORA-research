@@ -492,3 +492,88 @@ def test_p7_postgres_a_lease_spent_on_one_executor_is_refused_by_the_other(
     assert replay["executed"] is False
     assert replay["refusal_reason"] == "nonce_already_consumed"
     assert _mailbox(split) == after_first
+
+
+# --------------------------------------------------------------------------
+# P9/P10: the stop switch and the agent's inability to mint, across processes
+# (SDD unified capability execution v1.1, P0 item 7)
+# --------------------------------------------------------------------------
+
+
+def test_p9_an_operator_stop_refuses_valid_leases_across_a_restart(
+    split, tmp_path_factory
+) -> None:
+    """The authority stops execution; the executor, in its own process, reads
+    the flag from the shared store before anything is spent and refuses a
+    valid lease. A fresh executor over the same store refuses too. After the
+    resume the same lease runs: the refusals spent no nonce. The mailbox is
+    unchanged throughout the stop."""
+    from remora.governance.authority_epochs import EXECUTION_STOP_SUBJECT, AuthorityEpochs
+
+    db = tmp_path_factory.mktemp("stop") / "state.db"
+    env = {
+        "CONFORMANCE_EFFECT_TOKEN": EFFECT_TOKEN,
+        "CONFORMANCE_EFFECT_URL": split["effect_url"],
+        "CONFORMANCE_POLICY_BUNDLE_HASH": BUNDLE,
+        "REMORA_LEASE_VERIFY_KEY_ED25519_PUBLIC": _public_key_hex(),
+        "REMORA_LEASE_SIGNING_KEY_ED25519_PRIVATE": "",
+        "REMORA_LEASE_SIGNING_KEY": "",
+        "REMORA_PDP_SIGNING_KEY": "",
+        "REMORA_CHAIN_DB": str(db),
+    }
+    arguments = {"to": APPROVED}
+    lease = _issue("send_mail", arguments)
+    switch = AuthorityEpochs(db_path=str(db))      # the authority's side of the store
+    before = _mailbox(split)
+
+    first, port = _start("_executor.py", env)
+    try:
+        switch.advance(EXECUTION_STOP_SUBJECT, tenant_id="t1", revoked=True)
+        refused = _dispatch_to(f"http://127.0.0.1:{port}", lease, arguments)
+        assert refused == {"executed": False, "refusal_reason": "execution_stopped"}
+        assert _mailbox(split) == before, "a stopped executor produced an effect"
+    finally:
+        first.kill()
+        first.wait(timeout=10)
+
+    second, port2 = _start("_executor.py", env)
+    try:
+        still = _dispatch_to(f"http://127.0.0.1:{port2}", lease, arguments)
+        assert still == {"executed": False, "refusal_reason": "execution_stopped"}
+        assert _mailbox(split) == before, "the stop did not survive the executor restart"
+        switch.advance(EXECUTION_STOP_SUBJECT, tenant_id="t1", revoked=False)
+        ran = _dispatch_to(f"http://127.0.0.1:{port2}", lease, arguments)
+        assert ran["executed"] is True, ran
+        assert len(_mailbox(split)) == len(before) + 1
+    finally:
+        second.kill()
+        second.wait(timeout=10)
+
+
+def test_p10_a_process_holding_only_verification_material_cannot_mint() -> None:
+    """The agent side of the custody split, in a process of its own. With the
+    public key and no private seed or HMAC key, ``ExecutionLease.issue``
+    refuses; nothing falls back to an unsigned lease (ADR-A). The in-process
+    custody tests show the same with monkeypatched environments; this one
+    shows it where it matters, in a separate interpreter with a clean
+    environment."""
+    code = (
+        "from datetime import datetime, timezone\n"
+        "from remora.enforcement.lease import ExecutionLease, LeaseRefused\n"
+        "try:\n"
+        "    ExecutionLease.issue(decision='accept', tenant_id='t1', actor_identity='agent-1',\n"
+        "                         tool_name='send_mail', arguments={'to': 'x@example.com'},\n"
+        "                         target_environment='prod', policy_bundle_hash='c' * 64,\n"
+        "                         issued_at=datetime.now(timezone.utc).isoformat())\n"
+        "except LeaseRefused as exc:\n"
+        "    print('refused: ' + str(exc)[:60])\n"
+        "    raise SystemExit(3)\n"
+        "print('minted')\n"
+    )
+    env = {k: v for k, v in os.environ.items() if not k.startswith("REMORA_")}
+    env["REMORA_LEASE_VERIFY_KEY_ED25519_PUBLIC"] = _public_key_hex()
+    env["PYTHONPATH"] = str(REPO)
+    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True,
+                            text=True, timeout=120, check=False)
+    assert result.returncode == 3, (result.returncode, result.stdout, result.stderr)
+    assert result.stdout.startswith("refused: ")

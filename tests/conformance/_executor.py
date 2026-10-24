@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from remora.enforcement.lease import ExecutionLease, GovernedToolDispatcher
 from remora.enforcement.nonce_store import DurableNonceStore
+from remora.governance.authority_epochs import EXECUTION_STOP_SUBJECT, AuthorityEpochs
 
 EFFECT_URL_ENV = "CONFORMANCE_EFFECT_URL"
 EFFECT_TOKEN_ENV = "CONFORMANCE_EFFECT_TOKEN"
@@ -146,6 +147,14 @@ def main() -> int:
         ),
     )
     _DISPATCHER.register("send_mail", _send_mail)
+    if dsn or db_path:
+        # The operator's stop switch, read from the same store as the nonce
+        # ledger (SDD unified capability execution v1.1, P0 item 7), as
+        # servers/execution_api.py binds it.
+        epochs = AuthorityEpochs(dsn=dsn, db_path=db_path)
+        _DISPATCHER.bind_stop_source(
+            lambda tenant: epochs.read((EXECUTION_STOP_SUBJECT,),
+                                       tenant_id=tenant)[EXECUTION_STOP_SUBJECT][1])
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     print(server.server_address[1], flush=True)
     server.serve_forever()
