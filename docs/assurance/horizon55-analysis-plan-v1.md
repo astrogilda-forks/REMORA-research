@@ -124,10 +124,25 @@ receipt, before the row ran on them, so it records a prediction from a known
 digest, not a blind one. No other verdict may move. B's audit names a fixture
 (`1f75bcab…`) that is not public, so the estimate B audited is not checked.
 
+## Anchoring, checked separately (P2, 2026-10-24)
+
+`anchor.py` checks the checkpoint's OpenTimestamps proof against Bitcoin
+headers pinned from two explorers with different operators. It uses its own
+parser and does not use the producer's proof summary or header view.
+`EXPECTED_ANCHORING` (`ESTABLISHED`) was written after the proof was parsed
+and before the headers were fetched. The frozen `results.json` keeps
+`NOT_ESTABLISHED`.
+
+The trust basis is two explorers agreeing at fetch time, plus proof of work
+checked offline. It is not a node of ours. The single-byte mutation test over
+the whole proof shows that no flipped byte yields a verified attestation with
+a commitment other than the two genuine ones.
+
 ## Out of scope
 
 No live calls, payments, cloud tokens or network access during `run.py` or
-`enforce.py`. No Bitcoin anchor verification. No comparison of REMORA with
+`enforce.py`. The frozen row does not verify the Bitcoin anchor. It is checked
+separately (see below). No comparison of REMORA with
 MUSUBI as more or less secure: they act at different points, before the call
 and after it. A future study of
 pre-dispatch budget enforcement would need a new synthetic population, an

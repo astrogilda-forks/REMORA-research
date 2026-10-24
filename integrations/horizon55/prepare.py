@@ -20,6 +20,14 @@ git-ignored cache and pinned by digest only.
 The frozen lock is never rewritten for later evidence. B's audit bytes,
 published after the row first ran, are a separate extension with its own
 lock (``AUDIT_B_LOCK``, ``--write-audit-b-lock``).
+
+    python integrations/horizon55/prepare.py --anchor-headers   # pin the attested headers
+
+``--anchor-headers`` asks two block explorers run by different operators for
+the headers the checkpoint's OpenTimestamps proof attests to (and the one
+before the earliest, for linkage), and writes ``anchoring/headers.json`` only
+when both return the same block id and the same header bytes. ``anchor.py``
+then checks them offline.
 """
 from __future__ import annotations
 
@@ -94,6 +102,38 @@ def _fetch(revision: str, path: str) -> bytes:
         return response.read()
 
 
+EXPLORERS = {"blockstream.info": "https://blockstream.info/api",
+             "mempool.space": "https://mempool.space/api"}
+
+
+def _get(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310 - fixed https hosts
+        return response.read().decode("ascii").strip()
+
+
+def anchor_headers() -> dict[str, Any]:
+    """The attested headers, agreed by both explorers, or an error."""
+    import anchor
+
+    _, attestations = anchor.parse_ots(
+        (INPUTS / "pilot51/set2/log/checkpoint.stamp.ots").read_bytes())
+    heights = sorted({a["height"] for a in attestations if a["kind"] == "bitcoin"})
+    if not heights:
+        return {"error": "no_bitcoin_attestation"}
+    headers = {}
+    for height in [heights[0] - 1, *heights]:
+        ids = {name: _get(f"{base}/block-height/{height}") for name, base in EXPLORERS.items()}
+        raw = {name: _get(f"{EXPLORERS[name]}/block/{ids[name]}/header") for name in EXPLORERS}
+        if len(set(ids.values())) != 1 or len(set(raw.values())) != 1:
+            return {"error": "explorers_disagree", "height": height}
+        headers[str(height)] = {"hash": next(iter(ids.values())),
+                                "header": next(iter(raw.values())), "sources": ids}
+    return {"schema": "remora-h55-anchor-headers-v1",
+            "explorers": EXPLORERS,
+            "rule": "kept only when every explorer returned the same block id and header bytes",
+            "headers": headers}
+
+
 def local_path(vendored: bool, relative: str) -> Path:
     return (INPUTS if vendored else CACHE) / relative
 
@@ -149,7 +189,19 @@ def main(argv: list[str] | None = None) -> int:
                         help="freeze: write inputs.lock.json from the fetched bytes")
     parser.add_argument("--write-audit-b-lock", action="store_true",
                         help="freeze the B-audit extension: write audit-b/inputs.lock.json")
+    parser.add_argument("--anchor-headers", action="store_true",
+                        help="pin the attested Bitcoin headers: write anchoring/headers.json")
     args = parser.parse_args(argv)
+    if args.anchor_headers:
+        body = anchor_headers()
+        if "error" in body:
+            print(json.dumps(body))
+            return 2
+        path = LOCK.parent / "anchoring" / "headers.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(body, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(json.dumps({"headers": sorted(body["headers"], key=int)}))
+        return 0
     fetched = 0
     for sources, lock_path, write in ((SOURCES, LOCK, args.write_lock),
                                       (AUDIT_B_SOURCES, AUDIT_B_LOCK, args.write_audit_b_lock)):
