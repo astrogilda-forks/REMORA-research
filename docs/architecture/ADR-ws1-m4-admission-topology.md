@@ -299,6 +299,14 @@ the enqueue fails, admission refuses as `audit_outbox_unavailable` and rolls
 back with it: the grant stays unspent, no intent exists and a claim is
 released (M4-T12).
 
+A fault the admission cannot name, a driver error inside the transaction or
+at its commit, rolls back the same way. On the review path it is reported as
+`admission_storage_unavailable` and takes the refusal path. The refusal and
+the withheld grant go on the chain, the grant minted before the transaction
+is spent, and the item is settled (NEGATIVE_RESULTS §98, re-verified under
+SDD unified capability execution v1.1 P0 item 5). The driver's message is
+logged, not returned, so the response reasons stay a bounded set.
+
 - The record names the grant, the intent's outbox id, the actor, the
   delegating proposer, the worker on the async path, the WS1 audit block and
   the admission block. It is keyed on the grant's `jti`, which the spend

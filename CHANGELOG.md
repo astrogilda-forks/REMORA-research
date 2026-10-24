@@ -11,6 +11,12 @@ This file lists externally relevant changes by release. Fine-grained development
 - A separate interpreter holding only the public verification key cannot mint a lease (`tests/conformance`), the in-process custody tests' claim shown across a process boundary.
 - Not a stop: `REMORA_STATE_ENDPOINT` alone has no epoch store, so a D1-only deployment has none and the routes answer 409. The stop is per tenant; a platform-wide stop is a loop over tenants. No latency figure is claimed beyond "before the next dispatch's checks".
 
+### Review admission re-verified with ledger and storage faults (NEGATIVE_RESULTS §98; SDD unified capability execution v1.1, P0 item 5)
+
+- Under `REMORA_WS1_ADMISSION=atomic`, a storage fault inside the admission transaction on `/v1/execution/execute` (a lost connection, a failed commit) is now a refusal, `admission_storage_unavailable`, on the same path as every other refused admission: `execution_admission_refused` and `execution_grant_withheld` on the chain, the minted grant spent, the item settled, no `execution_grant` in the response. It answered 500 and recorded nothing before; the grant was unspent and unreturned either way.
+- `tests/test_review_admission_grant_withheld.py` runs every case on SQLite and on Postgres in a schema of its own, in the `postgres-contract` and coverage CI jobs, and adds the two cases the §98 repair stated without testing: the consumed-grant ledger fails on the withholding spend (`spent: false`, no grant returned) and the transaction fails at commit.
+- Still open: §98 stays open until atomic admission runs outside the author's tests; nothing here is an independent run.
+
 ### Cumulative limits: a shared Postgres ledger (SDD unified capability execution v1.1, P0 item 8)
 
 - `REMORA_LIMITS_LEDGER` may name a PostgreSQL DSN (`postgresql://...` or a libpq `key=value` string) instead of a SQLite file. Every ledger transaction takes one advisory lock, so two executors reserving against the same limit are serialized as one host's `BEGIN IMMEDIATE` transactions were; the schema is created on first open under the same lock. `tests/limits/test_limits_postgres.py` runs two executors on one database in the `postgres-contract` job: the sum never passes the limit, the same operation runs once, an unknown outcome resolves across executors.
@@ -697,6 +703,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
 - No committed ToolSpec bundle carries a `flow` block, so no signed bundle
   changes. `remora/flow/spec.py` is in the policy bundle hash, which
   changes.
+
 ### Policy (signal monotonicity, RMR-AUD-003)
 
 - A refusal no review can lift now outranks an ESCALATE. A cross-tenant
@@ -745,6 +752,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   without one. The split alone stayed green if bundles went missing. The
   agreement it reports is named `observed_effect_binary_agree`, because it
   compares only REMORA's `EFFECT_VERIFIED` with the reader's `ESTABLISHED`.
+
 ### Interop (E6 consumer for Veritas Acta receipts, author run)
 
 - New `remora/interop/acta_e6/` (EXPERIMENTAL): a paying-side consumer for
@@ -763,6 +771,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   author run, not an independent record under the boundary map's rule.
 - `tests/test_acta_e6_consumer.py`: 12 tests over the vendored subset, the
   committed record, pin refusals and the failure paths no case reaches.
+
 ### Evidence COMP-01 (AgentHarm re-score, post hoc)
 
 - `scripts/comp01_agentharm_rescore.py` writes
@@ -809,7 +818,6 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
 - The register's `updated` field moves to 2026-10-17.
 - PRF-043 records that the paper does not cite BFCL.
 
-
 ### Policy COMP-01 (meet composition, P-MONO)
 
 - `RemoraDecisionEngine.decide` now returns the least executable of its
@@ -849,6 +857,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
 - Contracts touched: three additive reason codes in
   `schemas/tool_spec_v1.yaml`; `schemas/tool_spec_v4.yaml` is now
   implemented. Nothing reads `ToolSpec.flow` to decide yet (IFC-05).
+
 ### Flow control IFC-05a (recipients and the flow check)
 
 - `remora/flow/check.py`: `recipients` computes who receives a resolved
@@ -915,6 +924,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   before signing.
 - Not yet wired: the bundle loader does not accept schema version 4 until
   IFC-03b, so no deployment can carry a block yet.
+
 ### Flow control IFC-02b (`POST /v1/contexts`)
 
 - `POST /v1/contexts` mints a flow context for the authenticated principal
@@ -1392,6 +1402,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   the evidence one execution can produce. Across processes the effect domain
   already claims each slot in the durable ledger before its executor runs;
   this fix is for the in-process mediator.
+
 ### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
 
 - `tests/test_hard_guards_dominate_max_trust.py` starts from one
@@ -2432,6 +2443,7 @@ execution-context binding.
   superuser (RLS bypassed even when forced) and nothing binds the verified
   tenant to the connection. REM-026 notes and the multi-tenant security model
   point to it. Proposal only; nothing implemented.
+
 ### Testing
 
 - Postgres outbox fault injection (`tests/test_postgres_outbox_fault_injection.py`),
@@ -2730,6 +2742,7 @@ execution-context binding.
   full registered set in collapsible groups by question. Every link from
   the previous index is preserved (governance index-completeness check);
   meta-governance sentences in the index went from 7 to 0.
+
 ### Repository layout
 
 - Root tidy, slice A: the licensing bundle (`COMMERCIAL_LICENSE.md`,
