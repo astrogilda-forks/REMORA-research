@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### CI: a pull request runs the test files its change can affect
+
+- `scripts/select_tests_for_change.py` selects the test files for the pull-request `pytest` leg from the diff against the base: every test file that imports a changed module, transitively, through the repository's static import graph (string literals that name a module count as imports, which is how the execution router and the test tool registry are loaded); every test file whose text names a changed path; a changed test file itself; the docgate files whenever a document, register, artifact or schema changed; and the docgate files always, so no selection is empty. Packaging, dependency and pytest configuration, `conftest.py`, the CI workflows, package `__init__` files, `tests/data/` and any path outside the modelled prefixes run the whole suite. `--report` records why each file ran.
+- `.github/workflows/ci.yml`: the `pytest` job selects on `pull_request` and runs the selection on Python 3.12; the label `ci:full` runs everything; a push to master never selects and runs the whole suite on every interpreter. The selection report is uploaded with the results. The skip-reason, test-accounting and inventory steps are unchanged.
+- `tests/test_select_tests_for_change.py` pins the rules on the live repository: the changes that run everything, the known regressions a subset must still catch (the Postgres limit ledger ran in `tests/limits`; a module named only through a string still selects its users), the document gates, determinism, and that every selected file exists.
+- Boundary of the claim: a pull request's green `pytest` leg says the affected subset passed; the full suite's verdict is master's. The coverage job in `quality-gates.yml` still runs the whole suite on every pull request.
+
 ### CI budget: one Python version per pull request, all four on master
 
 - The deterministic suite (12,564 tests) takes 14 to 20 minutes per interpreter on the hosted runners, and three matrix legs ended as "cancelled" (timed out) under the 15-minute job budget on 2026-10-24. The `pytest` job budget is 25 minutes.

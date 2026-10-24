@@ -1,6 +1,9 @@
 name: CI — Deterministic Test Suite
 
-# Runs the full deterministic test suite on pull requests and on master.
+# Runs the deterministic test suite: on a pull request, the test files the
+# change can affect (scripts/select_tests_for_change.py; the label ci:full
+# runs everything) on Python 3.12; on a push to master, the whole suite on
+# every supported interpreter. Nothing merges on a subset alone.
 # No API keys, no network access, no cloud resources required.
 # For the full quality-gates pipeline (lint, coverage, frontend, replay), see quality-gates.yml.
 #
@@ -46,6 +49,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          # The selection step diffs against the pull request's base commit.
+          fetch-depth: 0
 
       - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -68,6 +74,19 @@ jobs:
           # docs/assurance/skip_reason_allowlist_v1.yaml lists no reason for it.
           pip install -e ".[dev,causal,api,security,identity,otel]" -c /tmp/constraints.txt
 
+      - name: Select the test files this change can affect (pull requests only)
+        # scripts/select_tests_for_change.py: the import graph (static imports and
+        # string-named modules), the text mentions and the conservative ALL rules.
+        # A push to master never selects: every merged commit runs the whole
+        # suite on every interpreter, so nothing merges on a subset alone.
+        # The label ci:full on the pull request skips the selection and runs
+        # the whole suite on this leg.
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci:full')
+        run: >-
+          python scripts/select_tests_for_change.py
+          --base ${{ github.event.pull_request.base.sha }} --head ${{ github.sha }}
+          --out selected-tests.txt --report test-selection.json
+
       - name: Run deterministic test suite
         # Markers 'live' and 'live_replay_heavy' are excluded by default in
         # pyproject.toml addopts — no API keys or network access required.
@@ -75,7 +94,13 @@ jobs:
           REMORA_REQUIRE_SECURITY_EXTRA: "1"
         run: |
           set -o pipefail
-          python -m pytest tests/ -q -rs --junitxml=pytest-junit.xml | tee pytest-report.txt
+          if [ -f selected-tests.txt ] && ! grep -qx ALL selected-tests.txt; then
+            TARGETS=$(paste -sd ' ' selected-tests.txt)
+            echo "running the $(wc -l < selected-tests.txt) selected test file(s)"
+          else
+            TARGETS=tests/
+          fi
+          python -m pytest $TARGETS -q -rs --junitxml=pytest-junit.xml | tee pytest-report.txt
 
       - name: Every skipped test names a listed reason
         # A skipped test did not run. scripts/check_skip_reasons.py fails on a
@@ -109,6 +134,7 @@ jobs:
             pytest-report.txt
             pytest-junit.xml
             test-accounting.json
+            test-selection.json
             test-inventory.json
             environment-manifest.json
           if-no-files-found: warn
