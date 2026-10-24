@@ -154,6 +154,54 @@ _EXECUTOR_PATHS = frozenset({"/v1/execution/dispatch-leased"})
 #: domain that serves them. Exact equality, for the reason above.
 _EFFECT_PATHS = frozenset({"/v1/execution/effects", "/v1/execution/effects/close"})
 
+#: IFC-11 (derived information-flow control SDD §4), the execution API's
+#: mediation surface, classified. A tool runs, and a tool result returns, only
+#: through the three TOOL_DISPATCH routes and the worker entry, all of which
+#: hand the call to _dispatch_under_lease (the flow check, the lease, the
+#: nonce and the result commit live there). Every other route reaches no tool
+#: and returns no tool result. scripts/check_flow_mediation_surface.py holds
+#: both routers to this classification, statically, and
+#: tests/flow/test_mediation_surface.py fails when a route joins neither set:
+#: a new route is unclassified until someone says which kind it is.
+MEDIATION_TOOL_DISPATCH = frozenset({
+    ("POST", "/v1/execution/execute"),
+    ("POST", "/v1/execution/execute-accepted"),
+    ("POST", "/v1/execution/dispatch-leased"),
+})
+MEDIATION_NO_TOOL_RESULT = frozenset({
+    # decide, review, settle: no tool runs, nothing a tool returned is served
+    ("POST", "/v1/execution/assess"),
+    ("POST", "/v1/execution/approve"),
+    ("POST", "/v1/execution/reject"),
+    ("POST", "/v1/contexts"),
+    # authority state changes: revocations, limits, the stop switch, loops
+    ("POST", "/v1/execution/revoke-principal"),
+    ("POST", "/v1/execution/revoke-authority"),
+    ("POST", "/v1/execution/stop"),
+    ("POST", "/v1/execution/resume"),
+    ("GET", "/v1/execution/stop"),
+    ("GET", "/v1/execution/limits/unresolved"),
+    ("POST", "/v1/execution/limits/resolve"),
+    ("GET", "/v1/execution/loop-safety/{context_id}"),
+    ("POST", "/v1/execution/loop-safety/reset"),
+    # the effect domain's own routes: the effect credential, not the tool callable
+    ("POST", "/v1/execution/effects"),
+    ("POST", "/v1/execution/effects/close"),
+    # readers and evidence: records of what happened, never a live result
+    ("GET", "/v1/execution/capabilities"),
+    ("GET", "/v1/execution/proposals/{proposal_id}"),
+    ("GET", "/v1/execution/proposals/{proposal_id}/semantic-assessment"),
+    ("POST", "/v1/execution/proposals/{proposal_id}/effect"),
+    ("POST", "/v1/execution/proposals/{proposal_id}/effect-receipt"),
+    ("GET", "/v1/execution/proposals/{proposal_id}/lifecycle"),
+    ("GET", "/v1/execution/proposals/{proposal_id}/envelope"),
+    ("GET", "/v1/execution/proposals/{proposal_id}/evidence"),
+    ("GET", "/v1/execution/proposals/{proposal_id}/invocation-evidence"),
+    ("GET", "/v1/execution/audit/verify"),
+})
+#: Non-route entry points that dispatch: the async worker.
+MEDIATION_WORKER_ENTRIES = frozenset({"dispatch_pending_intents"})
+
 #: Which half of the custody split this process is.
 #:
 #: The split gave the execution container its own credentials and only the
