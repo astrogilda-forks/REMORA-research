@@ -50,7 +50,7 @@ def test_a_dependency_cycle_is_refused() -> None:
     mod = _module()
     data = copy.deepcopy(mod.load())
     by_id = {c["id"]: c for c in data["capabilities"]}
-    by_id["CAP-013"]["assessment"]["forutsetter"].append("CAP-031")
+    by_id["CAP-013"]["assessment"]["depends_on"].append("CAP-031")
     errors = mod.validate(data, check_paths=False)
     assert any(e.startswith("dependency cycle") for e in errors), errors
 
@@ -58,7 +58,7 @@ def test_a_dependency_cycle_is_refused() -> None:
 def test_an_externally_verified_target_is_refused() -> None:
     mod = _module()
     data = copy.deepcopy(mod.load())
-    data["capabilities"][0]["assessment"]["oppnaelig_niva"] = "EXTERNALLY_VERIFIED"
+    data["capabilities"][0]["assessment"]["reachable_rung"] = "EXTERNALLY_VERIFIED"
     errors = mod.validate(data, check_paths=False)
     assert any("independent party" in e for e in errors), errors
 
@@ -66,7 +66,7 @@ def test_an_externally_verified_target_is_refused() -> None:
 def test_an_unknown_dependency_is_refused() -> None:
     mod = _module()
     data = copy.deepcopy(mod.load())
-    data["capabilities"][0]["assessment"]["forutsetter"] = ["CAP-999"]
+    data["capabilities"][0]["assessment"]["depends_on"] = ["CAP-999"]
     errors = mod.validate(data, check_paths=False)
     assert any("unknown CAP-999" in e for e in errors), errors
 

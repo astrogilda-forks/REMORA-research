@@ -44,9 +44,9 @@ LADDER = [
     "IMPLEMENTED_LIBRARY", "WIRED_REFERENCE_PATH", "WIRED_API_PATH",
     "PERSISTED_ATOMIC", "ENFORCED_PRODUCTION", "EXTERNALLY_VERIFIED",
 ]
-NECESSITY = {"Kritisk", "Nødvendig", "Nyttig", "Valgfri", "Forskning"}
+NECESSITY = {"Critical", "Necessary", "Useful", "Optional", "Research"}
 LEVELS = {"H", "M", "L"}
-REVERSIBILITY = {"Lett", "Middels", "Vanskelig"}
+REVERSIBILITY = {"Easy", "Medium", "Hard"}
 GATE_STATUS = {"crit", "warn", "good", "none"}
 CAP_ID = re.compile(r"^CAP-(\d{3}|META)$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -95,32 +95,32 @@ def validate(data: dict[str, Any], *, check_paths: bool = True) -> list[str]:
         a = c.get("assessment") or {}
         if reg.get("status") not in LADDER:
             errors.append(f"{cid}: register status {reg.get('status')!r} is not a ladder rung")
-        if a.get("oppnaelig_niva") not in LADDER:
-            errors.append(f"{cid}: oppnaelig_niva {a.get('oppnaelig_niva')!r} is not a ladder rung")
+        if a.get("reachable_rung") not in LADDER:
+            errors.append(f"{cid}: reachable_rung {a.get('reachable_rung')!r} is not a ladder rung")
         elif reg.get("status") in LADDER and (
-            LADDER.index(a["oppnaelig_niva"]) < LADDER.index(reg["status"])
+            LADDER.index(a["reachable_rung"]) < LADDER.index(reg["status"])
         ):
-            errors.append(f"{cid}: oppnaelig_niva is below the registered status")
-        if a.get("oppnaelig_niva") == "EXTERNALLY_VERIFIED":
+            errors.append(f"{cid}: reachable_rung is below the registered status")
+        if a.get("reachable_rung") == "EXTERNALLY_VERIFIED":
             errors.append(f"{cid}: EXTERNALLY_VERIFIED needs an independent party, not the SDD")
-        if a.get("nodvendighet") not in NECESSITY:
-            errors.append(f"{cid}: nodvendighet {a.get('nodvendighet')!r} unknown")
-        risk = a.get("risiko") or {}
-        if risk.get("sannsynlighet") not in LEVELS or risk.get("konsekvens") not in LEVELS:
-            errors.append(f"{cid}: risiko needs sannsynlighet and konsekvens in H/M/L")
-        if (a.get("reversering") or {}).get("grad") not in REVERSIBILITY:
-            errors.append(f"{cid}: reversering.grad unknown")
-        for field in ("navn", "klasse", "formaal", "gjor", "naa", "sdd_hook",
-                      "sdd_modus", "sdd_endring", "sikkerhet"):
+        if a.get("necessity") not in NECESSITY:
+            errors.append(f"{cid}: necessity {a.get('necessity')!r} unknown")
+        risk = a.get("risk") or {}
+        if risk.get("likelihood") not in LEVELS or risk.get("consequence") not in LEVELS:
+            errors.append(f"{cid}: risk needs likelihood and consequence in H/M/L")
+        if (a.get("reversibility") or {}).get("grade") not in REVERSIBILITY:
+            errors.append(f"{cid}: reversibility.grade unknown")
+        for field in ("name", "class", "purpose", "does", "now", "sdd_hook",
+                      "sdd_mode", "sdd_change", "security"):
             if not str(a.get(field, "")).strip():
                 errors.append(f"{cid}: assessment.{field} is empty")
-        for lit in a.get("litteratur") or []:
-            if not all(str(lit.get(k, "")).strip() for k in ("kilde", "referanse", "rolle")):
-                errors.append(f"{cid}: litteratur entry needs kilde, referanse and rolle")
-        deps[cid] = list(a.get("forutsetter") or [])
+        for lit in a.get("literature") or []:
+            if not all(str(lit.get(k, "")).strip() for k in ("source", "reference", "role")):
+                errors.append(f"{cid}: literature entry needs source, reference and role")
+        deps[cid] = list(a.get("depends_on") or [])
         for d in deps[cid]:
             if d not in known:
-                errors.append(f"{cid}: forutsetter unknown {d}")
+                errors.append(f"{cid}: depends_on unknown {d}")
             if d == cid:
                 errors.append(f"{cid}: depends on itself")
         if check_paths:
@@ -133,13 +133,13 @@ def validate(data: dict[str, Any], *, check_paths: bool = True) -> list[str]:
     for g in data.get("gates") or []:
         if g.get("status") not in GATE_STATUS:
             errors.append(f"gate {g.get('id')}: status {g.get('status')!r} unknown")
-    order = [r.get("nr") for r in data.get("repair_order") or []]
+    order = [r.get("step") for r in data.get("repair_order") or []]
     if order != list(range(1, len(order) + 1)):
         errors.append("repair_order must be numbered 1..n in order")
     for r in data.get("repair_order") or []:
-        for cid in r.get("kapabiliteter") or []:
+        for cid in r.get("capabilities") or []:
             if cid not in known:
-                errors.append(f"repair_order {r.get('nr')}: unknown {cid}")
+                errors.append(f"repair_order {r.get('no')}: unknown {cid}")
     return errors
 
 
@@ -148,22 +148,22 @@ def _page_data(data: dict[str, Any]) -> list[dict[str, Any]]:
     for c in data["capabilities"]:
         reg, a = c["register_at_source"], c["assessment"]
         rows.append({
-            "id": c["id"], "registerNavn": reg["name"], "status": reg["status"],
+            "id": c["id"], "registerName": reg["name"], "status": reg["status"],
             "code": reg.get("code") or [], "tests": reg.get("tests") or [],
             "artifacts": reg.get("artifacts") or [], "docs": reg.get("docs") or [],
             "nr": [str(n) for n in reg.get("negative_results") or []],
             "ladder": reg.get("release_profile_requirements") or [],
-            "navn": a["navn"], "klasse": a["klasse"], "formaal": a["formaal"],
-            "gjor": a["gjor"], "naa": a["naa"], "nod": a["nodvendighet"],
-            "nodBegr": a["nodvendighet_begrunnelse"], "hook": a["sdd_hook"],
-            "modus": a["sdd_modus"], "sdd": a["sdd_endring"],
-            "maal": a["oppnaelig_niva"], "maalTekst": a["oppnaelig_niva_tekst"],
-            "risiko": {"p": a["risiko"]["sannsynlighet"], "k": a["risiko"]["konsekvens"],
-                       "tekst": a["risiko"]["tekst"]},
-            "rev": {"grad": a["reversering"]["grad"], "tekst": a["reversering"]["tekst"]},
-            "sikkerhet": a["sikkerhet"],
-            "lit": [[x["kilde"], x["referanse"], x["rolle"]] for x in a.get("litteratur") or []],
-            "deps": a.get("forutsetter") or [],
+            "name": a["name"], "cls": a["class"], "purpose": a["purpose"],
+            "does": a["does"], "now": a["now"], "necessity": a["necessity"],
+            "necessityRationale": a["necessity_rationale"], "hook": a["sdd_hook"],
+            "mode": a["sdd_mode"], "sdd": a["sdd_change"],
+            "target": a["reachable_rung"], "targetText": a["reachable_rung_text"],
+            "risk": {"p": a["risk"]["likelihood"], "c": a["risk"]["consequence"],
+                     "text": a["risk"]["text"]},
+            "rev": {"grade": a["reversibility"]["grade"], "text": a["reversibility"]["text"]},
+            "security": a["security"],
+            "lit": [[x["source"], x["reference"], x["role"]] for x in a.get("literature") or []],
+            "deps": a.get("depends_on") or [],
         })
     return rows
 
@@ -172,14 +172,14 @@ def _mermaid(rows: list[dict[str, Any]]) -> str:
     used = {r["id"] for r in rows if r["deps"]} | {d for r in rows for d in r["deps"]}
     node = {r["id"]: r["id"].replace("-", "_") for r in rows}
     lines = ["flowchart LR"]
-    lines += [f'  {node[r["id"]]}["{r["id"]}<br/>{r["navn"]}"]' for r in rows if r["id"] in used]
+    lines += [f'  {node[r["id"]]}["{r["id"]}<br/>{r["name"]}"]' for r in rows if r["id"] in used]
     lines += [f"  {node[d]} --> {node[r['id']]}" for r in rows for d in r["deps"]]
     return "\n".join(lines).replace("<", "&lt;").replace(">", "&gt;")
 
 
 def render(data: dict[str, Any], *, fragment: bool = False) -> str:
     rows = _page_data(data)
-    gates = [[g["id"], g["navn"], g["kobling"], g["status"], g["status_tekst"], g["mangler"]]
+    gates = [[g["id"], g["name"], g["mapping"], g["status"], g["status_text"], g["missing"]]
              for g in data.get("gates") or []]
     page = (TEMPLATE.read_text(encoding="utf-8")
             .replace("__DATA__", json.dumps(rows, ensure_ascii=False))
@@ -191,7 +191,7 @@ def render(data: dict[str, Any], *, fragment: bool = False) -> str:
     return (
         "<!doctype html>\n<!-- Generated by scripts/generate_capability_atlas.py from "
         "docs/design/unified-capability-execution-v1.1-atlas.yaml. Do not edit by hand. -->\n"
-        '<html lang="nb">\n<head>\n<meta charset="utf-8">\n'
+        '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
         "</head>\n<body>\n" + page + "\n</body>\n</html>\n"
     )
