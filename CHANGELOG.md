@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### The lease signs the flow decision; the executor checks against it (IFC-06; SDD unified capability execution v1.1, P0 item 6)
+
+- `ExecutionLease` gains `flow_epoch`, `flow_digest` and `resolved_tool_call_hash`, signed only when set, so every lease issued before them verifies byte for byte as before. A lease minted under `REMORA_FLOW_CONTROL=1` carries the context epoch and verdict digest the authority judged and the canonical hash of the call with every handle resolved.
+- `/v1/execution/dispatch-leased` compares the live context against the epoch and digest in the signed lease. Until now it computed both itself a moment before the comparison, so a label raised or a handle changed after the authority's grant was invisible to the executing domain. A lease without a flow decision is refused as `flow_lease_unbound` while flow control is on.
+- `GovernedToolDispatcher` refuses an invocation whose canonical hash is not the lease's `resolved_tool_call_hash` as `resolved_call_mismatch`, before the nonce is spent; a non-zero `flow_epoch` without its digest verifies as `flow_binding_malformed`.
+- Tests: a handle whose value changed after the grant, a label raised after the grant, an unbound lease, and two dispatches in one context held inside the tool at once, of which exactly one result is released. Still open: the check and the dispatch are two steps; the losing call's effect happens and its result is withheld.
+
 ### Review admission re-verified with ledger and storage faults (NEGATIVE_RESULTS §98; SDD unified capability execution v1.1, P0 item 5)
 
 - Under `REMORA_WS1_ADMISSION=atomic`, a storage fault inside the admission transaction on `/v1/execution/execute` (a lost connection, a failed commit) is now a refusal, `admission_storage_unavailable`, on the same path as every other refused admission: `execution_admission_refused` and `execution_grant_withheld` on the chain, the minted grant spent, the item settled, no `execution_grant` in the response. It answered 500 and recorded nothing before; the grant was unspent and unreturned either way.
@@ -696,6 +703,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
 - No committed ToolSpec bundle carries a `flow` block, so no signed bundle
   changes. `remora/flow/spec.py` is in the policy bundle hash, which
   changes.
+
 ### Policy (signal monotonicity, RMR-AUD-003)
 
 - A refusal no review can lift now outranks an ESCALATE. A cross-tenant
@@ -744,6 +752,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   without one. The split alone stayed green if bundles went missing. The
   agreement it reports is named `observed_effect_binary_agree`, because it
   compares only REMORA's `EFFECT_VERIFIED` with the reader's `ESTABLISHED`.
+
 ### Interop (E6 consumer for Veritas Acta receipts, author run)
 
 - New `remora/interop/acta_e6/` (EXPERIMENTAL): a paying-side consumer for
@@ -762,6 +771,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   author run, not an independent record under the boundary map's rule.
 - `tests/test_acta_e6_consumer.py`: 12 tests over the vendored subset, the
   committed record, pin refusals and the failure paths no case reaches.
+
 ### Evidence COMP-01 (AgentHarm re-score, post hoc)
 
 - `scripts/comp01_agentharm_rescore.py` writes
@@ -848,6 +858,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
 - Contracts touched: three additive reason codes in
   `schemas/tool_spec_v1.yaml`; `schemas/tool_spec_v4.yaml` is now
   implemented. Nothing reads `ToolSpec.flow` to decide yet (IFC-05).
+
 ### Flow control IFC-05a (recipients and the flow check)
 
 - `remora/flow/check.py`: `recipients` computes who receives a resolved
@@ -914,6 +925,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   before signing.
 - Not yet wired: the bundle loader does not accept schema version 4 until
   IFC-03b, so no deployment can carry a block yet.
+
 ### Flow control IFC-02b (`POST /v1/contexts`)
 
 - `POST /v1/contexts` mints a flow context for the authenticated principal
@@ -1391,6 +1403,7 @@ An external audit on 2026-10-18 reproduced these on the Python runtime.
   the evidence one execution can produce. Across processes the effect domain
   already claims each slot in the durable ledger before its executor runs;
   this fix is for the in-process mediator.
+
 ### Quality (hard guards hold at maximum trust, SDD-AS-v1 AS-013/AS-014)
 
 - `tests/test_hard_guards_dominate_max_trust.py` starts from one
@@ -2431,6 +2444,7 @@ execution-context binding.
   superuser (RLS bypassed even when forced) and nothing binds the verified
   tenant to the connection. REM-026 notes and the multi-tenant security model
   point to it. Proposal only; nothing implemented.
+
 ### Testing
 
 - Postgres outbox fault injection (`tests/test_postgres_outbox_fault_injection.py`),
@@ -2729,6 +2743,7 @@ execution-context binding.
   full registered set in collapsible groups by question. Every link from
   the previous index is preserved (governance index-completeness check);
   meta-governance sentences in the index went from 7 to 0.
+
 ### Repository layout
 
 - Root tidy, slice A: the licensing bundle (`COMMERCIAL_LICENSE.md`,

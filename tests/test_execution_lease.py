@@ -514,3 +514,79 @@ def test_the_runtime_checks_also_judge_the_invocation_arguments(monkeypatch) -> 
     assert res.refusal_reason == "capability_argument_refused"
     assert d._test_calls == []  # type: ignore[attr-defined]
     assert seen == [ARGS, dict(ARGS, site="dc-2")]
+
+
+# ── IFC-06: the resolved call is signed into the lease ──────────────────────
+#
+# SDD unified capability execution v1.1, P0 item 6. The lease binds the wire
+# form the approver saw; ``resolved_tool_call_hash`` binds the call with every
+# flow handle resolved, which is what the tool receives. The dispatcher
+# compares the invocation form against it before anything is spent.
+
+
+def _resolved_hash(arguments) -> str:
+    from remora.policy.observation import canonical_tool_call_hash
+
+    return canonical_tool_call_hash(name=TOOL, arguments=arguments, tenant=TENANT, target=TARGET)
+
+
+def test_a_lease_signs_the_flow_decision_only_when_it_carries_one() -> None:
+    plain = _issue()
+    assert "flow_epoch" not in plain._signed_fields()
+    assert "resolved_tool_call_hash" not in plain._signed_fields()
+    bound = _issue(flow_epoch=4, flow_digest="d" * 64, resolved_tool_call_hash="r" * 64)
+    signed = bound._signed_fields()
+    assert (signed["flow_epoch"], signed["flow_digest"]) == (4, "d" * 64)
+    assert signed["resolved_tool_call_hash"] == "r" * 64
+    assert ExecutionLease.from_dict(bound.to_dict()) == bound
+    with pytest.raises(ValueError):
+        _issue(flow_epoch=4)
+    with pytest.raises(ValueError):
+        _issue(flow_digest="d" * 64)
+
+
+def test_an_epoch_without_its_digest_is_a_malformed_lease() -> None:
+    lease = _issue()
+    half = ExecutionLease.from_dict({**lease.to_dict(), "flow_epoch": 2})
+    result = half.verify(tool_name=TOOL, arguments=ARGS, tenant_id=TENANT,
+                         target_environment=TARGET, now=BEFORE_EXPIRY, actor_identity=ACTOR)
+    assert result.reason == "signature_invalid"   # the epoch is signed whenever it is set
+
+
+def test_the_tool_receives_only_the_resolved_call_the_authority_signed() -> None:
+    d = _dispatcher()
+    resolved = dict(ARGS, site="hq-resolved")
+    lease = _issue(flow_epoch=1, flow_digest="d" * 64,
+                   resolved_tool_call_hash=_resolved_hash(resolved))
+    res = d.dispatch(lease, TOOL, ARGS, tenant_id=TENANT, target_environment=TARGET,
+                     now=BEFORE_EXPIRY, actor_identity=ACTOR, invocation_arguments=resolved)
+    assert res.executed is True
+    assert d._test_calls == [resolved]  # type: ignore[attr-defined]
+
+
+def test_a_resolution_the_authority_did_not_sign_is_refused_before_the_nonce() -> None:
+    """The handle store handed the executor another value than the one the
+    authority judged: the tool does not run and the lease stays unspent."""
+    d = _dispatcher()
+    lease = _issue(flow_epoch=1, flow_digest="d" * 64,
+                   resolved_tool_call_hash=_resolved_hash(dict(ARGS, site="hq-resolved")))
+    res = d.dispatch(lease, TOOL, ARGS, tenant_id=TENANT, target_environment=TARGET,
+                     now=BEFORE_EXPIRY, actor_identity=ACTOR,
+                     invocation_arguments=dict(ARGS, site="hq-other"))
+    assert (res.executed, res.refusal_reason) == (False, "resolved_call_mismatch")
+    assert d._test_calls == []  # type: ignore[attr-defined]
+    again = d.dispatch(lease, TOOL, ARGS, tenant_id=TENANT, target_environment=TARGET,
+                       now=BEFORE_EXPIRY, actor_identity=ACTOR,
+                       invocation_arguments=dict(ARGS, site="hq-resolved"))
+    assert again.executed is True  # the nonce was not spent by the refusal
+
+
+def test_a_signed_resolution_also_binds_a_call_with_no_handles() -> None:
+    """Without handles the resolved call is the wire call; a lease signed over
+    one call does not run another, even when the wire hash would be rechecked."""
+    d = _dispatcher()
+    lease = _issue(flow_epoch=1, flow_digest="d" * 64,
+                   resolved_tool_call_hash=_resolved_hash(dict(ARGS, site="elsewhere")))
+    res = d.dispatch(lease, TOOL, ARGS, tenant_id=TENANT, target_environment=TARGET,
+                     now=BEFORE_EXPIRY, actor_identity=ACTOR)
+    assert (res.executed, res.refusal_reason) == (False, "resolved_call_mismatch")

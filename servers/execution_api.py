@@ -3178,6 +3178,16 @@ def _dispatch_under_lease(
         if flow_refusal is not None:
             return {"executed": False, "refusal_reason": flow_refusal,
                     "proposal_id": proposal_id}
+    flow_binding: tuple[int, str, str] | None = None
+    if flow_expected is not None and presented_lease is None:
+        # IFC-06: signed into the lease, so the executing domain compares
+        # its live context and the arguments it is about to run against
+        # what this authority judged, not against a value of its own.
+        flow_binding = (flow_expected[0], flow_expected[1], canonical_tool_call_hash(
+            name=tool_call.tool_name,
+            arguments=(resolved_arguments if resolved_arguments is not None
+                       else tool_call.arguments),
+            tenant=tenant, target=tool_call.target_environment or ""))
     resolved_effect = None
     resolver = _effect_resolver() if presented_lease is None else None
     if resolver is not None:
@@ -3233,6 +3243,7 @@ def _dispatch_under_lease(
                 resolved_arguments if resolved_arguments not in (None, tool_call.arguments)
                 else None),
             not_after=not_after,
+            flow_binding=flow_binding,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):
@@ -3487,16 +3498,22 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
     if _flow_control_enabled():
         from remora.execution.service import _flow_refusal
 
-        flow_obs = _with_flow_principal(lease.actor_identity, lambda: _with_flow(
-            PolicyObservation(question="dispatch-leased"), req.tool_call, tenant))
-        refusal = _flow_refusal(flow_obs)
+        # IFC-06: the expected epoch and digest come from the SIGNED lease,
+        # what the authority judged when it granted the call. Until this
+        # change they were computed here, a moment before being compared
+        # with themselves. A lease that carries no flow decision cannot be
+        # checked against one and is refused while flow control is on.
+        refusal = "flow_lease_unbound" if not lease.flow_digest else None
+        if refusal is None:
+            flow_obs = _with_flow_principal(lease.actor_identity, lambda: _with_flow(
+                PolicyObservation(question="dispatch-leased"), req.tool_call, tenant))
+            refusal = _flow_refusal(flow_obs)
         if refusal is not None:
             api_mod.record_execution_execute(executed=False, refusal=refusal)
             return {"outcome": "refused",
                     "tool_execution": {"executed": False, "refusal_reason": refusal,
                                        "proposal_id": lease.proposal_id}}
-        if flow_obs.flow_status == "evaluated" and flow_obs.flow_digest:
-            flow_expected = (int(flow_obs.flow_epoch or 0), str(flow_obs.flow_digest))
+        flow_expected = (int(lease.flow_epoch), str(lease.flow_digest))
     tool_execution = _with_flow_principal(lease.actor_identity, lambda: _dispatch_under_lease(
         tenant=tenant,
         # From the SIGNED lease, never the request body and never the hop's
