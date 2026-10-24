@@ -751,8 +751,10 @@ enforces the new policy. The signature covers the `policy` block only:
 `signed_at` is unsigned metadata that no decision reads, though the digest
 covers it. `REMORA_REQUIRE_LIMITS=1` makes limits mandatory:
 startup refuses without limits, without trusted keys, or with coverage other
-than `all_writes`. No profile implies it; a deployment sets it. The OT pilot
-runs with it. `/assess`
+than `all_writes`. The `controlled_pilot` runtime profile requires it, together
+with `REMORA_LIMITS_FILE`, `REMORA_LIMITS_LEDGER`, `REMORA_LIMITS_TRUSTED_KEYS`
+and `REMORA_REQUIRE_IDEMPOTENCY` (below); `review` and `research` do not,
+and the OT pilot sets `REMORA_REQUIRE_LIMITS` itself. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
 holds.
@@ -766,17 +768,24 @@ call with the same key refuses before anything is charged:
 - `limit_outcome_unknown` while its outcome is unknown.
 
 It runs only once the first provably did not. Without a declared key, two
-calls are two operations.
+calls are two operations, so a deployment that declares none charges one
+payment proposed twice twice. `REMORA_REQUIRE_IDEMPOTENCY=1` closes that.
+Startup refuses while a metered write tool declares no key. A call to a tool
+the startup check could not classify refuses as `limit_key_undeclared`, or as
+`limit_coverage_unknown` when the deployment cannot say whether it writes.
 
 A reservation is given back only when the call provably did not run:
 
 - the fence refused;
-- the tool raised `ToolDidNotExecute(source, detail)`, which reports
-  `tool_did_not_execute`. Only the budget trusts the adapter here: the
-  execution outcome stays UNKNOWN, because FAILED needs a `PreEffectProof`
-  and no dispatch path produces one;
+- the tool raised `ToolDidNotExecute(source, detail)` and the policy names
+  `source` in `non_execution.<tool>.trusted_sources`. The dispatch reports
+  `tool_did_not_execute` either way. From a source the policy does not name,
+  the call is held as unknown like any other raised call, so an adapter
+  cannot free spent budget on its word. Only the budget trusts even the
+  declared source. The execution outcome stays UNKNOWN, because FAILED needs
+  a `PreEffectProof` and no dispatch path produces one;
 - the lease expired before the tool started;
-- a reviewer resolved the outcome.
+- a reviewer resolved the outcome and the deployment checked the evidence.
 
 A call whose outcome is unknown holds its reservation. `GET
 /v1/execution/limits/unresolved` lists such calls. `POST
@@ -784,9 +793,23 @@ A call whose outcome is unknown holds its reservation. `GET
 `reason`, `review` capability) settles one from what the rail or plant
 reports: `executed=false` returns the reservation, `executed=true` keeps it.
 The principal the call was charged to may not resolve it (409
-`limit_resolver_is_principal`), and the decision is appended to the chain as
-`limit_operation_resolved`. REMORA does not check the evidence; the reviewer
-answers for it. The ledger is per host. A
+`limit_resolver_is_principal`). Before anything changes, the module named by
+`REMORA_LIMITS_EVIDENCE_MODULE` (exposing
+`check_limit_evidence(tenant, operation, evidence_ref)`, which returns a
+mapping whose `executed` is `true` or `false`) is asked about the evidence.
+Without such a module every resolution refuses (409
+`limit_evidence_unchecked`) and the budget stays held; a checker that raises
+or cannot tell refuses as `limit_evidence_unavailable`, and one that
+disagrees with the reviewer as `limit_evidence_disputed`. The ledger records the decision first; the
+chain record `limit_operation_resolved` (reviewer, evidence, the module that
+checked it, `resolved_at`) is appended afterwards, keyed by the operation so it
+cannot be written twice. The response's `audit_recorded` says whether that
+append succeeded; when the chain was unreachable, the resolution stands in the
+ledger and the next limits call appends the record. A crash between the two
+steps therefore leaves no undocumented release, only a record that arrives
+late. The checker is only as trustworthy
+as the deployment's source; REMORA verifies that it answered and agreed, not
+that the rail told the truth. The ledger is per host. A
 `change` meter that is not observed tracks the values REMORA let through, not
 the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.

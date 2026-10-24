@@ -170,9 +170,36 @@ def validate_runtime_profile_prerequisites() -> str:
                 "REMORA runtime profile 'controlled_pilot' requires "
                 "REMORA_ENV=production"
             )
+        _check_limits_required(profile)
 
     _check_contract(profile)
     return profile
+
+
+#: The cumulative-limit settings a write pilot runs with (CAP-031, SDD
+#: unified capability execution v1.1 §4 and §10 P0 item 3).
+LIMITS_ENV = ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_TRUSTED_KEYS",
+              "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_IDEMPOTENCY")
+
+
+def _check_limits_required(profile: str) -> None:
+    """A controlled pilot runs with signed, mandatory cumulative limits.
+
+    ``REMORA_REQUIRE_LIMITS`` makes the execution API refuse startup without
+    a signed ``all_writes`` policy, and ``REMORA_REQUIRE_IDEMPOTENCY``
+    makes it refuse a metered write tool that declares no idempotency key.
+    Before this check both were deployment choices that no profile implied,
+    so a pilot could run privileged writes against no budget at all
+    (NEGATIVE_RESULTS.md section 97). Both the authority, which previews
+    limits at assess, and the executor, which reserves at dispatch, read the
+    policy, so the requirement does not depend on the domain role.
+    """
+    missing = [name for name in LIMITS_ENV if not _configured(name)]
+    if missing:
+        raise RuntimeProfileError(
+            f"REMORA runtime profile {profile!r} requires signed, mandatory cumulative "
+            "limits with an idempotency key per write tool; missing: " + ", ".join(missing)
+        )
 
 
 #: Derived information-flow control (SDD v1.3). ``1`` turns it on; any other

@@ -1094,7 +1094,7 @@ def _ws1_gate() -> Any:
 
 
 #: The guard and the limit settings it was built from (_limit_settings).
-_LIMIT_GUARD: tuple[tuple[str, str, str, bool], Any] | None = None
+_LIMIT_GUARD: tuple[tuple[str, str, str, bool, bool, str], Any] | None = None
 
 
 def _tool_is_write(tool_name: str) -> bool | None:
@@ -1136,7 +1136,7 @@ def _limit_guard() -> Any:
     """
     global _LIMIT_GUARD
     settings = _limit_settings()
-    path, ledger, _keys, required = settings
+    path, ledger, _keys, required, require_keys, _evidence = settings
     if not path and not ledger:
         if required:
             raise ValueError("REMORA_REQUIRE_LIMITS is set and no cumulative limits are "
@@ -1161,23 +1161,46 @@ def _limit_guard() -> Any:
         if required and policy.coverage != "all_writes":
             raise ValueError("REMORA_REQUIRE_LIMITS needs coverage all_writes: a write tool "
                              "the policy does not meter must not run")
+        if require_keys:
+            # Fail at startup for the tools the deployment can already name;
+            # the guard refuses the rest call by call (limit_key_undeclared,
+            # limit_coverage_unknown for a tool whose kind it cannot read).
+            unkeyed = sorted(tool for tool in policy.meters
+                             if tool not in policy.idempotency and _tool_is_write(tool))
+            if unkeyed:
+                raise ValueError("REMORA_REQUIRE_IDEMPOTENCY is set and these metered "
+                                 "write tools declare no idempotency.key_arguments: "
+                                 + ", ".join(unkeyed))
         _LIMIT_GUARD = (settings,
                         LimitGuard(policy, LimitLedger(ledger), is_write=_tool_is_write,
                                    observer=_limit_observer(),
-                                   in_force=lambda: _limit_policy_in_force(settings, digest)))
+                                   in_force=lambda: _limit_policy_in_force(settings, digest),
+                                   evidence=_limit_evidence_checker(),
+                                   require_keys=require_keys))
     return _LIMIT_GUARD[1]
 
 
-def _limit_settings() -> tuple[str, str, str, bool]:
-    """(policy file, ledger, trusted keys, required): what a limit guard is built from."""
+_ON = frozenset({"1", "true", "yes", "on"})
+
+
+def _limit_settings() -> tuple[str, str, str, bool, bool, str]:
+    """What a limit guard is built from.
+
+    (policy file, ledger, trusted keys, limits required, operation keys
+    required, evidence module). A change to any of them after startup makes
+    the guard refuse as ``limit_policy_changed``. Each key is read literally
+    so the credential-topology scanner can resolve every environment read.
+    """
     return (_os.environ.get("REMORA_LIMITS_FILE", "").strip(),
             _os.environ.get("REMORA_LIMITS_LEDGER", "").strip(),
             _os.environ.get("REMORA_LIMITS_TRUSTED_KEYS", "").strip(),
-            _os.environ.get("REMORA_REQUIRE_LIMITS", "").strip().lower() in {
-                "1", "true", "yes", "on"})
+            _os.environ.get("REMORA_REQUIRE_LIMITS", "").strip().lower() in _ON,
+            _os.environ.get("REMORA_REQUIRE_IDEMPOTENCY", "").strip().lower() in _ON,
+            _os.environ.get("REMORA_LIMITS_EVIDENCE_MODULE", "").strip())
 
 
-def _limit_policy_in_force(settings: tuple[str, str, str, bool], digest: str) -> bool:
+def _limit_policy_in_force(settings: tuple[str, str, str, bool, bool, str],
+                           digest: str) -> bool:
     """Whether the guard built from ``settings`` and ``digest`` is still the deployed one.
 
     The policy identity a grant binds (``limits_policy_hash``) is the digest
@@ -1247,6 +1270,28 @@ def _limit_observer() -> Any:
         raise ValueError(f"{spec} does not expose observe_limit_value(tenant, quantity, "
                          "resource)")
     return observe
+
+
+def _limit_evidence_checker() -> Any:
+    """The deployment's reader of what the rail or plant says an operation did, or None.
+
+    ``REMORA_LIMITS_EVIDENCE_MODULE`` names a module exposing
+    ``check_limit_evidence(tenant, operation, evidence_ref)``, which asks the
+    authoritative source named by ``evidence_ref`` and returns a mapping
+    whose ``executed`` is True or False, or raises. Without one no unknown
+    outcome can be resolved: ``POST /limits/resolve`` refuses as
+    ``limit_evidence_unchecked`` and the budget stays held.
+    """
+    spec = _os.environ.get("REMORA_LIMITS_EVIDENCE_MODULE", "").strip()
+    if not spec:
+        return None
+    import importlib
+
+    check = getattr(importlib.import_module(spec), "check_limit_evidence", None)
+    if not callable(check):
+        raise ValueError(f"{spec} does not expose check_limit_evidence(tenant, operation, "
+                         "evidence_ref)")
+    return check
 
 
 def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
@@ -2743,6 +2788,45 @@ def _limits_or_404() -> Any:
     return guard
 
 
+def _record_limit_resolutions(guard: Any, tenant: str) -> set[str]:
+    """Project every resolved limit operation the chain does not carry yet.
+
+    The ledger commits a resolution first (``audit_recorded=0``) and this
+    sweep appends ``limit_operation_resolved`` afterwards, keyed by the
+    operation through ``append_once`` so a crash after the append and before
+    the mark cannot write the record twice. It runs on every limits route,
+    like the stale-dispatch reconciler: a crash between the two steps leaves
+    a resolution the next call records, never one that is lost. Returns the
+    operation ids still unrecorded after the sweep (an unreachable chain).
+    """
+    left: set[str] = set()
+    for op in guard.unrecorded_resolutions(tenant):
+        payload = {
+            "event": "limit_operation_resolved",
+            "operation_id": op["operation_id"],
+            "executed": str(op.get("resolution") or "").startswith("executed"),
+            "resolved_by": op["resolved_by"],
+            "evidence_ref": op.get("evidence_ref") or "",
+            "evidence_checked_by": _limit_settings()[5],
+            "reason": op.get("reason") or "",
+            "resolved_at": op.get("resolved_at"),
+        }
+        try:
+            if hasattr(_CHAIN, "append_once"):
+                _CHAIN.append_once(tenant, f"limit_resolution:{op['operation_id']}", payload)
+            else:  # pragma: no cover - every shipped chain has append_once
+                _CHAIN.append(tenant, payload)
+            guard.mark_recorded(op["operation_id"])
+        except Exception as exc:
+            # The ledger keeps the resolution and the gap stays visible; the
+            # next limits call retries. Raising here would tell the reviewer
+            # that a resolution the ledger already holds did not happen.
+            _LOGGER.error("limits.resolution_unrecorded tenant_id=%s operation_id=%s "
+                          "error_type=%s", tenant, op["operation_id"], type(exc).__name__)
+            left.add(op["operation_id"])
+    return left
+
+
 @router.get("/limits/unresolved", responses={
     200: {"description": "Limit operations of this tenant whose outcome is unknown."},
     **_AUTH_RESPONSES,
@@ -2758,7 +2842,9 @@ def limits_unresolved(request: Request) -> dict[str, Any]:
     from servers import api as api_mod
 
     api_mod._require_tenant_capability(role, tenant, "review")
-    return {"operations": _limits_or_404().unresolved(tenant)}
+    guard = _limits_or_404()
+    _record_limit_resolutions(guard, tenant)
+    return {"operations": guard.unresolved(tenant)}
 
 
 @router.post("/limits/resolve", responses={
@@ -2766,42 +2852,47 @@ def limits_unresolved(request: Request) -> dict[str, Any]:
     **_AUTH_RESPONSES,
     404: {"model": ErrorDetail, "description": "No limits, or no such operation."},
     409: {"model": ErrorDetail,
-          "description": "The operation's outcome is not unknown, or the reviewer is the "
-                         "principal it was charged to."},
+          "description": "The operation's outcome is not unknown, the reviewer is the "
+                         "principal it was charged to, or the evidence could not be "
+                         "checked or disagrees with the reviewer."},
 })
 def limits_resolve(req: LimitResolveRequest, request: Request) -> dict[str, Any]:
     """Resolve an unknown outcome from what the rail or plant reports.
 
     A reviewer, never the principal the operation was charged to, states
-    whether the call executed and names the evidence. ``executed=false``
-    returns the reservation, so a legitimate retry is no longer refused;
-    ``executed=true`` keeps it and makes a duplicate refuse. The decision is
-    appended to the tenant chain with the reviewer, the evidence and the
-    reason. REMORA does not check the evidence; the reviewer answers for it.
+    whether the call executed and names the evidence. Before anything
+    changes, the deployment's evidence checker
+    (``REMORA_LIMITS_EVIDENCE_MODULE``) asks the authoritative source about
+    that evidence; the resolution is refused when no checker is configured
+    (``limit_evidence_unchecked``), when it fails or cannot tell
+    (``limit_evidence_unavailable``), and when it disagrees with the
+    reviewer (``limit_evidence_disputed``). ``executed=false`` then returns
+    the reservation, so a legitimate retry is no longer refused;
+    ``executed=true`` keeps it and makes a duplicate refuse. The ledger
+    records the decision first; it is then appended to the tenant chain as
+    ``limit_operation_resolved`` with the reviewer, the evidence, the module
+    that checked it and the reason. ``audit_recorded`` says whether that
+    append succeeded; when it did not, the ledger keeps the resolution and
+    the next limits call appends it (``recorded_late``).
     """
     tenant, role, reviewer = _auth(request)
     from servers import api as api_mod
 
     api_mod._require_tenant_capability(role, tenant, "review")
-    refusal = _limits_or_404().resolve(tenant=tenant, operation_id=req.operation_id,
-                                       executed=req.executed, resolved_by=reviewer,
-                                       reason=f"{req.evidence_ref}: {req.reason}")
+    guard = _limits_or_404()
+    refusal = guard.resolve(tenant=tenant, operation_id=req.operation_id,
+                            executed=req.executed, resolved_by=reviewer,
+                            reason=req.reason, evidence_ref=req.evidence_ref)
     if refusal == "limit_operation_not_found":
         raise HTTPException(status_code=404, detail=refusal)
     if refusal == "limit_ledger_unavailable":
         raise HTTPException(status_code=503, detail=refusal)
     if refusal is not None:
         raise HTTPException(status_code=409, detail=refusal)
-    _CHAIN.append(tenant, {
-        "event": "limit_operation_resolved",
-        "operation_id": req.operation_id,
-        "executed": req.executed,
-        "resolved_by": reviewer,
-        "evidence_ref": req.evidence_ref,
-        "reason": req.reason,
-    })
+    unrecorded = _record_limit_resolutions(guard, tenant)
     return {"operation_id": req.operation_id, "executed": req.executed,
-            "resolved_by": reviewer, "status": "resolved"}
+            "resolved_by": reviewer, "status": "resolved",
+            "audit_recorded": req.operation_id not in unrecorded}
 
 
 @router.post("/revoke-principal", responses={

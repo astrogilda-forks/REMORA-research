@@ -1,0 +1,521 @@
+<title>REMORA Capability Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column with a wide explorer band; register ledger look, ladder rungs as the one recurring visual. */
+:root{
+  --bg:#f6f8f8; --surface:#fbfcfc; --sunk:#edf1f1; --line:#d5dddc; --line-strong:#b4c0bf;
+  --fg:#13201f; --fg2:#43524f; --fg3:#66746f;
+  --accent:#0d6b62; --accent-ink:#0a564f; --accent-soft:#dcecea;
+  --r1:#86b6ef; --r2:#5598e7; --r3:#2a78d6; --r4:#1c5cab; --r5:#104281; --r6:#0b2a52;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --good-bg:#e4f4e4; --warn-bg:#fdf2d6; --serious-bg:#fbe8e0; --crit-bg:#f8e1e1;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1514; --surface:#121a19; --sunk:#18211f; --line:#26322f; --line-strong:#3a4845;
+  --fg:#e2ebe9; --fg2:#b3c1bd; --fg3:#8a9a96;
+  --accent:#4fc1b4; --accent-ink:#7fd6cb; --accent-soft:#16302d;
+  --r1:#184f95; --r2:#256abf; --r3:#3987e5; --r4:#6da7ec; --r5:#9ec5f4; --r6:#cde2fb;
+  --good-bg:#12301a; --warn-bg:#33290d; --serious-bg:#3a2218; --crit-bg:#3a1818;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1514; --surface:#121a19; --sunk:#18211f; --line:#26322f; --line-strong:#3a4845;
+  --fg:#e2ebe9; --fg2:#b3c1bd; --fg3:#8a9a96;
+  --accent:#4fc1b4; --accent-ink:#7fd6cb; --accent-soft:#16302d;
+  --r1:#184f95; --r2:#256abf; --r3:#3987e5; --r4:#6da7ec; --r5:#9ec5f4; --r6:#cde2fb;
+  --good-bg:#12301a; --warn-bg:#33290d; --serious-bg:#3a2218; --crit-bg:#3a1818;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+a{color:var(--accent-ink)}
+a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;letter-spacing:.005em;margin:0}
+h1{font-size:clamp(30px,5vw,46px);line-height:1.05;font-weight:700}
+h2{font-size:26px;line-height:1.15;font-weight:600}
+h3{font-size:18px;font-weight:600}
+p{margin:0}
+.prose{max-width:68ch;display:grid;gap:12px;color:var(--fg)}
+.prose p{color:var(--fg2)}
+.mono{font-family:var(--f-mono);font-size:.88em}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3)}
+.muted{color:var(--fg3)}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+
+/* header */
+header.top{border-bottom:1px solid var(--line);background:var(--surface)}
+header.top .wrap{padding-block:36px 28px;display:grid;gap:18px}
+.lede{max-width:70ch;color:var(--fg2);font-size:17px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--f-mono);font-size:12.5px;color:var(--fg3)}
+.meta b{color:var(--fg2);font-weight:500}
+
+/* nav */
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;scrollbar-width:thin}
+nav.toc a{flex:none;font-size:13px;text-decoration:none;color:var(--fg2);padding:5px 10px;border-radius:6px;white-space:nowrap}
+nav.toc a:hover{background:var(--sunk);color:var(--fg)}
+
+section{padding-block:44px;border-bottom:1px solid var(--line)}
+section > .wrap{display:grid;gap:22px}
+.sechead{display:grid;gap:6px}
+.secnum{font-family:var(--f-mono);font-size:12px;color:var(--accent-ink)}
+
+/* summary tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:4px;align-content:start}
+.tile .big{font-family:var(--f-display);font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .lbl{font-size:13.5px;color:var(--fg2)}
+.findings{display:grid;gap:10px;max-width:76ch;padding:0;margin:0;list-style:none;counter-reset:f}
+.findings li{display:grid;grid-template-columns:28px 1fr;gap:8px;color:var(--fg2)}
+.findings li::before{counter-increment:f;content:counter(f);font-family:var(--f-mono);font-size:12px;color:var(--accent-ink);padding-top:3px}
+.findings b{color:var(--fg);font-weight:600}
+
+/* status pills */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;padding:2px 9px 2px 7px;border-radius:999px;white-space:nowrap;color:var(--fg);border:1px solid var(--line)}
+.pill i{width:8px;height:8px;border-radius:50%;flex:none;font-style:normal}
+.st-good{background:var(--good-bg)} .st-good i{background:var(--good)}
+.st-warn{background:var(--warn-bg)} .st-warn i{background:var(--warn)}
+.st-serious{background:var(--serious-bg)} .st-serious i{background:var(--serious)}
+.st-crit{background:var(--crit-bg)} .st-crit i{background:var(--crit)}
+.st-none{background:var(--sunk)} .st-none i{background:var(--fg3)}
+.rung{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11.5px;color:var(--fg2);white-space:nowrap}
+.rung s{width:10px;height:10px;border-radius:2px;flex:none;text-decoration:none}
+
+/* ladder */
+.ladder{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.lrow{display:grid;grid-template-columns:minmax(150px,210px) 1fr 1fr;border-top:1px solid var(--line)}
+.lrow:first-child{border-top:0}
+.lrow.head{background:var(--sunk);font-size:12.5px;color:var(--fg2);font-weight:500}
+.lrow > div{padding:10px 12px;min-width:0}
+.lrow > div + div{border-left:1px solid var(--line)}
+.lname{display:grid;gap:2px}
+.lname .rung{font-size:11px}
+.lname span.n{font-size:13px;color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-family:var(--f-mono);font-size:11.5px;padding:2px 7px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.chip:hover{border-color:var(--line-strong)}
+.chip s{width:7px;height:7px;border-radius:2px;text-decoration:none}
+.chip.moved{border-color:var(--accent);background:var(--accent-soft)}
+.count{font-family:var(--f-mono);font-size:11px;color:var(--fg3);margin-left:4px}
+@media (max-width:640px){.lrow{grid-template-columns:1fr}.lrow > div + div{border-left:0;border-top:1px dashed var(--line)}.lrow.head{display:none}.lrow > div[data-col]::before{content:attr(data-col);display:block;font-size:11px;color:var(--fg3);margin-bottom:4px}}
+
+/* explorer */
+.filters{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.fgroup{display:grid;gap:4px}
+.fgroup label{font-size:12px;color:var(--fg3)}
+select,input[type=search]{font:inherit;font-size:14px;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:7px;padding:6px 9px;min-width:0}
+input[type=search]{width:min(260px,100%)}
+.resultline{font-size:13px;color:var(--fg3)}
+.caplist{display:grid;gap:8px}
+details.cap{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+details.cap[open]{border-color:var(--line-strong)}
+details.cap > summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:6px 14px;align-items:center;padding:12px 14px}
+details.cap > summary::-webkit-details-marker{display:none}
+.cid{font-family:var(--f-mono);font-size:12.5px;color:var(--accent-ink);font-weight:500}
+.ctitle{display:grid;gap:2px;min-width:0}
+.ctitle b{font-weight:600}
+.ctitle span{font-size:13px;color:var(--fg3)}
+.cbadges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+@media (max-width:720px){details.cap > summary{grid-template-columns:1fr}.cbadges{justify-content:flex-start}}
+.cbody{border-top:1px solid var(--line);padding:16px 14px 18px;display:grid;gap:16px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 22px}
+.field{display:grid;gap:4px;min-width:0}
+.field h4{margin:0;font-size:11.5px;font-family:var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);font-weight:500}
+.field p,.field li{color:var(--fg2);font-size:14px}
+.field ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.assess{border-left:3px solid var(--accent);padding-left:12px}
+.tag{font-family:var(--f-mono);font-size:10.5px;color:var(--fg3);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:4px;white-space:nowrap}
+.files{display:flex;flex-wrap:wrap;gap:4px}
+.files code{font-size:11.5px}
+.deplinks{display:flex;flex-wrap:wrap;gap:5px}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+thead th{border-top:0;background:var(--sunk);font-size:12.5px;font-weight:500;color:var(--fg2)}
+td{color:var(--fg2)}
+td:first-child{color:var(--fg)}
+.num{font-variant-numeric:tabular-nums}
+
+/* risk matrix */
+.rmwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.rm{display:grid;grid-template-columns:28px repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,auto) 26px;gap:6px}
+.rm .ax{font-size:11.5px;color:var(--fg3);display:flex;align-items:center;justify-content:center}
+.rm .ay{writing-mode:vertical-rl;transform:rotate(180deg)}
+.rcell{border:1px solid var(--line);border-radius:8px;padding:8px;min-height:84px;display:grid;align-content:start;gap:6px;background:var(--surface)}
+.rcell .lab{display:flex;justify-content:space-between;gap:6px;align-items:center}
+.rcell.lvl-H{background:var(--crit-bg)} .rcell.lvl-M{background:var(--warn-bg)} .rcell.lvl-L{background:var(--good-bg)}
+
+/* misc */
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;align-content:start}
+.card ul{margin:0;padding-left:18px;display:grid;gap:5px;color:var(--fg2);font-size:14px}
+.note{font-size:13px;color:var(--fg3);max-width:76ch}
+.mermaidbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+footer{padding-block:32px 48px;color:var(--fg3);font-size:13px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+html{scroll-behavior:smooth}
+</style>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">Report · REMORA-research · SDD v1.1</div>
+  <h1>REMORA Capability Atlas</h1>
+  <p class="lede">All 32 registered capabilities: what they do, how mature they are, what depends on what, and what changes if SDD v1.1 for unified capability execution is adopted. Register facts and assessments are kept apart: assessments are marked <span class="tag">assessment</span>.</p>
+  <div class="meta">
+    <span><b>Source</b> master <a href="https://github.com/darklordVirtual/REMORA-research/tree/d94eecf916dda6ee7cd8598e100a2ee64b690958">d94eecf9</a></span>
+    <span><b>SDD</b> <a href="https://github.com/darklordVirtual/REMORA-research/pull/1053">darklordVirtual/REMORA-research#1053</a></span>
+    <span><b>Date</b> 2026-10-24</span>
+    <span><b>Current profile</b> SHADOW_PILOT</span>
+    <span><b>Data</b> docs/design/unified-capability-execution-v1.1-atlas.yaml</span>
+  </div>
+</div></header>
+
+<nav class="toc" aria-label="Contents"><div class="wrap">
+  <a href="#summary">Summary</a><a href="#maturity">Maturity</a><a href="#explorer">Capabilities</a><a href="#dependencies">Dependencies</a><a href="#change">What changes</a><a href="#rung">Reachable rung</a><a href="#pilot">Pilot readiness</a><a href="#sdk">SDK</a><a href="#outcome">Expected outcome</a><a href="#reversibility">Reversibility</a><a href="#risk">Risk</a><a href="#security">Security</a><a href="#sources">Sources</a>
+</div></nav>
+
+<section id="summary"><div class="wrap">
+  <div class="sechead"><span class="secnum">01</span><h2>Summary</h2></div>
+  <div class="tiles">
+    <div class="tile"><span class="big">32</span><span class="lbl">registered capabilities (CAP-001 to CAP-031 and CAP-META)</span></div>
+    <div class="tile"><span class="big">0</span><span class="lbl">at ENFORCED_PRODUCTION or EXTERNALLY_VERIFIED today</span></div>
+    <div class="tile"><span class="big">SHADOW_PILOT</span><span class="lbl">current release profile: the permitted rung, not evidence of an operating pilot. CONTROLLED_PILOT is not offered</span></div>
+    <div class="tile"><span class="big" id="t-crit">–</span><span class="lbl">capabilities assessed as critical for a controlled pilot <span class="tag">assessment</span></span></div>
+  </div>
+  <ol class="findings">
+    <li><span><b>REMORA is stronger than SDD v1.0 suggested.</b> CAP-015, CAP-019 and CAP-021 already have runtime callers, most authority stores have a Postgres backend, and the release workflow can produce an SBOM and a Sigstore attestation. SDD v1.1 describes these as extensions, not new work. That the workflow exists does not prove that a given release was built and verified.</span></li>
+    <li><span><b>A controlled pilot is NO-GO today.</b> The existing gate requires REM-021 (independent human review, not started) and REM-023 (RBAC follow-through, in progress). CAP-031 had six open pilot blockers at the source revision, and the cumulative ledger exists on one host only.</span></li>
+    <li><span><b>Implementation alone does not yield CONTROLLED_PILOT.</b> The highest realistic rung is CONTROLLED_PILOT for one named configuration, and that additionally requires independent human review (REM-021) and deployment evidence. LIMITED_ENFORCEMENT additionally requires REM-024 and REM-030 and operating evidence. PRODUCTION requires external verification (CAP-001 EXTERNALLY_VERIFIED) and lies outside the SDD. <span class="tag">assessment</span></span></li>
+    <li><span><b>The largest single risk is an unknown bypass route.</b> Runtime surface completeness (CAP-022) is NOT_ESTABLISHED; a process with its own credentials makes every other guarantee local. <span class="tag">assessment</span></span></li>
+    <li><span><b>Activation must be described per capability and profile.</b> In the supported, enforcing execution configuration the token, payload binding and dispatch are on the path; durable audit, strict signature checking and actual isolation still depend on configuration. Other capabilities are opt-in behind flags or policy. Executed actions, spent tokens and chain records cannot be rolled back. Budget history is not deleted; a reservation can only be released through a documented resolution once it is established that the effect did not happen.</span></li>
+    <li><span><b>The next work is CAP-031 and one safe configuration, before all 32 are built out in the API and SDK.</b> See the repair order under pilot readiness. <span class="tag">assessment</span></span></li>
+    <li><span><b>The research components must not gain authority.</b> AROMER (CAP-012) and the WS1 monitor (CAP-030) become more useful when their evidence and failure modes are visible in the API, and more dangerous if they are treated as authority.</span></li>
+  </ol>
+</div></section>
+
+<section id="maturity"><div class="wrap">
+  <div class="sechead"><span class="secnum">02</span><h2>The maturity ladder</h2>
+  <p class="prose"><span>The register uses six rungs. The left column is the register's status at <code>d94eecf9</code>. The right column is where each capability could stand after full SDD implementation and a completed pilot <span class="tag">assessment</span>. Highlighted chips move. Click a chip for details.</span></p></div>
+  <div class="ladder" id="ladder" role="table" aria-label="Maturity today and potential"></div>
+  <p class="note">ENFORCED_PRODUCTION means enforced in an actual deployment with operating evidence. EXTERNALLY_VERIFIED requires an independent party (REM-021, REM-030) and cannot be reached through SDD work alone; it is therefore empty in both columns.</p>
+</div></section>
+
+<section id="explorer"><div class="wrap">
+  <div class="sechead"><span class="secnum">03</span><h2>All 32 capabilities</h2>
+  <p class="prose"><span>Each row opens purpose, function, maturity with the register's caveats, necessity, SDD change, reachable rung, risk, reversibility, security and what depends on what: code, tests, artifacts, literature and other capabilities.</span></p></div>
+  <div class="filters" role="search">
+    <div class="fgroup"><label for="f-q">Search</label><input type="search" id="f-q" placeholder="ID, name, file or source"></div>
+    <div class="fgroup"><label for="f-cls">Class</label><select id="f-cls"><option value="">All</option></select></div>
+    <div class="fgroup"><label for="f-nec">Necessity</label><select id="f-nec"><option value="">All</option></select></div>
+    <div class="fgroup"><label for="f-mat">Maturity today</label><select id="f-mat"><option value="">All</option></select></div>
+    <div class="fgroup"><label for="f-risk">Risk</label><select id="f-risk"><option value="">All</option><option value="H">High</option><option value="M">Medium</option><option value="L">Low</option></select></div>
+  </div>
+  <div class="resultline" id="resultline" aria-live="polite"></div>
+  <div class="caplist" id="caplist"></div>
+</div></section>
+
+<section id="dependencies"><div class="wrap">
+  <div class="sechead"><span class="secnum">04</span><h2>Dependencies between capabilities</h2>
+  <p class="prose"><span>A relation map of the chain from decision to effect. An arrow from A to B means that B depends on A <span class="tag">assessment</span>. The map is not an implementation order; that is the repair order under pilot readiness. Code, test and artifact dependencies are listed under each capability.</span></p></div>
+  <div class="mermaidbox"><pre class="mermaid">__MERMAID__</pre></div>
+  <div class="tbl"><table><thead><tr><th>Capability</th><th>Number that depend on it</th><th>Used by</th></tr></thead><tbody id="fanin"></tbody></table></div>
+  <p class="note">Shared code files explain why changes spread: <code>servers/execution_api.py</code> is cited as evidence for <span id="hub-api"></span> capabilities and <code>remora/enforcement/lease.py</code> for <span id="hub-lease"></span>. Changes there need broad regression testing.</p>
+</div></section>
+
+<section id="change"><div class="wrap">
+  <div class="sechead"><span class="secnum">05</span><h2>How REMORA changes if the SDD is adopted</h2></div>
+  <div class="tbl"><table><thead><tr><th>Area</th><th>Today (d94eecf9)</th><th>After SDD v1.1</th></tr></thead><tbody>
+    <tr><td>Activation</td><td>In the supported, enforcing execution configuration the token, payload binding and dispatch are on the path; durable audit, strict signature checking and isolation depend on configuration. Other capabilities are turned on with their own environment flags or policy. No single view of what is active in a deployment.</td><td>A signed Capability Activation Manifest per deployment. The server computes the effective mode from profile, verified premises and the signed requested mode; the caller has zero authority over the mode.</td></tr>
+    <tr><td>Per-call traceability</td><td>Decision, reasons and evidence can be read, but not which capabilities actually ran.</td><td>An immutable capability trace per proposal with NOT_RUN, UNAVAILABLE, SHADOW_RESULT, ENFORCED and ERROR. A capability that was not reached is never recorded as passed.</td></tr>
+    <tr><td>Discovery</td><td><code>remora-capabilities-v1.yaml</code> at repository level and <code>GET /v1/execution/capabilities</code> for agents.</td><td><code>GET /v1/system/capabilities</code> joining register, declaration and manifest; <code>/v1/system/readiness</code> with blocking reasons.</td></tr>
+    <tr><td>Cumulative limits</td><td>SQLite on one host, opt-in, three open §97 items at the source revision (closed on one host in this PR).</td><td>Postgres ledger shared between executors; a policy without an idempotency key is refused; REMORA_REQUIRE_LIMITS part of the profile; resolution and chain in one transaction.</td></tr>
+    <tr><td>UNKNOWN outcomes</td><td>The outbox sets stale dispatches to UNKNOWN; only a reviewer can resolve limit operations.</td><td>Resolution from authoritative observation (rail or plant), never free text from a reviewer alone.</td></tr>
+    <tr><td>Pilot gate</td><td>CONTROLLED_PILOT in <code>release_profiles_v1.yaml</code>: REM-020..023 and the CAP ladder.</td><td>The same gate, with G01–G12 added as additional conditions through their own reviewed changes.</td></tr>
+    <tr><td>SDK</td><td>Sync and async client, typed errors, API snapshot; no trace or review-list methods (limits methods added in this PR).</td><td>Role-based groups, typed outcomes on the existing enums, limits and recovery methods, token provider, contract-first transport.</td></tr>
+    <tr><td>Research components</td><td>Library or off by default.</td><td>Visible in the API as OFFLINE, SHADOW or EVIDENCE_ONLY; never authority.</td></tr>
+  </tbody></table></div>
+</div></section>
+
+<section id="rung"><div class="wrap">
+  <div class="sechead"><span class="secnum">06</span><h2>Rung potentially reached with full implementation</h2>
+  <p class="prose"><span>The profiles in <code>release_profiles_v1.yaml</code> build on each other. The table shows what each profile requires, the status today and whether the SDD work can close the requirement.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Profile</th><th>Requirement</th><th>Today</th><th>With the full SDD <span class="tag">assessment</span></th></tr></thead><tbody>
+    <tr><td><b>RESEARCH_REFERENCE</b></td><td>REM-014, REM-019</td><td><span class="pill st-good"><i></i>Met</span></td><td>Unchanged</td></tr>
+    <tr><td><b>SHADOW_PILOT</b></td><td>CAP-001 WIRED_API_PATH, CAP-005 PERSISTED_ATOMIC, CAP-011 IMPLEMENTED_LIBRARY</td><td><span class="pill st-good"><i></i>Current profile</span></td><td>Unchanged; all 32 become visible and honestly classified</td></tr>
+    <tr><td><b>CONTROLLED_PILOT</b></td><td>REM-020, REM-021, REM-022, REM-023; CAP-003/004/007/009 WIRED_API_PATH; CAP-008 WIRED_REFERENCE_PATH</td><td><span class="pill st-crit"><i></i>Blocked: REM-021, REM-023</span></td><td><span class="pill st-warn"><i></i>Possible</span> for one named configuration. Beyond implementation it requires REM-021 and REM-023 closed, the G-gates passed and deployment evidence</td></tr>
+    <tr><td><b>LIMITED_ENFORCEMENT</b></td><td>REM-024, REM-030; CAP-003/004 ENFORCED_PRODUCTION; CAP-007 PERSISTED_ATOMIC</td><td><span class="pill st-crit"><i></i>Blocked</span></td><td><span class="pill st-serious"><i></i>Possible later</span> after pilot operation and independent validation of interception</td></tr>
+    <tr><td><b>PRODUCTION</b></td><td>REM-025, REM-031, all P0–P3; CAP-001 EXTERNALLY_VERIFIED; CAP-005 ENFORCED_PRODUCTION</td><td><span class="pill st-crit"><i></i>Blocked</span></td><td><span class="pill st-none"><i></i>Outside the SDD</span> requires external verification and a compliance package</td></tr>
+  </tbody></table></div>
+  <p class="note">REM status at d94eecf9: REM-020 DONE, REM-021 NOT_STARTED, REM-022 DONE, REM-023 IN_PROGRESS, REM-024 IN_PROGRESS, REM-025 NOT_STARTED, REM-030 NOT_STARTED, REM-031 NOT_STARTED.</p>
+</div></section>
+
+<section id="pilot"><div class="wrap">
+  <div class="sechead"><span class="secnum">07</span><h2>Readiness for a pilot</h2>
+  <p class="prose"><span>SHADOW_PILOT is the current release profile. It states the permitted maturity rung, not that a shadow pilot is actually in operation. Tier C (controlled enforcement) is not ready. The gates below are the SDD's G01–G12, mapped to existing requirements.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Gate</th><th>Mapping</th><th>Status at d94eecf9</th><th>What is missing</th></tr></thead><tbody id="gates"></tbody></table></div>
+  <div class="two">
+    <div class="card"><h3>Immediate NO-GO</h3><ul>
+      <li>a known unmediated write route</li><li>an unsigned ToolSpec or a mutable permissive policy</li><li>a stale or missing shared budget ledger with several hosts</li><li>privilege escalation through a research component</li><li>a silent retry of an unknown payment or effect</li><li>a false independence label on evidence</li><li>a missing rollback or stop procedure</li>
+    </ul></div>
+    <div class="card"><h3>Recommended way forward</h3><ul>
+      <li>Freeze one named configuration and one harmless tool set.</li>
+      <li>Start REM-021 in parallel; finish REM-023.</li>
+      <li>Close items 1–7 below before privileged writes; require item 8 before more than one host. One host narrows the first pilot but does not replace the other requirements.</li>
+      <li>Then add the manifest, readiness and the capability trace as visibility over existing mechanisms.</li>
+      <li>The first canary is a read or non-actuating tool.</li>
+    </ul></div>
+  </div>
+  <h3 id="repair">Repair order</h3>
+  <div class="tbl"><table><thead><tr><th>#</th><th>Work</th><th>Acceptance criterion</th></tr></thead><tbody id="repair-rows"></tbody></table></div>
+  <p class="note">Sources: NEGATIVE_RESULTS §97 and §98, the route <code>POST /v1/execution/limits/resolve</code> and <code>docs/design/derived-information-flow-control-v1-status.md</code>. The order is also in SDD v1.1 §10.</p>
+</div></section>
+
+<section id="sdk"><div class="wrap">
+  <div class="sechead"><span class="secnum">08</span><h2>How the SDK can improve</h2>
+  <p class="prose"><span>The SDK (<code>remora.sdk</code>, package <code>remora-assurance</code> 0.12.0) has <code>RemoraClient</code> and <code>AsyncRemoraClient</code> with assess, execute, execute_accepted, approve, reject, export_evidence and verify_audit_chain, typed errors, <code>verify_effect</code> and a public API snapshot checked in CI. The priority order below is an <span class="tag">assessment</span>.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>#</th><th>Improvement</th><th>Why</th><th>Builds on</th></tr></thead><tbody>
+    <tr><td class="num">1</td><td>Wrappers for <code>limits/unresolved</code> and <code>limits/resolve</code> (delivered in this PR as <code>list_unresolved</code> and <code>resolve_unknown</code>)</td><td>The server routes exist; operators would otherwise need raw HTTP to resolve UNKNOWN.</td><td>CAP-031</td></tr>
+    <tr><td class="num">2</td><td>Typed outcomes: <code>DispatchOutcome</code> and <code>EffectStatus</code> in the results</td><td>Separates "sent" from "effect verified"; stops UNKNOWN being read as failure.</td><td>CAP-013, CAP-019</td></tr>
+    <tr><td class="num">3</td><td>Error envelope with <code>retryable=false</code> for UNKNOWN</td><td>No SDK retry of an action that may have happened.</td><td>UnknownExecutionStateError</td></tr>
+    <tr><td class="num">4</td><td><code>decision_trace</code> and capability trace</td><td>Shows which capabilities actually ran.</td><td>CAP-001, new trace route</td></tr>
+    <tr><td class="num">5</td><td>Review list and a separate reviewer client</td><td>Approvers need a queue; a separate credential prevents self-approval.</td><td>CAP-007, CAP-009</td></tr>
+    <tr><td class="num">6</td><td>Token provider with an OIDC test</td><td>Replaces static bearer tokens in the pilot.</td><td>CAP-009</td></tr>
+    <tr><td class="num">7</td><td>Role-based groups (<code>execution</code>, <code>reviews</code>, <code>limits</code>, <code>evidence</code>, <code>diagnostics</code>)</td><td>Operator methods are not offered to unprivileged agents.</td><td>Server RBAC unchanged</td></tr>
+    <tr><td class="num">8</td><td><code>await_result()</code> that polls without resending</td><td>An asynchronous 202 means authorized, not executed.</td><td>PendingExecution</td></tr>
+    <tr><td class="num">9</td><td>Generated transport from <code>schemas/openapi.json</code></td><td>Reuses the existing TypeScript generation and drift gate.</td><td>quality-gates.yml</td></tr>
+    <tr><td class="num">10</td><td>A <code>pilot</code> extra and a clean-install test</td><td>One installation profile for the pilot; does not exist today.</td><td>pyproject.toml, ci.yml</td></tr>
+  </tbody></table></div>
+  <p class="note">Existing names are kept: <code>close()</code>/<code>aclose()</code>, <code>PendingExecution</code>, <code>ResolutionPlan</code>, <code>export_evidence</code> and <code>verify_audit_chain</code> already exist and are to be documented, not added again.</p>
+</div></section>
+
+<section id="outcome"><div class="wrap">
+  <div class="sechead"><span class="secnum">09</span><h2>Expected outcome</h2>
+  <p class="prose"><span>The targets are the SDD's project targets, not present facts. The right-hand column is an <span class="tag">assessment</span> of how realistic they are.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Target</th><th>Realism</th></tr></thead><tbody>
+    <tr><td>32/32 with a signed manifest entry, API/SDK discovery, a hook or a justified OFFLINE/EVIDENCE_ONLY, an owner and tests</td><td><span class="pill st-good"><i></i>High</span> mostly inventory and contract work</td></tr>
+    <tr><td>Every enforcing capability with a real-HTTP positive test, an adversarial negative test, a killed mutation and a degraded-dependency result</td><td><span class="pill st-warn"><i></i>Medium</span> much exists; needs a systematic pass</td></tr>
+    <tr><td>Every published SDK method with an operationId, sync/async parity, typed errors and an installation example</td><td><span class="pill st-good"><i></i>High</span></td></tr>
+    <tr><td>0 known authority bypasses in the pilot's tool and credential surface</td><td><span class="pill st-serious"><i></i>Low to medium</span> depends on CAP-022 in an external host</td></tr>
+    <tr><td>0 automatic retries of UNKNOWN</td><td><span class="pill st-good"><i></i>High</span> already a design principle in the outbox</td></tr>
+    <tr><td>0 falsely promoted claim levels</td><td><span class="pill st-good"><i></i>High</span> CAP-META and the register gates</td></tr>
+    <tr><td>Reproducible release with a container, a signed manifest and a restore exercise</td><td><span class="pill st-warn"><i></i>Medium</span> SBOM and attestation exist; container and byte reproducibility are missing</td></tr>
+  </tbody></table></div>
+</div></section>
+
+<section id="reversibility"><div class="wrap">
+  <div class="sechead"><span class="secnum">10</span><h2>Scope for reversal</h2></div>
+  <div class="two">
+    <div class="card"><h3>Can be reversed</h3><ul>
+      <li>Activation: opt-in capabilities can be turned off by flag or policy. Token, payload binding and dispatch are part of the supported enforcing execution configuration and are not turned off there; configuration-dependent parts (durable audit, strict signature, isolation) can change, but only after privileged actions are stopped first. With the manifest, mode becomes a signed, versioned value.</li>
+      <li>Modes: ENFORCE can be lowered to SHADOW without data loss, but the protection goes with it. Stop privileged actions before such a downgrade.</li>
+      <li>Topology: Postgres can be switched back to SQLite only for technical review on one host, never in a multi-host pilot.</li>
+      <li>SDK: additive methods; existing methods are kept through migration.</li>
+    </ul></div>
+    <div class="card"><h3>Cannot be reversed</h3><ul>
+      <li>Executed effects in tools, rails or plants.</li>
+      <li>Spent tokens and lease nonces: they stay spent.</li>
+      <li>The audit chain's records: append-only.</li>
+      <li>The budget history: not deleted. UNKNOWN reservations are held until a documented resolution has established whether the effect happened; only then can a reservation be released.</li>
+    </ul></div>
+  </div>
+  <p class="prose"><span>Rollback after the SDD: stop new writes, keep the audit and the UNKNOWN reservations, drain reconciliations, and keep the exact old signed policy, ToolSpec and schema for reconstruction. A rollback never deletes spent grants and never treats an unobserved action as not executed.</span></p>
+  <div class="tbl"><table><thead><tr><th>Phase</th><th>Content</th><th>Reversal <span class="tag">assessment</span></th></tr></thead><tbody>
+    <tr><td>P0 Safety closure</td><td>§97 items, REMORA_REQUIRE_LIMITS in the profile, §98, REM-021/023</td><td><span class="pill st-good"><i></i>Easy</span> stricter rules; can be loosened, but should not be</td></tr>
+    <tr><td>P1 Inventory and manifest</td><td>Manifest, hook registry, read API</td><td><span class="pill st-good"><i></i>Easy</span> additive contract</td></tr>
+    <tr><td>P2 Execution substrate</td><td>Postgres LimitLedger, UNKNOWN resolution</td><td><span class="pill st-warn"><i></i>Medium</span> schema migration must be two-way; data is kept</td></tr>
+    <tr><td>P3 Core policy</td><td>One enforcing path for the core capabilities</td><td><span class="pill st-warn"><i></i>Medium</span> modes can be lowered</td></tr>
+    <tr><td>P4 Effect and evidence</td><td>Effect proof, independent recorder</td><td><span class="pill st-good"><i></i>Easy</span> evidence paths</td></tr>
+    <tr><td>P5–P6 Interop, research, observability</td><td>Adapters, SHADOW monitors, telemetry</td><td><span class="pill st-good"><i></i>Easy</span></td></tr>
+    <tr><td>P7 SDK</td><td>vNext</td><td><span class="pill st-good"><i></i>Easy</span> additive</td></tr>
+    <tr><td>P8 Packaging</td><td>Container, reproducibility, runbooks</td><td><span class="pill st-good"><i></i>Easy</span></td></tr>
+    <tr><td>P9 Pilot activation</td><td>Canary and stop rules</td><td><span class="pill st-crit"><i></i>Partial</span> new actions can be stopped; executed ones stand</td></tr>
+  </tbody></table></div>
+</div></section>
+
+<section id="risk"><div class="wrap">
+  <div class="sechead"><span class="secnum">11</span><h2>Risk assessment</h2>
+  <p class="prose"><span>Each capability is placed by the likelihood that something goes wrong and the consequence if it does, given the SDD's intended mode <span class="tag">assessment</span>. High consequence almost always follows from the capability sitting on the authority or effect path.</span></p></div>
+  <div class="rmwrap"><div class="rm" id="rm" aria-label="Risk matrix"></div></div>
+  <div class="two">
+    <div class="card"><h3>Cross-cutting risks</h3><ul>
+      <li><b>Bypass outside the PEP:</b> a process with direct credentials. Mitigation: CAP-022 in an external host, CAP-024 three-domain split, egress control.</li>
+      <li><b>Local state across hosts:</b> a SQLite ledger split between hosts gives an overrun. Mitigation: Postgres and NO-GO without a shared ledger.</li>
+      <li><b>UNKNOWN treated as not executed:</b> double effect. Mitigation: never retry; resolution only from an authoritative source.</li>
+      <li><b>A model given authority:</b> a monitor or AROMER lowers a refusal. Mitigation: INV-02, SHADOW mode.</li>
+      <li><b>False independence:</b> the same administrator owns recorder and executor. Mitigation: a separate trust domain, honest labelling.</li>
+      <li><b>Symmetric keys where they are still used:</b> the A2A envelope (CAP-006) and audit signing are HMAC, and grants accept HMAC only when REMORA_PDP_ACCEPT_HMAC is explicitly enabled or when no Ed25519 key is configured. Grants (v3) and leases have Ed25519. Mitigation: verify-only in the execution domain, HMAC refused in the pilot, documented key distribution.</li>
+    </ul></div>
+    <div class="card"><h3>Risks of the adoption itself <span class="tag">assessment</span></h3><ul>
+      <li>A new manifest becomes a fourth catalogue if it repeats the register and the declaration. SDD v1.1 limits it to deployment fields.</li>
+      <li>Changes to <code>servers/execution_api.py</code> and <code>lease.py</code> touch many capabilities at once.</li>
+      <li>The G-gates can be read as an alternative to the REM requirements. SDD v1.1 says they can only be added through their own changes.</li>
+      <li>Calendar risk: REM-021 needs an independent person and cannot be solved with code.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="security"><div class="wrap">
+  <div class="sechead"><span class="secnum">12</span><h2>How security is kept</h2>
+  <p class="prose"><span>The SDD locks twelve invariants. They build on mechanisms that already exist and make them mandatory in the pilot profile.</span></p></div>
+  <div class="tbl"><table><thead><tr><th>Invariant</th><th>Requirement</th><th>Carrying capabilities</th></tr></thead><tbody>
+    <tr><td class="mono">INV-01</td><td>Single PEP: privileged effects go only through the approved executor</td><td>CAP-013, CAP-024</td></tr>
+    <tr><td class="mono">INV-02</td><td>No model authority: monitors, oracles, AROMER cannot lower a refusal or mint a grant</td><td>CAP-001, CAP-012, CAP-030</td></tr>
+    <tr><td class="mono">INV-03</td><td>Exact action: tenant, principal, task, target, ToolSpec, arguments, policy, capability set and limits are bound</td><td>CAP-004, CAP-018, CAP-023, CAP-031</td></tr>
+    <tr><td class="mono">INV-04</td><td>Freshness (proposed requirement): REMORA's own authority state is re-checked at dispatch. Local admission can be atomic; the external effect is not atomic with the authority database</td><td>CAP-003, CAP-007, CAP-020</td></tr>
+    <tr><td class="mono">INV-05</td><td>Unknown is not negative: no blind replay of UNKNOWN</td><td>CAP-013, CAP-031</td></tr>
+    <tr><td class="mono">INV-06</td><td>Durable across workers</td><td>CAP-003, CAP-005, CAP-031</td></tr>
+    <tr><td class="mono">INV-07</td><td>Evidence is not authority</td><td>CAP-019, CAP-025, CAP-026..029</td></tr>
+    <tr><td class="mono">INV-08</td><td>Downgrade-resistant activation: a missing premise refuses startup</td><td>CAP-017, manifest</td></tr>
+    <tr><td class="mono">INV-09</td><td>Tenant separation through read, list, export and cache</td><td>CAP-009</td></tr>
+    <tr><td class="mono">INV-10</td><td>Testable claims; stale evidence cannot promote a release</td><td>CAP-META, CAP-015</td></tr>
+    <tr><td class="mono">INV-11</td><td>Every effect assertion names observer, vantage and method</td><td>CAP-021, CAP-022</td></tr>
+    <tr><td class="mono">INV-12</td><td>Private signing keys stay out of client and executor where custody requires it</td><td>CAP-017, CAP-024</td></tr>
+  </tbody></table></div>
+  <div class="two">
+    <div class="card"><h3>Layer on layer</h3><ul>
+      <li>Authentication and RBAC (CAP-009)</li><li>Deterministic decision with invariants (CAP-001, CAP-015)</li><li>Minimized capability set and task binding (CAP-023, CAP-018)</li><li>Human approval with a fresh re-gate (CAP-007)</li><li>Single-use token and exact call (CAP-003, CAP-004)</li><li>Premises, limits and lease at dispatch (CAP-020, CAP-031, CAP-013)</li><li>Mediated effect in its own domain (CAP-024)</li><li>Evidence in the chain and outside the process (CAP-005, CAP-021)</li>
+    </ul></div>
+    <div class="card"><h3>What security does not cover</h3><ul>
+      <li>Correctness of the model's intent.</li><li>Visibility into every host path without an external observer.</li><li>Independent proof of physical effect based on the producer's own logs.</li><li>Real financial clearing or regulatory certification.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section id="sources"><div class="wrap">
+  <div class="sechead"><span class="secnum">13</span><h2>Sources and caveats</h2></div>
+  <div class="prose">
+    <p>Register facts are taken at <code>d94eecf9</code> from <code>docs/assurance/capability_register_v1.yaml</code> (status, evidence files, caveats), <code>docs/assurance/release_profiles_v1.yaml</code>, <code>docs/assurance/remediation_register.yaml</code>, <code>docs/research/research_control_matrix_v1.yaml</code>, <code>docs/research/research_shelf_v1.yaml</code> and <code>NEGATIVE_RESULTS.md</code>. The code, test and artifact lists per capability are the register's own evidence links; for CAP-031, <code>tests/limits/test_limits_idempotency.py</code> and <code>test_limits_resolve_route.py</code> are added because they exist on master after #1052.</p>
+    <p>Everything marked <span class="tag">assessment</span> is analysis, not register status: necessity, risk, reversibility, reachable rung and the dependencies between capabilities. Literature links use the register's vocabulary: <code>implemented_and_tested</code> and <code>ADOPTED</code> mean code built on the source; <code>positioning_only</code> means the source is positioned or argued against, not that REMORA does the same. Numbers from external papers are their authors' own.</p>
+    <p>The report was produced with AI assistance and is not evidence in itself. No test suite or deployment was run for it.</p>
+    <p><b>Revision 2 (2026-10-24), after an AI-assisted document and source check against d94eecf9.</b> The check was not an independent human review or a runtime verification. Corrected: CAP-003 described grants as HMAC only (v3 is Ed25519 with a verify-only redeemer); CAP-017 said "symmetric HMAC only" (signing is separated per grant, lease and audit); CAP-011 mentioned only instrumentation helpers (execution has a dispatch span and a custody hop with tests); "almost all opt-in" replaced with activation per capability; "Tier S is in operation" replaced with the release profile as the permitted rung; "the SDD alone can yield CONTROLLED_PILOT" qualified; INV-04 marked as a proposed requirement; three mutual links in the dependency map removed (CAP-001/CAP-015, CAP-018/CAP-023, CAP-004/CAP-013); the dependency data was checked for cycles when the page was built, but the build step is scripts/generate_capability_atlas.py and the map is labelled a relation map; the downgrade from ENFORCE to SHADOW and refused delegation clarified. The repair order was added. The register's caveats for CAP-003, CAP-011 and CAP-017 lag the code and should be updated in a separate register change.</p>
+    <p><b>Revision 3 (2026-10-24), after a further AI-assisted check.</b> Clarified: the check in revision 2 was not independent; budget reservations can be released through a documented resolution while the history is kept; the core controls are scoped to the supported enforcing configuration; the HMAC flags only act when explicitly enabled; the CAP-031 gap concerns trust in the adapter's ToolDidNotExecute; the cycle-refusal claim about the build step and the absence claim about a process-restart test are scoped to what is documented.</p>
+    <p><b>Revision 4 (2026-10-24), the atlas translated to English and P0 items 1 to 3 recorded.</b> Field names, enums and all assessment text are English; the data is otherwise unchanged apart from G03, CAP-031 and the cells that name what this PR delivered. The register copy at the source revision is untouched.</p>
+  </div>
+</div></section>
+
+<footer><div class="wrap">REMORA Capability Atlas · source d94eecf9 · SDD v1.1 (proposal; P0 items 1 to 3 implemented in #1053)</div></footer>
+
+<script>
+const CAPS = __DATA__;
+const GATES = __GATES__;
+const REPAIR = __REPAIR__;
+const LADDER = ["IMPLEMENTED_LIBRARY","WIRED_REFERENCE_PATH","WIRED_API_PATH","PERSISTED_ATOMIC","ENFORCED_PRODUCTION","EXTERNALLY_VERIFIED"];
+const LADDER_LABEL = {IMPLEMENTED_LIBRARY:"Library",WIRED_REFERENCE_PATH:"Reference path",WIRED_API_PATH:"API path",PERSISTED_ATOMIC:"Persisted atomically",ENFORCED_PRODUCTION:"Enforced in production",EXTERNALLY_VERIFIED:"Externally verified"};
+const rc = s => `var(--r${LADDER.indexOf(s)+1})`;
+const RISK = {H:"High",M:"Medium",L:"Low"};
+const SC = {H:3,M:2,L:1};
+const lvl = c => {const s=SC[c.risk.p]*SC[c.risk.c]; return s>=6?"H":s>=3?"M":"L";};
+const NECCLS = {"Critical":"st-crit","Necessary":"st-serious","Useful":"st-warn","Optional":"st-none","Research":"st-none"};
+const RCLS = {H:"st-crit",M:"st-warn",L:"st-good"};
+const esc = s => String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const byId = Object.fromEntries(CAPS.map(c=>[c.id,c]));
+const usedBy = {}; CAPS.forEach(c=>c.deps.forEach(d=>(usedBy[d]=usedBy[d]||[]).push(c.id)));
+
+document.getElementById("t-crit").textContent = CAPS.filter(c=>c.necessity==="Critical").length;
+
+/* ladder */
+(function(){
+  const el=document.getElementById("ladder");
+  let h=`<div class="lrow head" role="row"><div role="columnheader">Rung</div><div role="columnheader">Today (register)</div><div role="columnheader">Potential after the full SDD</div></div>`;
+  [...LADDER].reverse().forEach(r=>{
+    const now=CAPS.filter(c=>c.status===r), fut=CAPS.filter(c=>c.target===r);
+    const chip=(c,moved)=>`<button type="button" class="chip${moved?" moved":""}" data-go="${c.id}" title="${esc(c.name)}"><s style="background:${rc(r)}"></s>${c.id}</button>`;
+    h+=`<div class="lrow" role="row"><div class="lname" role="cell"><span class="rung"><s style="background:${rc(r)}"></s>${LADDER.indexOf(r)+1}. ${r}</span><span class="n">${LADDER_LABEL[r]}</span></div>
+      <div role="cell" data-col="Today"><div class="chips">${now.map(c=>chip(c,false)).join("")||'<span class="muted">none</span>'}<span class="count">${now.length}</span></div></div>
+      <div role="cell" data-col="Potential"><div class="chips">${fut.map(c=>chip(c,c.target!==c.status)).join("")||'<span class="muted">none</span>'}<span class="count">${fut.length}</span></div></div></div>`;
+  });
+  el.innerHTML=h;
+})();
+
+/* explorer */
+const list=document.getElementById("caplist");
+function files(arr){return arr.length?`<div class="files">${arr.map(f=>`<code>${esc(f)}</code>`).join("")}</div>`:'<p class="muted">none registered</p>';}
+function capHTML(c){
+  const L=lvl(c);
+  return `<details class="cap" id="${c.id}" data-id="${c.id}">
+  <summary><span class="cid">${c.id}</span><span class="ctitle"><b>${esc(c.name)}</b><span>${esc(c.cls)} · ${esc(c.registerName)}</span></span>
+  <span class="cbadges"><span class="rung"><s style="background:${rc(c.status)}"></s>${c.status}</span><span class="pill ${NECCLS[c.necessity]}"><i></i>${c.necessity}</span><span class="pill ${RCLS[L]}"><i></i>Risk ${RISK[L].toLowerCase()}</span></span></summary>
+  <div class="cbody">
+    <div class="cgrid">
+      <div class="field"><h4>Purpose</h4><p>${esc(c.purpose)}</p></div>
+      <div class="field"><h4>What it does</h4><p>${esc(c.does)}</p></div>
+      <div class="field"><h4>Maturity today</h4><p><span class="rung"><s style="background:${rc(c.status)}"></s>${c.status}</span></p><p>${esc(c.now)}</p>${c.ladder.length?`<p class="muted">Profile requirements: ${c.ladder.map(esc).join(", ")}</p>`:""}</div>
+    </div>
+    <div class="cgrid">
+      <div class="field assess"><h4>Necessity <span class="tag">assessment</span></h4><p><span class="pill ${NECCLS[c.necessity]}"><i></i>${c.necessity}</span></p><p>${esc(c.necessityRationale)}</p></div>
+      <div class="field"><h4>Change with SDD v1.1</h4><p><span class="mono">hook ${esc(c.hook)} · mode ${esc(c.mode)}</span></p><p>${esc(c.sdd)}</p></div>
+      <div class="field assess"><h4>Reachable rung <span class="tag">assessment</span></h4><p><span class="rung"><s style="background:${rc(c.target)}"></s>${c.target}</span></p><p>${esc(c.targetText)}</p></div>
+    </div>
+    <div class="cgrid">
+      <div class="field assess"><h4>Risk <span class="tag">assessment</span></h4><p><span class="pill ${RCLS[L]}"><i></i>${RISK[L]}</span> <span class="muted">likelihood ${RISK[c.risk.p].toLowerCase()}, consequence ${RISK[c.risk.c].toLowerCase()}</span></p><p>${esc(c.risk.text)}</p></div>
+      <div class="field assess"><h4>Reversibility <span class="tag">assessment</span></h4><p><b>${esc(c.rev.grade)}.</b> ${esc(c.rev.text)}</p></div>
+      <div class="field"><h4>Security</h4><p>${esc(c.security)}</p></div>
+    </div>
+    <div class="cgrid">
+      <div class="field"><h4>Code (${c.code.length})</h4>${files(c.code)}</div>
+      <div class="field"><h4>Tests (${c.tests.length})</h4>${files(c.tests)}</div>
+      <div class="field"><h4>Artifacts and documents</h4>${files(c.artifacts.concat(c.docs))}${c.nr.length?`<p class="muted">NEGATIVE_RESULTS: ${c.nr.map(n=>"§"+n).join(", ")}</p>`:""}</div>
+    </div>
+    <div class="cgrid">
+      <div class="field"><h4>Literature and research basis</h4>${c.lit.length?`<ul>${c.lit.map(l=>`<li>${esc(l[0])} <span class="muted">(${esc(l[1])})</span> <span class="tag">${esc(l[2])}</span></li>`).join("")}</ul>`:'<p class="muted">No registered source; engineering work without a research anchor.</p>'}</div>
+      <div class="field"><h4>Depends on <span class="tag">assessment</span></h4>${c.deps.length?`<div class="deplinks">${c.deps.map(d=>`<button type="button" class="chip" data-go="${d}"><s style="background:${rc(byId[d].status)}"></s>${d}</button>`).join("")}</div>`:'<p class="muted">none</p>'}</div>
+      <div class="field"><h4>Depended on by</h4>${(usedBy[c.id]||[]).length?`<div class="deplinks">${usedBy[c.id].map(d=>`<button type="button" class="chip" data-go="${d}"><s style="background:${rc(byId[d].status)}"></s>${d}</button>`).join("")}</div>`:'<p class="muted">none</p>'}</div>
+    </div>
+  </div></details>`;
+}
+list.innerHTML=CAPS.map(capHTML).join("");
+const fill=(id,vals)=>{const s=document.getElementById(id);vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;s.appendChild(o);});};
+fill("f-cls",[...new Set(CAPS.map(c=>c.cls))].sort());
+fill("f-nec",["Critical","Necessary","Useful","Optional","Research"]);
+fill("f-mat",LADDER.filter(r=>CAPS.some(c=>c.status===r)));
+function apply(){
+  const q=document.getElementById("f-q").value.trim().toLowerCase(), k=document.getElementById("f-cls").value, n=document.getElementById("f-nec").value, m=document.getElementById("f-mat").value, r=document.getElementById("f-risk").value;
+  let shown=0;
+  CAPS.forEach(c=>{
+    const hay=[c.id,c.name,c.registerName,c.purpose,...c.code,...c.tests,...c.lit.map(l=>l.join(" "))].join(" ").toLowerCase();
+    const ok=(!q||hay.includes(q))&&(!k||c.cls===k)&&(!n||c.necessity===n)&&(!m||c.status===m)&&(!r||lvl(c)===r);
+    document.getElementById(c.id).hidden=!ok; if(ok)shown++;
+  });
+  document.getElementById("resultline").textContent=`Showing ${shown} of ${CAPS.length}`;
+}
+["f-q","f-cls","f-nec","f-mat","f-risk"].forEach(id=>document.getElementById(id).addEventListener("input",apply));
+apply();
+function go(id){
+  ["f-q","f-cls","f-nec","f-mat","f-risk"].forEach(i=>document.getElementById(i).value="");apply();
+  const d=document.getElementById(id); if(!d)return; d.open=true; d.scrollIntoView({block:"start"}); d.querySelector("summary").focus({preventScroll:true});
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b){e.preventDefault();go(b.dataset.go);}});
+if(/^#CAP-[0-9A-Z]+$/.test(location.hash))setTimeout(()=>go(location.hash.slice(1)),0);
+
+/* fan-in */
+document.getElementById("fanin").innerHTML=Object.entries(usedBy).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).slice(0,10)
+  .map(([id,u])=>`<tr><td><button type="button" class="chip" data-go="${id}"><s style="background:${rc(byId[id].status)}"></s>${id}</button> ${esc(byId[id].name)}</td><td class="num">${u.length}</td><td>${u.join(", ")}</td></tr>`).join("");
+document.getElementById("hub-api").textContent=CAPS.filter(c=>c.code.includes("servers/execution_api.py")).length;
+document.getElementById("hub-lease").textContent=CAPS.filter(c=>c.code.includes("remora/enforcement/lease.py")).length;
+
+/* gates */
+const GCLS={crit:"st-crit",warn:"st-warn",good:"st-good",none:"st-none"};
+document.getElementById("gates").innerHTML=GATES.map(g=>`<tr><td><b class="mono">${g[0]}</b> ${esc(g[1])}</td><td>${esc(g[2])}</td><td><span class="pill ${GCLS[g[3]]}"><i></i>${esc(g[4])}</span></td><td>${esc(g[5])}</td></tr>`).join("");
+
+/* repair order */
+document.getElementById("repair-rows").innerHTML=REPAIR.map(r=>`<tr><td class="num">${r.step}</td><td>${esc(r.work)}</td><td>${esc(r.acceptance)}</td></tr>`).join("");
+
+/* risk matrix */
+(function(){
+  const el=document.getElementById("rm"); let h="";
+  ["H","M","L"].forEach(k=>{
+    h+=`<div class="ax ay">${k==="H"?"Consequence high":k==="M"?"medium":"low"}</div>`;
+    ["L","M","H"].forEach(p=>{
+      const cs=CAPS.filter(c=>c.risk.p===p&&c.risk.c===k); const s=SC[p]*SC[k]; const L=s>=6?"H":s>=3?"M":"L";
+      h+=`<div class="rcell lvl-${L}"><div class="lab"><span class="pill ${RCLS[L]}"><i></i>${RISK[L]}</span><span class="count">${cs.length}</span></div><div class="chips">${cs.map(c=>`<button type="button" class="chip" data-go="${c.id}" title="${esc(c.name)}">${c.id}</button>`).join("")}</div></div>`;
+    });
+  });
+  h+=`<div></div><div class="ax">Likelihood low</div><div class="ax">medium</div><div class="ax">high</div>`;
+  el.innerHTML=h;
+})();
+</script>

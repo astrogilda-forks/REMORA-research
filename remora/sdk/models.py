@@ -42,6 +42,9 @@ __all__ = [
     "DerivationProposal",
     "ExecutionResult",
     "LifecycleTrail",
+    "LimitCharge",
+    "LimitResolution",
+    "UnresolvedOperation",
     "ProposalLineageView",
     "ProposalView",
     "RejectionResult",
@@ -553,5 +556,80 @@ class AuditVerification:
             problems=tuple(str(p) for p in payload.get("problems", [])),
             records_checked=int(payload.get("records_checked", 0)),
             empty=bool(payload.get("empty", False)),
+            raw=_frozen(payload) or MappingProxyType({}),
+        )
+
+
+@dataclass(frozen=True)
+class LimitCharge:
+    """What one metered call reserved against one cumulative limit."""
+
+    counter: str
+    amount: int
+
+
+@dataclass(frozen=True)
+class UnresolvedOperation:
+    """A metered call whose outcome is unknown; it holds its budget until resolved.
+
+    The call reached the tool and REMORA never learnt whether the effect
+    happened (a timeout, a lost reply, an adapter statement the limit policy
+    does not trust). Its charges stay reserved and the same operation refuses
+    as ``limit_outcome_unknown`` until a reviewer other than ``principal``
+    resolves it with evidence the deployment checks
+    (:meth:`RemoraClient.resolve_unknown`). Nothing here is retried by the
+    SDK: an unknown outcome is not a failure.
+    """
+
+    operation_id: str
+    principal: str
+    tool: str
+    at: float
+    charges: tuple[LimitCharge, ...]
+    raw: Mapping[str, Any] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> UnresolvedOperation:
+        return cls(
+            operation_id=str(payload["operation_id"]),
+            principal=str(payload.get("principal", "")),
+            tool=str(payload.get("tool", "")),
+            at=float(payload.get("at", 0.0)),
+            charges=tuple(LimitCharge(counter=str(c["counter"]), amount=int(c["amount"]))
+                          for c in payload.get("charges", [])),
+            raw=_frozen(payload) or MappingProxyType({}),
+        )
+
+
+@dataclass(frozen=True)
+class LimitResolution:
+    """The server's record of a resolved unknown outcome.
+
+    ``executed`` is the reviewer's statement as the deployment's evidence
+    checker confirmed it: False returned the reservation, True kept it and
+    makes a duplicate refuse. A disputed, unchecked or unavailable statement
+    never reaches this model; it raises :class:`ConflictError` with the
+    refusal code in its message.
+    """
+
+    operation_id: str
+    executed: bool
+    resolved_by: str
+    status: str
+    #: Whether the tenant chain already carries the record. False means the
+    #: ledger holds the resolution and the server appends the record on its
+    #: next limits call; the resolution itself is not in doubt.
+    audit_recorded: bool | None = None
+    raw: Mapping[str, Any] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> LimitResolution:
+        recorded = payload.get("audit_recorded")
+        return cls(
+            operation_id=str(payload["operation_id"]),
+            executed=bool(payload["executed"]),
+            resolved_by=str(payload.get("resolved_by", "")),
+            status=str(payload.get("status", "")),
+            audit_recorded=None if recorded is None else bool(recorded),
             raw=_frozen(payload) or MappingProxyType({}),
         )

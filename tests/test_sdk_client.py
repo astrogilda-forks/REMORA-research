@@ -363,3 +363,64 @@ def test_unknown_execution_state_is_not_retryable() -> None:
     from remora.sdk import UnknownExecutionStateError
 
     assert UnknownExecutionStateError("x").retryable is False
+
+
+def test_list_unresolved_reads_the_held_limit_operations() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert (request.method, request.url.path) == ("GET", "/v1/execution/limits/unresolved")
+        return httpx.Response(200, json={"operations": [
+            {"operation_id": "lease:n7", "principal": "employee-1", "tool": "transfer_payment",
+             "at": 1800000000.5, "charges": [{"counter": "hs51-set2", "amount": 7000}]},
+        ]})
+
+    with _client_for(handler) as client:
+        held = client.list_unresolved()
+
+    assert len(held) == 1 and held[0].operation_id == "lease:n7"
+    assert held[0].principal == "employee-1" and held[0].tool == "transfer_payment"
+    assert held[0].charges[0].counter == "hs51-set2" and held[0].charges[0].amount == 7000
+    with pytest.raises(TypeError):
+        held[0].raw["principal"] = "someone-else"  # type: ignore[index]
+
+
+def test_resolve_unknown_sends_the_reviewers_statement_and_its_evidence() -> None:
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={
+            "operation_id": "lease:n7", "executed": False,
+            "resolved_by": "treasury-reviewer", "status": "resolved",
+        })
+
+    with _client_for(handler) as client:
+        resolution = client.resolve_unknown(
+            "lease:n7", executed=False, evidence_ref="rail:stmt-77", reason="no transfer")
+
+    assert seen["path"] == "/v1/execution/limits/resolve"
+    assert seen["body"] == {"operation_id": "lease:n7", "executed": False,
+                            "evidence_ref": "rail:stmt-77", "reason": "no transfer"}
+    assert resolution.executed is False and resolution.resolved_by == "treasury-reviewer"
+    assert resolution.status == "resolved"
+
+
+@pytest.mark.parametrize("detail", [
+    "limit_evidence_unchecked", "limit_evidence_disputed", "limit_evidence_unavailable",
+    "limit_resolver_is_principal", "limit_operation_not_unknown",
+])
+def test_a_refused_resolution_is_a_conflict_naming_the_reason(detail) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(409, json={"detail": detail})
+
+    with _client_for(handler) as client, pytest.raises(ConflictError) as exc:
+        client.resolve_unknown("lease:n7", executed=False, evidence_ref="rail:stmt-77")
+    assert detail in str(exc.value)
+
+
+def test_no_limits_configured_is_not_found() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "no cumulative limits are configured"})
+
+    with _client_for(handler) as client, pytest.raises(NotFoundError):
+        client.list_unresolved()

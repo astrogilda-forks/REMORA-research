@@ -43,12 +43,17 @@ SPECS = [
 ]
 
 
-def make_client(monkeypatch, tmp_path, policy: dict[str, Any] | None):
+def make_client(monkeypatch, tmp_path, policy: dict[str, Any] | None,
+                evidence_module: str | None = None):
+    """``evidence_module`` is what ``REMORA_LIMITS_EVIDENCE_MODULE`` names; None unsets it."""
     import servers.execution_api as exec_mod
 
     monkeypatch.setenv("REMORA_LIMITS_TOOL_LOG", str(tmp_path / "tool-log.jsonl"))
-    for var in ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER"):
+    for var in ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_EVIDENCE_MODULE",
+                "REMORA_REQUIRE_IDEMPOTENCY"):
         monkeypatch.delenv(var, raising=False)
+    if evidence_module is not None:
+        monkeypatch.setenv("REMORA_LIMITS_EVIDENCE_MODULE", evidence_module)
     if policy is not None:
         (tmp_path / "limits.json").write_text(json.dumps(policy))
         monkeypatch.setenv("REMORA_LIMITS_FILE", str(tmp_path / "limits.json"))

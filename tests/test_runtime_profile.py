@@ -38,6 +38,14 @@ STRICT_ENV = {
     "REMORA_EFFECT_CREDENTIAL_ENV_NAMES": "ACME_SMTP_PASSWORD",
     # Property D: strict profiles require an intent resolver.
     "REMORA_SEMANTIC_BUNDLE_MODULE": "servers.semantic_bundle_research",
+    # CAP-031: controlled_pilot runs with signed, mandatory cumulative limits
+    # and an idempotency key per metered write tool. Presence only here; the
+    # execution API verifies the policy when it builds the guard.
+    "REMORA_LIMITS_FILE": "/tmp/limits.json",
+    "REMORA_LIMITS_LEDGER": "/tmp/limits-ledger.db",
+    "REMORA_LIMITS_TRUSTED_KEYS": "22" * 32,
+    "REMORA_REQUIRE_LIMITS": "1",
+    "REMORA_REQUIRE_IDEMPOTENCY": "1",
 }
 
 
@@ -61,6 +69,11 @@ def _clear(monkeypatch) -> None:
         "REMORA_EFFECT_CREDENTIAL_ENV_NAMES",
         "ACME_SMTP_PASSWORD",
         "REMORA_SEMANTIC_BUNDLE_MODULE",
+        "REMORA_LIMITS_FILE",
+        "REMORA_LIMITS_LEDGER",
+        "REMORA_LIMITS_TRUSTED_KEYS",
+        "REMORA_REQUIRE_LIMITS",
+        "REMORA_REQUIRE_IDEMPOTENCY",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -162,6 +175,31 @@ def test_controlled_pilot_accepts_full_production_configuration(monkeypatch) -> 
     _configure_strict(monkeypatch, "controlled_pilot")
     monkeypatch.setenv("REMORA_ENV", "production")
     assert validate_runtime_profile_prerequisites() == "controlled_pilot"
+
+
+@pytest.mark.parametrize("missing", [
+    "REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_TRUSTED_KEYS",
+    "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_IDEMPOTENCY",
+])
+def test_controlled_pilot_requires_signed_mandatory_limits(monkeypatch, missing) -> None:
+    """CAP-031, SDD P0 item 3: a write pilot cannot start against no budget."""
+    _clear(monkeypatch)
+    _configure_strict(monkeypatch, "controlled_pilot")
+    monkeypatch.setenv("REMORA_ENV", "production")
+    monkeypatch.delenv(missing)
+    with pytest.raises(RuntimeProfileError, match=f"cumulative limits.*{missing}"):
+        validate_runtime_profile_prerequisites()
+
+
+def test_review_does_not_require_limits(monkeypatch) -> None:
+    """The handoff profile reviews the path; only the write pilot must run with a budget."""
+    _clear(monkeypatch)
+    _configure_strict(monkeypatch, "review")
+    monkeypatch.setenv("REMORA_ENV", "development")
+    for name in ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_TRUSTED_KEYS",
+                 "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_IDEMPOTENCY"):
+        monkeypatch.delenv(name)
+    assert validate_runtime_profile_prerequisites() == "review"
 
 
 def test_deployment_registry_wires_the_profile_gate(monkeypatch) -> None:

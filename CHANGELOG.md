@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Cumulative limits: the open §97 items on one host (SDD unified capability execution v1.1, P0 items 1 to 3)
+
+- A `ToolDidNotExecute` statement frees a reservation only from a source the signed limit policy names in `non_execution.<tool>.trusted_sources`; from any other source the call is held as unknown until resolved. The dispatch still reports `tool_did_not_execute`, and its `dispatch.refused` event says whether the reservation was `released` or `held`.
+- `POST /v1/execution/limits/resolve` checks the reviewer's statement through `REMORA_LIMITS_EVIDENCE_MODULE` (`check_limit_evidence(tenant, operation, evidence_ref)`) before anything moves, and refuses as `limit_evidence_unchecked` (no module), `limit_evidence_unavailable` or `limit_evidence_disputed`. The chain record names the module.
+- `REMORA_REQUIRE_IDEMPOTENCY=1` refuses startup while a metered write tool declares no `idempotency.key_arguments`, and refuses a call to one it could not classify (`limit_key_undeclared`, `limit_coverage_unknown`).
+- `POST /v1/execution/limits/resolve` records the resolution in the ledger first and appends `limit_operation_resolved` afterwards through `append_once`, swept on every limits call; the response carries `audit_recorded`. A crash between the ledger and the chain leaves a record that arrives late, not a release that is undocumented (P0 item 4, one host). Older ledger files gain the columns on open.
+, `REMORA_LIMITS_LEDGER`, `REMORA_LIMITS_TRUSTED_KEYS`, `REMORA_REQUIRE_LIMITS` and `REMORA_REQUIRE_IDEMPOTENCY`; `review` does not.
+- SDK: `RemoraClient.list_unresolved()` and `resolve_unknown()` with their async twins, and the models `UnresolvedOperation`, `LimitCharge` and `LimitResolution` (public API snapshot updated).
+- Still open: the ledger is one host's SQLite; the resolution is appended to the chain after the ledger commits; nothing measures how often legitimate calls are refused (`NEGATIVE_RESULTS.md` §97).
+
 ### Execution-path audit: a refused admission returns no grant (NEGATIVE_RESULTS §98)
 
 - Under `REMORA_WS1_ADMISSION=atomic`, `/v1/execution/execute` no longer returns `execution_grant` when the admission refuses. The grant minted before the admission is spent in place and the chain records `execution_grant_withheld`. Before, the unspent grant could be redeemed at `/execute-accepted` without the review path's checks.

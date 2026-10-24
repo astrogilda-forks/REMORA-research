@@ -32,6 +32,13 @@
     }
    ]
   },
+  "non_execution": {
+   "transfer_payment": {
+    "trusted_sources": [
+     "sandbox-rail"
+    ]
+   }
+  },
   "schema": "remora-cumulative-limits/v1"
  },
  "question": "Does REMORA's own engine let payment C run past the signed budget?",
