@@ -76,7 +76,7 @@ Out of scope for the first enforcement pilot:
 - INV-01 Single PEP: Any privileged effect MUST go through exactly the approved executor/PEP path; agents, sidecars, legacy Cloudflare worker and SDK never receive a bypass token or direct production credential.
 - INV-02 No model authority: Learned monitors, ensemble/oracles, AROMER, Jev or evidence labels MUST NOT lower a hard refusal or mint/swap a signed grant.
 - INV-03 Exact action: Authorization binds tenant, principal, task, target, ToolSpec revision, tool, canonical arguments, relevant state, policy identity, capability set, signed limits and grant consumption epoch.
-- INV-04 Freshness: At dispatch the PEP MUST re-evaluate expiry, revocation, policy/version digests, premises, leased nonce, idempotency key, and cumulative limits atomically relative to authority-state transitions.
+- INV-04 Freshness: At dispatch the PEP MUST re-evaluate expiry, revocation, policy/version digests, premises, leased nonce, idempotency key, and cumulative limits atomically relative to authority-state transitions. This is a requirement on REMORA's own authority state: local admission can be atomic, but the external effect is never atomic with the authority database (INV-05 covers the gap).
 - INV-05 Unknown is not negative: Tool timeout, lost response, missing observation, source disagreement, or unverified audit proof MUST NOT imply that an effect did not happen. No blind replay of UNKNOWN.
 - INV-06 Durable across workers: For Tier C, losing a process/instance MUST NOT restore authority, release unknown budget, or make a duplicate side effect executable. A shared durable transaction boundary is mandatory whenever multiple executors are used.
 - INV-07 Evidence not authority: Signed records, OTS anchoring and another project's claims establish only their documented properties; provenance is not authorization.
@@ -277,7 +277,7 @@ Each entry below is an independent **implementation acceptance track**. The CURR
 
 - API / SDK and use in actual work: Expose grant/jti binding status in execution result; SDK types SingleUseGrant/GrantStatus; no client mint endpoint.
 - Mandatory proof / acceptance tests: Spent jti remains spent across process restart, worker change, race, expiry, role swap, replay and policy rotation; shared backend mandatory.
-- Truth boundary / pilot restriction: An in-memory nonce store is forbidden for Tier C; remote dispatcher only if it validates same ledger. jti consumption persists to `pep_consumed` only when `REMORA_PG_DSN` or `REMORA_CHAIN_DB` is set (in-process by default), and no test spawns a new interpreter, so restart behaviour is inferred from the shared ledger. The token is HMAC-SHA256: the verifier holds the material to mint, so this capability carries no asymmetric custody claim (register caveat).
+- Truth boundary / pilot restriction: An in-memory nonce store is forbidden for Tier C; remote dispatcher only if it validates same ledger. jti consumption persists to `pep_consumed` only when `REMORA_PG_DSN` or `REMORA_CHAIN_DB` is set (in-process by default), and no test spawns a new interpreter, so restart behaviour is inferred from the shared ledger. Grant format v3 is Ed25519 over `REMORA/POLICY-GRANT/v3`, and a process holding only `REMORA_PDP_VERIFY_KEYS_ED25519` can redeem grants and mint none (`remora/enforcement/token.py`). Once Ed25519 material is configured, a live v1/v2 HMAC token is refused unless `REMORA_PDP_ACCEPT_HMAC` is set for a migration window. The register caveat still describes the HMAC formats and lags the code. The custody split is real only when `/assess` and `/execute-accepted` run in different custody domains; in one process with the private key it is one domain.
 
 ### CAP-004 — Exact tool-call canonical payload binding
 
@@ -339,7 +339,7 @@ Each entry below is an independent **implementation acceptance track**. The CURR
 
 **Registered maturity:** `IMPLEMENTED_LIBRARY`. **Primary hook:** `OPS`. **Intended mode:** `EVIDENCE_ONLY`.
 
-- API / SDK and use in actual work: Wire OTel GenAI + remora spans in execution, SDK request IDs, outbox, review, rail, reconciliation; publish collector examples and dashboards.
+- API / SDK and use in actual work: The governed dispatch already emits a GenAI tool-governance span (`servers/execution_api.py`), and the custody hop carries W3C `traceparent` (`remora/execution/remote_dispatch.py`); `tests/test_tracing_structural.py` covers both, including a refusal stamped on the dispatch span. Target: extend spans to SDK request IDs, outbox, review, rail and reconciliation; publish collector examples, alerts and dashboards. The register caveat "instrumentation helpers" lags the code.
 - Mandatory proof / acceptance tests: Trace propagation, sampling privacy, no token/PII exfiltration, backpressure fail isolation, export-to-offline-collector smoke test.
 - Truth boundary / pilot restriction: Instrumentation alone is not a deployed telemetry pipeline or proof of effect.
 
@@ -389,7 +389,7 @@ Each entry below is an independent **implementation acceptance track**. The CURR
 
 - API / SDK and use in actual work: Readiness gate proving signer presence, key custody, trust pins and rotation policy; no API exposing private key material.
 - Mandatory proof / acceptance tests: Boot refusal for missing/unsafe production signing keys, issuer/executor split, rotated/expired keys, test key contamination and log signatures.
-- Truth boundary / pilot restriction: Key presence does not establish secure KMS/HSM custody on a real host.
+- Truth boundary / pilot restriction: Key presence does not establish secure KMS/HSM custody on a real host. Signing modes differ per object: grants have Ed25519 format v3 with a verify-only redeemer, leases have Ed25519 (`ed25519`, `ed25519-domain-v2`) with HMAC refused unless `REMORA_LEASE_ACCEPT_HMAC` is set, and audit envelope signatures are HMAC (`REMORA_ENVELOPE_SIGNING_KEY`). The register caveat "Symmetric HMAC only" lags the code for grants and leases. Key distribution for a named deployment is still undocumented.
 
 ### CAP-018 — Task-bound authority and loop safety
 
@@ -848,7 +848,7 @@ Do not attempt a single 32-capability mega-PR. Each milestone below must be inde
 
 | Phase | Work packages | Main deliverable | Exit gate / dependencies |
 |---|---|---|---|
-| **P0 Safety closure** | #1052 is merged (`d94eecf9`); a post-merge security review of it is still owed. Close the open §97 items on one host: refuse a limited write tool with no declared key; stop `ToolDidNotExecute` from freeing budget without trusted evidence (or keep it held); make `REMORA_REQUIRE_LIMITS` part of the `controlled_pilot` runtime profile. Run the §98 grant-withholding repair under atomic admission outside the author's tests. Advance REM-023 (IN_PROGRESS) and start REM-021 (NOT_STARTED) | Hardening with pinned commit and test record; §97/§98 status updated in `NEGATIVE_RESULTS.md` | Current code owner/security review, full CI, no bypass and no unreviewed evidence release |
+| **P0 Safety closure** | #1052 is merged (`d94eecf9`); a post-merge security review of it is still owed. Items 1 to 7 of the P0 repair order below, in that order, on one frozen named configuration with a harmless tool set; item 8 before more than one host. Start REM-021 (NOT_STARTED) and advance REM-023 (IN_PROGRESS) in parallel | Hardening with pinned commit and test record; §97/§98 status updated in `NEGATIVE_RESULTS.md` | Current code owner/security review, full CI, no bypass and no unreviewed evidence release |
 | **P1 Inventory + CAM** | CAP-001..031 plus META machine inventory; CAM schema (per-deployment fields only, §3), signing, startup validation, effective mode and hook registry; decide where hook/mode live (ADR-UE-03) | Contract `capability-activation-v1`, CLI/read-only API joining register + `remora-capabilities-v1.yaml` + CAM; all 32 explicitly mapped | Tests fail if registered CAP is not bound to a hook/API/test |
 | **P2 Execution substrate** | Postgres `LimitLedger` (the one authority store with no Postgres backend); limits resolution and chain append in one transaction or a proven repair protocol; UNKNOWN resolution from authoritative observation (the outbox reconciler only settles stale dispatches as UNKNOWN; M4.5a is unrelated); configure and prove the existing Postgres stores together, including a CAP-007 Postgres contract test; custody topology | Tier C reference service with 2-worker Postgres integration | Multi-host PILOT-T06..T10 and T16; no in-memory fallback |
 | **P3 Core policy integration** | CAP-001/003/004/005/007/009/013/017/018/023/031 and explicit configurable CAP-020 | One enforcing path, signed mandatory limits, exact authority, review/evidence | Real HTTP + SDK refusal and adversarial tests for each |
@@ -859,7 +859,24 @@ Do not attempt a single 32-capability mega-PR. Each milestone below must be inde
 | **P8 Packaging and security** | Extend the existing `release.yml` / `supply-chain.yml` pipeline (§8.2): container image and scan, byte-reproducible builds, dependency closure, hardening, DR, operational runbooks, migration and rollback | Customer pilot release candidate with release manifest and vulnerability disposition | Red-free release pipeline; owner and independent reviewer records |
 | **P9 Pilot activation** | Tier S baseline, shadow counters, customer signed scope, controlled allowlist, operator preflight, canary and stop rules | Evidence pack supporting a formal go/no-go decision | No unresolved critical controls; release profile computed not asserted |
 
-**Parallelism:** P1 inventory may run alongside P0; P3 and P6 can progress with shared hook contracts; P4/P5 depend on P1 and signed provenance; P7 begins with read-only facilities but stabilizes only after P2–P5 wire schemas. No safety-critical downstream work merges before its dependency contract and required checks.
+**Parallelism:** P1 starts as read-only visibility over existing mechanisms and must not delay P0; no manifest-driven enforcement merges before P0 items 1 to 7 close. P3 and P6 can progress with shared hook contracts; P4/P5 depend on P1 and signed provenance; P7 begins with read-only facilities but stabilizes only after P2–P5 wire schemas. No safety-critical downstream work merges before its dependency contract and required checks.
+
+### P0 repair order
+
+The six CAP-031 gaps in §5 and `NEGATIVE_RESULTS.md` §97 and §98 come first. Each item has a binary acceptance criterion.
+
+| Order | Work | Acceptance criterion |
+|---|---|---|
+| 1 | Stop unconfirmed budget release. Cover both `ToolDidNotExecute` and a reviewer's `executed=false` on `POST /v1/execution/limits/resolve`. | Without checkable evidence the reservation stays held as unknown. |
+| 2 | Require a stable operation key for every relevant write tool. | The same business operation submitted through new proposals does not run again. |
+| 3 | Make signed limits and required coverage mandatory in the write-pilot profile. | A missing key, signature or meter refuses startup or the call. |
+| 4 | Make limits resolution and audit transactionally consistent. | A crash between the ledger change and the chain record leaves no permanent undocumented budget release. |
+| 5 | Re-verify the §98 repair and atomic admission. | A refused review leaks no usable grant, also when invalidation or storage fails. |
+| 6 | Finish flow binding, the flow race and the freshness contract (IFC-06, IFC-11, IFC-12). | Controlled arguments match the actual tool input; changed authority or flow stops the action within the declared contract. |
+| 7 | Verify credential topology and the stop mechanism. | Agent and tool worker cannot bypass the executor; a verify-only process cannot sign. |
+| 8 | Build the shared `LimitLedger` before multi-host activation. | Two executors share budget and operation keys without double spending. |
+
+Freeze one named configuration and one harmless tool set. Close items 1 to 7 before any privileged write; item 8 is required before more than one host. A single host narrows the first pilot; it does not replace the other items. The manifest, readiness and capability trace then add visibility over existing mechanisms. Research, evidence and interop components get an honest operational place, and none gains authority to reach "32/32 integrated".
 
 ### Proposed PR naming / acceptance templates
 
@@ -998,7 +1015,7 @@ v1.0 is superseded, not erased. Each row records what v1.0 said and what v1.1 sa
 | §4 strict profiles | `controlled_pilot` startup checks as new | Existing checks named; CAM, shared state and `REMORA_REQUIRE_LIMITS` are the additions |
 | CAP-001 | "existing … read-only capability-trace" | Trace route is proposed; none exists |
 | CAP-002 | `PolicyProvider` registry | No such registry; `DecisionProvider` is the nearest seam |
-| CAP-003, -005, -007 | Register caveats omitted | HMAC custody, default in-process persistence, untested Postgres branch stated; §98 cited |
+| CAP-003, -005, -007 | Register caveats omitted | Default in-process persistence, untested Postgres branch stated; §98 cited. CAP-003 states grant format v3 (Ed25519, verify-only redeemer) and that the register's HMAC caveat lags the code |
 | CAP-004, -005, -007, -008 | Targets that partly exist framed as new | Existing lease binding, audit routes, approve/reject, G4 allowlist named; only the gaps remain targets |
 | CAP-014 | "Promote from routing library" | Already in the engine's conditional gates |
 | CAP-015 | No runtime caller ("shelfware") | Runtime caller exists since 2026-08-20; guard-removal test is the new work |
@@ -1007,7 +1024,10 @@ v1.0 is superseded, not erased. Each row records what v1.0 said and what v1.1 sa
 | CAP-030 | "learned hints produced no established gain"; IFC "must pass" | Study B lost / Study C recovered utility (§95, §96); IFC evidence is only checked as named |
 | §6 SDK | `pilot` extra; `close()`, recovery and several models as new | `pilot` extra marked proposed; existing models, lifecycle and evidence methods named |
 | §7.1 | Postgres as target; M4.5a as the UNKNOWN scheduler | Existing Postgres backends and the outbox stale-dispatch reconciler listed; `LimitLedger` and UNKNOWN resolution are the gaps; M4.5a is WS1 evidence re-assessment |
-| §8.2 | Release gates as new | Existing pipeline tabulated; gaps listed |
+| §8.2 | Release gates as new | Existing pipeline tabulated; gaps listed. A workflow that can produce SBOM and attestations is not evidence that a given release was built and verified |
+| CAP-011, CAP-017 | Instrumentation helpers only; no signing-mode detail | Existing dispatch span and custody-hop trace context named; grant, lease and audit signing modes separated |
+| INV-04 | Atomic re-check at dispatch | Scoped to REMORA's own authority state; the external effect is not atomic with it |
+| §10 | P0 as one paragraph | P0 repair order 1 to 8 with acceptance criteria |
 | §9.3 | PILOT-T01..T20 | Marked new; overlaps mapped to existing tests |
 
 End of SDD v1.1 (proposed).
