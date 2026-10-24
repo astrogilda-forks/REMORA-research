@@ -24,7 +24,9 @@ gates:
   mapping: CAP-003, CAP-004
   status: warn
   status_text: Internally implemented
-  missing: Host-level proof; §98 run independently
+  missing: >-
+    Host-level proof; §98 run independently (the repair runs on Postgres in CI since P0 item 5,
+    by the author's tests)
 - id: G03
   name: Limit semantics
   mapping: Additional condition (CAP-031)
@@ -310,8 +312,8 @@ capabilities:
       text: >-
         Reusing a token gives double execution. With issuer and redeemer in one process holding
         the private key, the split is one domain only. NEGATIVE_RESULTS §98 showed that an
-        unspent grant could be returned on the review path; repaired, but open until run
-        independently.
+        unspent grant could be returned on the review path; repaired and re-verified on Postgres
+        with ledger and storage faults (P0 item 5), but open until run independently.
     reversibility:
       grade: Hard
       text: Spent tokens must stay spent. A rollback never deletes pep_consumed rows.
@@ -529,8 +531,9 @@ capabilities:
       Queue with TTL to ABSTAIN and a fresh re-gate at approval: a changed intent, actor or
       ToolSpec invalidates.
     now: >-
-      approve/reject and the SDK exist; no list endpoint exists. SQLite is restart-proven, the
-      Postgres branch is not contract-tested. §98 (open).
+      approve/reject and the SDK exist; no list endpoint exists. SQLite is restart-proven; the
+      review path's admission runs on Postgres in CI since P0 item 5 (§98 tests), the queue's
+      other Postgres branches are not contract-tested. §98 (open until run independently).
     necessity: Critical
     necessity_rationale: >-
       CONTROLLED_PILOT requires human approval on every non-accept and WIRED_API_PATH;

@@ -9,10 +9,19 @@ proposal that ``/execute-accepted`` would redeem with none of the review
 path's checks (approver, approval policy, queue state). Found by the
 2026-10-24 execution-path audit. The grant is now spent in place and left
 out of the response; the chain records it as withheld.
+
+Every test runs on SQLite and, with ``REMORA_PG_DSN`` set, on Postgres in a
+schema of its own (SDD unified capability execution v1.1, P0 item 5: the §98
+repair re-verified on the reference backend, and when the ledger or the
+storage fails). The Postgres cases carry "postgres" in their id, so the
+``postgres-contract`` CI job selects them and fails on a skip.
 """
 from __future__ import annotations
 
+import os
 import sqlite3
+import uuid
+from contextlib import contextmanager
 
 import pytest
 
@@ -23,6 +32,7 @@ from tests.test_toolspec_execution_wiring import CALL, _bundle_file, _client  # 
 
 PROPOSER = "employee-1"
 APPROVER = "approver-1"
+BASE_DSN = os.environ.get("REMORA_PG_DSN", "")
 
 
 def _mod():
@@ -41,23 +51,56 @@ def _events(name):
     return [e.payload for e in _mod()._CHAIN.entries("acme") if e.payload.get("event") == name]
 
 
-@pytest.fixture()
-def client(monkeypatch, tmp_path):
+@pytest.fixture(params=["sqlite", pytest.param("postgres", marks=pytest.mark.skipif(
+    not BASE_DSN, reason="REMORA_PG_DSN not set"))])
+def client(request, monkeypatch, tmp_path):
+    """The route client over one state backend: ``(client, consumed)`` where
+    ``consumed(jti)`` reads the durable consumed-grant set of that backend."""
     c = _client(monkeypatch, tmp_path, bundle_path=_bundle_file(tmp_path))
     exec_mod = _mod()
-    db = str(tmp_path / "state.db")
     for name in ("REMORA_PG_DSN", "REMORA_STATE_ENDPOINT", "REMORA_WS1_MODE",
-                 "REMORA_ASYNC_DISPATCH"):
+                 "REMORA_ASYNC_DISPATCH", "REMORA_CHAIN_DB"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("REMORA_CHAIN_DB", db)
+    schema = ""
+    if request.param == "postgres":
+        psycopg = pytest.importorskip("psycopg")
+        from psycopg import conninfo
+
+        schema = f"review_{uuid.uuid4().hex[:12]}"
+        with psycopg.connect(BASE_DSN) as conn:
+            conn.execute(f"CREATE SCHEMA {schema}")
+            conn.commit()
+        dsn = conninfo.make_conninfo(BASE_DSN, options=f"-c search_path={schema}")
+        monkeypatch.setenv("REMORA_PG_DSN", dsn)
+        gate = EnforcementGate(strict=True, audience=exec_mod.PEP_AUDIENCE, dsn=dsn)
+
+        def consumed(jti: str) -> bool:
+            with psycopg.connect(dsn) as conn:
+                return conn.execute("SELECT 1 FROM pep_consumed WHERE jti=%s",
+                                    (jti,)).fetchone() is not None
+    else:
+        db = str(tmp_path / "state.db")
+        monkeypatch.setenv("REMORA_CHAIN_DB", db)
+        gate = EnforcementGate(strict=True, audience=exec_mod.PEP_AUDIENCE, db_path=db)
+
+        def consumed(jti: str) -> bool:
+            conn = sqlite3.connect(db)
+            try:
+                return conn.execute("SELECT 1 FROM pep_consumed WHERE jti=?",
+                                    (jti,)).fetchone() is not None
+            finally:
+                conn.close()
     monkeypatch.setenv("REMORA_WS1_ADMISSION", "atomic")
     monkeypatch.setenv("REMORA_MAX_CLOCK_SKEW_MS", "1000")
-    monkeypatch.setattr(exec_mod, "_GATE", EnforcementGate(
-        strict=True, audience=exec_mod.PEP_AUDIENCE, db_path=db))
+    monkeypatch.setattr(exec_mod, "_GATE", gate)
     monkeypatch.setattr(exec_mod, "_ADMISSION", None)
     exec_mod._reset_outbox()
-    yield c, db
+    yield c, consumed
     exec_mod._reset_outbox()
+    if schema:
+        with psycopg.connect(BASE_DSN) as conn:
+            conn.execute(f"DROP SCHEMA {schema} CASCADE")
+            conn.commit()
 
 
 def _approved_item(client, monkeypatch) -> str:
@@ -89,16 +132,23 @@ def _revoke_approver_before_admission(monkeypatch):
     monkeypatch.setattr(admission, "admit", late)
 
 
-def _jti_spent(db: str, jti: str) -> bool:
-    conn = sqlite3.connect(db)
-    try:
-        return conn.execute("SELECT 1 FROM pep_consumed WHERE jti=?", (jti,)).fetchone() is not None
-    finally:
-        conn.close()
+def _once(monkeypatch, owner, name, replacement):
+    """Replace ``owner.name`` so that ``replacement`` runs for the first call
+    only and the original for every later one."""
+    real = getattr(owner, name)
+    fired: list[bool] = []
+
+    def first(*args, **kwargs):
+        if not fired:
+            fired.append(True)
+            return replacement(real, *args, **kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(owner, name, first)
 
 
 def test_a_refused_admission_returns_no_grant_and_spends_the_minted_one(client, monkeypatch):
-    c, db = client
+    c, consumed = client
     item_id = _approved_item(c, monkeypatch)
     _revoke_approver_before_admission(monkeypatch)
     r = c.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": CALL})
@@ -108,7 +158,7 @@ def test_a_refused_admission_returns_no_grant_and_spends_the_minted_one(client, 
     assert "execution_grant" not in body
     withheld = _events("execution_grant_withheld")[-1]
     assert withheld["spent"] is True and withheld["detail"] == "principal_revoked"
-    assert _jti_spent(db, withheld["grant_jti"])
+    assert consumed(withheld["grant_jti"])
     assert not _events("execution_authorized")
 
 
@@ -117,26 +167,81 @@ def test_a_transient_admission_fault_also_returns_no_grant(client, monkeypatch):
     back, and the response still carries no grant."""
     from remora.execution import admission as admission_mod
 
-    c, db = client
+    c, consumed = client
     item_id = _approved_item(c, monkeypatch)
-    real_enqueue = admission_mod.audit_outbox.enqueue
-    calls: list[int] = []
 
-    def flaky(*args, **kwargs):
-        calls.append(1)
-        if len(calls) == 1:
-            raise RuntimeError("audit outbox insert failed once")
-        return real_enqueue(*args, **kwargs)
+    def failing_insert(real, *args, **kwargs):
+        raise RuntimeError("audit outbox insert failed once")
 
-    monkeypatch.setattr(admission_mod.audit_outbox, "enqueue", flaky)
+    _once(monkeypatch, admission_mod.audit_outbox, "enqueue", failing_insert)
     body = c.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": CALL}).json()
     assert body["tool_execution"]["refusal_reason"] == "audit_outbox_unavailable"
     assert "execution_grant" not in body
-    assert _jti_spent(db, _events("execution_grant_withheld")[-1]["grant_jti"])
+    assert consumed(_events("execution_grant_withheld")[-1]["grant_jti"])
+
+
+def test_a_ledger_that_cannot_spend_the_grant_still_withholds_it(client, monkeypatch):
+    """The admission refuses, and then the consumed-grant ledger fails on the
+    spend that withholds the grant. The response still carries no grant, and
+    the chain says the grant was withheld unspent, so an operator can see the
+    jti that is live in nobody's hands until it expires."""
+    c, consumed = client
+    exec_mod = _mod()
+    item_id = _approved_item(c, monkeypatch)
+    _revoke_approver_before_admission(monkeypatch)
+    real_check = exec_mod._GATE.check
+
+    def check(token, *args, **kwargs):
+        if kwargs.get("consume") and kwargs.get("connection") is None:
+            raise RuntimeError("consumed-grant ledger unavailable")
+        return real_check(token, *args, **kwargs)
+
+    monkeypatch.setattr(exec_mod._GATE, "check", check)
+    r = c.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": CALL})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["tool_execution"]["refusal_reason"] == "principal_revoked"
+    assert "execution_grant" not in body
+    withheld = _events("execution_grant_withheld")[-1]
+    assert withheld["spent"] is False and withheld["detail"] == "principal_revoked"
+    assert not consumed(withheld["grant_jti"])
+    assert not _events("execution_authorized")
+
+
+def test_a_storage_fault_inside_the_admission_returns_no_grant(client, monkeypatch):
+    """The admission transaction itself fails at commit (a driver error, not
+    a refusal the admission named). Before this slice the route answered 500
+    and recorded nothing; the grant was unspent and unreturned. Now the fault
+    is a refusal: recorded, the grant spent and withheld, the item settled."""
+    c, consumed = client
+    exec_mod = _mod()
+    item_id = _approved_item(c, monkeypatch)
+    admission = exec_mod._admission()
+
+    @contextmanager
+    def lost_at_commit(real, tenant):
+        with real(tenant) as queue:
+            yield queue
+            raise RuntimeError("connection lost at commit")
+
+    _once(monkeypatch, admission, "_transaction",
+          lambda real, tenant: lost_at_commit(real, tenant))
+    r = c.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": CALL})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["tool_execution"]["executed"] is False
+    assert body["tool_execution"]["refusal_reason"] == "admission_storage_unavailable"
+    assert "execution_grant" not in body
+    refused = _events("execution_admission_refused")[-1]
+    withheld = _events("execution_grant_withheld")[-1]
+    assert refused["detail"] == withheld["detail"] == "admission_storage_unavailable"
+    assert withheld["spent"] is True and consumed(withheld["grant_jti"])
+    assert not _events("execution_authorized")
+    assert not _events("execution_admitted")
 
 
 def test_an_admitted_execution_still_returns_its_grant(client, monkeypatch):
-    c, _db = client
+    c, _consumed = client
     item_id = _approved_item(c, monkeypatch)
     body = c.post("/v1/execution/execute", json={"item_id": item_id, "tool_call": CALL}).json()
     assert body["tool_execution"]["executed"] is True
