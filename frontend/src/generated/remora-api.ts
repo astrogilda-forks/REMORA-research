@@ -455,11 +455,17 @@ export interface paths {
          * @description Resolve an unknown outcome from what the rail or plant reports.
          *
          *     A reviewer, never the principal the operation was charged to, states
-         *     whether the call executed and names the evidence. ``executed=false``
-         *     returns the reservation, so a legitimate retry is no longer refused;
+         *     whether the call executed and names the evidence. Before anything
+         *     changes, the deployment's evidence checker
+         *     (``REMORA_LIMITS_EVIDENCE_MODULE``) asks the authoritative source about
+         *     that evidence; the resolution is refused when no checker is configured
+         *     (``limit_evidence_unchecked``), when it fails or cannot tell
+         *     (``limit_evidence_unavailable``), and when it disagrees with the
+         *     reviewer (``limit_evidence_disputed``). ``executed=false`` then returns
+         *     the reservation, so a legitimate retry is no longer refused;
          *     ``executed=true`` keeps it and makes a duplicate refuse. The decision is
-         *     appended to the tenant chain with the reviewer, the evidence and the
-         *     reason. REMORA does not check the evidence; the reviewer answers for it.
+         *     appended to the tenant chain with the reviewer, the evidence, the
+         *     module that checked it and the reason.
          */
         post: operations["limits_resolve_v1_execution_limits_resolve_post"];
         delete?: never;
@@ -2768,7 +2774,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description The operation's outcome is not unknown, or the reviewer is the principal it was charged to. */
+            /** @description The operation's outcome is not unknown, the reviewer is the principal it was charged to, or the evidence could not be checked or disagrees with the reviewer. */
             409: {
                 headers: {
                     [name: string]: unknown;

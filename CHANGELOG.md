@@ -8,8 +8,8 @@ This file lists externally relevant changes by release. Fine-grained development
 
 - A `ToolDidNotExecute` statement frees a reservation only from a source the signed limit policy names in `non_execution.<tool>.trusted_sources`; from any other source the call is held as unknown until resolved. The dispatch still reports `tool_did_not_execute`, and its `dispatch.refused` event says whether the reservation was `released` or `held`.
 - `POST /v1/execution/limits/resolve` checks the reviewer's statement through `REMORA_LIMITS_EVIDENCE_MODULE` (`check_limit_evidence(tenant, operation, evidence_ref)`) before anything moves, and refuses as `limit_evidence_unchecked` (no module), `limit_evidence_unavailable` or `limit_evidence_disputed`. The chain record names the module.
-- `REMORA_REQUIRE_OPERATION_KEYS=1` refuses startup while a metered write tool declares no `idempotency.key_arguments`, and refuses a call to one it could not classify (`limit_key_undeclared`, `limit_coverage_unknown`).
-- The `controlled_pilot` runtime profile requires `REMORA_LIMITS_FILE`, `REMORA_LIMITS_LEDGER`, `REMORA_LIMITS_TRUSTED_KEYS`, `REMORA_REQUIRE_LIMITS` and `REMORA_REQUIRE_OPERATION_KEYS`; `review` does not.
+- `REMORA_REQUIRE_IDEMPOTENCY=1` refuses startup while a metered write tool declares no `idempotency.key_arguments`, and refuses a call to one it could not classify (`limit_key_undeclared`, `limit_coverage_unknown`).
+- The `controlled_pilot` runtime profile requires `REMORA_LIMITS_FILE`, `REMORA_LIMITS_LEDGER`, `REMORA_LIMITS_TRUSTED_KEYS`, `REMORA_REQUIRE_LIMITS` and `REMORA_REQUIRE_IDEMPOTENCY`; `review` does not.
 - SDK: `RemoraClient.list_unresolved()` and `resolve_unknown()` with their async twins, and the models `UnresolvedOperation`, `LimitCharge` and `LimitResolution` (public API snapshot updated).
 - Still open: the ledger is one host's SQLite; the resolution is appended to the chain after the ledger commits; nothing measures how often legitimate calls are refused (`NEGATIVE_RESULTS.md` §97).
 

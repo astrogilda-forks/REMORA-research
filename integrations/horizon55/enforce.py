@@ -154,7 +154,7 @@ class _Api:
         }
         for var in ("REMORA_SEMANTIC_BUNDLE_MODULE", "REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER",
                     "REMORA_LIMITS_OBSERVER_MODULE", "REMORA_LIMITS_EVIDENCE_MODULE",
-                    "REMORA_REQUIRE_OPERATION_KEYS"):
+                    "REMORA_REQUIRE_IDEMPOTENCY"):
             os.environ.pop(var, None)
         if limits is not None:
             (work / "limits.json").write_text(json.dumps(limits), encoding="utf-8")

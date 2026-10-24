@@ -163,14 +163,14 @@ def test_required_signed_all_writes_limits_run(monkeypatch, tmp_path):
 
 def _keys_required(monkeypatch, tmp_path, document):
     guard = _required(monkeypatch, tmp_path, document)
-    monkeypatch.setenv("REMORA_REQUIRE_OPERATION_KEYS", "1")
+    monkeypatch.setenv("REMORA_REQUIRE_IDEMPOTENCY", "1")
     _reset()
     return guard
 
 
 def test_required_keys_refuse_startup_while_a_metered_write_tool_has_none(monkeypatch, tmp_path):
     guard = _keys_required(monkeypatch, tmp_path, signed(ventilation_policy()))
-    with pytest.raises(ValueError, match="REMORA_REQUIRE_OPERATION_KEYS.*set_supply_air_setpoint"):
+    with pytest.raises(ValueError, match="REMORA_REQUIRE_IDEMPOTENCY.*set_supply_air_setpoint"):
         guard()
 
 

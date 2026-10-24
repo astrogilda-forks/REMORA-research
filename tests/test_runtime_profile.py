@@ -45,7 +45,7 @@ STRICT_ENV = {
     "REMORA_LIMITS_LEDGER": "/tmp/limits-ledger.db",
     "REMORA_LIMITS_TRUSTED_KEYS": "22" * 32,
     "REMORA_REQUIRE_LIMITS": "1",
-    "REMORA_REQUIRE_OPERATION_KEYS": "1",
+    "REMORA_REQUIRE_IDEMPOTENCY": "1",
 }
 
 
@@ -73,7 +73,7 @@ def _clear(monkeypatch) -> None:
         "REMORA_LIMITS_LEDGER",
         "REMORA_LIMITS_TRUSTED_KEYS",
         "REMORA_REQUIRE_LIMITS",
-        "REMORA_REQUIRE_OPERATION_KEYS",
+        "REMORA_REQUIRE_IDEMPOTENCY",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -179,7 +179,7 @@ def test_controlled_pilot_accepts_full_production_configuration(monkeypatch) -> 
 
 @pytest.mark.parametrize("missing", [
     "REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_TRUSTED_KEYS",
-    "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_OPERATION_KEYS",
+    "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_IDEMPOTENCY",
 ])
 def test_controlled_pilot_requires_signed_mandatory_limits(monkeypatch, missing) -> None:
     """CAP-031, SDD P0 item 3: a write pilot cannot start against no budget."""
@@ -197,7 +197,7 @@ def test_review_does_not_require_limits(monkeypatch) -> None:
     _configure_strict(monkeypatch, "review")
     monkeypatch.setenv("REMORA_ENV", "development")
     for name in ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_TRUSTED_KEYS",
-                 "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_OPERATION_KEYS"):
+                 "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_IDEMPOTENCY"):
         monkeypatch.delenv(name)
     assert validate_runtime_profile_prerequisites() == "review"
 

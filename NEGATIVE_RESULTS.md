@@ -5914,7 +5914,7 @@ P0 items 1 to 3): the three are closed in code on one host, with tests in
   limit policy names its `source` among the tool's trusted non-execution
   sources. From any other source the call is held as unknown. The authority
   that signs the budget now also says whose word may free it.
-- `REMORA_REQUIRE_OPERATION_KEYS` refuses startup while a metered write tool
+- `REMORA_REQUIRE_IDEMPOTENCY` refuses startup while a metered write tool
   declares no key. The `controlled_pilot` profile requires it together with
   signed mandatory limits. Research and review deployments are unchanged.
   The OT pilot's signed policy still declares no keys.

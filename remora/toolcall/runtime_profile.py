@@ -179,14 +179,14 @@ def validate_runtime_profile_prerequisites() -> str:
 #: The cumulative-limit settings a write pilot runs with (CAP-031, SDD
 #: unified capability execution v1.1 §4 and §10 P0 item 3).
 LIMITS_ENV = ("REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER", "REMORA_LIMITS_TRUSTED_KEYS",
-              "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_OPERATION_KEYS")
+              "REMORA_REQUIRE_LIMITS", "REMORA_REQUIRE_IDEMPOTENCY")
 
 
 def _check_limits_required(profile: str) -> None:
     """A controlled pilot runs with signed, mandatory cumulative limits.
 
     ``REMORA_REQUIRE_LIMITS`` makes the execution API refuse startup without
-    a signed ``all_writes`` policy, and ``REMORA_REQUIRE_OPERATION_KEYS``
+    a signed ``all_writes`` policy, and ``REMORA_REQUIRE_IDEMPOTENCY``
     makes it refuse a metered write tool that declares no idempotency key.
     Before this check both were deployment choices that no profile implied,
     so a pilot could run privileged writes against no budget at all

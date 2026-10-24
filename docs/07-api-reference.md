@@ -753,7 +753,7 @@ covers it. `REMORA_REQUIRE_LIMITS=1` makes limits mandatory:
 startup refuses without limits, without trusted keys, or with coverage other
 than `all_writes`. The `controlled_pilot` runtime profile requires it, together
 with `REMORA_LIMITS_FILE`, `REMORA_LIMITS_LEDGER`, `REMORA_LIMITS_TRUSTED_KEYS`
-and `REMORA_REQUIRE_OPERATION_KEYS` (below); `review` and `research` do not,
+and `REMORA_REQUIRE_IDEMPOTENCY` (below); `review` and `research` do not,
 and the OT pilot sets `REMORA_REQUIRE_LIMITS` itself. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
@@ -769,7 +769,7 @@ call with the same key refuses before anything is charged:
 
 It runs only once the first provably did not. Without a declared key, two
 calls are two operations, so a deployment that declares none charges one
-payment proposed twice twice. `REMORA_REQUIRE_OPERATION_KEYS=1` closes that.
+payment proposed twice twice. `REMORA_REQUIRE_IDEMPOTENCY=1` closes that.
 Startup refuses while a metered write tool declares no key. A call to a tool
 the startup check could not classify refuses as `limit_key_undeclared`, or as
 `limit_coverage_unknown` when the deployment cannot say whether it writes.

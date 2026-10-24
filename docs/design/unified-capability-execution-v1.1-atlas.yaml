@@ -1830,7 +1830,7 @@ capabilities:
       Opt-in, SQLite på én host, ingen Postgres. Ved source_revision seks pilotblokkere; P0 1–3
       er lukket i denne PR-en: reviewerens bevis kontrolleres av et deployment-eid
       evidensmodul før noe frigis (uten modul holdes alt), ToolDidNotExecute frigir kun fra en
-      kilde den signerte policyen navngir, REMORA_REQUIRE_OPERATION_KEYS krever
+      kilde den signerte policyen navngir, REMORA_REQUIRE_IDEMPOTENCY krever
       idempotensnøkkel per metret skriveverktøy, og controlled_pilot krever signerte
       obligatoriske limits. Gjenstår: lokal ledger (P0 8) og kjede-append utenfor
       ledger-transaksjonen (P0 4).

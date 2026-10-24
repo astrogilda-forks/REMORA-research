@@ -1168,7 +1168,7 @@ def _limit_guard() -> Any:
             unkeyed = sorted(tool for tool in policy.meters
                              if tool not in policy.idempotency and _tool_is_write(tool))
             if unkeyed:
-                raise ValueError("REMORA_REQUIRE_OPERATION_KEYS is set and these metered "
+                raise ValueError("REMORA_REQUIRE_IDEMPOTENCY is set and these metered "
                                  "write tools declare no idempotency.key_arguments: "
                                  + ", ".join(unkeyed))
         _LIMIT_GUARD = (settings,
@@ -1180,8 +1180,7 @@ def _limit_guard() -> Any:
     return _LIMIT_GUARD[1]
 
 
-def _flag(name: str) -> bool:
-    return _os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+_ON = frozenset({"1", "true", "yes", "on"})
 
 
 def _limit_settings() -> tuple[str, str, str, bool, bool, str]:
@@ -1189,13 +1188,14 @@ def _limit_settings() -> tuple[str, str, str, bool, bool, str]:
 
     (policy file, ledger, trusted keys, limits required, operation keys
     required, evidence module). A change to any of them after startup makes
-    the guard refuse as ``limit_policy_changed``.
+    the guard refuse as ``limit_policy_changed``. Each key is read literally
+    so the credential-topology scanner can resolve every environment read.
     """
     return (_os.environ.get("REMORA_LIMITS_FILE", "").strip(),
             _os.environ.get("REMORA_LIMITS_LEDGER", "").strip(),
             _os.environ.get("REMORA_LIMITS_TRUSTED_KEYS", "").strip(),
-            _flag("REMORA_REQUIRE_LIMITS"),
-            _flag("REMORA_REQUIRE_OPERATION_KEYS"),
+            _os.environ.get("REMORA_REQUIRE_LIMITS", "").strip().lower() in _ON,
+            _os.environ.get("REMORA_REQUIRE_IDEMPOTENCY", "").strip().lower() in _ON,
             _os.environ.get("REMORA_LIMITS_EVIDENCE_MODULE", "").strip())
 
 
