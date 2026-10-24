@@ -84,7 +84,9 @@ jobs:
           # extras drive what gets installed. Filter out -e/comment lines that
           # pip rejects in a constraints file.
           grep -vE '^-e|^#|file://' requirements-lock.txt > /tmp/constraints.txt
-          pip install -e ".[dev,causal,api,security,postgres]" -c /tmp/constraints.txt
+          # otel and identity as in ci.yml: without them the tracing tests skip
+          # and the coverage union misses the custody hop (remote_dispatch._post).
+          pip install -e ".[dev,causal,api,security,postgres,identity,otel]" -c /tmp/constraints.txt
 
       - name: Lint (ruff)
         run: ruff check .
@@ -193,7 +195,7 @@ jobs:
           REMORA_PG_DSN: postgresql://remora:remora@localhost:5432/remora_test
           REMORA_REQUIRE_SECURITY_EXTRA: "1"
         run: |
-          pytest -q -rs tests/test_execution_api.py tests/test_execution_outbox.py tests/test_postgres_outbox_fault_injection.py tests/conformance/test_execution_boundary_process_split.py tests/test_assess_idempotency_reservation.py tests/test_enforcement_ledgers_postgres.py -k postgres             --cov --cov-branch --cov-append --cov-report=json:coverage.json | tee /tmp/pg.txt
+          pytest -q -rs tests/test_execution_api.py tests/test_execution_outbox.py tests/test_postgres_outbox_fault_injection.py tests/conformance/test_execution_boundary_process_split.py tests/test_assess_idempotency_reservation.py tests/test_enforcement_ledgers_postgres.py tests/flow/test_context_store.py tests/test_atomic_admission.py tests/test_authority_epochs.py tests/test_crypto_v2_audit.py tests/test_audit_outbox_atomicity.py -k postgres             --cov --cov-branch --cov-append --cov-report=json:coverage.json | tee /tmp/pg.txt
           if grep -qiE "skipped|no tests ran" /tmp/pg.txt; then
             echo "ERROR: Postgres tests skipped inside the coverage job" >&2; exit 1
           fi

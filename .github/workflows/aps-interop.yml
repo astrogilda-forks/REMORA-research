@@ -79,8 +79,15 @@ jobs:
           grep -vE '^-e|^#|file://' requirements-lock.txt > /tmp/constraints.txt
           pip install -e . pytest jsonschema cryptography -c /tmp/constraints.txt
 
-      - name: Unit-test v0.2 mapping boundaries
-        run: python -m pytest tests/test_aps_profile_v0_2.py -q
+      - name: Unit-test v0.1 and v0.2 mapping boundaries
+        # test_aps_profile_v0_1.py reads the suite from a sibling directory of
+        # the checkout; the symlink gives it the pinned clone above.
+        run: |
+          ln -sfn "$PWD/aps-suite" ../aps-conformance-suite
+          python -m pytest tests/test_aps_profile_v0_1.py tests/test_aps_profile_v0_2.py -q -rs | tee /tmp/aps.txt
+          if grep -qiE "skipped" /tmp/aps.txt; then
+            echo "ERROR: APS v0.1 tests skipped despite the pinned clone" >&2; exit 1
+          fi
 
       - name: Verify APS accountability and receipt gates
         working-directory: aps-suite

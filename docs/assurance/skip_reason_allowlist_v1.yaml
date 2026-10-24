@@ -37,7 +37,7 @@ entries:
     note: "OPA/Rego conformance is its own mandatory job with the binary installed."
   - pattern: "APS suite sibling clone is not present"
     class: other_job
-    note: "The APS v0.1 profile runs in the 'REMORA v0.1 + v0.2 against pinned APS' job, which clones the suite."
+    note: "The APS v0.1 profile runs in aps-interop.yml, which clones the pinned suite and links it as the sibling directory the test reads; a skip fails that job."
 
   # ── external_tool ──────────────────────────────────────────────────────
   - pattern: "node not available"

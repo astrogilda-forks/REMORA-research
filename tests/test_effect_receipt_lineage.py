@@ -48,6 +48,15 @@ from remora.governance.effect_verification import EffectStatus  # noqa: E402
 # fixture that had dated its own observations ahead of the server.
 DISPATCHED_AT = datetime.now(UTC) - timedelta(minutes=1)
 OBSERVED_AT = DISPATCHED_AT + timedelta(seconds=5)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_clock():
+    """Taken once at collection, the instants age for the whole session; a
+    slow run would then read them as far older than one minute."""
+    global DISPATCHED_AT, OBSERVED_AT
+    DISPATCHED_AT = datetime.now(UTC) - timedelta(minutes=1)
+    OBSERVED_AT = DISPATCHED_AT + timedelta(seconds=5)
 CALL_HASH = "a" * 64
 JTI = "jti-dispatch-1"
 DIGEST = "d" * 64
