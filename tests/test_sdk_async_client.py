@@ -181,3 +181,33 @@ def test_async_record_effect_matches_the_sync_wire_contract() -> None:
     assert len(seen["body"]["expected_sha256"]) == 64
     assert "observed" not in seen["body"]
     assert result.status is EffectStatus.VERIFIED
+
+
+def test_async_limits_methods_mirror_the_sync_client() -> None:
+    seen: list = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path))
+        if request.url.path.endswith("/unresolved"):
+            return httpx.Response(200, json={"operations": [
+                {"operation_id": "lease:n7", "principal": "employee-1",
+                 "tool": "transfer_payment", "at": 1.0,
+                 "charges": [{"counter": "hs51-set2", "amount": 7000}]}]})
+        assert json.loads(request.content) == {
+            "operation_id": "lease:n7", "executed": True,
+            "evidence_ref": "rail:stmt-77", "reason": ""}
+        return httpx.Response(200, json={"operation_id": "lease:n7", "executed": True,
+                                         "resolved_by": "treasury-reviewer",
+                                         "status": "resolved"})
+
+    async def run():
+        async with _client_for(handler) as client:
+            held = await client.list_unresolved()
+            resolution = await client.resolve_unknown(
+                held[0].operation_id, executed=True, evidence_ref="rail:stmt-77")
+            return held, resolution
+
+    held, resolution = asyncio.run(run())
+    assert seen == [("GET", "/v1/execution/limits/unresolved"),
+                    ("POST", "/v1/execution/limits/resolve")]
+    assert held[0].charges[0].amount == 7000 and resolution.executed is True

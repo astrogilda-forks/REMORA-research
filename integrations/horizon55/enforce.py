@@ -99,7 +99,10 @@ def _limit_policy(seq: dict[str, Any]) -> dict[str, Any]:
             # One payment is one operation: the same payee, amount, unit and
             # occurrence reference twice is a duplicate, not a second payment.
             "idempotency": {"transfer_payment": {
-                "key_arguments": ["payee", "amount", "unit", "reference"]}}}
+                "key_arguments": ["payee", "amount", "unit", "reference"]}},
+            # Only the sandbox rail's own refusal frees a reservation at once;
+            # any other adapter statement holds the payment as unknown.
+            "non_execution": {"transfer_payment": {"trusted_sources": ["sandbox-rail"]}}}
 
 
 def _toolspec_bundle(path: Path) -> None:
@@ -150,12 +153,16 @@ class _Api:
             "REMORA_TOOLSPEC_TRUSTED_IDENTITIES": SPEC_IDENTITY,
         }
         for var in ("REMORA_SEMANTIC_BUNDLE_MODULE", "REMORA_LIMITS_FILE", "REMORA_LIMITS_LEDGER",
-                    "REMORA_LIMITS_OBSERVER_MODULE"):
+                    "REMORA_LIMITS_OBSERVER_MODULE", "REMORA_LIMITS_EVIDENCE_MODULE",
+                    "REMORA_REQUIRE_OPERATION_KEYS"):
             os.environ.pop(var, None)
         if limits is not None:
             (work / "limits.json").write_text(json.dumps(limits), encoding="utf-8")
             env["REMORA_LIMITS_FILE"] = str(work / "limits.json")
             env["REMORA_LIMITS_LEDGER"] = str(work / "limits-ledger.db")
+            # A reviewer's resolution is checked against the sandbox rail's
+            # own records before any budget is returned.
+            env["REMORA_LIMITS_EVIDENCE_MODULE"] = "payment_tool"
         os.environ.update(env)
         _toolspec_bundle(work / "toolspec.json")
 

@@ -61,6 +61,8 @@ from remora.sdk.models import (
     ExecutionResult,
     PendingExecution,
     LifecycleTrail,
+    LimitCharge,
+    LimitResolution,
     ProposalView,
     RejectionResult,
     ResolutionPlan,
@@ -68,6 +70,7 @@ from remora.sdk.models import (
     SemanticAssessment,
     ToolCall,
     ToolSpecIdentity,
+    UnresolvedOperation,
 )
 
 __all__ = [
@@ -88,6 +91,8 @@ __all__ = [
     "ExecutionResult",
     "InvalidRequestError",
     "LifecycleTrail",
+    "LimitCharge",
+    "LimitResolution",
     "NotFoundError",
     "PendingExecution",
     "PostconditionSpec",
@@ -105,6 +110,7 @@ __all__ = [
     "ToolCall",
     "ToolSpecIdentity",
     "UnknownExecutionStateError",
+    "UnresolvedOperation",
     "build_postcondition",
     "content_digest",
     "verify_effect",

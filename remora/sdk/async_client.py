@@ -31,10 +31,12 @@ from remora.sdk.models import (
     AuditVerification,
     ExecutionResult,
     LifecycleTrail,
+    LimitResolution,
     PendingExecution,
     ProposalView,
     RejectionResult,
     ToolCall,
+    UnresolvedOperation,
 )
 
 __all__ = ["AsyncRemoraClient"]
@@ -187,6 +189,21 @@ class AsyncRemoraClient:
         """Async :meth:`RemoraClient.verify_audit_chain`."""
         payload = await self._request("GET", "/v1/execution/audit/verify")
         return AuditVerification.from_payload(payload)
+
+    async def list_unresolved(self) -> tuple[UnresolvedOperation, ...]:
+        """Async :meth:`RemoraClient.list_unresolved`."""
+        payload = await self._request("GET", "/v1/execution/limits/unresolved")
+        return tuple(UnresolvedOperation.from_payload(op)
+                     for op in payload.get("operations", []))
+
+    async def resolve_unknown(self, operation_id: str, *, executed: bool,
+                              evidence_ref: str, reason: str = "") -> LimitResolution:
+        """Async :meth:`RemoraClient.resolve_unknown`."""
+        payload = await self._request("POST", "/v1/execution/limits/resolve", json={
+            "operation_id": operation_id, "executed": executed,
+            "evidence_ref": evidence_ref, "reason": reason,
+        })
+        return LimitResolution.from_payload(payload)
 
     # -- transport ---------------------------------------------------------
 

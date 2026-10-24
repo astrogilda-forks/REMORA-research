@@ -40,7 +40,18 @@ A deployment declares, in a ``remora-cumulative-limits/v1`` policy:
     ran (``limit_duplicate_operation``) and while its outcome is unknown
     (``limit_outcome_unknown``). It may run only once the first provably did
     not. Neither the charge nor the effect happens twice. Without a declared
-    key, two calls are two operations, as before.
+    key, two calls are two operations, as before; a guard built with
+    ``require_keys`` refuses a metered write tool that declares none
+    (``limit_key_undeclared``), so a payment that cannot be identified cannot
+    be charged twice either.
+``non_execution``
+    Per tool, the ``trusted_sources`` whose statement that a call did not run
+    the authority accepts. A tool adapter raises ``ToolDidNotExecute(source,
+    detail)`` when its rail refused or was never reached. Only a statement
+    from a declared source returns the reservation at once; from any other
+    source the call is held as unknown, like a call that raised anything
+    else, until a reviewer resolves it. The authority that signs the budget
+    thereby also says whose word may free it.
 
 Numbers are exact: a value is scaled by the meter's ``scale`` and must then
 be an integer, so a move too small to count is refused rather than rounded
@@ -52,14 +63,18 @@ never passes the limit (one SQLite transaction per call). A reservation is
 returned only when the call provably did not run:
 
 - the fence refused before the write;
-- the tool raised ``ToolDidNotExecute`` (the rail refused or was never reached);
+- the tool raised ``ToolDidNotExecute`` from a source the policy trusts for
+  that tool (the rail refused or was never reached);
 - the lease expired before the tool was started (``begin`` and that release
   are serialized, so a released reservation never starts);
 - a reviewer other than the proposer resolved an unknown outcome as not
-  executed (``resolve``), after checking the rail.
+  executed (``resolve``), and the deployment's evidence checker confirmed
+  the reviewer's statement against the rail or plant.
 
 A call whose outcome is unknown keeps its reservation until it is resolved;
-it is never released on a timer. A ``change`` meter's last value is the value REMORA last let
+it is never released on a timer, and never on a reviewer's word alone: a
+guard without an evidence checker refuses every resolution
+(``limit_evidence_unchecked``), so the budget stays held. A ``change`` meter's last value is the value REMORA last let
 through; a call that fails or whose outcome is unknown leaves the resource
 ``unknown``, and the next change refuses until a baseline with a new
 ``seed_id`` is declared or the outcome is resolved. It is not a distributed
@@ -110,6 +125,10 @@ RESERVATION_RELEASED = "limit_reservation_released"
 NOT_FOUND = "limit_operation_not_found"
 NOT_UNKNOWN = "limit_operation_not_unknown"
 RESOLVER_IS_PRINCIPAL = "limit_resolver_is_principal"
+KEY_UNDECLARED = "limit_key_undeclared"
+EVIDENCE_UNCHECKED = "limit_evidence_unchecked"
+EVIDENCE_UNAVAILABLE = "limit_evidence_unavailable"
+EVIDENCE_DISPUTED = "limit_evidence_disputed"
 
 KINDS = ("sum", "count", "change")
 #: Joins the parts of ledger keys; refused inside any part.
@@ -301,6 +320,8 @@ class LimitPolicy:
     baselines: tuple[Baseline, ...]
     #: Per tool, the arguments whose values identify one operation.
     idempotency: Mapping[str, tuple[str, ...]] = dataclass_field(default_factory=dict)
+    #: Per tool, the ``ToolDidNotExecute`` sources whose statement frees a reservation.
+    non_execution: Mapping[str, frozenset[str]] = dataclass_field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> LimitPolicy:
@@ -371,8 +392,25 @@ class LimitPolicy:
                 raise LimitPolicyError(f"tool {tool!r}: key_arguments is a non-empty list "
                                        "of distinct argument names")
             idempotency[tool] = tuple(_text(a, f"tool {tool!r} key argument") for a in args)
+        raw_trust = data.get("non_execution")
+        if raw_trust is None:
+            raw_trust = {}
+        if not isinstance(raw_trust, Mapping):
+            raise LimitPolicyError("non_execution is an object keyed by tool")
+        non_execution: dict[str, frozenset[str]] = {}
+        for tool, raw in raw_trust.items():
+            if tool not in meters:
+                raise LimitPolicyError(f"non_execution for unmetered tool {tool!r}")
+            sources = raw.get("trusted_sources") if isinstance(raw, Mapping) else None
+            if (not isinstance(sources, list) or not sources
+                    or len(set(sources)) != len(sources)):
+                raise LimitPolicyError(f"tool {tool!r}: trusted_sources is a non-empty list "
+                                       "of distinct source names")
+            non_execution[tool] = frozenset(_text(s, f"tool {tool!r} trusted source")
+                                            for s in sources)
         return cls(coverage=coverage, meters=meters, limits=tuple(limits),
-                   baselines=tuple(baselines), idempotency=idempotency)
+                   baselines=tuple(baselines), idempotency=idempotency,
+                   non_execution=non_execution)
 
     @property
     def observed_quantities(self) -> frozenset[str]:
@@ -622,7 +660,9 @@ class LimitGuard:
     def __init__(self, policy: LimitPolicy, ledger: LimitLedger,
                  is_write: Callable[[str], bool | None] | None = None,
                  observer: Callable[[str, str, str], Any] | None = None,
-                 in_force: Callable[[], bool] | None = None) -> None:
+                 in_force: Callable[[], bool] | None = None,
+                 evidence: Callable[[str, Mapping[str, Any], str], Any] | None = None,
+                 require_keys: bool = False) -> None:
         """``in_force`` answers whether ``policy`` is still the one deployed.
 
         The deployment builds the guard once, from the policy it verified at
@@ -634,6 +674,14 @@ class LimitGuard:
         grant bound to the other. Reservations already made are still
         released and settled, so the ledger stays exact. A failing check
         counts as changed.
+
+        ``evidence(tenant, operation, evidence_ref)`` asks the deployment's
+        authoritative source (the rail, the plant) whether the operation a
+        reviewer wants to resolve ran, and returns a mapping whose
+        ``executed`` is True or False. :meth:`resolve` refuses without one,
+        when it fails or cannot tell, and when it disagrees with the
+        reviewer. ``require_keys`` refuses a metered write tool that
+        declares no idempotency key.
         """
         if policy.observed_quantities and observer is None:
             raise LimitPolicyError("observed change meters need an observer")
@@ -642,6 +690,8 @@ class LimitGuard:
         self.is_write = is_write
         self.observer = observer
         self.in_force = in_force
+        self.evidence = evidence
+        self.require_keys = require_keys
 
     def _changed(self) -> bool:
         if self.in_force is None:
@@ -670,16 +720,29 @@ class LimitGuard:
             return True  # the deployed policy may meter it; refuse rather than guess
         return tool_name in self.policy.meters or self.policy.coverage == "all_writes"
 
+    def _write(self, tool_name: str) -> bool | None:
+        """Whether the deployment says ``tool_name`` writes; None when it cannot say."""
+        try:
+            return self.is_write(tool_name) if self.is_write is not None else None
+        except Exception:
+            return None
+
     def _coverage_refusal(self, tool_name: str) -> str | None:
         if tool_name in self.policy.meters or self.policy.coverage != "all_writes":
             return None
-        try:
-            write = self.is_write(tool_name) if self.is_write is not None else None
-        except Exception:
-            write = None
+        write = self._write(tool_name)
         if write is None:
             return COVERAGE_UNKNOWN
         return TOOL_UNMETERED if write else None
+
+    def _key_refusal(self, tool_name: str) -> str | None:
+        """Under ``require_keys``, a metered write tool must declare its key."""
+        if not self.require_keys or tool_name in self.policy.idempotency:
+            return None
+        write = self._write(tool_name)
+        if write is None:
+            return COVERAGE_UNKNOWN
+        return KEY_UNDECLARED if write else None
 
     def readings(self, tool_name: str, arguments: Any) -> list[Reading]:
         """What the call consumes per meter; raises ``_Refused`` when unreadable."""
@@ -841,6 +904,9 @@ class LimitGuard:
             return refusal
         if tool_name not in self.policy.meters:
             return None
+        refusal = self._key_refusal(tool_name)
+        if refusal is not None:
+            return refusal
         if not principal:
             return PRINCIPAL_MISSING
         if _SEP in principal:
@@ -947,8 +1013,50 @@ class LimitGuard:
                                     for k, a in self.ledger.charges(row["operation_id"])]})
         return out
 
+    def did_not_execute(self, operation_id: str, tool_name: str, source: str) -> bool:
+        """Act on an adapter's statement that the call did not run.
+
+        Returns True when the statement came from a source the policy trusts
+        for ``tool_name`` and the reservation was returned. Otherwise the
+        call is settled as unknown, exactly as a call that raised anything
+        else: the budget stays held and a reviewer resolves it with checked
+        evidence. An adapter the authority did not name cannot free budget
+        by claiming nothing happened.
+        """
+        if source in self.policy.non_execution.get(tool_name, frozenset()):
+            self.ledger.release(operation_id)
+            return True
+        self.settle(operation_id, ok=False)
+        return False
+
+    @staticmethod
+    def _resolvable(conn: sqlite3.Connection, tenant: str, operation_id: str,
+                    resolved_by: str) -> tuple[dict[str, Any] | None, str | None]:
+        row = LimitLedger.operation(conn, operation_id)
+        if row is None or row["tenant"] != tenant:
+            return None, NOT_FOUND
+        if row["state"] != "unknown":
+            return None, NOT_UNKNOWN
+        if row["principal"] == resolved_by:
+            return None, RESOLVER_IS_PRINCIPAL
+        return row, None
+
+    def _check_evidence(self, tenant: str, operation: Mapping[str, Any], evidence_ref: str,
+                        executed: bool) -> str | None:
+        """Ask the deployment's source whether the operation ran; the refusal, or None."""
+        if self.evidence is None:
+            return EVIDENCE_UNCHECKED
+        try:
+            verdict = self.evidence(tenant, operation, evidence_ref)
+        except Exception:
+            return EVIDENCE_UNAVAILABLE
+        answer = verdict.get("executed") if isinstance(verdict, Mapping) else None
+        if not isinstance(answer, bool):
+            return EVIDENCE_UNAVAILABLE
+        return None if answer is executed else EVIDENCE_DISPUTED
+
     def resolve(self, *, tenant: str, operation_id: str, executed: bool,
-                resolved_by: str, reason: str = "") -> str | None:
+                resolved_by: str, reason: str = "", evidence_ref: str = "") -> str | None:
         """Settle an unknown outcome from what the rail or plant says; the refusal, or None.
 
         ``executed=False`` releases the reservation (and puts a change
@@ -957,18 +1065,30 @@ class LimitGuard:
         Only an operation in ``unknown`` can be resolved, only within its
         tenant, and not by the principal it was charged to: an agent must
         not free its own budget.
+
+        The reviewer's statement is checked, not taken: the guard's
+        ``evidence`` callable asks the authoritative source about
+        ``evidence_ref`` outside the ledger transaction, and the resolution
+        proceeds only when it answers and agrees. Without a checker nothing
+        can be resolved and every unknown outcome keeps its budget.
         """
         if not resolved_by:
             return RESOLVER_IS_PRINCIPAL
         try:
             with self.ledger.transaction() as conn:
-                row = self.ledger.operation(conn, operation_id)
-                if row is None or row["tenant"] != tenant:
-                    return NOT_FOUND
-                if row["state"] != "unknown":
-                    return NOT_UNKNOWN
-                if row["principal"] == resolved_by:
-                    return RESOLVER_IS_PRINCIPAL
+                row, refusal = self._resolvable(conn, tenant, operation_id, resolved_by)
+            if refusal is not None or row is None:
+                return refusal
+            # Outside the transaction: the source is remote, and the ledger
+            # must not be locked while it answers.
+            refusal = self._check_evidence(tenant, row, evidence_ref, executed)
+            if refusal is not None:
+                return refusal
+            with self.ledger.transaction() as conn:
+                # Re-read: another reviewer may have resolved it meanwhile.
+                row, refusal = self._resolvable(conn, tenant, operation_id, resolved_by)
+                if refusal is not None:
+                    return refusal
                 if executed:
                     conn.execute("UPDATE limit_operation SET state='settled' "
                                  "WHERE operation_id=?", (operation_id,))
@@ -976,10 +1096,13 @@ class LimitGuard:
                                  "operation_id=? AND status='unknown'", (operation_id,))
                 else:
                     LimitLedger.release_in(conn, operation_id)
+                resolution = ("executed" if executed else "not_executed")
+                if evidence_ref:
+                    resolution += f" ({evidence_ref} checked)"
+                if reason:
+                    resolution += f": {reason}"
                 conn.execute("UPDATE limit_operation SET resolved_by=?, resolution=? "
-                             "WHERE operation_id=?",
-                             (resolved_by, ("executed" if executed else "not_executed")
-                              + (f": {reason}" if reason else ""), operation_id))
+                             "WHERE operation_id=?", (resolved_by, resolution, operation_id))
         except Exception:
             return LEDGER_UNAVAILABLE
         return None
@@ -1026,10 +1149,11 @@ class LimitGuard:
         """Give back what a call reserved when the write provably did not happen.
 
         The dispatcher calls this after the fence refused, when the tool was
-        never invoked, and when the tool raised ``ToolDidNotExecute``. The
-        lease's nonce is spent in both cases, so the lease cannot run later
-        under the same reservation. Every other refusal after a reservation
-        keeps it: the same lease may be retried until it expires.
+        never invoked; :meth:`did_not_execute` calls it for a trusted
+        ``ToolDidNotExecute``. The lease's nonce is spent in both cases, so
+        the lease cannot run later under the same reservation. Every other
+        refusal after a reservation keeps it: the same lease may be retried
+        until it expires.
         """
         self.ledger.release(operation_id)
 

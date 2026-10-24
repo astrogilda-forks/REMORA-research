@@ -3058,7 +3058,7 @@
     },
     "/v1/execution/limits/resolve": {
       "post": {
-        "description": "Resolve an unknown outcome from what the rail or plant reports.\n\nA reviewer, never the principal the operation was charged to, states\nwhether the call executed and names the evidence. ``executed=false``\nreturns the reservation, so a legitimate retry is no longer refused;\n``executed=true`` keeps it and makes a duplicate refuse. The decision is\nappended to the tenant chain with the reviewer, the evidence and the\nreason. REMORA does not check the evidence; the reviewer answers for it.",
+        "description": "Resolve an unknown outcome from what the rail or plant reports.\n\nA reviewer, never the principal the operation was charged to, states\nwhether the call executed and names the evidence. Before anything\nchanges, the deployment's evidence checker\n(``REMORA_LIMITS_EVIDENCE_MODULE``) asks the authoritative source about\nthat evidence; the resolution is refused when no checker is configured\n(``limit_evidence_unchecked``), when it fails or cannot tell\n(``limit_evidence_unavailable``), and when it disagrees with the\nreviewer (``limit_evidence_disputed``). ``executed=false`` then returns\nthe reservation, so a legitimate retry is no longer refused;\n``executed=true`` keeps it and makes a duplicate refuse. The decision is\nappended to the tenant chain with the reviewer, the evidence, the\nmodule that checked it and the reason.",
         "operationId": "limits_resolve_v1_execution_limits_resolve_post",
         "requestBody": {
           "content": {
@@ -3121,7 +3121,7 @@
                 }
               }
             },
-            "description": "The operation's outcome is not unknown, or the reviewer is the principal it was charged to."
+            "description": "The operation's outcome is not unknown, the reviewer is the principal it was charged to, or the evidence could not be checked or disagrees with the reviewer."
           },
           "422": {
             "content": {

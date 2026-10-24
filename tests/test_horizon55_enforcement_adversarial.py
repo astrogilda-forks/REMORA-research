@@ -167,7 +167,8 @@ def test_a_payment_the_rail_refused_can_be_retried_at_once(start):
     assert _paid() == 14000
 
 
-def _resolve(api, executed):
+def _resolve(api, executed, payment=None, expect=200):
+    """A reviewer resolves the one held payment; the sandbox rail checks the statement."""
     import servers.api as api_mod
 
     [held] = api.client.get("/v1/execution/limits/unresolved").json()["operations"]
@@ -176,10 +177,24 @@ def _resolve(api, executed):
     try:
         r = api.client.post("/v1/execution/limits/resolve", json={
             "operation_id": held["operation_id"], "executed": executed,
-            "evidence_ref": "sandbox-rail-statement", "reason": "checked against the rail"})
+            "evidence_ref": f"sandbox-rail:{(payment or B)['occurrence_id']}",
+            "reason": "checked against the rail"})
     finally:
         api_mod._authenticated_principal = payer
-    assert r.status_code == 200, r.text
+    assert r.status_code == expect, r.text
+    return r.json()
+
+
+def test_a_reviewer_contradicted_by_the_rail_frees_nothing(start):
+    """The rail paid B; a reviewer saying it did not is refused and the budget stays held."""
+    api = start()
+    assert _run(api, A) == "executed"
+    payment_tool.FAIL_NEXT.append("after")
+    assert _run(api, B).startswith("refused at dispatch")
+    assert _resolve(api, executed=False, expect=409)["detail"] == "limit_evidence_disputed"
+    assert _run(api, B) == "refused at assess: limit_outcome_unknown"
+    assert _run(api, C) == "refused at assess: limit_exceeded"
+    assert _paid() == 14000
 
 
 def test_a_payment_whose_outcome_is_unknown_holds_until_resolved(start):

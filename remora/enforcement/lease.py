@@ -118,8 +118,11 @@ class ToolDidNotExecute(Exception):
     never reached it: the payment was not made, the setpoint not written.
     ``source`` names what observed it and ``detail`` what it saw (a refusal
     from the rail, a connection never opened); both are required. The
-    dispatcher returns what the call reserved against its cumulative limits
-    and reports ``tool_did_not_execute``.
+    dispatcher reports ``tool_did_not_execute`` and returns what the call
+    reserved against its cumulative limits only when the limit policy names
+    ``source`` among the tool's ``non_execution.trusted_sources``; from any
+    other source the reservation is held as unknown until a reviewer resolves
+    it with checked evidence.
 
     Only the budget trusts this statement. The execution outcome stays
     UNKNOWN: FAILED needs a ``remora.execution.outcome.PreEffectProof``, and
@@ -129,7 +132,8 @@ class ToolDidNotExecute(Exception):
     An adapter that cannot tell (a timeout after sending, a lost reply) must
     raise anything else: its outcome stays unknown and its reservation is
     held until a reviewer resolves it. Raising this after the effect
-    happened would let the same budget be spent twice.
+    happened would let the same budget be spent twice, which is why only a
+    source the budget's authority declared is believed.
     """
 
     def __init__(self, source: str, detail: str) -> None:
@@ -1300,6 +1304,28 @@ class GovernedToolDispatcher:
                 tenant_id=lease.tenant_id, tool_name=tool_name,
                 proposal_id=lease.proposal_id, error_type=type(exc).__name__)
 
+    def _limit_did_not_execute(self, lease: ExecutionLease, tool_name: str,
+                               source: str) -> str:
+        """Act on the adapter's ``ToolDidNotExecute``; what became of the reservation.
+
+        ``released`` when the policy trusts ``source`` for this tool,
+        ``held`` when it does not (the call is unknown until resolved) or the
+        ledger failed, ``none`` when the call reserved nothing.
+        """
+        guard = self._limit_guard
+        if guard is None or not guard.governs(tool_name):
+            return "none"
+        try:
+            released = guard.did_not_execute(f"lease:{lease.nonce}", tool_name, source)
+        except Exception as exc:
+            # Kept reserved: the limit errs towards refusing.
+            governance_event(
+                "dispatch.limit_release_failed", level=logging.WARNING,
+                tenant_id=lease.tenant_id, tool_name=tool_name,
+                proposal_id=lease.proposal_id, error_type=type(exc).__name__)
+            return "held"
+        return "released" if released else "held"
+
     def _limit_settle(self, lease: ExecutionLease, tool_name: str, ok: bool,
                       result: Any = None, now: str | None = None) -> None:
         guard = self._limit_guard
@@ -1920,16 +1946,19 @@ class GovernedToolDispatcher:
                 execution_id=lease.grant_jti, dispatch_check=check,
             )
         except ToolDidNotExecute as e:
-            # The adapter knows nothing happened: give the reservation back
-            # and report a clean refusal, not an unknown state. The nonce is
-            # spent; a new attempt needs a new grant.
-            self._limit_release(lease, tool_name)
+            # The adapter says nothing happened. The budget believes it only
+            # from a source the limit policy names; otherwise the reservation
+            # is held as unknown until a reviewer resolves it with checked
+            # evidence. Either way the nonce is spent and the dispatch reports
+            # a refusal; a new attempt needs a new grant.
+            reservation = self._limit_did_not_execute(lease, tool_name, e.source)
             self._record_outcome(lease, tool_name, recorder_seq, "refused")
             governance_event(
                 "dispatch.refused", level=logging.WARNING,
                 reason="tool_did_not_execute", tenant_id=tenant_id,
                 tool_name=tool_name, proposal_id=proposal_id,
                 grant_jti=lease.grant_jti, detail=str(e),
+                limit_reservation=reservation,
             )
             return DispatchResult(
                 executed=False, refusal_reason="tool_did_not_execute",

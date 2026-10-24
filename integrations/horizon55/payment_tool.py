@@ -35,5 +35,23 @@ def transfer_payment(arguments: dict[str, Any]) -> dict[str, Any]:
     return {"settled": "sandbox", **arguments}
 
 
+def check_limit_evidence(tenant: str, operation: dict[str, Any],
+                         evidence_ref: str) -> dict[str, Any]:
+    """The sandbox rail's statement about a payment, from its own records.
+
+    ``REMORA_LIMITS_EVIDENCE_MODULE`` names this module, so a reviewer's
+    resolution on ``POST /v1/execution/limits/resolve`` is checked here
+    before any budget moves. ``evidence_ref`` is ``sandbox-rail:<reference>``;
+    the rail answers whether a transfer with that reference reached it.
+    Anything else is a statement the rail cannot make, and raises.
+    """
+    prefix = "sandbox-rail:"
+    if not evidence_ref.startswith(prefix):
+        raise LookupError(f"the sandbox rail has no statement {evidence_ref!r}")
+    reference = evidence_ref[len(prefix):]
+    return {"executed": any(r.get("reference") == reference for r in REACHED),
+            "observed_by": "sandbox-rail"}
+
+
 def register_tools(register: Callable[[str, Callable[[Any], Any]], None]) -> None:
     register("transfer_payment", transfer_payment)

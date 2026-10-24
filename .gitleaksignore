@@ -27,3 +27,8 @@ d3d690ebbdfb8b689e8ee4dd4ecba72bb069699b:scripts/execution_chain_attack_eval.py:
 # not in the repository. The generic-api-key rule reads "..._KEYS: <hex>" as a
 # key and its value.
 f5f3363090becd74f64e399d37b099370c336967:deploy/ot-pilot/docker-compose.yml:generic-api-key:111
+# docs/design/unified-capability-execution-v1.1.md: the proposed CAM example
+# names an API contract, `api_contract: remora.execution.limits.v1`. The
+# generic-api-key rule reads "api_..." followed by a dotted token as a key.
+# It is a contract name in a design document, not a credential.
+793d9164cc5174e323d38563f589d9c193505b8b:docs/design/unified-capability-execution-v1.1.md:generic-api-key:158

@@ -158,6 +158,45 @@ def test_required_signed_all_writes_limits_run(monkeypatch, tmp_path):
     assert guard().policy.coverage == "all_writes"
 
 
+# ── mandatory operation keys (SDD unified capability execution, P0 item 2) ─
+
+
+def _keys_required(monkeypatch, tmp_path, document):
+    guard = _required(monkeypatch, tmp_path, document)
+    monkeypatch.setenv("REMORA_REQUIRE_OPERATION_KEYS", "1")
+    _reset()
+    return guard
+
+
+def test_required_keys_refuse_startup_while_a_metered_write_tool_has_none(monkeypatch, tmp_path):
+    guard = _keys_required(monkeypatch, tmp_path, signed(ventilation_policy()))
+    with pytest.raises(ValueError, match="REMORA_REQUIRE_OPERATION_KEYS.*set_supply_air_setpoint"):
+        guard()
+
+
+def test_required_keys_let_a_policy_that_keys_every_write_tool_run(monkeypatch, tmp_path):
+    body = ventilation_policy()
+    body["idempotency"] = {tool: {"key_arguments": ["unit"]} for tool in body["meters"]}
+    guard = _keys_required(monkeypatch, tmp_path, signed(body))
+    assert guard().require_keys is True
+    assert guard().policy.idempotency["start_fan"] == ("unit",)
+
+
+def test_required_keys_refuse_the_call_when_the_tool_kind_is_unknown(monkeypatch, tmp_path):
+    """A tool the startup check could not classify is refused call by call, never assumed."""
+    import servers.execution_api as exec_mod
+
+    body = ventilation_policy()
+    body["meters"]["mystery_tool"] = [{"quantity": "fan_starts", "kind": "count",
+                                       "unit": "starts"}]
+    guard = _keys_required(monkeypatch, tmp_path, signed(body))
+    monkeypatch.setattr(exec_mod, "_tool_is_write",
+                        lambda tool: None if tool == "mystery_tool" else False)
+    _reset()
+    assert guard().preview(tenant="acme", principal="employee-1", tool_name="mystery_tool",
+                           arguments={}) == cl.COVERAGE_UNKNOWN
+
+
 def test_an_approval_from_before_limits_runs_under_the_limits_in_force(monkeypatch, tmp_path):
     """The safe direction: limits turned on after approval apply at dispatch."""
     client = make_client(monkeypatch, tmp_path, None)

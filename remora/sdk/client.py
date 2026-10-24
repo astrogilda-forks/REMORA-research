@@ -46,10 +46,12 @@ from remora.sdk.models import (
     AuditVerification,
     ExecutionResult,
     LifecycleTrail,
+    LimitResolution,
     PendingExecution,
     ProposalView,
     RejectionResult,
     ToolCall,
+    UnresolvedOperation,
 )
 
 __all__ = ["RemoraClient"]
@@ -293,6 +295,37 @@ class RemoraClient:
         """Verify the authenticated tenant's audit chain end to end."""
         payload = self._request("GET", "/v1/execution/audit/verify")
         return AuditVerification.from_payload(payload)
+
+    # -- cumulative limits (CAP-031) ---------------------------------------
+
+    def list_unresolved(self) -> tuple[UnresolvedOperation, ...]:
+        """Metered calls whose outcome is unknown, oldest first; each holds its budget.
+
+        Needs the ``review`` capability. :class:`NotFoundError` when the
+        deployment runs without cumulative limits.
+        """
+        payload = self._request("GET", "/v1/execution/limits/unresolved")
+        return tuple(UnresolvedOperation.from_payload(op)
+                     for op in payload.get("operations", []))
+
+    def resolve_unknown(self, operation_id: str, *, executed: bool,
+                        evidence_ref: str, reason: str = "") -> LimitResolution:
+        """Resolve an unknown outcome from what the rail or plant reports.
+
+        The caller is a reviewer, never the principal the call was charged
+        to. ``evidence_ref`` names the authoritative statement; the server
+        checks it through the deployment's evidence module before anything
+        changes, and refuses with :class:`ConflictError`
+        (``limit_evidence_unchecked``, ``limit_evidence_unavailable``,
+        ``limit_evidence_disputed``, ``limit_resolver_is_principal``,
+        ``limit_operation_not_unknown``) when it cannot. ``executed=False``
+        returns the reservation; ``executed=True`` keeps it.
+        """
+        payload = self._request("POST", "/v1/execution/limits/resolve", json={
+            "operation_id": operation_id, "executed": executed,
+            "evidence_ref": evidence_ref, "reason": reason,
+        })
+        return LimitResolution.from_payload(payload)
 
     # -- transport ---------------------------------------------------------
 

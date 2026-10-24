@@ -2222,12 +2222,18 @@ capabilities:
       ToolDidNotExecute from the adapter, lease expired before the tool
       started, or a reviewer's resolution); a call whose outcome is unknown
       holds its budget until a reviewer other than the payer resolves it,
-      and REMORA does not check that reviewer's evidence. An adapter that
-      raises ToolDidNotExecute after the effect happened frees budget that
-      was spent; the execution outcome of such a call stays UNKNOWN. The resolution is appended to the chain after the ledger
-      commits, not in one transaction with it. Idempotency is per declared
-      key: a deployment that declares none charges two proposals of one
-      payment twice, and the key decides what counts as the same payment.
+      and the reviewer's statement is checked by the module the deployment
+      names in REMORA_LIMITS_EVIDENCE_MODULE; without one nothing can be
+      resolved, and REMORA verifies that the module answered and agreed, not
+      that the rail told the truth. An adapter's ToolDidNotExecute frees a
+      reservation only from a source the signed policy names for that tool;
+      from any other source the call is held as unknown. The execution
+      outcome of such a call stays UNKNOWN. The resolution is appended to
+      the chain after the ledger commits, not in one transaction with it.
+      Idempotency is per declared key, and the key decides what counts as
+      the same payment: a deployment that declares none charges two
+      proposals of one payment twice unless REMORA_REQUIRE_OPERATION_KEYS
+      is set, which refuses startup while a metered write tool has no key.
       Operations reserved before this ledger kept operations cannot be
       resolved. Amounts and values are the arguments the deployment
       names. A change meter that is not observed tracks the values REMORA
@@ -2246,8 +2252,11 @@ capabilities:
       which is unsigned metadata no decision reads. A policy file replaced
       without a restart is never enforced: every call on that host refuses
       as limit_policy_changed until a restart verifies it, so a replacement
-      stops the governed tools until then. Mandatory limits (REMORA_REQUIRE_LIMITS) are opt-in per
-      deployment and are not part of any runtime profile. A change resource left pending by a lease that is
+      stops the governed tools until then. Mandatory limits (REMORA_REQUIRE_LIMITS) and
+      mandatory operation keys (REMORA_REQUIRE_OPERATION_KEYS) are required by the
+      controlled_pilot runtime profile only; research and review deployments, and the OT
+      pilot (which runs with REMORA_REQUIRE_LIMITS but whose signed policy declares no
+      keys), are opt-in. A change resource left pending by a lease that is
       never retried stays busy until it is re-seeded. A limit for one
       principal is keyed by the principal the lease names: on the review
       path the principal that requested execution, not the proposer; limits

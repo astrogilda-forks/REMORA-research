@@ -13,6 +13,18 @@ Two weaknesses the Horizon #55 stress runs recorded, closed here:
   did not run (the tool raised ``ToolDidNotExecute``, the lease expired
   before the tool started, or a reviewer resolved the outcome), and held
   while the outcome is unknown.
+
+Two more, recorded as open in NEGATIVE_RESULTS section 97 and closed here
+(SDD unified capability execution v1.1, P0 items 1 and 2):
+
+* ``ToolDidNotExecute`` freed budget on the adapter's word. Only a source
+  the policy names in ``non_execution.trusted_sources`` is believed; any
+  other statement holds the call as unknown;
+* a reviewer's ``executed`` was taken, not checked. ``resolve`` asks the
+  guard's evidence checker and refuses without one, when it cannot answer
+  and when it disagrees;
+* under ``require_keys`` a metered write tool without an idempotency key
+  refuses, so no deployment can charge one payment twice by declaring none.
 """
 from __future__ import annotations
 
@@ -37,12 +49,22 @@ LIMITS = [
      "principal": "*", "resource": "*"},
 ]
 IDEMPOTENCY = {"pay": {"key_arguments": ["payee", "amount", "reference"]}}
+TRUSTED = {"pay": {"trusted_sources": ["rail"]}}
+
+#: What the rail says about each operation when a reviewer resolves it.
+RAIL_SAYS: dict[str, bool] = {}
+
+
+def rail(tenant, operation, evidence_ref):
+    """The evidence checker of the fixture guard: ``RAIL_SAYS[operation_id]``."""
+    return {"executed": RAIL_SAYS.get(operation["operation_id"], False)}
 
 
 def policy(idempotency=IDEMPOTENCY, **changes):
     data = {"schema": cl.SCHEMA, "meters": METERS, "limits": LIMITS,
             "baselines": [{"tenant": "t", "quantity": "movement", "resource": "AHU-1",
-                           "value": 19.0, "seed_id": "s1"}]}
+                           "value": 19.0, "seed_id": "s1"}],
+            "non_execution": TRUSTED}
     if idempotency is not None:
         data["idempotency"] = idempotency
     data.update(changes)
@@ -51,7 +73,8 @@ def policy(idempotency=IDEMPOTENCY, **changes):
 
 @pytest.fixture()
 def guard(tmp_path):
-    return cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "ledger.db"))
+    RAIL_SAYS.clear()
+    return cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "ledger.db"), evidence=rail)
 
 
 def pay(guard, op, reference="INV-1", amount=7000, now=T0, expires_at=None):
@@ -158,10 +181,168 @@ def test_an_unknown_outcome_holds_the_budget_until_resolved(guard):
 def test_an_outcome_resolved_as_executed_stays_charged_and_blocks_a_duplicate(guard):
     assert pay(guard, "A") is None and guard.begin("A") is None
     guard.settle("A", ok=False)
+    RAIL_SAYS["A"] = True
     assert guard.resolve(tenant="t", operation_id="A", executed=True,
                          resolved_by="reviewer-1") is None
     assert pay(guard, "B") == cl.DUPLICATE
     assert spent(guard) == 7000
+
+
+# ── the reviewer's statement is checked, not taken ────────────────────────
+
+
+def test_resolving_without_an_evidence_checker_refuses_and_holds_the_budget(tmp_path):
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "ledger.db"))
+    assert pay(guard, "A") is None
+    guard.settle("A", ok=False)
+    assert guard.resolve(tenant="t", operation_id="A", executed=False,
+                         resolved_by="reviewer-1") == cl.EVIDENCE_UNCHECKED
+    assert guard.resolve(tenant="t", operation_id="A", executed=True,
+                         resolved_by="reviewer-1") == cl.EVIDENCE_UNCHECKED
+    assert [o["operation_id"] for o in guard.unresolved("t")] == ["A"]
+    assert spent(guard) == 7000
+
+
+@pytest.mark.parametrize("executed", [False, True])
+def test_evidence_that_disagrees_with_the_reviewer_refuses(guard, executed):
+    assert pay(guard, "A") is None
+    guard.settle("A", ok=False)
+    RAIL_SAYS["A"] = not executed
+    assert guard.resolve(tenant="t", operation_id="A", executed=executed,
+                         resolved_by="reviewer-1") == cl.EVIDENCE_DISPUTED
+    assert [o["operation_id"] for o in guard.unresolved("t")] == ["A"]
+    assert spent(guard) == 7000
+
+
+@pytest.mark.parametrize("answer", [
+    lambda t, op, ref: (_ for _ in ()).throw(ConnectionError("rail unreachable")),
+    lambda t, op, ref: None,
+    lambda t, op, ref: {"executed": None},
+    lambda t, op, ref: {"executed": "no"},
+    lambda t, op, ref: "no",
+])
+def test_evidence_that_cannot_be_read_refuses(tmp_path, answer):
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "ledger.db"), evidence=answer)
+    assert pay(guard, "A") is None
+    guard.settle("A", ok=False)
+    assert guard.resolve(tenant="t", operation_id="A", executed=False,
+                         resolved_by="reviewer-1") == cl.EVIDENCE_UNAVAILABLE
+    assert spent(guard) == 7000
+
+
+def test_the_checker_is_asked_about_the_operation_and_the_evidence_named(tmp_path):
+    asked = []
+
+    def checker(tenant, operation, evidence_ref):
+        asked.append((tenant, operation["operation_id"], operation["principal"], evidence_ref))
+        return {"executed": False}
+    guard = cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "ledger.db"), evidence=checker)
+    assert pay(guard, "A") is None
+    guard.settle("A", ok=False)
+    assert guard.resolve(tenant="t", operation_id="A", executed=False, resolved_by="reviewer-1",
+                         reason="rail statement", evidence_ref="stmt-77") is None
+    assert asked == [("t", "A", "p", "stmt-77")]
+    with guard.ledger.transaction() as conn:
+        row = cl.LimitLedger.operation(conn, "A")
+    assert row["resolution"] == "not_executed (stmt-77 checked): rail statement"
+    assert row["resolved_by"] == "reviewer-1"
+
+
+def test_the_cheap_refusals_come_before_the_rail_is_asked(guard):
+    asked = []
+    guard.evidence = lambda t, op, ref: asked.append(ref) or {"executed": False}
+    assert pay(guard, "A") is None
+    assert guard.resolve(tenant="t", operation_id="A", executed=False,
+                         resolved_by="reviewer-1") == cl.NOT_UNKNOWN
+    guard.settle("A", ok=False)
+    assert guard.resolve(tenant="t", operation_id="A", executed=False,
+                         resolved_by="p") == cl.RESOLVER_IS_PRINCIPAL
+    assert guard.resolve(tenant="other", operation_id="A", executed=False,
+                         resolved_by="reviewer-1") == cl.NOT_FOUND
+    assert asked == []
+
+
+# ── the adapter's statement is believed only from a declared source ──────
+
+
+def test_did_not_execute_from_a_trusted_source_frees_the_budget(guard):
+    assert pay(guard, "A") is None and guard.begin("A") is None
+    assert guard.did_not_execute("A", "pay", "rail") is True
+    assert guard.unresolved("t") == [] and spent(guard) == 0
+    assert pay(guard, "B") is None   # the same payment may be made now
+
+
+@pytest.mark.parametrize("source", ["adapter", "", "RAIL"])
+def test_did_not_execute_from_any_other_source_holds_the_call_as_unknown(guard, source):
+    assert pay(guard, "A") is None and guard.begin("A") is None
+    assert guard.did_not_execute("A", "pay", source) is False
+    assert [o["operation_id"] for o in guard.unresolved("t")] == ["A"]
+    assert pay(guard, "B") == cl.OUTCOME_UNKNOWN
+    assert spent(guard) == 7000
+
+
+def test_a_tool_with_no_trusted_source_never_frees_on_the_adapters_word(tmp_path):
+    guard = cl.LimitGuard(policy(non_execution={}), cl.LimitLedger(tmp_path / "ledger.db"))
+    assert pay(guard, "A") is None
+    assert guard.did_not_execute("A", "pay", "rail") is False
+    assert spent(guard) == 7000
+
+
+def test_an_untrusted_statement_about_a_change_leaves_the_resource_unknown(guard):
+    move = {"unit": "AHU-1", "value": 20.0}
+    assert guard.reserve(tenant="t", principal="p", tool_name="move", arguments=move,
+                         operation_id="A", request_hash="h", now=T0) is None
+    assert guard.did_not_execute("A", "move", "controller") is False
+    assert guard.reserve(tenant="t", principal="p", tool_name="move",
+                         arguments={"unit": "AHU-1", "value": 19.5},
+                         operation_id="B", request_hash="h", now=T0) == cl.BASELINE_UNKNOWN
+
+
+@pytest.mark.parametrize("non_execution", [
+    [], {"nope": {"trusted_sources": ["rail"]}}, {"pay": {"trusted_sources": []}},
+    {"pay": {"trusted_sources": ["rail", "rail"]}}, {"pay": {"trusted_sources": [1]}},
+    {"pay": ["rail"]}, {"pay": {"trusted_sources": ""}},
+])
+def test_a_malformed_non_execution_declaration_refuses_at_load(non_execution):
+    with pytest.raises(cl.LimitPolicyError):
+        policy(non_execution=non_execution)
+
+
+# ── a metered write tool needs a key under require_keys ───────────────────
+
+
+def _keyed(tmp_path, is_write, idempotency=None):
+    return cl.LimitGuard(policy(idempotency=idempotency),
+                         cl.LimitLedger(tmp_path / "ledger.db"), is_write=is_write,
+                         require_keys=True)
+
+
+def test_require_keys_refuses_a_metered_write_tool_without_a_key(tmp_path):
+    guard = _keyed(tmp_path, lambda tool: True)
+    assert pay(guard, "A") == cl.KEY_UNDECLARED
+    assert guard.preview(tenant="t", principal="p", tool_name="pay",
+                         arguments={"payee": "acme", "amount": 7000,
+                                    "reference": "INV-1"}) == cl.KEY_UNDECLARED
+    assert spent(guard) == 0
+
+
+def test_require_keys_lets_a_keyed_tool_and_a_read_tool_run(tmp_path):
+    guard = _keyed(tmp_path, lambda tool: tool != "pay", idempotency=IDEMPOTENCY)
+    assert pay(guard, "A") is None
+    guard = _keyed(tmp_path, lambda tool: False)   # a metered tool the deployment calls a read
+    assert pay(guard, "B", reference="INV-2") is None
+
+
+@pytest.mark.parametrize("is_write", [None, lambda tool: None,
+                                      lambda tool: (_ for _ in ()).throw(RuntimeError("x"))])
+def test_require_keys_refuses_a_tool_whose_kind_it_cannot_read(tmp_path, is_write):
+    assert pay(_keyed(tmp_path, is_write), "A") == cl.COVERAGE_UNKNOWN
+
+
+def test_without_require_keys_an_unkeyed_write_tool_runs_as_before(tmp_path):
+    guard = cl.LimitGuard(policy(idempotency=None), cl.LimitLedger(tmp_path / "ledger.db"),
+                          is_write=lambda tool: True)
+    assert pay(guard, "A") is None
 
 
 @pytest.mark.parametrize("tenant, op, by, want", [
@@ -252,7 +433,28 @@ def test_the_dispatcher_begin_refuses_a_released_reservation(guard):
 
 
 def test_the_adapters_statement_frees_budget_but_decides_no_outcome():
-    """The budget trusts ToolDidNotExecute; the outcome record does not (CAP-013)."""
+    """A trusted ToolDidNotExecute frees the budget; the outcome record stays UNKNOWN (CAP-013)."""
     began = {"executed": False, "dispatch_began": True,
              "refusal_reason": "tool_did_not_execute"}
     assert classify_outcome(began) is DispatchOutcome.UNKNOWN
+
+
+def test_the_dispatcher_releases_or_holds_by_the_statements_source(guard):
+    d = _dispatcher(guard)
+    args = {"payee": "acme", "amount": 7000, "reference": "INV-1"}
+    assert d._limit_refusal(_lease("n1"), "pay", args, args, None) is None
+    assert d._limit_did_not_execute(_lease("n1"), "pay", "rail") == "released"
+    assert d._limit_refusal(_lease("n2"), "pay", args, args, None) is None
+    assert d._limit_did_not_execute(_lease("n2"), "pay", "adapter") == "held"
+    assert d._limit_did_not_execute(_lease("n0"), "unmetered", "rail") == "none"
+    assert [o["operation_id"] for o in guard.unresolved("t")] == ["lease:n2"]
+
+
+def test_a_ledger_that_fails_on_the_statement_holds(guard, monkeypatch):
+    d = _dispatcher(guard)
+    args = {"payee": "acme", "amount": 7000, "reference": "INV-1"}
+    assert d._limit_refusal(_lease("n1"), "pay", args, args, None) is None
+    monkeypatch.setattr(guard, "did_not_execute",
+                        lambda *a: (_ for _ in ()).throw(RuntimeError("disk")))
+    assert d._limit_did_not_execute(_lease("n1"), "pay", "rail") == "held"
+    assert spent(guard) == 0 and guard.ledger.charges("lease:n1") != []

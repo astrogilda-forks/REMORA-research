@@ -5888,7 +5888,7 @@ and `tests/limits/test_limits_resolve_route.py`:
   raised `ToolDidNotExecute`, the lease expired before the tool started, or a
   reviewer other than the payer resolved the outcome.
 
-What remains open:
+What remained open after that update:
 
 - An unknown outcome holds the budget until a person resolves it, and REMORA
   does not check that person's evidence.
@@ -5896,6 +5896,40 @@ What remains open:
   free budget that was spent.
 - A deployment that declares no key still charges two proposals of one
   payment twice.
+
+Update 2026-10-24, later the same day (SDD unified capability execution v1.1,
+P0 items 1 to 3): the three are closed in code on one host, with tests in
+`tests/limits/test_limits_idempotency.py`, `test_limits_resolve_route.py`,
+`test_limits_binding.py` and `tests/test_runtime_profile.py`.
+
+- A reviewer's resolution is checked before anything moves. The deployment
+  names a module (`REMORA_LIMITS_EVIDENCE_MODULE`) that asks the rail or
+  plant about the evidence the reviewer cites. Without one every resolution
+  refuses and the budget stays held. A checker that cannot answer, or that
+  disagrees with the reviewer, refuses too. The Horizon #55 replay's sandbox
+  rail answers from its own record of what reached it. A reviewer who says a
+  paid transfer did not happen is refused there
+  (`tests/test_horizon55_enforcement_adversarial.py`).
+- An adapter's `ToolDidNotExecute` frees a reservation only when the signed
+  limit policy names its `source` among the tool's trusted non-execution
+  sources. From any other source the call is held as unknown. The authority
+  that signs the budget now also says whose word may free it.
+- `REMORA_REQUIRE_OPERATION_KEYS` refuses startup while a metered write tool
+  declares no key. The `controlled_pilot` profile requires it together with
+  signed mandatory limits. Research and review deployments are unchanged.
+  The OT pilot's signed policy still declares no keys.
+
+What remains open:
+
+- The ledger is one host's SQLite. Two hosts with separate ledgers do not
+  share a limit (SDD P0 item 8).
+- The resolution is appended to the tenant chain after the ledger commits,
+  not in one transaction with it (SDD P0 item 4).
+- A checker is only as good as the deployment's source. REMORA verifies that
+  it answered and agreed. It cannot tell whether the rail told the truth.
+- All of this is the author's controls on a public sequence. Nothing
+  measures how often legitimate payments are refused. That needs new tasks
+  and a holdout.
 
 ## §98 The review path handed back an unspent grant when the admission refused (2026-10-24)
 <!-- finding-status: open -->
