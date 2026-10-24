@@ -42,6 +42,20 @@ unestablished_properties:
       recording. Internal tests do not establish the authority of deployment
       sources or a deployed end-to-end property. TRACE export and hardware
       attestation are not implemented by this path.
+  - id: flow_mediation_completeness
+    phase: RESEARCH
+    status: NOT_ESTABLISHED
+    evidence: tests/flow/test_mediation_surface.py
+    caveat: >-
+      IFC-11 premise A1 (every tool result reaches the model only through the governed
+      dispatcher under the flow check) is held as a tested property for the execution API
+      only: the 28 routes of servers/execution_api.py are classified, the three dispatching
+      routes and the async worker are held statically to _dispatch_under_lease, and forged,
+      foreign and replayed contexts are refused on /dispatch-leased
+      (scripts/check_flow_mediation_surface.py). Not covered: servers/mcp_remora.py
+      tools/call, the MCP gateway, the SDK as a surface, and any MCP server registered
+      outside REMORA. A deployment that adds a tool path outside these routes is outside
+      the property.
   - id: runtime_capability_surface_completeness
     phase: RESEARCH
     status: NOT_ESTABLISHED

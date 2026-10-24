@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Mediation completeness of the execution API (IFC-11, first slice)
+
+- Every route of the execution API is classified in code beside its routers (`MEDIATION_TOOL_DISPATCH`, `MEDIATION_NO_TOOL_RESULT`, `MEDIATION_WORKER_ENTRIES`). `scripts/check_flow_mediation_surface.py` holds the routers to the classification and, by AST, holds the three dispatching routes and the async worker to `_dispatch_under_lease`, where the flow check, the lease, the nonce and the result commit live; no other handler may reach the dispatcher, and the service-layer and dispatcher call sites are allowlisted.
+- `tests/flow/test_mediation_surface.py`: a route added to neither set fails; a classified route that is no longer served fails; the static check is pinned on synthetic sources; forged, foreign and replayed contexts are refused on `/dispatch-leased` before the tool runs and with the nonce unspent.
+- Not covered, and recorded as NOT_ESTABLISHED in the capability register (`flow_mediation_completeness`): `servers/mcp_remora.py` tools/call, the MCP gateway, the SDK as a surface, an MCP server registered outside REMORA.
+
 ### ADR-UE-03 proposed: capability activation manifest, hook in the register, mode in the manifest (SDD unified capability execution v1.1 §13)
 
 - `docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md` (DOC-412, status proposed) records the options, the proposed default (the primary hook as a register fact, the requested mode in a signed per-deployment manifest whose digest is pinned into the lease), the particulars the owner must confirm (key custody, whether the digest enters the policy identity, the flag migration rule) and the slices that follow acceptance. It decides nothing by itself and changes no path.
