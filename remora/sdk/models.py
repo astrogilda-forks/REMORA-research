@@ -616,14 +616,20 @@ class LimitResolution:
     executed: bool
     resolved_by: str
     status: str
+    #: Whether the tenant chain already carries the record. False means the
+    #: ledger holds the resolution and the server appends the record on its
+    #: next limits call; the resolution itself is not in doubt.
+    audit_recorded: bool | None = None
     raw: Mapping[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> LimitResolution:
+        recorded = payload.get("audit_recorded")
         return cls(
             operation_id=str(payload["operation_id"]),
             executed=bool(payload["executed"]),
             resolved_by=str(payload.get("resolved_by", "")),
             status=str(payload.get("status", "")),
+            audit_recorded=None if recorded is None else bool(recorded),
             raw=_frozen(payload) or MappingProxyType({}),
         )

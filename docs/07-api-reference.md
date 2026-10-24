@@ -800,9 +800,14 @@ mapping whose `executed` is `true` or `false`) is asked about the evidence.
 Without such a module every resolution refuses (409
 `limit_evidence_unchecked`) and the budget stays held; a checker that raises
 or cannot tell refuses as `limit_evidence_unavailable`, and one that
-disagrees with the reviewer as `limit_evidence_disputed`. The decision is
-appended to the chain as `limit_operation_resolved` with the reviewer, the
-evidence and the module that checked it. The checker is only as trustworthy
+disagrees with the reviewer as `limit_evidence_disputed`. The ledger records the decision first; the
+chain record `limit_operation_resolved` (reviewer, evidence, the module that
+checked it, `resolved_at`) is appended afterwards, keyed by the operation so it
+cannot be written twice. The response's `audit_recorded` says whether that
+append succeeded; when the chain was unreachable, the resolution stands in the
+ledger and the next limits call appends the record. A crash between the two
+steps therefore leaves no undocumented release, only a record that arrives
+late. The checker is only as trustworthy
 as the deployment's source; REMORA verifies that it answered and agreed, not
 that the rail told the truth. The ledger is per host. A
 `change` meter that is not observed tracks the values REMORA let through, not

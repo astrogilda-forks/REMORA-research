@@ -250,3 +250,50 @@ def test_resolving_needs_the_review_capability(monkeypatch, tmp_path):
     assert client.get("/v1/execution/limits/unresolved").status_code == 403
     assert _resolve(client, "lease:x", executed=False).status_code == 403
     assert asked == ["review", "review"]
+
+
+# ── a crash between the ledger and the chain loses no record (SDD P0 item 4) ─
+
+
+def test_a_resolution_the_chain_missed_is_recorded_on_the_next_call(monkeypatch, tmp_path):
+    import servers.execution_api as exec_mod
+
+    client, op = _held_payment(monkeypatch, tmp_path, RAIL)
+    rail.STATEMENTS[STATEMENT] = False
+    real = exec_mod._CHAIN.append_once
+    broken = {"armed": True}
+
+    def append_once(tenant, key, payload):
+        if broken.pop("armed", False):
+            raise OSError("chain store unreachable")       # the crash window
+        return real(tenant, key, payload)
+    monkeypatch.setattr(exec_mod._CHAIN, "append_once", append_once)
+
+    r = _resolve(client, op, executed=False)
+    assert r.status_code == 200 and r.json()["audit_recorded"] is False
+    assert _resolved_events() == []                          # not on the chain yet
+    assert _unresolved(client) == []                         # the next limits call recorded it
+    [event] = _resolved_events()
+    assert event["operation_id"] == op and event["executed"] is False
+    assert event["resolved_by"] == "treasury-reviewer" and event["evidence_ref"] == STATEMENT
+    assert event["resolved_at"] > 0
+    assert _unresolved(client) == [] and len(_resolved_events()) == 1   # recorded once
+    _as(monkeypatch, "employee-1")
+    assert run(client, pay("A"))["executed"] is True          # the release itself held
+
+
+def test_a_recorded_resolution_is_never_appended_twice(monkeypatch, tmp_path):
+    import servers.execution_api as exec_mod
+
+    client, op = _held_payment(monkeypatch, tmp_path, RAIL)
+    rail.STATEMENTS[STATEMENT] = True
+    r = _resolve(client, op, executed=True)
+    assert r.status_code == 200 and r.json()["audit_recorded"] is True
+    # The mark failed after the append: the key is claimed, so the sweep
+    # re-projects nothing and then marks it.
+    guard = exec_mod._limit_guard()
+    with guard.ledger._connect() as conn:
+        conn.execute("UPDATE limit_operation SET audit_recorded=0 WHERE operation_id=?", (op,))
+    assert _unresolved(client) == []
+    assert len(_resolved_events()) == 1
+    assert guard.unrecorded_resolutions("acme") == []

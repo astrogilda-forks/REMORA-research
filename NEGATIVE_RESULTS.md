@@ -5923,8 +5923,11 @@ What remains open:
 
 - The ledger is one host's SQLite. Two hosts with separate ledgers do not
   share a limit (SDD P0 item 8).
-- The resolution is appended to the tenant chain after the ledger commits,
-  not in one transaction with it (SDD P0 item 4).
+- The chain record of a resolution is appended after the ledger commits, by
+  an idempotent sweep on the next limits call rather than in one
+  transaction. A crash between the two leaves a record that arrives late
+  (SDD P0 item 4, closed on one host as a repair protocol); the chain can
+  lag the ledger until that call.
 - A checker is only as good as the deployment's source. REMORA verifies that
   it answered and agreed. It cannot tell whether the rail told the truth.
 - All of this is the author's controls on a public sequence. Nothing

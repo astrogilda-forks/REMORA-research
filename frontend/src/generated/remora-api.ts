@@ -463,9 +463,12 @@ export interface paths {
          *     (``limit_evidence_unavailable``), and when it disagrees with the
          *     reviewer (``limit_evidence_disputed``). ``executed=false`` then returns
          *     the reservation, so a legitimate retry is no longer refused;
-         *     ``executed=true`` keeps it and makes a duplicate refuse. The decision is
-         *     appended to the tenant chain with the reviewer, the evidence, the
-         *     module that checked it and the reason.
+         *     ``executed=true`` keeps it and makes a duplicate refuse. The ledger
+         *     records the decision first; it is then appended to the tenant chain as
+         *     ``limit_operation_resolved`` with the reviewer, the evidence, the module
+         *     that checked it and the reason. ``audit_recorded`` says whether that
+         *     append succeeded; when it did not, the ledger keeps the resolution and
+         *     the next limits call appends it (``recorded_late``).
          */
         post: operations["limits_resolve_v1_execution_limits_resolve_post"];
         delete?: never;

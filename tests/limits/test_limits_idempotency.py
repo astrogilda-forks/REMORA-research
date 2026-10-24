@@ -458,3 +458,44 @@ def test_a_ledger_that_fails_on_the_statement_holds(guard, monkeypatch):
                         lambda *a: (_ for _ in ()).throw(RuntimeError("disk")))
     assert d._limit_did_not_execute(_lease("n1"), "pay", "rail") == "held"
     assert spent(guard) == 0 and guard.ledger.charges("lease:n1") != []
+
+
+# ── the resolution is the ledger's record; the chain is its projection ───
+
+
+def test_a_resolution_is_unrecorded_until_the_chain_carries_it(guard):
+    assert pay(guard, "A") is None
+    guard.settle("A", ok=False)
+    assert guard.unrecorded_resolutions("t") == []
+    assert guard.resolve(tenant="t", operation_id="A", executed=False, resolved_by="reviewer-1",
+                         reason="no transfer", evidence_ref="stmt-1") is None
+    [op] = guard.unrecorded_resolutions("t")
+    assert (op["operation_id"], op["resolved_by"], op["evidence_ref"], op["reason"]) == \
+        ("A", "reviewer-1", "stmt-1", "no transfer")
+    assert op["resolution"].startswith("not_executed") and op["resolved_at"] > 0
+    assert guard.unrecorded_resolutions("other") == []
+    guard.mark_recorded("A")
+    assert guard.unrecorded_resolutions("t") == []
+
+
+def test_an_older_ledger_gains_the_resolution_columns_on_open(tmp_path):
+    """A ledger file created before these columns existed opens and keeps its rows."""
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            CREATE TABLE limit_operation (
+                operation_id TEXT PRIMARY KEY, tenant TEXT NOT NULL, principal TEXT NOT NULL,
+                tool TEXT NOT NULL, op_key TEXT, state TEXT NOT NULL, expires_at REAL,
+                at REAL NOT NULL, resolved_by TEXT, resolution TEXT);
+            INSERT INTO limit_operation VALUES('old','t','p','pay',NULL,'unknown',NULL,1.0,
+                                               NULL,NULL);
+        """)
+    ledger = cl.LimitLedger(path)
+    with ledger.transaction() as conn:
+        row = cl.LimitLedger.operation(conn, "old")
+    assert row["state"] == "unknown" and row["audit_recorded"] == 0
+    assert row["evidence_ref"] is None and row["resolved_at"] is None
+    assert ledger.unrecorded_resolutions("t") == []   # never resolved, so nothing to record
+    cl.LimitLedger(path)                              # a second open is a no-op

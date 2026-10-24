@@ -477,6 +477,24 @@ class LimitLedger:
                 );
                 CREATE INDEX IF NOT EXISTS limit_operation_key ON limit_operation(op_key);
             """)
+            self._migrate(conn)
+
+    #: Columns added after the first ledgers were created. A ledger file from
+    #: an earlier version gains them on open; their defaults describe the old
+    #: rows truthfully (nothing recorded, no evidence named).
+    _ADDED_COLUMNS = (
+        ("evidence_ref", "TEXT"),
+        ("reason", "TEXT"),
+        ("resolved_at", "REAL"),
+        ("audit_recorded", "INTEGER NOT NULL DEFAULT 0"),
+    )
+
+    @classmethod
+    def _migrate(cls, conn: sqlite3.Connection) -> None:
+        present = {row[1] for row in conn.execute("PRAGMA table_info(limit_operation)")}
+        for name, declaration in cls._ADDED_COLUMNS:
+            if name not in present:
+                conn.execute(f"ALTER TABLE limit_operation ADD COLUMN {name} {declaration}")  # noqa: S608 - fixed names
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -596,10 +614,24 @@ class LimitLedger:
 
     @staticmethod
     def operation(conn: sqlite3.Connection, operation_id: str) -> dict[str, Any] | None:
-        row = conn.execute("SELECT operation_id,tenant,principal,tool,op_key,state,expires_at,"
-                           "at,resolved_by,resolution FROM limit_operation "
+        row = conn.execute(f"SELECT {_OPERATION_SELECT} FROM limit_operation "  # noqa: S608 - fixed column list
                            "WHERE operation_id=?", (operation_id,)).fetchone()
         return None if row is None else dict(zip(_OPERATION_FIELDS, row, strict=True))
+
+    def unrecorded_resolutions(self, tenant: str) -> list[dict[str, Any]]:
+        """Resolved operations of ``tenant`` whose chain record has not been written, oldest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT {_OPERATION_SELECT} FROM limit_operation WHERE tenant=? AND "  # noqa: S608
+                "resolved_by IS NOT NULL AND audit_recorded=0 ORDER BY resolved_at, at",
+                (tenant,)).fetchall()
+        return [dict(zip(_OPERATION_FIELDS, r, strict=True)) for r in rows]
+
+    def mark_recorded(self, operation_id: str) -> None:
+        """The chain now carries this operation's resolution."""
+        with self._connect() as conn:
+            conn.execute("UPDATE limit_operation SET audit_recorded=1 WHERE operation_id=?",
+                         (operation_id,))
 
     @staticmethod
     def same_key(conn: sqlite3.Connection, op_key: str, operation_id: str) -> list[str]:
@@ -619,8 +651,7 @@ class LimitLedger:
     def operations(self, tenant: str, state: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT operation_id,tenant,principal,tool,op_key,state,expires_at,at,"
-                "resolved_by,resolution FROM limit_operation WHERE tenant=? AND state=? "
+                f"SELECT {_OPERATION_SELECT} FROM limit_operation WHERE tenant=? AND state=? "  # noqa: S608
                 "ORDER BY at", (tenant, state)).fetchall()
         return [dict(zip(_OPERATION_FIELDS, r, strict=True)) for r in rows]
 
@@ -638,7 +669,9 @@ class LimitLedger:
 
 
 _OPERATION_FIELDS = ("operation_id", "tenant", "principal", "tool", "op_key", "state",
-                     "expires_at", "at", "resolved_by", "resolution")
+                     "expires_at", "at", "resolved_by", "resolution", "evidence_ref", "reason",
+                     "resolved_at", "audit_recorded")
+_OPERATION_SELECT = ",".join(_OPERATION_FIELDS)
 
 
 def _epoch(now: str | float | None) -> float:
@@ -1101,11 +1134,31 @@ class LimitGuard:
                     resolution += f" ({evidence_ref} checked)"
                 if reason:
                     resolution += f": {reason}"
-                conn.execute("UPDATE limit_operation SET resolved_by=?, resolution=? "
-                             "WHERE operation_id=?", (resolved_by, resolution, operation_id))
+                # The ledger is the record of the resolution; the chain is its
+                # projection. audit_recorded stays 0 until the chain carries
+                # it, so a crash in between leaves a visible, recoverable gap
+                # (unrecorded_resolutions), never an undocumented release.
+                conn.execute("UPDATE limit_operation SET resolved_by=?, resolution=?, "
+                             "evidence_ref=?, reason=?, resolved_at=?, audit_recorded=0 "
+                             "WHERE operation_id=?",
+                             (resolved_by, resolution, evidence_ref, reason, time.time(),
+                              operation_id))
         except Exception:
             return LEDGER_UNAVAILABLE
         return None
+
+    def unrecorded_resolutions(self, tenant: str) -> list[dict[str, Any]]:
+        """Resolutions the ledger holds that no chain record carries yet, oldest first.
+
+        The caller projects each one to the audit chain and then calls
+        :meth:`mark_recorded`. Idempotent by construction when the chain
+        append is keyed by the operation: a crash after the append and before
+        the mark re-projects the same key, which the chain refuses.
+        """
+        return self.ledger.unrecorded_resolutions(tenant)
+
+    def mark_recorded(self, operation_id: str) -> None:
+        self.ledger.mark_recorded(operation_id)
 
     def compare(self, tool_name: str, wire: Any, invocation: Any) -> str | None:
         """Refuse a resolved invocation that would meter differently from the wire form."""

@@ -2788,6 +2788,45 @@ def _limits_or_404() -> Any:
     return guard
 
 
+def _record_limit_resolutions(guard: Any, tenant: str) -> set[str]:
+    """Project every resolved limit operation the chain does not carry yet.
+
+    The ledger commits a resolution first (``audit_recorded=0``) and this
+    sweep appends ``limit_operation_resolved`` afterwards, keyed by the
+    operation through ``append_once`` so a crash after the append and before
+    the mark cannot write the record twice. It runs on every limits route,
+    like the stale-dispatch reconciler: a crash between the two steps leaves
+    a resolution the next call records, never one that is lost. Returns the
+    operation ids still unrecorded after the sweep (an unreachable chain).
+    """
+    left: set[str] = set()
+    for op in guard.unrecorded_resolutions(tenant):
+        payload = {
+            "event": "limit_operation_resolved",
+            "operation_id": op["operation_id"],
+            "executed": str(op.get("resolution") or "").startswith("executed"),
+            "resolved_by": op["resolved_by"],
+            "evidence_ref": op.get("evidence_ref") or "",
+            "evidence_checked_by": _limit_settings()[5],
+            "reason": op.get("reason") or "",
+            "resolved_at": op.get("resolved_at"),
+        }
+        try:
+            if hasattr(_CHAIN, "append_once"):
+                _CHAIN.append_once(tenant, f"limit_resolution:{op['operation_id']}", payload)
+            else:  # pragma: no cover - every shipped chain has append_once
+                _CHAIN.append(tenant, payload)
+            guard.mark_recorded(op["operation_id"])
+        except Exception as exc:
+            # The ledger keeps the resolution and the gap stays visible; the
+            # next limits call retries. Raising here would tell the reviewer
+            # that a resolution the ledger already holds did not happen.
+            _LOGGER.error("limits.resolution_unrecorded tenant_id=%s operation_id=%s "
+                          "error_type=%s", tenant, op["operation_id"], type(exc).__name__)
+            left.add(op["operation_id"])
+    return left
+
+
 @router.get("/limits/unresolved", responses={
     200: {"description": "Limit operations of this tenant whose outcome is unknown."},
     **_AUTH_RESPONSES,
@@ -2803,7 +2842,9 @@ def limits_unresolved(request: Request) -> dict[str, Any]:
     from servers import api as api_mod
 
     api_mod._require_tenant_capability(role, tenant, "review")
-    return {"operations": _limits_or_404().unresolved(tenant)}
+    guard = _limits_or_404()
+    _record_limit_resolutions(guard, tenant)
+    return {"operations": guard.unresolved(tenant)}
 
 
 @router.post("/limits/resolve", responses={
@@ -2827,34 +2868,31 @@ def limits_resolve(req: LimitResolveRequest, request: Request) -> dict[str, Any]
     (``limit_evidence_unavailable``), and when it disagrees with the
     reviewer (``limit_evidence_disputed``). ``executed=false`` then returns
     the reservation, so a legitimate retry is no longer refused;
-    ``executed=true`` keeps it and makes a duplicate refuse. The decision is
-    appended to the tenant chain with the reviewer, the evidence, the
-    module that checked it and the reason.
+    ``executed=true`` keeps it and makes a duplicate refuse. The ledger
+    records the decision first; it is then appended to the tenant chain as
+    ``limit_operation_resolved`` with the reviewer, the evidence, the module
+    that checked it and the reason. ``audit_recorded`` says whether that
+    append succeeded; when it did not, the ledger keeps the resolution and
+    the next limits call appends it (``recorded_late``).
     """
     tenant, role, reviewer = _auth(request)
     from servers import api as api_mod
 
     api_mod._require_tenant_capability(role, tenant, "review")
-    refusal = _limits_or_404().resolve(tenant=tenant, operation_id=req.operation_id,
-                                       executed=req.executed, resolved_by=reviewer,
-                                       reason=req.reason, evidence_ref=req.evidence_ref)
+    guard = _limits_or_404()
+    refusal = guard.resolve(tenant=tenant, operation_id=req.operation_id,
+                            executed=req.executed, resolved_by=reviewer,
+                            reason=req.reason, evidence_ref=req.evidence_ref)
     if refusal == "limit_operation_not_found":
         raise HTTPException(status_code=404, detail=refusal)
     if refusal == "limit_ledger_unavailable":
         raise HTTPException(status_code=503, detail=refusal)
     if refusal is not None:
         raise HTTPException(status_code=409, detail=refusal)
-    _CHAIN.append(tenant, {
-        "event": "limit_operation_resolved",
-        "operation_id": req.operation_id,
-        "executed": req.executed,
-        "resolved_by": reviewer,
-        "evidence_ref": req.evidence_ref,
-        "evidence_checked_by": _limit_settings()[5],
-        "reason": req.reason,
-    })
+    unrecorded = _record_limit_resolutions(guard, tenant)
     return {"operation_id": req.operation_id, "executed": req.executed,
-            "resolved_by": reviewer, "status": "resolved"}
+            "resolved_by": reviewer, "status": "resolved",
+            "audit_recorded": req.operation_id not in unrecorded}
 
 
 @router.post("/revoke-principal", responses={

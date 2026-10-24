@@ -2255,8 +2255,11 @@ capabilities:
       that the rail told the truth. An adapter's ToolDidNotExecute frees a
       reservation only from a source the signed policy names for that tool;
       from any other source the call is held as unknown. The execution
-      outcome of such a call stays UNKNOWN. The resolution is appended to
-      the chain after the ledger commits, not in one transaction with it.
+      outcome of such a call stays UNKNOWN. The ledger records a resolution first and the chain record is
+      appended afterwards, keyed by the operation (append_once) and swept on
+      every limits call; a crash between the two leaves a resolution the next
+      call records, never one that is lost or recorded twice. The chain can
+      lag the ledger until that call.
       Idempotency is per declared key, and the key decides what counts as
       the same payment: a deployment that declares none charges two
       proposals of one payment twice unless REMORA_REQUIRE_IDEMPOTENCY
