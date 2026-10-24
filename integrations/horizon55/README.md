@@ -115,6 +115,8 @@ python integrations/horizon55/enforce.py --check  # offline: REMORA's engine on 
 | H55-T07 strict JSON | `test_t07_*` |
 | H55-T08 B without audit bytes | `test_t08_*` |
 | B-audit extension | `tests/test_horizon55_audit_b.py` |
+| P1: replayed, duplicated, reordered, truncated log | `tests/test_horizon55_log_adversarial.py` |
+| P1: concurrency, crashes, retries, restarts | `tests/test_horizon55_enforcement_adversarial.py` |
 | H55-T10 dataset bytes | `test_t10_*` (two need the prepared cache) |
 | H55-T11 altered native settlement | `test_t11_*` |
 | H55-T12 receipt mapped to a REMORA grant | `test_t12_*` |

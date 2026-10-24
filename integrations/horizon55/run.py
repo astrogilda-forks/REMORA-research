@@ -325,6 +325,18 @@ def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None) -> str:
              "chooses. The same mechanism caps setpoint movement and equipment starts "
              "(`remora/enforcement/cumulative_limits.py`, CAP-031)."),
             "",
+            ("Under stress (`tests/test_horizon55_enforcement_adversarial.py`), the total "
+             "reaching the payment tool never passed the budget. A, B and C ran at once, "
+             "and six approved payments raced. One approval was executed twice, in turn "
+             "and at once. The same payment was proposed twice. The tool failed before "
+             "or after paying. The process restarted between B and C, and after C was "
+             "approved. The three ran in every order. Two of these have a cost. "
+             "REMORA does not deduplicate payments: the same payment proposed twice is "
+             "charged twice. A reservation is never returned: a payment that failed "
+             "before paying still counts, and its retry is refused. These are the "
+             "author's controls on this sequence, not a measure of how often legitimate "
+             "calls are refused."),
+            "",
         ]
     lines += [
         "## What this row does not establish",

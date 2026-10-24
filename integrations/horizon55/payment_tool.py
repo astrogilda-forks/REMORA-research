@@ -13,10 +13,19 @@ from collections.abc import Callable
 from typing import Any
 
 REACHED: list[dict[str, Any]] = []
+#: Failures the next calls raise, for the crash tests: ``"before"`` raises
+#: without paying, ``"after"`` pays and then raises (the rail moved the money
+#: but the caller never heard back). Empty in the replay itself.
+FAIL_NEXT: list[str] = []
 
 
 def transfer_payment(arguments: dict[str, Any]) -> dict[str, Any]:
+    failure = FAIL_NEXT.pop(0) if FAIL_NEXT else None
+    if failure == "before":
+        raise RuntimeError("payment rail unavailable")
     REACHED.append(dict(arguments))
+    if failure == "after":
+        raise RuntimeError("payment rail did not acknowledge the transfer")
     return {"settled": "sandbox", **arguments}
 
 
