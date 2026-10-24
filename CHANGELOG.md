@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### The flow check and the dispatch are one step: the dispatch fence (IFC-06; SDD unified capability execution v1.1, P0 item 6)
+
+- After the dispatch-time flow re-check passes, the call holds the context with a `dispatch` event on its flow stream at the sequence it checked (`FlowContextStore.begin_dispatch`); the commit releases it (`dispatch_end`), and so does every refusing path, so a refused or raising call does not hold the context. A context held by another proposal's unexpired dispatch, or a fence lost to a concurrent writer, refuses as `flow_dispatch_contended` before the tool runs and before a nonce, a limit reservation or a recorder intent is spent. Two dispatches judged at the same epoch therefore run exactly one tool; before this change both ran and one result was withheld.
+- The same proposal on another hop (the authority forwarding to the execution domain) does not contend with itself; a fence expires with the lease TTL, so a process that died mid-call does not hold the context forever. `FlowContextState.open_dispatches` and `holding()` expose the holds; the fold refuses an unreadable dispatch event.
+- Still open in IFC-06: the TLA+ model (§6.3). A raise that lands while the holder runs still withholds the holder's result.
+
 ### CI: a pull request runs the test files its change can affect
 
 - `scripts/select_tests_for_change.py` selects the test files for the pull-request `pytest` leg from the diff against the base: every test file that imports a changed module, transitively, through the repository's static import graph (string literals that name a module count as imports, which is how the execution router and the test tool registry are loaded); every test file whose text names a changed path; a changed test file itself; the docgate files whenever a document, register, artifact or schema changed; and the docgate files always, so no selection is empty. Packaging, dependency and pytest configuration, `conftest.py`, the CI workflows, package `__init__` files, `tests/data/` and any path outside the modelled prefixes run the whole suite. `--report` records why each file ran.

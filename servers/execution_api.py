@@ -3286,23 +3286,32 @@ _EXEC_TRACER = get_remora_tracer(service_name="remora-execution")
 
 
 def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[int, str],
-                      proposal_id: str) -> tuple[str | None, Any, dict[str, Any] | None]:
-    """Re-check the flow decision right before dispatch, and bind the result commit.
+                      proposal_id: str,
+                      ) -> tuple[str | None, Any, dict[str, Any] | None, Callable[[], None] | None]:
+    """Re-check the flow decision right before dispatch, hold the context, and
+    bind the result commit.
 
-    SDD v2 WP-04 (AR-017, AR-018). ``expected`` is the epoch and digest the
-    flow check had when the call was decided. If the context's label moved
-    since, or the check now differs, the call is refused before a lease is
-    minted. Otherwise the returned commit labels the raw result, persists the
-    handles it mints and raises the context label, and only then hands back
-    the rendered result. A failed commit withholds the result. The third
-    value is the call's arguments with every handle resolved to its value,
-    which is what the tool receives (IFC-06).
+    SDD v2 WP-04 (AR-017, AR-018) and IFC-06. ``expected`` is the epoch and
+    digest the flow check had when the call was decided. If the context's
+    label moved since, or the check now differs, the call is refused before a
+    lease is minted. The check then takes the dispatch fence: one ``dispatch``
+    event on the context stream at the sequence the check saw. A context held
+    by another proposal's unexpired dispatch, or a fence lost to a concurrent
+    writer, refuses as ``flow_dispatch_contended`` before anything is spent;
+    so two calls judged at the same epoch cannot both run, and a raise that
+    lands while the holder runs still withholds the holder's result.
 
-    The check and the dispatch are not one transaction. A concurrent call in
-    the same context can raise the label between them. The commit then finds
-    another epoch and withholds the result: the effect has happened, and
-    nothing it returned reaches the agent under the stale decision.
+    The returned commit labels the raw result, persists the handles it mints,
+    raises the context label, releases the fence and only then hands back the
+    rendered result. A failed commit withholds the result. The third value is
+    the call's arguments with every handle resolved to its value, which is
+    what the tool receives; the fourth releases the fence, and the caller runs
+    it on every path that does not commit, so a refusal or a raising tool
+    does not hold the context until the fence expires (the lease TTL).
     """
+    import time as _time
+
+    from remora.enforcement.lease import DEFAULT_LEASE_TTL_SECONDS
     from remora.flow.labeler import (
         FlowLabeler,
         commit_labeled_result,
@@ -3312,25 +3321,51 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     flow = _flow_spec(tool_call.tool_name)
     principal, context_id = _FLOW_PRINCIPAL.get(), tool_call.context_id
     if flow is None or not principal or not context_id:
-        return "flow_state_unavailable", None, None
+        return "flow_state_unavailable", None, None, None
     contexts, handles = _flow_contexts(), _flow_handles()
     ok, reason, resolved = verify_flow_at_dispatch(
         contexts=contexts, handles=handles, tenant_id=tenant, principal=principal,
         context_id=context_id, flow=flow, arguments=tool_call.arguments,
         expected_epoch=expected[0], expected_digest=expected[1])
     if not ok:
-        return reason, None, None
+        return reason, None, None, None
+    now = _time.time()
+    try:
+        dispatch_id = contexts.begin_dispatch(
+            tenant, principal, context_id, proposal_id=proposal_id,
+            expires_at=now + DEFAULT_LEASE_TTL_SECONDS, now=now)
+    except Exception:
+        return "flow_state_unavailable", None, None, None
+    if dispatch_id is None:
+        return "flow_dispatch_contended", None, None, None
+    released = False
+
+    def release() -> None:
+        nonlocal released
+        if released:
+            return
+        released = True
+        try:
+            contexts.end_dispatch(tenant, principal, context_id, dispatch_id)
+        except Exception:
+            # The hold expires with the lease TTL; until then the context
+            # refuses other proposals, which is the fail-closed side.
+            _LOGGER.warning("flow dispatch fence %s on context %s not released",
+                            dispatch_id, context_id, exc_info=True)
 
     def commit(raw: Any) -> tuple[Any, dict[str, Any]]:
-        done = commit_labeled_result(
-            FlowLabeler(), flow, contexts=contexts, handles=handles, tenant_id=tenant,
-            principal=principal, context_id=context_id, proposal_id=proposal_id,
-            arguments=tool_call.arguments, raw_result=raw, expected_epoch=expected[0])
+        try:
+            done = commit_labeled_result(
+                FlowLabeler(), flow, contexts=contexts, handles=handles, tenant_id=tenant,
+                principal=principal, context_id=context_id, proposal_id=proposal_id,
+                arguments=tool_call.arguments, raw_result=raw, expected_epoch=expected[0])
+        finally:
+            release()
         return done.rendered_result, {"raw_result_sha256": done.raw_result_sha256,
                                       "epoch": done.new_epoch,
                                       "minted_handles": len(done.minted_handle_ids)}
 
-    return None, commit, resolved
+    return None, commit, resolved, release
 
 
 def _dispatch_under_lease(
@@ -3396,12 +3431,56 @@ def _dispatch_under_lease(
                         "proposal_id": proposal_id}
     result_commit = None
     resolved_arguments: dict[str, Any] | None = None
+    release_fence: Callable[[], None] | None = None
     if flow_expected is not None:
-        flow_refusal, result_commit, resolved_arguments = _flow_at_dispatch(
+        flow_refusal, result_commit, resolved_arguments, release_fence = _flow_at_dispatch(
             tenant, tool_call, flow_expected, proposal_id)
         if flow_refusal is not None:
             return {"executed": False, "refusal_reason": flow_refusal,
                     "proposal_id": proposal_id}
+    try:
+        return _dispatch_under_lease_fenced(
+            tenant=tenant, principal=principal, tool_call=tool_call, semantic=semantic, now=now,
+            gate_allowed=gate_allowed, toolspec=toolspec, proposal_id=proposal_id,
+            grant_jti=grant_jti, presented_lease=presented_lease, task_identity=task_identity,
+            plan=plan, capability_set=capability_set, report_lease=report_lease,
+            not_after=not_after, flow_expected=flow_expected, result_commit=result_commit,
+            resolved_arguments=resolved_arguments)
+    finally:
+        if release_fence is not None:
+            # The commit released it on the executed path; every other path
+            # (a refusal below, a lease that could not be minted, a raising
+            # tool) releases it here, so the context is not held until expiry.
+            release_fence()
+
+
+def _dispatch_under_lease_fenced(
+    *,
+    tenant: str,
+    principal: str,
+    tool_call: ToolCallRequest,
+    semantic: dict[str, Any],
+    now: datetime,
+    gate_allowed: bool,
+    toolspec: dict[str, Any] | None,
+    proposal_id: str,
+    grant_jti: str,
+    presented_lease: Any,
+    task_identity: TaskIdentity | None,
+    plan: Any,
+    capability_set: Any,
+    report_lease: bool,
+    not_after: datetime | None,
+    flow_expected: tuple[int, str] | None,
+    result_commit: Any,
+    resolved_arguments: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """The rest of ``_dispatch_under_lease`` once the flow fence is held.
+
+    Split out only so the fence is released in one ``finally`` around every
+    path below; it is not a second entry point, and the mediation checker
+    holds the route handlers to ``_dispatch_under_lease``.
+    """
     flow_binding: tuple[int, str, str] | None = None
     if flow_expected is not None and presented_lease is None:
         # IFC-06: signed into the lease, so the executing domain compares

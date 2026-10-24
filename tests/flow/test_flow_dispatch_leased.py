@@ -79,8 +79,10 @@ def _binding(call) -> tuple[int, str, str]:
         if obs.flow_status != "evaluated":
             return 0, "0" * 64, digest(call["arguments"])
         expected = (int(obs.flow_epoch), str(obs.flow_digest))
-        _refusal, _commit, resolved = exec_mod._flow_at_dispatch(
+        _refusal, _commit, resolved, release = exec_mod._flow_at_dispatch(
             "acme", tool_call, expected, "p-mint")
+        if release is not None:
+            release()  # the mint-time check must not hold the context
     finally:
         exec_mod._FLOW_PRINCIPAL.reset(token)
     return expected[0], expected[1], digest(
@@ -263,22 +265,18 @@ def test_a_label_raised_after_the_grant_refuses_before_the_tool_runs(executor):
     assert executor.registry.CALLS == []
 
 
-def test_two_dispatches_in_one_context_release_exactly_one_result(executor):
-    """IFC-06's race: two leases judged at the same epoch, both past the
-    pre-dispatch check and inside the tool at once (a barrier holds them
-    there). The first commit raises the context label; the second finds the
-    epoch moved and withholds its result. Both effects happened, both calls
-    count as executed, and exactly one result reaches the agent under the
-    decision it was made for. The check and the dispatch are still not one
-    transaction; this pins what the commit guarantees instead."""
+def test_two_dispatches_in_one_context_run_exactly_one_tool(executor):
+    """IFC-06's race, closed by the dispatch fence. Two leases judged at the
+    same epoch: the first passes the check, takes the fence and is held
+    inside the tool; the second, arriving meanwhile, is refused as
+    flow_dispatch_contended before its tool runs and before anything is
+    spent. Exactly one tool call happens. After the first commits (which
+    raises the label here), a lease at the old epoch refuses as
+    flow_epoch_changed."""
     import threading
-    from concurrent.futures import ThreadPoolExecutor
 
     import servers.execution_api as exec_mod
 
-    # The result is rendered by value under a label above the fresh context's,
-    # so a committed result raises the context (the work-order flow above
-    # renders by handle and raises nothing).
     raising = parse_flow({
         "provider": "tcb",
         "arguments": {"work_order_id": {"kind": "text"}, "status": {"kind": "text"}},
@@ -298,19 +296,82 @@ def test_two_dispatches_in_one_context_release_exactly_one_result(executor):
              for i in (1, 2)]
     leases = [_lease(executor, call) for call in calls]
     assert leases[0].flow_epoch == leases[1].flow_epoch
-    barrier = threading.Barrier(2, timeout=15)
-    executor.registry.BEFORE_CALL.append(lambda _arguments: barrier.wait())
+    inside, proceed = threading.Event(), threading.Event()
+
+    def hold(_arguments):
+        inside.set()
+        assert proceed.wait(timeout=15)
+
+    executor.registry.BEFORE_CALL.append(hold)
+    first: dict = {}
+    worker = threading.Thread(
+        target=lambda: first.update(_post(executor, leases[0], call=calls[0]).json()))
     try:
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            bodies = list(pool.map(
-                lambda pair: _post(executor, pair[0], call=pair[1]).json(), zip(leases, calls)))
+        worker.start()
+        assert inside.wait(timeout=15), "the first dispatch never reached the tool"
+        second = _post(executor, leases[1], call=calls[1]).json()["tool_execution"]
+        assert second["executed"] is False
+        assert second["refusal_reason"] == "flow_dispatch_contended", second
     finally:
+        proceed.set()
+        worker.join(timeout=15)
         executor.registry.BEFORE_CALL.clear()
-    executions = [body["tool_execution"] for body in bodies]
-    assert [e["executed"] for e in executions] == [True, True], bodies
-    assert len(executor.registry.CALLS) == 2
-    released = [e for e in executions if "result" in e]
-    withheld = [e for e in executions
-                if e.get("result_withheld") == "flow_epoch_changed_during_dispatch"]
-    assert (len(released), len(withheld)) == (1, 1), executions
-    assert "result" not in withheld[0]
+    assert first["tool_execution"]["executed"] is True and "result" in first["tool_execution"]
+    assert len(executor.registry.CALLS) == 1   # the loser never reached the tool
+    stale = _post(executor, leases[1], call=calls[1]).json()["tool_execution"]
+    assert stale["refusal_reason"] == "flow_epoch_changed", stale
+    assert len(executor.registry.CALLS) == 1
+
+
+def test_a_refused_dispatch_does_not_hold_the_context(executor):
+    """A fence taken by a call that is refused later (a replayed lease whose
+    nonce is spent) is released on the way out, so the next call in the
+    context runs instead of waiting for the fence to expire."""
+    import servers.execution_api as exec_mod
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    lease, later = _lease(executor, call), _lease(executor, call)   # minted while the key is held
+    assert _post(executor, lease, call=call).json()["tool_execution"]["executed"] is True
+    replay = _post(executor, lease, call=call).json()["tool_execution"]
+    assert replay["refusal_reason"] == "nonce_already_consumed"
+    state = exec_mod._flow_contexts().load("acme", "employee-1", context_id)
+    assert state.open_dispatches == ()
+    again = _post(executor, later, call=call).json()["tool_execution"]
+    assert again["executed"] is True
+
+
+def test_an_expired_fence_does_not_hold_the_context(executor):
+    """A process that died mid-call leaves its fence; once the fence's expiry
+    (the lease TTL) has passed, the next call runs."""
+    import servers.execution_api as exec_mod
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    contexts = exec_mod._flow_contexts()
+    held = contexts.begin_dispatch("acme", "employee-1", context_id, proposal_id="p-dead",
+                                   expires_at=1.0, now=0.0)
+    assert held is not None
+    assert len(contexts.load("acme", "employee-1", context_id).open_dispatches) == 1
+    body = _post(executor, _lease(executor, call), call=call).json()
+    assert body["tool_execution"]["executed"] is True, body
+
+
+def test_a_live_fence_of_another_proposal_refuses_before_the_tool(executor):
+    import time
+
+    import servers.execution_api as exec_mod
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    lease = _lease(executor, call)
+    contexts = exec_mod._flow_contexts()
+    now = time.time()
+    held = contexts.begin_dispatch("acme", "employee-1", context_id, proposal_id="p-other",
+                                   expires_at=now + 60, now=now)
+    assert held is not None
+    body = _post(executor, lease, call=call).json()["tool_execution"]
+    assert (body["executed"], body["refusal_reason"]) == (False, "flow_dispatch_contended")
+    assert executor.registry.CALLS == []
+    contexts.end_dispatch("acme", "employee-1", context_id, held)
+    assert _post(executor, lease, call=call).json()["tool_execution"]["executed"] is True
