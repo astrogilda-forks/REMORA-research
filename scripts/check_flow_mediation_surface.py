@@ -49,8 +49,10 @@ API = Path("servers/execution_api.py")
 SERVICE = Path("remora/execution/service.py")
 DISPATCH = Path("remora/execution/dispatch.py")
 
-#: The route wrapper around the implementation, and the implementation.
+#: The route wrapper around the implementation, the helper it delegates to
+#: once the flow fence is held (IFC-06), and the implementation.
 FUNNEL = "_dispatch_under_lease"
+FUNNEL_HELD = "_dispatch_under_lease_fenced"
 FUNNEL_IMPL = "_dispatch_under_lease_impl"
 #: Service-layer functions that may call the ``dispatch_under_lease`` callback.
 SERVICE_CALLERS = frozenset({"execute_approved_item", "dispatch_pending_intent",
@@ -162,7 +164,7 @@ def static_problems(api_source: str, service_source: str, dispatch_source: str,
         if node is None:
             continue
         names = _names(node)
-        for forbidden in (FUNNEL, FUNNEL_IMPL, *sorted(worker_entries)):
+        for forbidden in (FUNNEL, FUNNEL_HELD, FUNNEL_IMPL, *sorted(worker_entries)):
             if forbidden in names:
                 out.append(f"{key[0]} {key[1]} ({name}) reaches {forbidden} but returns no tool result")
         if _attr_calls(node, "dispatch"):
@@ -173,13 +175,19 @@ def static_problems(api_source: str, service_source: str, dispatch_source: str,
     else:
         if "_flow_at_dispatch" not in _names(funnel):
             out.append(f"{FUNNEL} does not run _flow_at_dispatch")
-        if FUNNEL_IMPL not in _names(funnel):
+        held = functions.get(FUNNEL_HELD)
+        # The wrapper reaches the implementation directly, or through the one
+        # helper that runs inside its fence release; nothing else may.
+        reaches = FUNNEL_IMPL in _names(funnel) or (
+            held is not None and FUNNEL_HELD in _names(funnel) and FUNNEL_IMPL in _names(held))
+        if not reaches:
             out.append(f"{FUNNEL} does not reach {FUNNEL_IMPL}")
     for node in functions.values():
-        if node is funnel or node.name == FUNNEL:
+        if node.name in (FUNNEL, FUNNEL_HELD):
             continue
-        if FUNNEL_IMPL in _names(node):
-            out.append(f"{node.name} reaches {FUNNEL_IMPL} around the route wrapper")
+        for target in (FUNNEL_IMPL, FUNNEL_HELD):
+            if target in _names(node):
+                out.append(f"{node.name} reaches {target} around the route wrapper")
     leased = functions.get("dispatch_leased")
     if leased is not None and not any(
             isinstance(n, ast.Constant) and n.value == "flow_lease_unbound" for n in ast.walk(leased)):

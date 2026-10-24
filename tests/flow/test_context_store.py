@@ -163,7 +163,8 @@ def test_postgres_and_every_backend_raise_and_never_lower(backend):
 
 def test_no_public_api_lowers_or_resets_a_label():
     names = {n for n in dir(FlowContextStore) if not n.startswith("_")}
-    assert names == {"mint", "fork", "load", "raise_label", "charge_budget", "charged"}
+    assert names == {"mint", "fork", "load", "raise_label", "charge_budget", "charged",
+                     "begin_dispatch", "end_dispatch"}
     assert not {n for n in dir(InMemoryFlowEventStore) if not n.startswith("_")} - {
         "append_if", "events"}
 
@@ -363,3 +364,82 @@ def test_the_fold_refuses_a_stream_it_cannot_trust():
     with pytest.raises(FlowStoreUnavailable):
         fold(TENANT, ctx.context_id, gap)
     assert events.events(tenant_id=TENANT, context_id="ctx_none") == []
+
+
+# ── the dispatch fence (IFC-06) ───────────────────────────────────────────
+
+
+def test_the_fold_tracks_open_dispatches_and_moves_seq_not_epoch():
+    store = _contexts(InMemoryFlowEventStore())
+    ctx = _mint(store).context_id
+    before = store.load(TENANT, ALICE, ctx)
+    held = store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=100.0, now=0.0)
+    assert held is not None
+    state = store.load(TENANT, ALICE, ctx)
+    assert (state.seq, state.epoch) == (before.seq + 1, before.epoch)
+    assert [(o.dispatch_id, o.proposal_id, o.expires_at) for o in state.open_dispatches] == [
+        (held, "p-1", 100.0)]
+    assert state.holding(now=50.0) is not None
+    assert state.holding(now=50.0, proposal_id="p-1") is None   # the same proposal, another hop
+    assert state.holding(now=100.0) is None                      # expired
+    store.end_dispatch(TENANT, ALICE, ctx, held)
+    after = store.load(TENANT, ALICE, ctx)
+    assert after.open_dispatches == () and (after.seq, after.epoch) == (before.seq + 2, before.epoch)
+    store.end_dispatch(TENANT, ALICE, ctx, held)                  # idempotent
+    assert store.load(TENANT, ALICE, ctx).seq == before.seq + 2
+
+
+def test_a_second_proposal_cannot_begin_while_a_live_dispatch_holds_the_context():
+    store = _contexts(InMemoryFlowEventStore())
+    ctx = _mint(store).context_id
+    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=100.0, now=0.0)
+    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-2", expires_at=100.0,
+                                now=10.0) is None
+    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=100.0,
+                                now=10.0) is not None            # same proposal, another hop
+    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="", expires_at=100.0,
+                                now=10.0) is None                # an empty id never matches
+    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-2", expires_at=200.0,
+                                now=150.0) is not None           # the holds expired
+
+
+def test_postgres_and_every_backend_let_exactly_one_dispatch_begin(backend):
+    store = _contexts(backend)
+    ctx = _mint(store).context_id
+    n = 8
+    barrier = threading.Barrier(n)
+    results: list[str | None] = []
+    lock = threading.Lock()
+
+    def beginner(i: int) -> None:
+        barrier.wait()
+        held = store.begin_dispatch(TENANT, ALICE, ctx, proposal_id=f"p-{i}", expires_at=1e12,
+                                    now=0.0)
+        with lock:
+            results.append(held)
+
+    threads = [threading.Thread(target=beginner, args=(i,)) for i in range(n)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert sum(1 for r in results if r is not None) == 1, results
+    assert len(store.load(TENANT, ALICE, ctx).open_dispatches) == 1
+
+
+def test_a_raise_in_the_fold_still_moves_epoch_with_a_dispatch_open():
+    store = _contexts(InMemoryFlowEventStore())
+    ctx = _mint(store).context_id
+    held = store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=1e12, now=0.0)
+    raised = store.raise_label(TENANT, ALICE, ctx, Label([USER, MODEL], Integrity.TRUSTED))
+    assert raised.epoch == raised.seq and len(raised.open_dispatches) == 1
+    store.end_dispatch(TENANT, ALICE, ctx, held)
+    assert store.load(TENANT, ALICE, ctx).epoch == raised.epoch
+
+
+def test_an_unreadable_dispatch_event_is_unavailable_not_ignored():
+    fork = FlowEvent("fork", {"principal": ALICE, "label": {"readers": "PUBLIC",
+                     "integrity": "TRUSTED"}, "root_context_id": "c", "parent_context_id": None,
+                     "user_principal": USER, "model_principal": MODEL, "processors": []}, seq=1)
+    with pytest.raises(FlowStoreUnavailable):
+        fold(TENANT, "c", [fork, FlowEvent("dispatch", {"dispatch_id": "d"}, seq=2)])

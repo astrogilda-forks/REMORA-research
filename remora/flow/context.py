@@ -62,6 +62,7 @@ __all__ = [
     "FlowStoreUnavailable",
     "DurableFlowEventStore",
     "InMemoryFlowEventStore",
+    "OpenDispatch",
     "ProcessingNotAuthorized",
     "ProcessingPolicy",
     "fold",
@@ -70,7 +71,12 @@ __all__ = [
     "new_context_id",
 ]
 
-EVENT_KINDS: Final = frozenset({"fork", "raise", "charge", "declassify"})
+#: ``dispatch`` and ``dispatch_end`` are the dispatch fence (IFC-06): a call
+#: holds the context from the moment its flow decision is re-checked until
+#: its result is committed, so a second call in the same context refuses
+#: before its tool runs instead of running and losing its result.
+EVENT_KINDS: Final = frozenset({"fork", "raise", "charge", "declassify", "dispatch",
+                                "dispatch_end"})
 _MAX_RETRIES: Final = 16
 
 
@@ -147,6 +153,18 @@ class FlowEvent:
 
 
 @dataclass(frozen=True)
+class OpenDispatch:
+    """A call that re-checked its flow decision in this context and has not
+    committed its result yet (IFC-06). ``expires_at`` is epoch seconds: a
+    process that died mid-call must not hold the context forever."""
+
+    dispatch_id: str
+    proposal_id: str
+    expires_at: float
+    seq: int
+
+
+@dataclass(frozen=True)
 class FlowContextState:
     tenant_id: str
     context_id: str
@@ -165,6 +183,23 @@ class FlowContextState:
     #: Charged bits per ledger key. Only the root context's stream carries charges.
     charged: Mapping[str, int] = field(default_factory=dict)
     declassifications: int = 0
+    #: Dispatches that began and have not ended, in stream order (IFC-06).
+    open_dispatches: tuple[OpenDispatch, ...] = ()
+
+    def holding(self, now: float, *, proposal_id: str = "") -> OpenDispatch | None:
+        """The unexpired open dispatch of another proposal, or None.
+
+        The same proposal on another hop (the authority forwarding to the
+        execution domain, which fences the same stream) does not contend
+        with itself; an empty proposal id never matches anything.
+        """
+        for open_ in self.open_dispatches:
+            if open_.expires_at <= now:
+                continue
+            if proposal_id and open_.proposal_id == proposal_id:
+                continue
+            return open_
+        return None
 
 
 def fold(tenant_id: str, context_id: str, events: Sequence[FlowEvent]) -> FlowContextState:
@@ -188,6 +223,7 @@ def fold(tenant_id: str, context_id: str, events: Sequence[FlowEvent]) -> FlowCo
     except (KeyError, TypeError, ValueError) as exc:
         raise FlowStoreUnavailable(f"unreadable fork event: {exc}") from exc
     label, epoch, charged, declassified = state.label, 0, dict(state.charged), 0
+    open_: dict[str, OpenDispatch] = {}
     last = 1
     for event in events[1:]:
         if event.seq != last + 1:
@@ -201,6 +237,16 @@ def fold(tenant_id: str, context_id: str, events: Sequence[FlowEvent]) -> FlowCo
             charged[key] = charged.get(key, 0) + int(event.payload["bits"])
         elif event.kind == "declassify":
             declassified += 1
+        elif event.kind == "dispatch":
+            try:
+                open_[str(event.payload["dispatch_id"])] = OpenDispatch(
+                    dispatch_id=str(event.payload["dispatch_id"]),
+                    proposal_id=str(event.payload.get("proposal_id", "")),
+                    expires_at=float(event.payload["expires_at"]), seq=event.seq)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise FlowStoreUnavailable(f"unreadable dispatch event: {exc}") from exc
+        elif event.kind == "dispatch_end":
+            open_.pop(str(event.payload.get("dispatch_id", "")), None)
         else:
             raise FlowStoreUnavailable("a fork event inside a stream")
     return FlowContextState(
@@ -208,7 +254,8 @@ def fold(tenant_id: str, context_id: str, events: Sequence[FlowEvent]) -> FlowCo
         label=label, epoch=epoch, seq=last, root_context_id=state.root_context_id,
         parent_context_id=state.parent_context_id, user_principal=state.user_principal,
         model_principal=state.model_principal, q_principal=state.q_principal,
-        processors=state.processors, charged=charged, declassifications=declassified)
+        processors=state.processors, charged=charged, declassifications=declassified,
+        open_dispatches=tuple(open_.values()))
 
 
 # ── stores ──────────────────────────────────────────────────────────────
@@ -501,6 +548,42 @@ class FlowContextStore:
                                      event=FlowEvent("raise", {"label": label_payload(new)})):
                 return self.load(tenant_id, principal, context_id)
         raise FlowStoreUnavailable("flow label raise lost every retry under contention")
+
+    def begin_dispatch(self, tenant_id: str, principal: str, context_id: str, *,
+                       proposal_id: str, expires_at: float, now: float) -> str | None:
+        """Hold the context for one dispatch (IFC-06); None when another holds it.
+
+        One attempt at the sequence the caller's check saw: a context held by
+        an unexpired dispatch of another proposal, or an append lost to any
+        concurrent writer (another dispatch, a raise, a charge on a root
+        context), is contention, and the caller refuses before its tool runs.
+        The holder's expiry bounds a process that dies mid-call; an expired
+        hold is ignored, not removed. Returns the dispatch id to end with.
+        """
+        state = self.load(tenant_id, principal, context_id)
+        if state.holding(now, proposal_id=proposal_id) is not None:
+            return None
+        dispatch_id = uuid.uuid4().hex
+        event = FlowEvent("dispatch", {"dispatch_id": dispatch_id, "proposal_id": proposal_id,
+                                       "expires_at": float(expires_at)})
+        if not self._store.append_if(tenant_id=tenant_id, context_id=context_id,
+                                     expected_seq=state.seq, event=event):
+            return None
+        return dispatch_id
+
+    def end_dispatch(self, tenant_id: str, principal: str, context_id: str,
+                     dispatch_id: str) -> None:
+        """Release the hold ``begin_dispatch`` took; retried under contention."""
+        for _ in range(_MAX_RETRIES):
+            state = self.load(tenant_id, principal, context_id)
+            if all(o.dispatch_id != dispatch_id for o in state.open_dispatches):
+                return
+            if self._store.append_if(tenant_id=tenant_id, context_id=context_id,
+                                     expected_seq=state.seq,
+                                     event=FlowEvent("dispatch_end",
+                                                     {"dispatch_id": dispatch_id})):
+                return
+        raise FlowStoreUnavailable("flow dispatch release lost every retry under contention")
 
     def charge_budget(self, tenant_id: str, principal: str, context_id: str, *,
                       key: str, bits: int) -> int:
