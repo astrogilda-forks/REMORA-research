@@ -755,8 +755,37 @@ than `all_writes`. No profile implies it; a deployment sets it. The OT pilot
 runs with it. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
-holds. A reservation is given back only when the fence refused and the tool provably
-did not run; otherwise it is never returned. The ledger is per host. A
+holds.
+
+A policy may declare, per tool, the `idempotency.key_arguments` that identify
+one operation (for a payment: payee, amount, unit and reference). A second
+call with the same key refuses before anything is charged:
+
+- `limit_duplicate_in_flight` while the first is reserved or running;
+- `limit_duplicate_operation` after it ran;
+- `limit_outcome_unknown` while its outcome is unknown.
+
+It runs only once the first provably did not. Without a declared key, two
+calls are two operations.
+
+A reservation is given back only when the call provably did not run:
+
+- the fence refused;
+- the tool raised `ToolDidNotExecute(source, detail)`, which reports
+  `tool_did_not_execute` and records the adapter's evidence, so the outcome is
+  FAILED rather than UNKNOWN;
+- the lease expired before the tool started;
+- a reviewer resolved the outcome.
+
+A call whose outcome is unknown holds its reservation. `GET
+/v1/execution/limits/unresolved` lists such calls. `POST
+/v1/execution/limits/resolve` (`operation_id`, `executed`, `evidence_ref`,
+`reason`, `review` capability) settles one from what the rail or plant
+reports: `executed=false` returns the reservation, `executed=true` keeps it.
+The principal the call was charged to may not resolve it (409
+`limit_resolver_is_principal`), and the decision is appended to the chain as
+`limit_operation_resolved`. REMORA does not check the evidence; the reviewer
+answers for it. The ledger is per host. A
 `change` meter that is not observed tracks the values REMORA let through, not
 the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.

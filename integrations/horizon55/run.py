@@ -376,12 +376,21 @@ def report(body: dict[str, Any], audit_b: dict[str, Any] | None = None,
              "and six approved payments raced. One approval was executed twice, in turn "
              "and at once. The same payment was proposed twice. The tool failed before "
              "or after paying. The process restarted between B and C, and after C was "
-             "approved. The three ran in every order. Two of these have a cost. "
-             "REMORA does not deduplicate payments: the same payment proposed twice is "
-             "charged twice. A reservation is never returned: a payment that failed "
-             "before paying still counts, and its retry is refused. These are the "
-             "author's controls on this sequence, not a measure of how often legitimate "
-             "calls are refused."),
+             "approved. The three ran in every order."),
+            "",
+            ("Those runs first found two costs (recorded in #1050). The same payment "
+             "proposed twice was charged twice, and a payment that failed kept its "
+             "reservation, so its retry was refused. Both are closed now. The replay's "
+             "limit policy declares payee, amount, unit and reference as the identity of "
+             "one payment, so a second proposal of it refuses "
+             "(`limit_duplicate_operation`) instead of being paid. A failed payment gives "
+             "its budget back only when it provably did not happen. Either the tool "
+             "reports that the rail refused it (`tool_did_not_execute`), or a reviewer "
+             "other than the payer resolves the unknown outcome against the rail "
+             "(`POST /v1/execution/limits/resolve`). Until then it holds the budget and "
+             "a retry refuses (`limit_outcome_unknown`). The same payment under a new "
+             "reference is still a second payment. These are the author's controls on "
+             "this sequence, not a measure of how often legitimate calls are refused."),
             "",
         ]
     lines += [

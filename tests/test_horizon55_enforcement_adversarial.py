@@ -117,13 +117,27 @@ def test_an_approved_payment_executed_twice_at_once_runs_once(start):
     assert _paid() == 7000
 
 
-def test_the_same_payment_proposed_twice_is_charged_twice(start):
-    """REMORA does not deduplicate payments; the budget still holds.
+def test_the_same_payment_proposed_twice_runs_once(start):
+    """Same payee, amount, unit and reference: one operation (``idempotency``)."""
+    api = start()
+    assert [_run(api, A), _run(api, A), _run(api, B)] == [
+        "executed", "refused at assess: limit_duplicate_operation", "executed"]
+    assert _paid() == 14000
 
-    A proposed again as a new request is a second payment of 7000. Whether it
-    is a duplicate is the payer's or the rail's idempotency question, not one
-    the limit answers.
-    """
+
+def test_the_same_payment_approved_twice_before_either_ran_runs_once(start):
+    api = start()
+    items = [_approved(api, A), _approved(api, A)]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda item: api.execute(item, A), items))
+    assert sorted(r["executed"] for r in results) == [False, True]
+    assert {r["refusal"] for r in results} - {None} <= {"limit_duplicate_in_flight",
+                                                       "limit_duplicate_operation"}
+    assert _paid() == 7000
+
+
+def test_a_payment_under_a_new_reference_is_a_new_payment(start):
+    """The key names the payment; a new reference is a second payment of 7000."""
     api = start()
     assert [_run(api, A), _run(api, _again(A, 1)), _run(api, B)] == [
         "executed", "executed", "refused at assess: limit_exceeded"]
@@ -137,21 +151,58 @@ def test_a_payment_that_failed_after_paying_cannot_be_paid_again(start):
     payment_tool.FAIL_NEXT.append("after")
     assert _run(api, B).startswith("refused at dispatch")
     assert api.reached() == [A["occurrence_id"], B["occurrence_id"]]
+    assert _run(api, B) == "refused at assess: limit_outcome_unknown"   # never paid twice
     assert _run(api, _again(B, 1)) == "refused at assess: limit_exceeded"
     assert _run(api, C) == "refused at assess: limit_exceeded"
     assert _paid() == 14000
 
 
-def test_a_payment_that_failed_before_paying_still_counts(start):
-    """The cost of the rule above: a reservation is never returned, so a retry of a
-    payment that never happened is refused once the budget is reserved."""
+def test_a_payment_the_rail_refused_can_be_retried_at_once(start):
+    """The tool knows nothing moved (``ToolDidNotExecute``): the budget comes back."""
+    api = start()
+    assert _run(api, A) == "executed"
+    payment_tool.FAIL_NEXT.append("refused")
+    assert _run(api, B) == "refused at dispatch: tool_did_not_execute"
+    assert [_run(api, B), _run(api, C)] == ["executed", "refused at assess: limit_exceeded"]
+    assert _paid() == 14000
+
+
+def _resolve(api, executed):
+    import servers.api as api_mod
+
+    [held] = api.client.get("/v1/execution/limits/unresolved").json()["operations"]
+    payer = api_mod._authenticated_principal
+    api_mod._authenticated_principal = lambda request: "treasury-reviewer"
+    try:
+        r = api.client.post("/v1/execution/limits/resolve", json={
+            "operation_id": held["operation_id"], "executed": executed,
+            "evidence_ref": "sandbox-rail-statement", "reason": "checked against the rail"})
+    finally:
+        api_mod._authenticated_principal = payer
+    assert r.status_code == 200, r.text
+
+
+def test_a_payment_whose_outcome_is_unknown_holds_until_resolved(start):
+    """The tool could not tell (it raised without paying): held, then resolved."""
     api = start()
     assert _run(api, A) == "executed"
     payment_tool.FAIL_NEXT.append("before")
     assert _run(api, B).startswith("refused at dispatch")
-    assert _run(api, _again(B, 1)) == "refused at assess: limit_exceeded"
-    assert api.reached() == [A["occurrence_id"]]
-    assert _paid() == 7000
+    assert _run(api, B) == "refused at assess: limit_outcome_unknown"
+    _resolve(api, executed=False)   # the rail shows no transfer
+    assert [_run(api, B), _run(api, C)] == ["executed", "refused at assess: limit_exceeded"]
+    assert _paid() == 14000
+
+
+def test_a_payment_resolved_as_made_is_not_made_again(start):
+    api = start()
+    assert _run(api, A) == "executed"
+    payment_tool.FAIL_NEXT.append("after")
+    assert _run(api, B).startswith("refused at dispatch")
+    _resolve(api, executed=True)    # the rail shows the transfer
+    assert [_run(api, B), _run(api, C)] == ["refused at assess: limit_duplicate_operation",
+                                            "refused at assess: limit_exceeded"]
+    assert _paid() == 14000
 
 
 def test_a_restart_between_b_and_c_does_not_reset_the_budget(start):

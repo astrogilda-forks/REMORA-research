@@ -95,7 +95,11 @@ def _limit_policy(seq: dict[str, Any]) -> dict[str, Any]:
                                              "argument": "amount", "unit_argument": "unit"}]},
             "limits": [{"limit_id": "hs51-set2-budget", "tenant": TENANT, "quantity": "spend",
                         "unit": seq["budget"]["unit"], "max": seq["budget"]["max_total"],
-                        "principal": seq["payer"]}]}
+                        "principal": seq["payer"]}],
+            # One payment is one operation: the same payee, amount, unit and
+            # occurrence reference twice is a duplicate, not a second payment.
+            "idempotency": {"transfer_payment": {
+                "key_arguments": ["payee", "amount", "unit", "reference"]}}}
 
 
 def _toolspec_bundle(path: Path) -> None:

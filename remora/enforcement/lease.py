@@ -111,6 +111,31 @@ class ToolExecutionStateUnknown(RemoraError, RuntimeError):
         self.dispatch_check: dict[str, Any] | None = None
 
 
+class ToolDidNotExecute(Exception):
+    """Raised by a tool adapter that knows its effect did not happen.
+
+    For an adapter whose rail or controller refused the request, or that
+    never reached it: the payment was not made, the setpoint not written.
+    ``source`` names what observed it and ``detail`` what it saw (a refusal
+    from the rail, a connection never opened); both are required, because
+    this is the adapter evidence ``remora.execution.outcome.PreEffectProof``
+    holds, and the outcome is then FAILED rather than UNKNOWN. The dispatcher
+    returns what the call reserved against its cumulative limits.
+
+    An adapter that cannot tell (a timeout after sending, a lost reply) must
+    raise anything else: its outcome stays unknown and its reservation is
+    held until a reviewer resolves it. Raising this after the effect
+    happened would let the same budget be spent twice.
+    """
+
+    def __init__(self, source: str, detail: str) -> None:
+        if not source or not detail:
+            raise ValueError("ToolDidNotExecute needs the source and what it observed")
+        super().__init__(f"{source}: {detail}")
+        self.source = source
+        self.detail = detail
+
+
 class LeaseRefused(RemoraError):
     """Raised when a lease cannot be issued (non-accept decision)."""
 
@@ -751,6 +776,9 @@ class DispatchResult:
     #: outcome. A dispatch that never began is the one negative claim REMORA
     #: can make first-hand; one that began and then raised is not.
     dispatch_began: bool = False
+    #: (source, detail) from a tool that raised ``ToolDidNotExecute``: the
+    #: adapter's evidence that the effect did not happen. None otherwise.
+    pre_effect: tuple[str, str] | None = None
     #: Issue #45: the lifecycle identity carried out of the dispatcher, so a
     #: recorded effect joins back to the decision without re-deriving hashes.
     #: Empty when the refusal happened before a lease was available to read it
@@ -1229,7 +1257,19 @@ class GovernedToolDispatcher:
         refusal = guard.reserve(tenant=lease.tenant_id, principal=lease.actor_identity or "",
                                 tool_name=tool_name, arguments=arguments,
                                 operation_id=f"lease:{lease.nonce}",
-                                request_hash=lease.tool_args_hash or "none", now=now)
+                                request_hash=lease.tool_args_hash or "none", now=now,
+                                expires_at=lease.expires_at)
+        return None if refusal is None else str(refusal)
+
+    def _limit_begin(self, lease: ExecutionLease, tool_name: str) -> str | None:
+        """Mark the reservation started before the tool runs; the refusal, or None."""
+        guard = self._limit_guard
+        if guard is None or not guard.governs(tool_name):
+            return None
+        try:
+            refusal = guard.begin(f"lease:{lease.nonce}")
+        except Exception:
+            refusal = "limit_ledger_unavailable"
         return None if refusal is None else str(refusal)
 
     def _limit_fence(self, lease: ExecutionLease, tool_name: str) -> str | None:
@@ -1837,6 +1877,10 @@ class GovernedToolDispatcher:
         # read it. The nonce is spent, so a refusal here costs the grant; the
         # write does not happen, and what it reserved is given back.
         fence_refusal = self._limit_fence(lease, tool_name)
+        if fence_refusal is None:
+            # From here the reservation cannot be released by time. One that
+            # already was (the lease expired after the reservation) refuses.
+            fence_refusal = self._limit_begin(lease, tool_name)
         if fence_refusal is not None:
             # Nothing was written, so the resource is not unknown: release
             # puts its value back. settle(ok=False) is for a write that ran.
@@ -1870,6 +1914,23 @@ class GovernedToolDispatcher:
                 nested_effects=nested_effects, effect_graph=effect_graph,
                 execution_context_hash=lease.execution_context_hash,
                 execution_id=lease.grant_jti, dispatch_check=check,
+            )
+        except ToolDidNotExecute as e:
+            # The adapter knows nothing happened: give the reservation back
+            # and report a clean refusal, not an unknown state. The nonce is
+            # spent; a new attempt needs a new grant.
+            self._limit_release(lease, tool_name)
+            self._record_outcome(lease, tool_name, recorder_seq, "refused")
+            governance_event(
+                "dispatch.refused", level=logging.WARNING,
+                reason="tool_did_not_execute", tenant_id=tenant_id,
+                tool_name=tool_name, proposal_id=proposal_id,
+                grant_jti=lease.grant_jti, detail=str(e),
+            )
+            return DispatchResult(
+                executed=False, refusal_reason="tool_did_not_execute",
+                proposal_id=proposal_id, dispatch_began=True, recorder_seq=recorder_seq,
+                pre_effect=(e.source, e.detail),
             )
         except Exception as e:
             self._limit_settle(lease, tool_name, ok=False, now=now)

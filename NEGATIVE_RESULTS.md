@@ -5861,13 +5861,41 @@ also part of the policy identity that ACCEPT tokens bind. Limit policies can
 be signed by the authority that sets them, and `REMORA_REQUIRE_LIMITS` makes
 signed limits with `all_writes` coverage mandatory, as the OT pilot now does.
 
-Limits: the ledger is SQLite on one host. A reservation is given back only
-when the fence refused the write; otherwise it is never returned. The amount is the argument the deployment names, not what a rail
+Limits: the ledger is SQLite on one host. Until 2026-10-24 a reservation was
+given back only when the fence refused the write; otherwise it was never
+returned (see the update below). The amount is the argument the deployment names, not what a rail
 settled. A change meter that is not observed tracks the values REMORA let
 through, not the plant, and an observed one is only as good as the observer.
 The sequence is public and was replayed by the author, so this shows the
 mechanism works on the case it was built for. It does not measure how often
 legitimate payments are refused, which needs new tasks and a holdout.
+
+Update 2026-10-24: the Horizon #55 stress runs
+(`tests/test_horizon55_enforcement_adversarial.py`, #1050) recorded two
+costs of the mechanism above:
+
+1. The same payment proposed twice was charged, and paid, twice.
+2. A payment that failed kept its reservation, so a legitimate retry was
+   refused.
+
+Both are closed in code, with tests in `tests/limits/test_limits_idempotency.py`
+and `tests/limits/test_limits_resolve_route.py`:
+
+- A policy may declare the arguments that identify one operation. A second
+  call with the same key refuses while the first is in flight, after it ran
+  and while its outcome is unknown.
+- A reservation is returned when the call provably did not run: the tool
+  raised `ToolDidNotExecute`, the lease expired before the tool started, or a
+  reviewer other than the payer resolved the outcome.
+
+What remains open:
+
+- An unknown outcome holds the budget until a person resolves it, and REMORA
+  does not check that person's evidence.
+- An adapter that raises `ToolDidNotExecute` after the effect happened would
+  free budget that was spent.
+- A deployment that declares no key still charges two proposals of one
+  payment twice.
 
 ## §98 The review path handed back an unspent grant when the admission refused (2026-10-24)
 <!-- finding-status: open -->

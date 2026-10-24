@@ -2196,9 +2196,19 @@ capabilities:
     caveat: >-
       Off by default and enabled in no deployment here. The limits hold on
       one host: the ledger is SQLite, two hosts with separate ledgers do not
-      share a limit, and no Postgres backend exists. A reservation is never
-      returned, so a call that was reserved and then failed or never ran
-      still counts. Amounts and values are the arguments the deployment
+      share a limit, and no Postgres backend exists. A reservation is
+      returned only when the call provably did not run (fence refusal,
+      ToolDidNotExecute from the adapter, lease expired before the tool
+      started, or a reviewer's resolution); a call whose outcome is unknown
+      holds its budget until a reviewer other than the payer resolves it,
+      and REMORA does not check that reviewer's evidence. An adapter that
+      raises ToolDidNotExecute after the effect happened frees budget that
+      was spent. The resolution is appended to the chain after the ledger
+      commits, not in one transaction with it. Idempotency is per declared
+      key: a deployment that declares none charges two proposals of one
+      payment twice, and the key decides what counts as the same payment.
+      Operations reserved before this ledger kept operations cannot be
+      resolved. Amounts and values are the arguments the deployment
       names. A change meter that is not observed tracks the values REMORA
       let through, not the plant: after a change made outside REMORA it can
       under-count, and an end-to-end test shows it letting REMORA move a

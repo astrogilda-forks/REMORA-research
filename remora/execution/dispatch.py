@@ -314,6 +314,11 @@ def dispatch_under_lease(
         tool_execution["lease"] = lease.to_dict()
     # Reported by the dispatcher, never inferred from the refusal reason.
     tool_execution["dispatch_began"] = dres.dispatch_began
+    if getattr(dres, "pre_effect", None):
+        # The adapter's evidence that nothing happened (ToolDidNotExecute);
+        # classify_outcome reads it as a PreEffectProof.
+        source, detail = dres.pre_effect
+        tool_execution["pre_effect_proof"] = {"source": source, "detail": detail}
     # Read the identity back off the dispatch result rather than the local
     # variable: what is reported is what the dispatcher actually acted under.
     tool_execution["proposal_id"] = dres.proposal_id

@@ -32,6 +32,15 @@ A deployment declares, in a ``remora-cumulative-limits/v1`` policy:
     ``listed`` governs only metered tools. ``all_writes`` also refuses any
     tool whose signed ToolSpec is not a read and that has no meter, so a
     write tool added later cannot run unbounded by being forgotten.
+``idempotency``
+    Per tool, the ``key_arguments`` that identify one operation (for a
+    payment: payee, amount, unit and the payer's reference). A second call
+    with the same key is the same operation, not a second one: it refuses
+    while the first is in flight (``limit_duplicate_in_flight``), after it
+    ran (``limit_duplicate_operation``) and while its outcome is unknown
+    (``limit_outcome_unknown``). It may run only once the first provably did
+    not. Neither the charge nor the effect happens twice. Without a declared
+    key, two calls are two operations, as before.
 
 Numbers are exact: a value is scaled by the meter's ``scale`` and must then
 be an integer, so a move too small to count is refused rather than rounded
@@ -40,11 +49,21 @@ a limit by a call.
 
 What this guarantees: on one host, the sum of reservations inside a window
 never passes the limit (one SQLite transaction per call). A reservation is
-returned only when the fence refused and the tool provably did not run. A ``change`` meter's last value is the value REMORA last let
+returned only when the call provably did not run:
+
+- the fence refused before the write;
+- the tool raised ``ToolDidNotExecute`` (the rail refused or was never reached);
+- the lease expired before the tool was started (``begin`` and that release
+  are serialized, so a released reservation never starts);
+- a reviewer other than the proposer resolved an unknown outcome as not
+  executed (``resolve``), after checking the rail.
+
+A call whose outcome is unknown keeps its reservation until it is resolved;
+it is never released on a timer. A ``change`` meter's last value is the value REMORA last let
 through; a call that fails or whose outcome is unknown leaves the resource
 ``unknown``, and the next change refuses until a baseline with a new
-``seed_id`` is declared. It is not a distributed limit across hosts, and it
-does not observe the plant or the payment rail.
+``seed_id`` is declared or the outcome is resolved. It is not a distributed
+limit across hosts, and it does not observe the plant or the payment rail.
 """
 from __future__ import annotations
 
@@ -56,6 +75,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -82,6 +102,14 @@ OBSERVATION_UNAVAILABLE = "limit_observation_unavailable"
 STATE_CHANGED = "limit_state_changed"
 INVOCATION_DIFFERS = "limit_invocation_differs"
 POLICY_CHANGED = "limit_policy_changed"
+DUPLICATE_IN_FLIGHT = "limit_duplicate_in_flight"
+DUPLICATE = "limit_duplicate_operation"
+OUTCOME_UNKNOWN = "limit_outcome_unknown"
+IDEMPOTENCY_KEY_INVALID = "limit_idempotency_key_invalid"
+RESERVATION_RELEASED = "limit_reservation_released"
+NOT_FOUND = "limit_operation_not_found"
+NOT_UNKNOWN = "limit_operation_not_unknown"
+RESOLVER_IS_PRINCIPAL = "limit_resolver_is_principal"
 
 KINDS = ("sum", "count", "change")
 #: Joins the parts of ledger keys; refused inside any part.
@@ -271,6 +299,8 @@ class LimitPolicy:
     meters: Mapping[str, tuple[Meter, ...]]
     limits: tuple[Limit, ...]
     baselines: tuple[Baseline, ...]
+    #: Per tool, the arguments whose values identify one operation.
+    idempotency: Mapping[str, tuple[str, ...]] = dataclass_field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> LimitPolicy:
@@ -329,8 +359,20 @@ class LimitPolicy:
         keys = [(b.tenant, b.quantity, b.resource) for b in baselines]
         if len(set(keys)) != len(keys):
             raise LimitPolicyError("two baselines for one resource")
+        raw_idem = data.get("idempotency") or {}
+        if not isinstance(raw_idem, Mapping):
+            raise LimitPolicyError("idempotency is an object keyed by tool")
+        idempotency: dict[str, tuple[str, ...]] = {}
+        for tool, raw in raw_idem.items():
+            if tool not in meters:
+                raise LimitPolicyError(f"idempotency for unmetered tool {tool!r}")
+            args = raw.get("key_arguments") if isinstance(raw, Mapping) else None
+            if not isinstance(args, list) or not args or len(set(args)) != len(args):
+                raise LimitPolicyError(f"tool {tool!r}: key_arguments is a non-empty list "
+                                       "of distinct argument names")
+            idempotency[tool] = tuple(_text(a, f"tool {tool!r} key argument") for a in args)
         return cls(coverage=coverage, meters=meters, limits=tuple(limits),
-                   baselines=tuple(baselines))
+                   baselines=tuple(baselines), idempotency=idempotency)
 
     @property
     def observed_quantities(self) -> frozenset[str]:
@@ -387,6 +429,15 @@ class LimitLedger:
                     status TEXT NOT NULL CHECK(status IN ('settled','pending','unknown')),
                     operation_id TEXT NOT NULL, seed_id TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS limit_operation (
+                    operation_id TEXT PRIMARY KEY, tenant TEXT NOT NULL,
+                    principal TEXT NOT NULL, tool TEXT NOT NULL, op_key TEXT,
+                    state TEXT NOT NULL CHECK(state IN
+                        ('reserved','started','settled','unknown','released')),
+                    expires_at REAL, at REAL NOT NULL,
+                    resolved_by TEXT, resolution TEXT
+                );
+                CREATE INDEX IF NOT EXISTS limit_operation_key ON limit_operation(op_key);
             """)
 
     @contextmanager
@@ -482,21 +533,57 @@ class LimitLedger:
         return [(str(k), int(a)) for k, a in rows]
 
     def release(self, operation_id: str) -> None:
-        """Return an operation's reservations. Only for a call that provably did not run.
+        """Return an operation's reservations. Only for a call that provably did not run."""
+        with self._connect() as conn:
+            self.release_in(conn, operation_id)
+
+    @staticmethod
+    def release_in(conn: sqlite3.Connection, operation_id: str) -> None:
+        """``release`` inside an open transaction.
 
         A change meter's value row is put back to the value the reservation
         was measured from and settled, whatever status it holds: nothing was
         written, so nothing is unknown.
         """
+        for key, observed in conn.execute(
+                "SELECT value_key,observed FROM limit_observation WHERE operation_id=?",
+                (operation_id,)).fetchall():
+            conn.execute("UPDATE limit_value SET value=?, status='settled' "
+                         "WHERE value_key=? AND operation_id=?",
+                         (int(Decimal(str(observed)).to_integral_value()), key, operation_id))
+        conn.execute("DELETE FROM limit_reservation WHERE operation_id=?", (operation_id,))
+        conn.execute("DELETE FROM limit_observation WHERE operation_id=?", (operation_id,))
+        conn.execute("UPDATE limit_operation SET state='released' WHERE operation_id=?",
+                     (operation_id,))
+
+    @staticmethod
+    def operation(conn: sqlite3.Connection, operation_id: str) -> dict[str, Any] | None:
+        row = conn.execute("SELECT operation_id,tenant,principal,tool,op_key,state,expires_at,"
+                           "at,resolved_by,resolution FROM limit_operation "
+                           "WHERE operation_id=?", (operation_id,)).fetchone()
+        return None if row is None else dict(zip(_OPERATION_FIELDS, row, strict=True))
+
+    @staticmethod
+    def same_key(conn: sqlite3.Connection, op_key: str, operation_id: str) -> list[str]:
+        """States of other operations with this key that have not been released."""
+        rows = conn.execute("SELECT state FROM limit_operation WHERE op_key=? AND "
+                            "operation_id!=? AND state!='released'",
+                            (op_key, operation_id)).fetchall()
+        return [str(r[0]) for r in rows]
+
+    def set_state(self, operation_id: str, state: str, *, only_from: tuple[str, ...]) -> None:
         with self._connect() as conn:
-            for key, observed in conn.execute(
-                    "SELECT value_key,observed FROM limit_observation WHERE operation_id=?",
-                    (operation_id,)).fetchall():
-                conn.execute("UPDATE limit_value SET value=?, status='settled' "
-                             "WHERE value_key=? AND operation_id=?",
-                             (int(Decimal(str(observed)).to_integral_value()), key, operation_id))
-            conn.execute("DELETE FROM limit_reservation WHERE operation_id=?", (operation_id,))
-            conn.execute("DELETE FROM limit_observation WHERE operation_id=?", (operation_id,))
+            conn.execute(f"UPDATE limit_operation SET state=? WHERE operation_id=? AND state IN "
+                         f"({','.join('?' * len(only_from))})",
+                         (state, operation_id, *only_from))
+
+    def operations(self, tenant: str, states: tuple[str, ...]) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT operation_id,tenant,principal,tool,op_key,state,expires_at,at,"
+                f"resolved_by,resolution FROM limit_operation WHERE tenant=? AND state IN "
+                f"({','.join('?' * len(states))}) ORDER BY at", (tenant, *states)).fetchall()
+        return [dict(zip(_OPERATION_FIELDS, r, strict=True)) for r in rows]
 
     def debit(self, key: str, operation_id: str, amount: int, now: float) -> None:
         """Charge movement found after the fact; it is not checked against the limit."""
@@ -509,6 +596,10 @@ class LimitLedger:
         with self._connect() as conn:
             conn.execute("UPDATE limit_value SET value=?, status='settled' WHERE value_key=? "
                          "AND status!='pending'", (value, value_key))
+
+
+_OPERATION_FIELDS = ("operation_id", "tenant", "principal", "tool", "op_key", "state",
+                     "expires_at", "at", "resolved_by", "resolution")
 
 
 def _epoch(now: str | float | None) -> float:
@@ -691,9 +782,57 @@ class LimitGuard:
                 raise _Refused(EXCEEDED)
         return False, charges, values, seen_at
 
+    def operation_key(self, tenant: str, tool_name: str, arguments: Any) -> str | None:
+        """The idempotency key of a call, None when its tool declares none.
+
+        Raises ``_Refused`` when a declared key argument is missing or not a
+        plain value: a payment that cannot be identified must not run.
+        """
+        names = self.policy.idempotency.get(tool_name)
+        if not names:
+            return None
+        args = arguments if isinstance(arguments, Mapping) else {}
+        values = []
+        for name in names:
+            value = args.get(name)
+            if isinstance(value, bool) or not isinstance(value, str | int) or value == "":
+                raise _Refused(IDEMPOTENCY_KEY_INVALID)
+            values.append(value)
+        body = json.dumps([tenant, tool_name, list(names), values], separators=(",", ":"),
+                          ensure_ascii=False)
+        return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _duplicate(conn: sqlite3.Connection, op_key: str | None,
+                   operation_id: str) -> str | None:
+        """The refusal for another live operation with the same key, or None."""
+        if op_key is None:
+            return None
+        states = LimitLedger.same_key(conn, op_key, operation_id)
+        if "unknown" in states:
+            return OUTCOME_UNKNOWN
+        if "settled" in states:
+            return DUPLICATE
+        if states:
+            return DUPLICATE_IN_FLIGHT
+        return None
+
+    @staticmethod
+    def _release_expired(conn: sqlite3.Connection, now: float) -> None:
+        """Release reservations whose lease expired before the tool was started.
+
+        Such a lease can no longer be dispatched, and ``begin`` refuses one
+        released here, so its reservation would otherwise hold the limit for
+        nothing. A started operation is never released by time.
+        """
+        for (operation_id,) in conn.execute(
+                "SELECT operation_id FROM limit_operation WHERE state='reserved' AND "
+                "expires_at IS NOT NULL AND expires_at<?", (now,)).fetchall():
+            LimitLedger.release_in(conn, operation_id)
+
     def _run(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
              operation_id: str, request_hash: str, now: str | float | None,
-             write: bool) -> str | None:
+             write: bool, expires_at: str | float | None = None) -> str | None:
         if self._changed():
             return POLICY_CHANGED
         refusal = self._coverage_refusal(tool_name)
@@ -716,7 +855,15 @@ class LimitGuard:
                         return OBSERVATION_UNAVAILABLE
                     observed[index] = seen
             at = _epoch(now)
+            op_key = self.operation_key(tenant, tool_name, arguments)
             with self.ledger.transaction() as conn:
+                self._release_expired(conn, at)
+                mine = self.ledger.operation(conn, operation_id)
+                if mine is not None and mine["state"] == "released":
+                    return RESERVATION_RELEASED
+                duplicate = self._duplicate(conn, op_key, operation_id)
+                if duplicate is not None:
+                    return duplicate
                 done, charges, values, seen_at = self._plan(
                     conn, tenant=tenant, principal=principal, readings=readings,
                     operation_id=operation_id, request_hash=request_hash, now=at,
@@ -731,6 +878,11 @@ class LimitGuard:
                     for value_key, seen, amount in seen_at:
                         self.ledger.record_observation(conn, operation_id, value_key, seen,
                                                        amount)
+                    conn.execute(
+                        "INSERT OR IGNORE INTO limit_operation(operation_id,tenant,principal,"
+                        "tool,op_key,state,expires_at,at) VALUES(?,?,?,?,?,'reserved',?,?)",
+                        (operation_id, tenant, principal, tool_name, op_key,
+                         None if expires_at is None else _epoch(expires_at), at))
         except _Refused as exc:
             return exc.reason
         except Exception:
@@ -750,16 +902,86 @@ class LimitGuard:
 
     def reserve(self, *, tenant: str, principal: str, tool_name: str, arguments: Any,
                 operation_id: str, request_hash: str,
-                now: str | float | None = None) -> str | None:
+                now: str | float | None = None,
+                expires_at: str | float | None = None) -> str | None:
         """Reserve the call against every limit it matches; None when it may run.
 
         ``operation_id`` names the lease, so a retry of one lease (a crash
         between this reservation and the nonce consumption) finds its own
-        reservation and is not charged twice.
+        reservation and is not charged twice. ``expires_at`` is the lease's
+        expiry: a reservation whose lease expired before ``begin`` is released.
         """
         return self._run(tenant=tenant, principal=principal, tool_name=tool_name,
                          arguments=arguments, operation_id=operation_id,
-                         request_hash=request_hash, now=now, write=True)
+                         request_hash=request_hash, now=now, write=True,
+                         expires_at=expires_at)
+
+    def begin(self, operation_id: str) -> str | None:
+        """Mark the operation started, just before the tool is invoked; the refusal, or None.
+
+        Serialized with the release of expired reservations: once this
+        returns None the reservation can no longer be released by time, and
+        once it was released this refuses and the tool must not run.
+        """
+        try:
+            with self.ledger.transaction() as conn:
+                row = self.ledger.operation(conn, operation_id)
+                if row is None:
+                    return None  # reserved before this ledger kept operations
+                if row["state"] == "released":
+                    return RESERVATION_RELEASED
+                if row["state"] == "reserved":
+                    conn.execute("UPDATE limit_operation SET state='started' "
+                                 "WHERE operation_id=?", (operation_id,))
+        except Exception:
+            return LEDGER_UNAVAILABLE
+        return None
+
+    def unresolved(self, tenant: str) -> list[dict[str, Any]]:
+        """Operations of ``tenant`` whose outcome is unknown, oldest first, with their charges."""
+        out = []
+        for row in self.ledger.operations(tenant, ("unknown",)):
+            out.append({**{k: row[k] for k in ("operation_id", "principal", "tool", "at")},
+                        "charges": [{"counter": k.split(_SEP, 1)[0], "amount": a}
+                                    for k, a in self.ledger.charges(row["operation_id"])]})
+        return out
+
+    def resolve(self, *, tenant: str, operation_id: str, executed: bool,
+                resolved_by: str, reason: str = "") -> str | None:
+        """Settle an unknown outcome from what the rail or plant says; the refusal, or None.
+
+        ``executed=False`` releases the reservation (and puts a change
+        meter's value back); ``executed=True`` keeps it and settles the
+        operation, so a duplicate refuses as ``limit_duplicate_operation``.
+        Only an operation in ``unknown`` can be resolved, only within its
+        tenant, and not by the principal it was charged to: an agent must
+        not free its own budget.
+        """
+        if not resolved_by:
+            return RESOLVER_IS_PRINCIPAL
+        try:
+            with self.ledger.transaction() as conn:
+                row = self.ledger.operation(conn, operation_id)
+                if row is None or row["tenant"] != tenant:
+                    return NOT_FOUND
+                if row["state"] != "unknown":
+                    return NOT_UNKNOWN
+                if row["principal"] == resolved_by:
+                    return RESOLVER_IS_PRINCIPAL
+                if executed:
+                    conn.execute("UPDATE limit_operation SET state='settled' "
+                                 "WHERE operation_id=?", (operation_id,))
+                    conn.execute("UPDATE limit_value SET status='settled' WHERE "
+                                 "operation_id=? AND status='unknown'", (operation_id,))
+                else:
+                    LimitLedger.release_in(conn, operation_id)
+                conn.execute("UPDATE limit_operation SET resolved_by=?, resolution=? "
+                             "WHERE operation_id=?",
+                             (resolved_by, ("executed" if executed else "not_executed")
+                              + (f": {reason}" if reason else ""), operation_id))
+        except Exception:
+            return LEDGER_UNAVAILABLE
+        return None
 
     def compare(self, tool_name: str, wire: Any, invocation: Any) -> str | None:
         """Refuse a resolved invocation that would meter differently from the wire form."""
@@ -802,10 +1024,11 @@ class LimitGuard:
     def release(self, operation_id: str) -> None:
         """Give back what a call reserved when the write provably did not happen.
 
-        The dispatcher calls this only after the fence refused, when the tool
-        was never invoked and the lease's nonce is spent, so the lease cannot
-        run later under the same reservation. Every other refusal after a
-        reservation keeps it: the same lease may be retried.
+        The dispatcher calls this after the fence refused, when the tool was
+        never invoked, and when the tool raised ``ToolDidNotExecute``. The
+        lease's nonce is spent in both cases, so the lease cannot run later
+        under the same reservation. Every other refusal after a reservation
+        keeps it: the same lease may be retried until it expires.
         """
         self.ledger.release(operation_id)
 
@@ -854,6 +1077,8 @@ class LimitGuard:
         ``unknown`` after a failure); the next change reads the plant anyway.
         """
         settled = self.ledger.settle(operation_id, ok)
+        self.ledger.set_state(operation_id, "settled" if ok else "unknown",
+                              only_from=("reserved", "started"))
         out: list[dict[str, Any]] = []
         if self.observer is None:
             return out
