@@ -8,6 +8,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 - `docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md` (DOC-412, status proposed) records the options, the proposed default (the primary hook as a register fact, the requested mode in a signed per-deployment manifest whose digest is pinned into the lease), the particulars the owner must confirm (key custody, whether the digest enters the policy identity, the flag migration rule) and the slices that follow acceptance. It decides nothing by itself and changes no path.
 
+### Capability hook inventory (SDD unified capability execution v1.1, phase P1, first slice)
+
+- Every entry of `docs/assurance/capability_register_v1.yaml` carries a `hook` block: `primary` from the SDD's eleven-value vocabulary, optional `secondary`, and `bound_at`, the code symbols, routes or tests where the capability binds, each one of the entry's own evidence paths so the freshness gate covers it.
+- `scripts/check_capability_hooks.py` verifies every binding against the repository (the path exists, the symbol is defined, the route is served) and compares the register's primary hook with the atlas's `sdd_hook`; `tests/test_capability_hooks.py` is the P1 exit gate: a registered capability bound to no hook, route or test fails. `--json` prints the read-only join of register, hook, freshness classification and atlas assessment, with `mode` as `NOT_ESTABLISHED`.
+- Not in this slice: a capability activation manifest, its signature, an effective mode, startup validation against it, or `GET /v1/system/capabilities`. Where a deployment's mode lives is ADR-UE-03, an owner decision; the hook is recorded in the register as that ADR's default proposes. The atlas's judgement words beyond the vocabulary (REVIEW, EVIDENCE, INTEGRATION) are not hooks and are not carried over.
+
 ### The operator's stop switch (SDD unified capability execution v1.1, P0 item 7; gate G10)
 
 - `POST /v1/execution/stop` and `/resume` (`review` capability) write one durable flag per tenant, the authority-epoch subject `execution:stop` in the store the lease nonce ledger uses, with `execution_stopped` or `execution_resumed` on the chain in the same transaction. `GET /v1/execution/stop` (`read`) returns the flag and the epoch.
