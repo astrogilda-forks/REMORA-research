@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### CI budget: one Python version per pull request, all four on master
+
+- The deterministic suite (12,564 tests) takes 14 to 20 minutes per interpreter on the hosted runners, and three matrix legs ended as "cancelled" (timed out) under the 15-minute job budget on 2026-10-24. The `pytest` job budget is 25 minutes.
+- A pull request now runs the full suite on Python 3.12 only; a push to master runs 3.11, 3.12, 3.13 and 3.14, so every merged commit is still verified on every supported interpreter, including the paper's pinned 3.14. The required aggregate and the inventory job are unchanged (3.12 is always among the legs).
+- Not changed: what is tested. A change-scoped selection for pull requests is a separate change with its own evidence.
+
 ### Mediation completeness of the execution API (IFC-11, first slice)
 
 - Every route of the execution API is classified in code beside its routers (`MEDIATION_TOOL_DISPATCH`, `MEDIATION_NO_TOOL_RESULT`, `MEDIATION_WORKER_ENTRIES`). `scripts/check_flow_mediation_surface.py` holds the routers to the classification and, by AST, holds the three dispatching routes and the async worker to `_dispatch_under_lease`, where the flow check, the lease, the nonce and the result commit live; no other handler may reach the dispatcher, and the service-layer and dispatcher call sites are allowlisted.
