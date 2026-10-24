@@ -441,6 +441,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/execution/limits/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Limits Resolve
+         * @description Resolve an unknown outcome from what the rail or plant reports.
+         *
+         *     A reviewer, never the principal the operation was charged to, states
+         *     whether the call executed and names the evidence. ``executed=false``
+         *     returns the reservation, so a legitimate retry is no longer refused;
+         *     ``executed=true`` keeps it and makes a duplicate refuse. The decision is
+         *     appended to the tenant chain with the reviewer, the evidence and the
+         *     reason. REMORA does not check the evidence; the reviewer answers for it.
+         */
+        post: operations["limits_resolve_v1_execution_limits_resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/execution/limits/unresolved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Limits Unresolved
+         * @description The reservations held because a tool's outcome is unknown, oldest first.
+         *
+         *     Each holds budget until a reviewer resolves it against the rail or plant
+         *     (``POST /limits/resolve``). Reviewer capability, as for resolving.
+         */
+        get: operations["limits_unresolved_v1_execution_limits_unresolved_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution/loop-safety/reset": {
         parameters: {
             query?: never;
@@ -1527,6 +1577,25 @@ export interface components {
             uptime_seconds: number;
             /** Version */
             version: string;
+        };
+        /**
+         * LimitResolveRequest
+         * @description Settle a cumulative-limit operation whose outcome is unknown.
+         *
+         *     ``executed`` is what the rail or the plant says happened, checked by the
+         *     reviewer outside REMORA; ``evidence_ref`` names where (a rail statement,
+         *     a controller log, a ticket). ``False`` returns the reservation, ``True``
+         *     keeps it and settles the operation.
+         */
+        LimitResolveRequest: {
+            /** Evidence Ref */
+            evidence_ref: string;
+            /** Executed */
+            executed: boolean;
+            /** Operation Id */
+            operation_id: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * LoopSafetyResetRequest
@@ -2644,6 +2713,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    limits_resolve_v1_execution_limits_resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LimitResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description The operation is settled; a reservation was returned or kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No limits, or no such operation. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The operation's outcome is not unknown, or the reviewer is the principal it was charged to. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    limits_unresolved_v1_execution_limits_unresolved_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Limit operations of this tenant whose outcome is unknown. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Role lacks the required capability for this tenant. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No cumulative limits are configured. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };

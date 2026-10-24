@@ -772,8 +772,9 @@ A reservation is given back only when the call provably did not run:
 
 - the fence refused;
 - the tool raised `ToolDidNotExecute(source, detail)`, which reports
-  `tool_did_not_execute` and records the adapter's evidence, so the outcome is
-  FAILED rather than UNKNOWN;
+  `tool_did_not_execute`. Only the budget trusts the adapter here: the
+  execution outcome stays UNKNOWN, because FAILED needs a `PreEffectProof`
+  and no dispatch path produces one;
 - the lease expired before the tool started;
 - a reviewer resolved the outcome.
 

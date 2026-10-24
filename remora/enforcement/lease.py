@@ -117,10 +117,14 @@ class ToolDidNotExecute(Exception):
     For an adapter whose rail or controller refused the request, or that
     never reached it: the payment was not made, the setpoint not written.
     ``source`` names what observed it and ``detail`` what it saw (a refusal
-    from the rail, a connection never opened); both are required, because
-    this is the adapter evidence ``remora.execution.outcome.PreEffectProof``
-    holds, and the outcome is then FAILED rather than UNKNOWN. The dispatcher
-    returns what the call reserved against its cumulative limits.
+    from the rail, a connection never opened); both are required. The
+    dispatcher returns what the call reserved against its cumulative limits
+    and reports ``tool_did_not_execute``.
+
+    Only the budget trusts this statement. The execution outcome stays
+    UNKNOWN: FAILED needs a ``remora.execution.outcome.PreEffectProof``, and
+    no dispatch path produces one (tests/test_unknown_execution_state.py;
+    changing that is a CAP-013 decision).
 
     An adapter that cannot tell (a timeout after sending, a lost reply) must
     raise anything else: its outcome stays unknown and its reservation is
@@ -776,8 +780,8 @@ class DispatchResult:
     #: outcome. A dispatch that never began is the one negative claim REMORA
     #: can make first-hand; one that began and then raised is not.
     dispatch_began: bool = False
-    #: (source, detail) from a tool that raised ``ToolDidNotExecute``: the
-    #: adapter's evidence that the effect did not happen. None otherwise.
+    #: (source, detail) from a tool that raised ``ToolDidNotExecute``: what the
+    #: adapter says it observed. Informational; it decides no outcome.
     pre_effect: tuple[str, str] | None = None
     #: Issue #45: the lifecycle identity carried out of the dispatcher, so a
     #: recorded effect joins back to the decision without re-deriving hashes.

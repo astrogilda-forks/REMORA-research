@@ -91,9 +91,9 @@ class DispatchOutcome(str, Enum):
 class PreEffectProof:
     """Adapter evidence that a failure happened before the effect boundary.
 
-    Deliberately not constructible from a request field. An adapter produces
-    one by raising ``remora.enforcement.lease.ToolDidNotExecute(source,
-    detail)``; the dispatcher carries it out and ``dispatch`` records it.
+    Deliberately not constructible from a request field. Nothing in this
+    repository produces one yet, and the type exists so that the day an adapter
+    can, there is a place to put the evidence rather than a boolean to trust.
 
     ``source`` names the adapter that observed it, and ``detail`` records what
     it saw -- a transport-level rejection, a pre-commit constraint violation, a
@@ -133,16 +133,6 @@ def classify_outcome(
         # a spent nonce, an unknown tool. REMORA watched itself not act.
         return DispatchOutcome.REFUSED
 
-    if pre_effect_proof is None and isinstance(tool_execution.get("pre_effect_proof"), Mapping):
-        # Written only by remora.execution.dispatch from the dispatcher's
-        # result, when the tool raised ToolDidNotExecute; no request field
-        # reaches it. An incomplete one is not a proof.
-        raw = tool_execution["pre_effect_proof"]
-        try:
-            pre_effect_proof = PreEffectProof(source=str(raw.get("source") or ""),
-                                              detail=str(raw.get("detail") or ""))
-        except ValueError:
-            pre_effect_proof = None
     if pre_effect_proof is not None:
         return DispatchOutcome.FAILED
 

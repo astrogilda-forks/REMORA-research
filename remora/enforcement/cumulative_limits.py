@@ -571,18 +571,19 @@ class LimitLedger:
                             (op_key, operation_id)).fetchall()
         return [str(r[0]) for r in rows]
 
-    def set_state(self, operation_id: str, state: str, *, only_from: tuple[str, ...]) -> None:
+    def finish(self, operation_id: str, ok: bool) -> None:
+        """Record that a reserved or started operation ran, or ended unknown."""
         with self._connect() as conn:
-            conn.execute(f"UPDATE limit_operation SET state=? WHERE operation_id=? AND state IN "
-                         f"({','.join('?' * len(only_from))})",
-                         (state, operation_id, *only_from))
+            conn.execute("UPDATE limit_operation SET state=? WHERE operation_id=? AND "
+                         "state IN ('reserved','started')",
+                         ("settled" if ok else "unknown", operation_id))
 
-    def operations(self, tenant: str, states: tuple[str, ...]) -> list[dict[str, Any]]:
+    def operations(self, tenant: str, state: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT operation_id,tenant,principal,tool,op_key,state,expires_at,at,"
-                f"resolved_by,resolution FROM limit_operation WHERE tenant=? AND state IN "
-                f"({','.join('?' * len(states))}) ORDER BY at", (tenant, *states)).fetchall()
+                "resolved_by,resolution FROM limit_operation WHERE tenant=? AND state=? "
+                "ORDER BY at", (tenant, state)).fetchall()
         return [dict(zip(_OPERATION_FIELDS, r, strict=True)) for r in rows]
 
     def debit(self, key: str, operation_id: str, amount: int, now: float) -> None:
@@ -940,7 +941,7 @@ class LimitGuard:
     def unresolved(self, tenant: str) -> list[dict[str, Any]]:
         """Operations of ``tenant`` whose outcome is unknown, oldest first, with their charges."""
         out = []
-        for row in self.ledger.operations(tenant, ("unknown",)):
+        for row in self.ledger.operations(tenant, "unknown"):
             out.append({**{k: row[k] for k in ("operation_id", "principal", "tool", "at")},
                         "charges": [{"counter": k.split(_SEP, 1)[0], "amount": a}
                                     for k, a in self.ledger.charges(row["operation_id"])]})
@@ -1077,8 +1078,7 @@ class LimitGuard:
         ``unknown`` after a failure); the next change reads the plant anyway.
         """
         settled = self.ledger.settle(operation_id, ok)
-        self.ledger.set_state(operation_id, "settled" if ok else "unknown",
-                              only_from=("reserved", "started"))
+        self.ledger.finish(operation_id, ok)
         out: list[dict[str, Any]] = []
         if self.observer is None:
             return out

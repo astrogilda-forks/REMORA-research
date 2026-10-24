@@ -235,11 +235,10 @@ def _lease(nonce):
                            tool_args_hash="h" * 64, proposal_id="prop")
 
 
-def test_tool_did_not_execute_needs_its_evidence():
+@pytest.mark.parametrize("source, detail", [("", "refused"), ("rail", "")])
+def test_tool_did_not_execute_needs_its_evidence(source, detail):
     with pytest.raises(ValueError):
-        ToolDidNotExecute("", "refused")
-    with pytest.raises(ValueError):
-        ToolDidNotExecute("rail", "")
+        raise ToolDidNotExecute(source, detail)
 
 
 def test_the_dispatcher_begin_refuses_a_released_reservation(guard):
@@ -252,10 +251,8 @@ def test_the_dispatcher_begin_refuses_a_released_reservation(guard):
     assert d._limit_begin(_lease("n1"), "pay") == cl.RESERVATION_RELEASED
 
 
-def test_an_adapters_proof_makes_the_outcome_failed_not_unknown():
-    base = {"executed": False, "dispatch_began": True}
-    assert classify_outcome(base) is DispatchOutcome.UNKNOWN
-    proof = {**base, "pre_effect_proof": {"source": "rail", "detail": "refused: 402"}}
-    assert classify_outcome(proof) is DispatchOutcome.FAILED
-    half = {**base, "pre_effect_proof": {"source": "rail", "detail": ""}}
-    assert classify_outcome(half) is DispatchOutcome.UNKNOWN
+def test_the_adapters_statement_frees_budget_but_decides_no_outcome():
+    """The budget trusts ToolDidNotExecute; the outcome record does not (CAP-013)."""
+    began = {"executed": False, "dispatch_began": True,
+             "refusal_reason": "tool_did_not_execute"}
+    assert classify_outcome(began) is DispatchOutcome.UNKNOWN
