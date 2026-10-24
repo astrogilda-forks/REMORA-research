@@ -127,6 +127,7 @@ from servers.execution_contracts import (  # noqa: F401
     ExecutionOutcome,
     ExecutionPendingResponse,
     GovernanceAction,
+    LimitResolveRequest,
     LoopSafetyResetRequest,
     PepResult,
     RejectRequest,
@@ -2733,6 +2734,74 @@ def loop_safety_reset(req: LoopSafetyResetRequest, request: Request) -> dict[str
         "reason": req.reason,
     })
     return {"context_id": req.context_id, "reset_by": reviewer, "status": "reset"}
+
+
+def _limits_or_404() -> Any:
+    guard = _limit_guard()
+    if guard is None:
+        raise HTTPException(status_code=404, detail="no cumulative limits are configured")
+    return guard
+
+
+@router.get("/limits/unresolved", responses={
+    200: {"description": "Limit operations of this tenant whose outcome is unknown."},
+    **_AUTH_RESPONSES,
+    404: {"model": ErrorDetail, "description": "No cumulative limits are configured."},
+})
+def limits_unresolved(request: Request) -> dict[str, Any]:
+    """The reservations held because a tool's outcome is unknown, oldest first.
+
+    Each holds budget until a reviewer resolves it against the rail or plant
+    (``POST /limits/resolve``). Reviewer capability, as for resolving.
+    """
+    tenant, role, _ = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "review")
+    return {"operations": _limits_or_404().unresolved(tenant)}
+
+
+@router.post("/limits/resolve", responses={
+    200: {"description": "The operation is settled; a reservation was returned or kept."},
+    **_AUTH_RESPONSES,
+    404: {"model": ErrorDetail, "description": "No limits, or no such operation."},
+    409: {"model": ErrorDetail,
+          "description": "The operation's outcome is not unknown, or the reviewer is the "
+                         "principal it was charged to."},
+})
+def limits_resolve(req: LimitResolveRequest, request: Request) -> dict[str, Any]:
+    """Resolve an unknown outcome from what the rail or plant reports.
+
+    A reviewer, never the principal the operation was charged to, states
+    whether the call executed and names the evidence. ``executed=false``
+    returns the reservation, so a legitimate retry is no longer refused;
+    ``executed=true`` keeps it and makes a duplicate refuse. The decision is
+    appended to the tenant chain with the reviewer, the evidence and the
+    reason. REMORA does not check the evidence; the reviewer answers for it.
+    """
+    tenant, role, reviewer = _auth(request)
+    from servers import api as api_mod
+
+    api_mod._require_tenant_capability(role, tenant, "review")
+    refusal = _limits_or_404().resolve(tenant=tenant, operation_id=req.operation_id,
+                                       executed=req.executed, resolved_by=reviewer,
+                                       reason=f"{req.evidence_ref}: {req.reason}")
+    if refusal == "limit_operation_not_found":
+        raise HTTPException(status_code=404, detail=refusal)
+    if refusal == "limit_ledger_unavailable":
+        raise HTTPException(status_code=503, detail=refusal)
+    if refusal is not None:
+        raise HTTPException(status_code=409, detail=refusal)
+    _CHAIN.append(tenant, {
+        "event": "limit_operation_resolved",
+        "operation_id": req.operation_id,
+        "executed": req.executed,
+        "resolved_by": reviewer,
+        "evidence_ref": req.evidence_ref,
+        "reason": req.reason,
+    })
+    return {"operation_id": req.operation_id, "executed": req.executed,
+            "resolved_by": reviewer, "status": "resolved"}
 
 
 @router.post("/revoke-principal", responses={

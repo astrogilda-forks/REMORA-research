@@ -263,7 +263,7 @@ def _dispatcher(guard):
 
 
 def _lease(nonce="n1"):
-    return SimpleNamespace(tenant_id="t", actor_identity="p", nonce=nonce,
+    return SimpleNamespace(tenant_id="t", actor_identity="p", nonce=nonce, expires_at=None,
                            tool_args_hash="h" * 64, proposal_id="prop")
 
 

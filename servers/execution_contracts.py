@@ -418,6 +418,21 @@ class ContextMintResponse(BaseModel):
     label_epoch: int
 
 
+class LimitResolveRequest(BaseModel):
+    """Settle a cumulative-limit operation whose outcome is unknown.
+
+    ``executed`` is what the rail or the plant says happened, checked by the
+    reviewer outside REMORA; ``evidence_ref`` names where (a rail statement,
+    a controller log, a ticket). ``False`` returns the reservation, ``True``
+    keeps it and settles the operation.
+    """
+
+    operation_id: str = Field(..., min_length=1, max_length=200)
+    executed: bool
+    evidence_ref: str = Field(..., min_length=1, max_length=200)
+    reason: str = Field(..., min_length=1, max_length=512)
+
+
 class LoopSafetyResetRequest(BaseModel):
     """Start a context's loop safety count again, under a named policy decision.
 

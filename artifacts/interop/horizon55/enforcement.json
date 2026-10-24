@@ -2,6 +2,16 @@
  "classification": "author-run replay of a public sequence through REMORA's execution API with a sandboxed tool; not a holdout, not independent",
  "limit_policy": {
   "coverage": "listed",
+  "idempotency": {
+   "transfer_payment": {
+    "key_arguments": [
+     "payee",
+     "amount",
+     "unit",
+     "reference"
+    ]
+   }
+  },
   "limits": [
    {
     "limit_id": "hs51-set2-budget",
