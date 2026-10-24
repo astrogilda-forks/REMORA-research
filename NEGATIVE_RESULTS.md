@@ -5921,8 +5921,10 @@ P0 items 1 to 3): the three are closed in code on one host, with tests in
 
 What remains open:
 
-- The ledger is one host's SQLite. Two hosts with separate ledgers do not
-  share a limit (SDD P0 item 8).
+- The ledger can be a Postgres database shared by every executor (SDD P0
+  item 8, PR after #1053). Two executors on one database are tested in CI;
+  no multi-host deployment has run it, and two hosts with separate SQLite
+  files are still two budgets.
 - The chain record of a resolution is appended after the ledger commits, by
   an idempotent sweep on the next limits call rather than in one
   transaction. A crash between the two leaves a record that arrives late

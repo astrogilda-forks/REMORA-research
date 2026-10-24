@@ -2256,9 +2256,11 @@ capabilities:
       - remora/execution/service.py
       - servers/api.py
     caveat: >-
-      Off by default and enabled in no deployment here. The limits hold on
-      one host: the ledger is SQLite, two hosts with separate ledgers do not
-      share a limit, and no Postgres backend exists. A reservation is
+      Off by default and enabled in no deployment here. The ledger is a SQLite
+      file on one host or a PostgreSQL database every executor shares (one
+      advisory lock per transaction); hosts share a limit only when they share
+      the Postgres ledger, which is tested with two executors on one database
+      in CI and on no multi-host deployment. A reservation is
       returned only when the call provably did not run (fence refusal,
       ToolDidNotExecute from the adapter, lease expired before the tool
       started, or a reviewer's resolution); a call whose outcome is unknown

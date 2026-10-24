@@ -200,6 +200,19 @@ def _check_limits_required(profile: str) -> None:
             f"REMORA runtime profile {profile!r} requires signed, mandatory cumulative "
             "limits with an idempotency key per write tool; missing: " + ", ".join(missing)
         )
+    # Shared authority state with a host-local budget would let two executors
+    # each spend the whole limit (SDD unified capability execution v1.1 §7.1,
+    # G04). When the rest of the authority state is on Postgres, the limit
+    # ledger must be too; a single-host SQLite deployment stays allowed.
+    from remora.enforcement.cumulative_limits import is_postgres_dsn
+
+    ledger = os.getenv("REMORA_LIMITS_LEDGER", "").strip()
+    if _configured("REMORA_PG_DSN") and not is_postgres_dsn(ledger):
+        raise RuntimeProfileError(
+            f"REMORA runtime profile {profile!r} runs its authority state on REMORA_PG_DSN, "
+            "so REMORA_LIMITS_LEDGER must be a PostgreSQL DSN shared by every executor, not "
+            "a host-local SQLite file"
+        )
 
 
 #: Derived information-flow control (SDD v1.3). ``1`` turns it on; any other

@@ -28,6 +28,8 @@ Two more, recorded as open in NEGATIVE_RESULTS section 97 and closed here
 """
 from __future__ import annotations
 
+import os
+import uuid
 from types import SimpleNamespace
 
 import pytest
@@ -71,10 +73,38 @@ def policy(idempotency=IDEMPOTENCY, **changes):
     return cl.LimitPolicy.from_dict(data)
 
 
+BASE_DSN = os.environ.get("REMORA_PG_DSN", "")
+
+
+@pytest.fixture(params=["sqlite", pytest.param("postgres", marks=pytest.mark.skipif(
+    not BASE_DSN, reason="REMORA_PG_DSN not set"))])
+def ledger(request, tmp_path):
+    """The same ledger contract on a SQLite file and, with a DSN, on Postgres.
+
+    Each Postgres test gets its own schema, so a shared service never carries
+    one test's reservations into the next.
+    """
+    if request.param == "sqlite":
+        yield cl.LimitLedger(tmp_path / "ledger.db")
+        return
+    psycopg = pytest.importorskip("psycopg")
+    conninfo = pytest.importorskip("psycopg.conninfo")
+    schema = f"limits_{uuid.uuid4().hex[:12]}"
+    with psycopg.connect(BASE_DSN) as conn:
+        conn.execute(f"CREATE SCHEMA {schema}")
+        conn.commit()
+    try:
+        yield cl.LimitLedger(conninfo.make_conninfo(BASE_DSN, options=f"-c search_path={schema}"))
+    finally:
+        with psycopg.connect(BASE_DSN) as conn:
+            conn.execute(f"DROP SCHEMA {schema} CASCADE")
+            conn.commit()
+
+
 @pytest.fixture()
-def guard(tmp_path):
+def guard(ledger):
     RAIL_SAYS.clear()
-    return cl.LimitGuard(policy(), cl.LimitLedger(tmp_path / "ledger.db"), evidence=rail)
+    return cl.LimitGuard(policy(), ledger, evidence=rail)
 
 
 def pay(guard, op, reference="INV-1", amount=7000, now=T0, expires_at=None):

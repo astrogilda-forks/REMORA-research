@@ -642,9 +642,14 @@ packages ([design](design/ws1-deterministic-authorization-learned-monitoring-v1.
 **Cumulative limits (opt-in, default off):** a check on one call cannot see
 that three payments pass a budget, that small setpoint moves add up, or that
 a fan was started too often. `REMORA_LIMITS_FILE` names a YAML or JSON
-`remora-cumulative-limits/v1` policy and `REMORA_LIMITS_LEDGER` the SQLite
-file its reservations are kept in. Either one without the other refuses
-startup.
+`remora-cumulative-limits/v1` policy and `REMORA_LIMITS_LEDGER` where its
+reservations are kept: a SQLite file on one host, or a PostgreSQL DSN
+(`postgresql://...` or a libpq `key=value` string) that every executor shares.
+On Postgres every ledger transaction takes one advisory lock. Two hosts
+reserving against the same limit are therefore serialized, as one host's
+SQLite transactions are, and the schema is created on first open under that
+lock.
+Either one without the other refuses startup.
 
 The policy has four parts. `meters` says what one call of a tool consumes. A
 `sum` meter reads an amount argument, a `count` meter charges `per_call`, and
@@ -753,7 +758,8 @@ covers it. `REMORA_REQUIRE_LIMITS=1` makes limits mandatory:
 startup refuses without limits, without trusted keys, or with coverage other
 than `all_writes`. The `controlled_pilot` runtime profile requires it, together
 with `REMORA_LIMITS_FILE`, `REMORA_LIMITS_LEDGER`, `REMORA_LIMITS_TRUSTED_KEYS`
-and `REMORA_REQUIRE_IDEMPOTENCY` (below); `review` and `research` do not,
+and `REMORA_REQUIRE_IDEMPOTENCY` (below), and a PostgreSQL `REMORA_LIMITS_LEDGER`
+whenever `REMORA_PG_DSN` is set; `review` and `research` do not,
 and the OT pilot sets `REMORA_REQUIRE_LIMITS` itself. `/assess`
 gives the same answer earlier as a 409 and records `limit_refused` on the
 chain. That check reserves nothing; the reservation at dispatch is what
@@ -809,7 +815,8 @@ ledger and the next limits call appends the record. A crash between the two
 steps therefore leaves no undocumented release, only a record that arrives
 late. The checker is only as trustworthy
 as the deployment's source; REMORA verifies that it answered and agreed, not
-that the rail told the truth. The ledger is per host. A
+that the rail told the truth. Hosts share a limit only when they share the
+Postgres ledger; separate SQLite files are separate limits. A
 `change` meter that is not observed tracks the values REMORA let through, not
 the plant.
 NEGATIVE_RESULTS.md §97 has the measurement and CAP-031 the caveats.

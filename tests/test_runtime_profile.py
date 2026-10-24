@@ -235,3 +235,16 @@ def test_strict_profile_requires_an_intent_resolver(monkeypatch) -> None:
     monkeypatch.delenv("REMORA_SEMANTIC_BUNDLE_MODULE", raising=False)
     with pytest.raises(RuntimeProfileError, match="intent resolver"):
         validate_runtime_profile_prerequisites()
+
+
+def test_controlled_pilot_on_postgres_requires_a_shared_limit_ledger(monkeypatch) -> None:
+    """SDD §7.1 / G04: shared authority state with a host-local budget lets each executor spend it all."""
+    _clear(monkeypatch)
+    _configure_strict(monkeypatch, "controlled_pilot")
+    monkeypatch.setenv("REMORA_ENV", "production")
+    monkeypatch.delenv("REMORA_CHAIN_DB")
+    monkeypatch.setenv("REMORA_PG_DSN", "postgresql://remora@db/remora")
+    with pytest.raises(RuntimeProfileError, match="REMORA_LIMITS_LEDGER must be a PostgreSQL DSN"):
+        validate_runtime_profile_prerequisites()
+    monkeypatch.setenv("REMORA_LIMITS_LEDGER", "postgresql://remora@db/remora")
+    assert validate_runtime_profile_prerequisites() == "controlled_pilot"

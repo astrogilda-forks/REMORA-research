@@ -58,8 +58,10 @@ be an integer, so a move too small to count is refused rather than rounded
 to nothing. Negative amounts are refused, so nothing can be paid back into
 a limit by a call.
 
-What this guarantees: on one host, the sum of reservations inside a window
-never passes the limit (one SQLite transaction per call). A reservation is
+What this guarantees: the sum of reservations inside a window never passes
+the limit, because every reservation is one serialized ledger transaction
+(``BEGIN IMMEDIATE`` on a host's SQLite file; one advisory lock on a
+Postgres database that every executor shares). A reservation is
 returned only when the call provably did not run:
 
 - the fence refused before the write;
@@ -77,14 +79,16 @@ guard without an evidence checker refuses every resolution
 (``limit_evidence_unchecked``), so the budget stays held. A ``change`` meter's last value is the value REMORA last let
 through; a call that fails or whose outcome is unknown leaves the resource
 ``unknown``, and the next change refuses until a baseline with a new
-``seed_id`` is declared or the outcome is resolved. It is not a distributed
-limit across hosts, and it does not observe the plant or the payment rail.
+``seed_id`` is declared or the outcome is resolved. Hosts share a limit only
+when they share the Postgres ledger; separate SQLite files are separate
+limits. The ledger does not observe the plant or the payment rail.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import math
+import re
 import sqlite3
 import time
 from collections.abc import Callable, Iterator, Mapping
@@ -434,89 +438,164 @@ class Reading:
     value: int  # scaled amount (sum, count) or scaled new value (change)
 
 
+#: The tables, in a dialect both backends read. ``{REAL}`` is the backend's
+#: double-precision type: SQLite ``REAL`` is 8 bytes, Postgres ``REAL`` is 4
+#: and would round epoch seconds.
+_DDL = (
+    "CREATE TABLE IF NOT EXISTS limit_counter ("
+    " counter_key TEXT PRIMARY KEY, binding TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS limit_reservation ("
+    " counter_key TEXT NOT NULL REFERENCES limit_counter(counter_key),"
+    " operation_id TEXT NOT NULL, request_hash TEXT NOT NULL,"
+    " amount INTEGER NOT NULL CHECK(amount >= 0), at {REAL} NOT NULL,"
+    " PRIMARY KEY(counter_key, operation_id))",
+    "CREATE TABLE IF NOT EXISTS limit_observation ("
+    " operation_id TEXT NOT NULL, value_key TEXT NOT NULL,"
+    " observed TEXT NOT NULL, charged INTEGER NOT NULL,"
+    " PRIMARY KEY(operation_id, value_key))",
+    "CREATE TABLE IF NOT EXISTS limit_value ("
+    " value_key TEXT PRIMARY KEY, value INTEGER NOT NULL,"
+    " status TEXT NOT NULL CHECK(status IN ('settled','pending','unknown')),"
+    " operation_id TEXT NOT NULL, seed_id TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS limit_operation ("
+    " operation_id TEXT PRIMARY KEY, tenant TEXT NOT NULL,"
+    " principal TEXT NOT NULL, tool TEXT NOT NULL, op_key TEXT,"
+    " state TEXT NOT NULL CHECK(state IN"
+    " ('reserved','started','settled','unknown','released')),"
+    " expires_at {REAL}, at {REAL} NOT NULL,"
+    " resolved_by TEXT, resolution TEXT)",
+    "CREATE INDEX IF NOT EXISTS limit_operation_key ON limit_operation(op_key)",
+)
+
+#: Transaction-scoped Postgres advisory lock that serializes every ledger
+#: transaction, as ``BEGIN IMMEDIATE`` does on SQLite. One key for the whole
+#: ledger: the invariant is a sum over every reservation that matches a
+#: limit, and a lock per counter would still need the operation and value
+#: rows; serializing the ledger is the proven semantics, and a pilot's limit
+#: traffic is far below what that costs.
+_PG_LOCK_KEY = 0x52454D4C  # "REML"
+_PG_SCHEMES = ("postgres://", "postgresql://")
+_PG_KEYWORD = re.compile(r"^\s*[A-Za-z_]+\s*=")
+
+
+def is_postgres_dsn(spec: str) -> bool:
+    """Whether ``spec`` names a PostgreSQL database rather than a SQLite file.
+
+    A libpq URL (``postgresql://...``) or a libpq keyword string
+    (``host=... dbname=...``, which ``psycopg.conninfo.make_conninfo``
+    produces). A file path is neither.
+    """
+    return spec.startswith(_PG_SCHEMES) or bool(_PG_KEYWORD.match(spec))
+
+
+class _PgConnection:
+    """A psycopg connection that takes this module's ``?`` SQL.
+
+    Every statement in this module is written once, with ``?`` placeholders
+    and no ``?`` or ``%`` anywhere else, so the rewrite is textual. psycopg's
+    ``execute`` returns a cursor with ``fetchone`` and ``fetchall``, as
+    sqlite3's does, so the callers do not know which backend they hold.
+    """
+
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> Any:
+        return self._conn.execute(sql.replace("?", "%s"), params)
+
+
 class LimitLedger:
-    """Single-host SQLite ledger of reservations and last values.
+    """Ledger of reservations and last values: one host's SQLite file, or a
+    PostgreSQL database every executor shares.
+
+    ``spec`` is a file path, or a ``postgres://`` / ``postgresql://`` DSN.
+    On SQLite every transaction is ``BEGIN IMMEDIATE``; on Postgres every
+    transaction takes one advisory lock (``_PG_LOCK_KEY``), so in both the
+    reads and writes of a reservation are serial against every other
+    executor's, and the sum of reservations inside a window never passes the
+    limit across hosts. The schema is created on first open, under the same
+    lock, so two executors opening a fresh database do not race the catalog.
 
     Kept in ``remora/enforcement``: the enforcement core does not import the
     verification library (tests/verification/test_architecture_boundary.py).
     """
 
-    def __init__(self, path: str | Path) -> None:
-        from remora.persistence.sqlite_path import refuse_memory_db
+    def __init__(self, spec: str | Path) -> None:
+        spec = str(spec)
+        self.dsn = spec if is_postgres_dsn(spec) else ""
+        self.path = "" if self.dsn else spec
+        if not self.dsn:
+            from remora.persistence.sqlite_path import refuse_memory_db
 
-        self.path = str(path)
-        refuse_memory_db(self.path, what="cumulative limit ledger")
-        with self._connect() as conn:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS limit_counter (
-                    counter_key TEXT PRIMARY KEY, binding TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS limit_reservation (
-                    counter_key TEXT NOT NULL REFERENCES limit_counter(counter_key),
-                    operation_id TEXT NOT NULL, request_hash TEXT NOT NULL,
-                    amount INTEGER NOT NULL CHECK(amount >= 0), at REAL NOT NULL,
-                    PRIMARY KEY(counter_key, operation_id)
-                );
-                CREATE TABLE IF NOT EXISTS limit_observation (
-                    operation_id TEXT NOT NULL, value_key TEXT NOT NULL,
-                    observed TEXT NOT NULL, charged INTEGER NOT NULL,
-                    PRIMARY KEY(operation_id, value_key)
-                );
-                CREATE TABLE IF NOT EXISTS limit_value (
-                    value_key TEXT PRIMARY KEY, value INTEGER NOT NULL,
-                    status TEXT NOT NULL CHECK(status IN ('settled','pending','unknown')),
-                    operation_id TEXT NOT NULL, seed_id TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS limit_operation (
-                    operation_id TEXT PRIMARY KEY, tenant TEXT NOT NULL,
-                    principal TEXT NOT NULL, tool TEXT NOT NULL, op_key TEXT,
-                    state TEXT NOT NULL CHECK(state IN
-                        ('reserved','started','settled','unknown','released')),
-                    expires_at REAL, at REAL NOT NULL,
-                    resolved_by TEXT, resolution TEXT
-                );
-                CREATE INDEX IF NOT EXISTS limit_operation_key ON limit_operation(op_key);
-            """)
+            refuse_memory_db(self.path, what="cumulative limit ledger")
+        with self.transaction() as conn:
+            real = "DOUBLE PRECISION" if self.dsn else "REAL"
+            for statement in _DDL:
+                conn.execute(statement.replace("{REAL}", real))
             self._migrate(conn)
 
-    #: Columns added after the first ledgers were created. A ledger file from
-    #: an earlier version gains them on open; their defaults describe the old
+    @property
+    def shared(self) -> bool:
+        """Whether more than one host can hold this ledger (a Postgres DSN)."""
+        return bool(self.dsn)
+
+    #: Columns added after the first ledgers were created. A ledger from an
+    #: earlier version gains them on open; their defaults describe the old
     #: rows truthfully (nothing recorded, no evidence named).
     _ADDED_COLUMNS = (
         ("evidence_ref", "TEXT"),
         ("reason", "TEXT"),
-        ("resolved_at", "REAL"),
+        ("resolved_at", "{REAL}"),
         ("audit_recorded", "INTEGER NOT NULL DEFAULT 0"),
     )
 
-    @classmethod
-    def _migrate(cls, conn: sqlite3.Connection) -> None:
+    def _migrate(self, conn: Any) -> None:
+        if self.dsn:
+            for name, declaration in self._ADDED_COLUMNS:
+                conn.execute(f"ALTER TABLE limit_operation ADD COLUMN IF NOT EXISTS {name} "
+                             f"{declaration.replace('{REAL}', 'DOUBLE PRECISION')}")
+            return
         present = {row[1] for row in conn.execute("PRAGMA table_info(limit_operation)")}
-        for name, declaration in cls._ADDED_COLUMNS:
+        for name, declaration in self._ADDED_COLUMNS:
             if name not in present:
-                conn.execute(f"ALTER TABLE limit_operation ADD COLUMN {name} {declaration}")
+                conn.execute(f"ALTER TABLE limit_operation ADD COLUMN {name} "
+                             f"{declaration.replace('{REAL}', 'REAL')}")
 
     @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self.path, timeout=5.0)
+    def _connect(self) -> Iterator[Any]:
+        """One connection, committed on a clean exit and rolled back on an exception."""
+        if self.dsn:
+            import psycopg  # type: ignore[import-not-found]
+
+            with psycopg.connect(self.dsn) as conn:
+                yield _PgConnection(conn)
+            return
+        sqlite = sqlite3.connect(self.path, timeout=5.0)
         try:
-            conn.execute("PRAGMA foreign_keys=ON")
-            with conn:
-                yield conn
+            sqlite.execute("PRAGMA foreign_keys=ON")
+            with sqlite:
+                yield sqlite
         finally:
-            conn.close()
+            sqlite.close()
 
     def transaction(self) -> Any:
-        """One ``BEGIN IMMEDIATE`` transaction: reads and writes in it are serial."""
+        """One serialized transaction: reads and writes in it are serial across executors.
+
+        ``BEGIN IMMEDIATE`` on SQLite; on Postgres the ledger's advisory lock,
+        held until the transaction commits or rolls back.
+        """
         @contextmanager
-        def _tx() -> Iterator[sqlite3.Connection]:
+        def _tx() -> Iterator[Any]:
             with self._connect() as conn:
-                conn.execute("BEGIN IMMEDIATE")
+                if self.dsn:
+                    conn.execute("SELECT pg_advisory_xact_lock(?)", (_PG_LOCK_KEY,))
+                else:
+                    conn.execute("BEGIN IMMEDIATE")
                 yield conn
         return _tx()
 
     @staticmethod
-    def used(conn: sqlite3.Connection, key: str, binding: str,
+    def used(conn: Any, key: str, binding: str,
              window_seconds: int | None, now: float) -> int:
         row = conn.execute("SELECT binding FROM limit_counter WHERE counter_key=?",
                            (key,)).fetchone()
@@ -529,27 +608,27 @@ class LimitLedger:
         return int(total)
 
     @staticmethod
-    def prior(conn: sqlite3.Connection, key: str, operation_id: str) -> tuple[str, int] | None:
+    def prior(conn: Any, key: str, operation_id: str) -> tuple[str, int] | None:
         row = conn.execute("SELECT request_hash,amount FROM limit_reservation "
                            "WHERE counter_key=? AND operation_id=?",
                            (key, operation_id)).fetchone()
         return None if row is None else (row[0], int(row[1]))
 
     @staticmethod
-    def record(conn: sqlite3.Connection, key: str, binding: str, operation_id: str,
+    def record(conn: Any, key: str, binding: str, operation_id: str,
                request_hash: str, amount: int, now: float) -> None:
-        conn.execute("INSERT OR IGNORE INTO limit_counter VALUES(?,?)", (key, binding))
+        conn.execute("INSERT INTO limit_counter VALUES(?,?) ON CONFLICT DO NOTHING", (key, binding))
         conn.execute("INSERT INTO limit_reservation VALUES(?,?,?,?,?)",
                      (key, operation_id, request_hash, amount, now))
 
     @staticmethod
-    def value(conn: sqlite3.Connection, key: str) -> tuple[int, str, str, str] | None:
+    def value(conn: Any, key: str) -> tuple[int, str, str, str] | None:
         row = conn.execute("SELECT value,status,operation_id,seed_id FROM limit_value "
                            "WHERE value_key=?", (key,)).fetchone()
         return None if row is None else (int(row[0]), row[1], row[2], row[3])
 
     @staticmethod
-    def set_value(conn: sqlite3.Connection, key: str, value: int, status: str,
+    def set_value(conn: Any, key: str, value: int, status: str,
                   operation_id: str, seed_id: str) -> None:
         conn.execute("INSERT INTO limit_value VALUES(?,?,?,?,?) ON CONFLICT(value_key) DO "
                      "UPDATE SET value=excluded.value, status=excluded.status, "
@@ -569,9 +648,9 @@ class LimitLedger:
         return [(str(key), int(value)) for key, value in rows]
 
     @staticmethod
-    def record_observation(conn: sqlite3.Connection, operation_id: str, value_key: str,
+    def record_observation(conn: Any, operation_id: str, value_key: str,
                            observed: Decimal, charged: int) -> None:
-        conn.execute("INSERT OR IGNORE INTO limit_observation VALUES(?,?,?,?)",
+        conn.execute("INSERT INTO limit_observation VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                      (operation_id, value_key, str(observed), charged))
 
     def observations(self, operation_id: str) -> list[tuple[str, Decimal, int]]:
@@ -594,7 +673,7 @@ class LimitLedger:
             self.release_in(conn, operation_id)
 
     @staticmethod
-    def release_in(conn: sqlite3.Connection, operation_id: str) -> None:
+    def release_in(conn: Any, operation_id: str) -> None:
         """``release`` inside an open transaction.
 
         A change meter's value row is put back to the value the reservation
@@ -613,7 +692,7 @@ class LimitLedger:
                      (operation_id,))
 
     @staticmethod
-    def operation(conn: sqlite3.Connection, operation_id: str) -> dict[str, Any] | None:
+    def operation(conn: Any, operation_id: str) -> dict[str, Any] | None:
         row = conn.execute(f"SELECT {_OPERATION_SELECT} FROM limit_operation "  # noqa: S608 - fixed column list
                            "WHERE operation_id=?", (operation_id,)).fetchone()
         return None if row is None else dict(zip(_OPERATION_FIELDS, row, strict=True))
@@ -634,7 +713,7 @@ class LimitLedger:
                          (operation_id,))
 
     @staticmethod
-    def same_key(conn: sqlite3.Connection, op_key: str, operation_id: str) -> list[str]:
+    def same_key(conn: Any, op_key: str, operation_id: str) -> list[str]:
         """States of other operations with this key that have not been released."""
         rows = conn.execute("SELECT state FROM limit_operation WHERE op_key=? AND "
                             "operation_id!=? AND state!='released'",
@@ -658,7 +737,7 @@ class LimitLedger:
     def debit(self, key: str, operation_id: str, amount: int, now: float) -> None:
         """Charge movement found after the fact; it is not checked against the limit."""
         with self._connect() as conn:
-            conn.execute("INSERT OR IGNORE INTO limit_reservation VALUES(?,?,?,?,?)",
+            conn.execute("INSERT INTO limit_reservation VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                          (key, operation_id, "after-the-fact", amount, now))
 
     def observe(self, value_key: str, value: int) -> None:
@@ -804,7 +883,7 @@ class LimitGuard:
             out.append(Reading(meter, unit, resource, value))
         return out
 
-    def _plan(self, conn: sqlite3.Connection, *, tenant: str, principal: str,
+    def _plan(self, conn: Any, *, tenant: str, principal: str,
               readings: list[Reading], operation_id: str, request_hash: str,
               now: float, observed: Mapping[int, Decimal] | None = None,
               ) -> tuple[bool, list[tuple[Limit, str, int]], list[tuple[str, int, str]],
@@ -900,7 +979,7 @@ class LimitGuard:
         return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _duplicate(conn: sqlite3.Connection, op_key: str | None,
+    def _duplicate(conn: Any, op_key: str | None,
                    operation_id: str) -> str | None:
         """The refusal for another live operation with the same key, or None."""
         if op_key is None:
@@ -915,7 +994,7 @@ class LimitGuard:
         return None
 
     @staticmethod
-    def _release_expired(conn: sqlite3.Connection, now: float) -> None:
+    def _release_expired(conn: Any, now: float) -> None:
         """Release reservations whose lease expired before the tool was started.
 
         Such a lease can no longer be dispatched, and ``begin`` refuses one
@@ -979,8 +1058,9 @@ class LimitGuard:
                         self.ledger.record_observation(conn, operation_id, value_key, seen,
                                                        amount)
                     conn.execute(
-                        "INSERT OR IGNORE INTO limit_operation(operation_id,tenant,principal,"
-                        "tool,op_key,state,expires_at,at) VALUES(?,?,?,?,?,'reserved',?,?)",
+                        "INSERT INTO limit_operation(operation_id,tenant,principal,"
+                        "tool,op_key,state,expires_at,at) VALUES(?,?,?,?,?,'reserved',?,?) "
+                        "ON CONFLICT DO NOTHING",
                         (operation_id, tenant, principal, tool_name, op_key,
                          None if expires_at is None else _epoch(expires_at), at))
         except _Refused as exc:
@@ -1063,7 +1143,7 @@ class LimitGuard:
         return False
 
     @staticmethod
-    def _resolvable(conn: sqlite3.Connection, tenant: str, operation_id: str,
+    def _resolvable(conn: Any, tenant: str, operation_id: str,
                     resolved_by: str) -> tuple[dict[str, Any] | None, str | None]:
         row = LimitLedger.operation(conn, operation_id)
         if row is None or row["tenant"] != tenant:

@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Cumulative limits: a shared Postgres ledger (SDD unified capability execution v1.1, P0 item 8)
+
+- `REMORA_LIMITS_LEDGER` may name a PostgreSQL DSN (`postgresql://...` or a libpq `key=value` string) instead of a SQLite file. Every ledger transaction takes one advisory lock, so two executors reserving against the same limit are serialized as one host's `BEGIN IMMEDIATE` transactions were; the schema is created on first open under the same lock. `tests/limits/test_limits_postgres.py` runs two executors on one database in the `postgres-contract` job: the sum never passes the limit, the same operation runs once, an unknown outcome resolves across executors.
+- `controlled_pilot` refuses a SQLite limit ledger when `REMORA_PG_DSN` is set: shared authority state with a host-local budget would let every executor spend the whole limit.
+- Still not established: activation on a multi-host deployment. Two hosts with separate SQLite files remain two budgets.
+
 ### Cumulative limits: the open §97 items on one host (SDD unified capability execution v1.1, P0 items 1 to 3)
 
 - A `ToolDidNotExecute` statement frees a reservation only from a source the signed limit policy names in `non_execution.<tool>.trusted_sources`; from any other source the call is held as unknown until resolved. The dispatch still reports `tool_did_not_execute`, and its `dispatch.refused` event says whether the reservation was `released` or `held`.
