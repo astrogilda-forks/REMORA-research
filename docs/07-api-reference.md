@@ -1067,6 +1067,18 @@ restart-proven by test.
   yet. The effective mode, the startup validation, the lease field and the
   catalogue route are the next slices, and every mode is NOT_ESTABLISHED
   until they land.
+- `remora/governance/capability_activation.py`: the effective mode per
+  capability, from the signed requested mode, the premises this process can
+  verify (`PREMISES`, each stating what it checks) and the registered maturity
+  in the packaged catalogue `capability_catalogue_v1.json`. A capability absent
+  from the manifest is `DISABLED`. A failed or unverifiable premise applies the
+  entry's fail mode (`DISABLED`, or `BLOCKED`, never allow). An enforcing
+  request below `WIRED_API_PATH` is downgraded to the highest non-enforcing
+  allowed mode. `servers/api.py` computes the report at startup
+  (`CAPABILITY_ACTIVATION`). With `REMORA_CAM_REQUIRED=1` startup refuses
+  without a loadable manifest, with an entry the catalogue does not have, and,
+  under a strict profile, with a registered capability left out. No
+  enforcement path reads the report yet.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.
