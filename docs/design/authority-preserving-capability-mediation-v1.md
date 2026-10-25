@@ -283,6 +283,9 @@ where it already has the meaning:
 | the lease was never dispatched (effect domain) | `execution_not_started` |
 | the dispatch or closure state cannot be read (effect domain) | `execution_state_unverifiable` |
 | an effect request that cannot be parsed (effect domain) | `request_malformed` |
+| a network effect on a host the flow check did not approve as a recipient (IFC-12) | `capability_recipient_not_approved` |
+| the executor's recipient set differs from the one the lease signs (dispatcher, IFC-12) | `flow_recipients_changed` |
+| the worker presents no recipient set, or not the signed one (effect domain, IFC-12) | `flow_recipients_mismatch` |
 
 Proposed and not needed so far: `capability_resolution_unknown`,
 `capability_provider_not_authorized` (a provider switch is a resource refusal

@@ -79,7 +79,7 @@ def _binding(call) -> tuple[int, str, str]:
         if obs.flow_status != "evaluated":
             return 0, "0" * 64, digest(call["arguments"])
         expected = (int(obs.flow_epoch), str(obs.flow_digest))
-        _refusal, _commit, resolved, release = exec_mod._flow_at_dispatch(
+        _refusal, _commit, resolved, release, _approved = exec_mod._flow_at_dispatch(
             "acme", tool_call, expected, "p-mint")
         if release is not None:
             release()  # the mint-time check must not hold the context
@@ -375,3 +375,70 @@ def test_a_live_fence_of_another_proposal_refuses_before_the_tool(executor):
     assert executor.registry.CALLS == []
     contexts.end_dispatch("acme", "employee-1", context_id, held)
     assert _post(executor, lease, call=call).json()["tool_execution"]["executed"] is True
+
+
+# ── IFC-12: the recipients the flow check approved bind the mediated effects ─
+
+NOTIFY_FLOW = parse_flow({
+    "provider": "tcb",
+    "arguments": {"url": {"kind": "url"}, "message": {"kind": "text"}},
+    "sources": {"default_integrity": "TRUSTED", "fields": [
+        {"path": "$", "return_mode": "BY_VALUE", "type": "object",
+         "readers": {"static": [USER, MODEL]}},
+        {"path": "$.sent", "return_mode": "BY_VALUE", "type": "string",
+         "readers": {"static": [USER, MODEL]}},
+        {"path": "$.leak", "return_mode": "BY_VALUE", "type": "string",
+         "readers": {"static": [USER, MODEL]}}]},
+    "sink": {"recipients": {"url_host_of": "url"}, "payload_args": ["message"]}})
+NOTIFY = {"tool_name": "notify_partner",
+          "arguments": {"url": "https://partner.example/hook", "message": "closed"},
+          "target_environment": "staging"}
+
+
+def test_a_mediated_tool_may_send_the_payload_only_to_the_recipients_the_flow_check_approved(
+        executor):
+    """§3.5.1 of the flow-control design: the tool was approved to post to
+    partner.example and, misbehaving, also posts to a collector nobody
+    approved. The mediator refuses the second effect as
+    capability_recipient_not_approved before any executor runs; the first
+    goes through; the lease carries the digest of the approved set."""
+    from remora.capabilities import CapabilityPolicy, CapabilityResolver
+    from remora.enforcement.effect_capability import DownstreamCeiling
+    from remora.enforcement.flow_recipients import recipients_digest
+    import servers.execution_api as exec_mod
+
+    exec_mod_spec = exec_mod._flow_spec
+    executor.monkeypatch.setattr(
+        exec_mod, "_flow_spec",
+        lambda tool: NOTIFY_FLOW if tool == "notify_partner" else exec_mod_spec(tool))
+    ceiling = DownstreamCeiling.from_dict("notify_partner", [
+        {"capability": "network.http.post",
+         "resources": ["https://partner.example/*", "https://exfil.example/*"],
+         "purpose": "notify"}])
+    executor.monkeypatch.setattr(
+        exec_mod, "_downstream_ceiling", lambda tool: ceiling if tool == "notify_partner" else None)
+    policy = CapabilityPolicy.from_dict({
+        "policy_version": "p", "registry_version": "r",
+        "registry": {"notify_partner": ["staging"]},
+        "principals": {"employee-1": ["notify_partner"]}, "tasks": {"notify": ["notify_partner"]},
+        "tenants": {"acme": ["notify_partner"]}, "environments": {"staging": ["notify_partner"]}})
+    capability_set = CapabilityResolver(policy).resolve(
+        principal_id="employee-1", tenant_id="acme", environment="staging", task_type="notify",
+        now=datetime.now(UTC))
+    call = dict(NOTIFY, context_id=_context(executor), task_id="task-1")
+    lease = issue_execution_lease(
+        tenant="acme", principal="employee-1", tool_call=SimpleNamespace(**call),
+        semantic=SEMANTIC, now=datetime.now(UTC), policy_bundle_hash=executor.bundle,
+        task_identity=TaskIdentity.from_fields(
+            {"context_id": call["context_id"], "task_id": "task-1"}),
+        capability_set=capability_set, flow_binding=_binding(call),
+        flow_recipients=frozenset({"ext://partner.example"}))
+    assert lease.flow_recipients_digest == recipients_digest({"ext://partner.example"})
+    executor.registry.EFFECTS.clear()
+    body = _post(executor, lease, call=call, capability_set=capability_set.to_dict()).json()
+    execution = body["tool_execution"]
+    assert execution["executed"] is True, body
+    assert execution["result"]["sent"] == "EXECUTED"
+    assert execution["result"]["leak"] == "capability_recipient_not_approved"
+    assert executor.registry.EFFECTS == [("network.http.post", "https://partner.example/hook")]
+    assert execution["nested_effects"]["by_state"] == {"EXECUTED": 1, "REFUSED": 1}

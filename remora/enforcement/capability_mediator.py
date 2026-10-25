@@ -36,6 +36,7 @@ from typing import Any
 from remora.capabilities.model import CapabilityRefusal, EffectiveCapabilitySet
 from remora.capabilities.resource import ResourceRefused, canonical_resource
 from remora.enforcement.execution_context import ExecutionContext
+from remora.enforcement.flow_recipients import effect_recipient
 from remora.frozen_json import freeze, thaw
 
 __all__ = ["MAX_NESTED_EFFECTS", "CapabilityMediator", "EffectExecutor", "EffectRefused",
@@ -179,6 +180,14 @@ class CapabilityMediator:
             shown = canonical_resource(resource)
         except ResourceRefused:
             return CapabilityRefusal.RESOURCE_NOT_AUTHORIZED, shown
+        # IFC-12: under flow control the call's payload may reach only the
+        # recipients the flow check approved; a network effect elsewhere is
+        # refused before the ceiling is consulted, so the record says why.
+        approved = self._context.flow_recipients
+        if approved is not None:
+            recipient = effect_recipient(capability, shown)
+            if recipient is not None and recipient not in approved:
+                return CapabilityRefusal.RECIPIENT_NOT_APPROVED, shown
         refusal = self._authority.check(
             capability, principal_id=self._context.tool_name,
             tenant_id=self._context.tenant_id, environment=self._context.target_environment,

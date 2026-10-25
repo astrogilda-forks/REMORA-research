@@ -140,6 +140,7 @@ FILE_THRESHOLDS: dict[str, float] = {
     "remora/enforcement/effect_domain.py": 98.0,  # 100.00 measured 2026-09-29
     "remora/enforcement/cumulative_limits.py": 98.0,  # 100.00 measured 2026-10-22
     "remora/enforcement/effect_client.py": 98.0,  # 100.00 measured 2026-09-29
+    "remora/enforcement/flow_recipients.py": 98.0,  # 100.00 measured 2026-10-25 (IFC-12, first slice)
     "remora/enforcement/binding_policy.py": 98.0,  # 100.00 measured 2026-10-07 (CR-006)
     # RES-013 runtime surface (quality program Q5.3). Measured 2026-09-28 on
     # the full local suite; floors sit half a point under the measurement.

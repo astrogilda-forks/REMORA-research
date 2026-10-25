@@ -499,7 +499,10 @@ envelope from that trail on read; it is never stored. `POST /effects` and
 `POST /effects/close` (`execute`) are the effect domain of the three-domain
 mediation split (NTA-2 phase 3). The domain verifies the lease and that it was
 dispatched, derives authority from its own ToolSpec ceiling, and answers
-`REFUSED` or `EXECUTED` without raising. A lease for another tenant is a 409.
+`REFUSED` or `EXECUTED` without raising. A lease for another tenant is a 409. A lease
+judged under flow control carries `flow_recipients_digest`; the request then carries
+`flow_recipients`, the set the executor computed, and a missing or different set is
+`flow_recipients_mismatch` (IFC-12).
 
 **Execution context (opt-in).** `REMORA_REQUIRE_EXECUTION_CONTEXT=1` with
 `REMORA_EXECUTION_CONTEXT_MODULE` naming a deployment provider binds a
@@ -897,7 +900,7 @@ lease unspent. An unset setting leaves dispatch as it was.
 | `REMORA_STATE_REVISION_MODULE` (`read_revision(resource)`) | A call may carry `plan` (`plan_id`, `reads`, `depends_on`); its dependencies are re-read before the write | `stale_plan`, `plan_state_unverifiable` |
 | `REMORA_RECORDER_ADDRESS` with `REMORA_RECORDER_MANDATORY_TOOLS` | The intent is appended to the independent recorder (`python -m remora.audit.recorder`) before the named tools run | `recorder_unavailable` |
 | `REMORA_PROCEDURE_MODULE` (`contract()`, `trace_for(lease)`) | A step that would violate the procedure's safety obligations is refused before it runs | `procedure_violation`, `procedure_trace_unavailable` |
-| `REMORA_FLOW_CONTROL=1` (IFC-06) | The flow decision the authority judged (context epoch, verdict digest, hash of the call with every handle resolved) is signed into the lease; the executing domain compares its live context and the arguments the tool is about to receive against it, never against a value of its own. The check then holds the context with a dispatch fence on its event stream until the result commits, so a second call in the same context refuses before its tool runs; the fence expires with the lease TTL | `flow_lease_unbound`, `flow_epoch_changed`, `flow_digest_changed`, `flow_dispatch_contended`, `resolved_call_mismatch` |
+| `REMORA_FLOW_CONTROL=1` (IFC-06) | The flow decision the authority judged (context epoch, verdict digest, hash of the call with every handle resolved) is signed into the lease; the executing domain compares its live context and the arguments the tool is about to receive against it, never against a value of its own. The check then holds the context with a dispatch fence on its event stream until the result commits, so a second call in the same context refuses before its tool runs; the fence expires with the lease TTL. The recipients the verdict approved are signed into the lease as `flow_recipients_digest` (IFC-12, first slice): the mediator admits a network effect only on a host among them (`capability_recipient_not_approved` in the effect record), and the effect domain verifies the set the worker presents (`flow_recipients_mismatch`) | `flow_lease_unbound`, `flow_epoch_changed`, `flow_digest_changed`, `flow_dispatch_contended`, `resolved_call_mismatch`, `flow_recipients_changed` |
 
 The evidence export (`GET /proposals/{proposal_id}/evidence`) carries an
 `evidence_coverage` section in its hashed manifest. It says, for the claims

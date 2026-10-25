@@ -56,6 +56,9 @@ class CapabilityRefusal(str, Enum):
     DEFAULT_UNRESOLVED = "capability_default_unresolved"
     EXECUTOR_UNAVAILABLE = "capability_executor_unavailable"
     EFFECT_BUDGET_EXHAUSTED = "capability_effect_budget_exhausted"
+    # IFC-12: a network effect on a host the flow check did not approve as a
+    # recipient of this call's payload (remora.enforcement.flow_recipients).
+    RECIPIENT_NOT_APPROVED = "capability_recipient_not_approved"
 
 
 @dataclass(frozen=True)
