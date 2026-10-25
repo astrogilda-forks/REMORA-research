@@ -10,7 +10,8 @@ It is not an agent platform, not a data platform, and not a finished security
 product. It defines (and implements, at research grade) the layer that sits
 *between* an agent platform and the systems agents act on.
 
-**Maturity:** research-grade, `SHADOW_ONLY`. See
+**Maturity:** research-grade; release profile `CONTROLLED_PILOT` (owner
+decision 2026-10-25). See
 [Scope and maturity](#8-scope-and-maturity) and
 [docs/assurance/release_gates.md](assurance/release_gates.md) before relying
 on any component. This document describes what the reference implementation
@@ -300,10 +301,11 @@ the DecisionEnvelope remains the evidence.
 Stated plainly, because a reference architecture is only useful when its
 boundaries are explicit:
 
-- **Deployment status is `SHADOW_ONLY`.** The intended first deployment mode
-  is shadow: REMORA consumes real agent action logs and produces decisions,
-  envelopes, and counterfactual deltas (`make shadow-replay`) *without*
-  enforcement, until the release gates close. Production gates and their
+- **Release profile is `CONTROLLED_PILOT`** (owner decision 2026-10-25). The
+  lowest-risk first deployment mode is shadow: REMORA consumes real agent
+  action logs and produces decisions, envelopes, and counterfactual deltas
+  (`make shadow-replay`) *without* enforcement. A bounded controlled pilot
+  may enforce under the `controlled_pilot` runtime profile. Production gates and their
   current state: [docs/assurance/release_gates.md](assurance/release_gates.md).
 - **Benchmarks are internal.** Safety results (including the external-dataset
   benchmark) were run by the author; independent replication is a tracked,
@@ -325,7 +327,7 @@ API path, atomic persistence, production enforcement, is recorded per
 capability in the machine-readable
 [`assurance/capability_register_v1.yaml`](assurance/capability_register_v1.yaml)
 (CI-validated; narrative documents must not claim beyond it). Nothing is
-production-enforced or externally verified while deployment is SHADOW_ONLY.
+production-enforced or externally verified; REM-021 has not taken place.
 
 Partition behavior and approval-freshness semantics (what stops when a link
 goes down; when a human approval expires or is invalidated by a changed
@@ -371,8 +373,8 @@ one of these open contracts.
 3. **Weeks 8–12, Gated enforcement.** Enforce on one low-consequence,
    high-volume action class first (e.g. recommendation writes), with the
    documented mode-degradation path (full governance down to hard-blocks-only)
-   and independent review of the deployment (the REM-021 gate) as the
-   promotion criterion.
+   and independent review (the REM-021 gate) as the criterion for wider
+   enforcement than the controlled pilot.
 
 Each phase produces artifacts (decision envelopes, replay reports, conformance
 results) that the next phase's go/no-go decision is made against, the same

@@ -10,7 +10,7 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 23 paths). CI fails on drift between it and the routes, so it is
+(OpenAPI 3.1, 40 paths). CI fails on drift between it and the routes, so it is
 the authority for request and response shapes; this document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
@@ -492,7 +492,16 @@ never be approved or executed afterwards. `POST /proposals/{proposal_id}/effect`
 included. It requires `execution_id`, `tool_id`, `status` (one of the five
 published statuses), `reason_code` and `verifier_identity`, and carries
 `execution_context_hash` for a context-bound dispatch. Another tenant's
-proposal is a 404. `GET /proposals/{proposal_id}/lifecycle` (`read`) returns
+proposal is a 404. `POST /proposals/{proposal_id}/effect-receipt` records a
+verdict REMORA computes from a receipt signed by a registered verifier key
+(CAPR-07/08). The contract comes from the signed ToolSpec v5 `postcondition`
+block and the approved arguments. A status the receipt claims is kept beside
+the computed one, never in its place. It is a 503 without registered verifier
+keys. `GET /proposals/{proposal_id}` (`read`) returns the proposal's current
+state. `GET /proposals/{proposal_id}/invocation-evidence` (`read`) exports one
+executed direct ACCEPT, signed under `REMORA/EVIDENCE/v1`. It carries the grant
+and lease bytes their signatures cover, so a verifier holding only public keys
+can check it offline. It is a 503 without an evidence signing key. `GET /proposals/{proposal_id}/lifecycle` (`read`) returns
 the ordered chain trail plus the dispatch verdict, and
 `GET /proposals/{proposal_id}/envelope` (`read`) derives the proposal-to-effect
 envelope from that trail on read; it is never stored. `POST /effects` and

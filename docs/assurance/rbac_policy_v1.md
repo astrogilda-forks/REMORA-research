@@ -163,7 +163,7 @@ The following are documented as future work; they do not block REM-022 closure b
 4. CI/CD-only wrangler deploy: no Cloudflare Access rule enforcing pipeline-only deploys.
 5. OIDC approver binding: reviewer identity in the `AuditBlock` is not verified against an OIDC token.
 
-These gaps are consistent with TRL 3–4 (SHADOW_ONLY deployment). They must be resolved before production certification.
+These gaps are consistent with TRL 3–4 (a bounded controlled pilot at most). They must be resolved before production certification.
 
 ---
 

@@ -133,6 +133,18 @@ maintainer's operational decision; no running pilot is claimed here. Until
 | REM-022 | RBAC access control audit | **DONE** (with recorded deviation) | Policy v1 committed: `docs/assurance/rbac_policy_v1.md`. Covers asset inventory, 8-role matrix, key management, D1 access controls, rotation policy, audit log retention. Acknowledged gaps in §8 (KMS/HSM, RFC 3161, CI/CD-only deploy), consistent with TRL 3–4. Completed 2026-06-30. **Closure deviation (2026-07-02):** rbac_design_v1.md's own DONE criteria (isolation test, admin-wildcard removal, external confirmation) were not met at closure, the unmet steps are tracked as **REM-023** in the remediation register, now **IN_PROGRESS** (the REM-023 row below is authoritative). |
 | REM-023 | RBAC follow-through | **DONE** (2026-10-25, owner decision) | The three REM-022 design criteria unmet at closure. Steps 8–9 DONE 2026-07-03: `tests/test_rbac_isolation.py` (no cross-tenant leakage) and admin-wildcard removal in `servers/api.py`. Step 10, external confirmation of the RBAC design, is no longer a closure criterion (owner decision 2026-10-25) and stays recorded under REM-021 as work not done. |
 
+### Four statements, kept apart
+
+`CONTROLLED_PILOT` says the first of these and nothing more. Each of the
+others needs its own evidence, and none follows from the profile.
+
+| Statement | Status on 2026-10-25 | Evidence |
+|---|---|---|
+| The owner permits a bounded pilot | Yes | [Owner decision](../architecture/ADR-pilot-readiness-owner-decision.md), `owner_decisions` in `release_profiles_v1.yaml` |
+| The controls are tested internally | Yes, per mechanism and across the process split | The CI suites; conformance P1 to P11; the recorded OT battery run in `artifacts/pilot-pack/runs/` |
+| A deployment is verified | No | No deployment record exists. The OT run is a simulated plant on one host |
+| An independent review has taken place | No | REM-021 `NOT_STARTED` |
+
 ## Record of gate elevation
 
 | Date | Change | Reason |

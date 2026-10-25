@@ -65,6 +65,14 @@ claimed in prose, stays. What changes is which state the computation reads.
 - The independent review protocol and the panel matrix stay as written. They
   are how `EXTERNALLY_VERIFIED` is reached, not a precondition for the pilot.
 
+## How to describe the profile
+
+Four statements are kept apart, and only the first follows from this
+decision: the owner permits a bounded pilot; the controls are tested
+internally; a deployment is verified; an independent review has taken place.
+`release_gates.md` keeps the table of which hold and what evidence each
+needs. A text that says "ready for pilot" says the first statement only.
+
 ## What this ADR does not decide
 
 It does not choose the pilot's customer, scope or duration (SDD ADR-UE-01),

@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Documentation brought in line with the release profile and the delivered SDD work
+
+- Twenty statements outside the files #1070 touched still described the earlier rule (`SHADOW_ONLY` until REM-021, REM-023 in progress, `CONTROLLED_PILOT` not offered) or called delivered SDD work open: the commercial packaging, deployment options, Shadow Pilot and security overview; the pilot evaluation protocol; the RBAC design and policy; the oversight operations note; the reference architecture, executive one-pager, use-case and EU AI Act notes, the Azure reference, the REMORA Prime note, the research monograph and the TOGAF rollout plan; the SDD's status line; the atlas step 6 and gates G05 and G12; the IFC status row 6. Each now says what holds.
+- `release_gates.md` and the owner-decision ADR keep four statements apart: the owner permits a bounded pilot (yes); the controls are tested internally (yes); a deployment is verified (no); an independent review has taken place (no).
+- `docs/07-api-reference.md` documents `POST /proposals/{proposal_id}/effect-receipt`, `GET /proposals/{proposal_id}` and `GET /proposals/{proposal_id}/invocation-evidence`, which were served but undocumented, and counts 40 OpenAPI paths, not 23.
+- The Norwegian TOGAF v1.0 source document and its PDF move to `docs/archive/legacy/` with an archive banner, registered `historical` and superseded by the English rollout plan.
+
 ### Release profile CONTROLLED_PILOT by owner decision; REM-021 no longer gates the pilot
 
 - `docs/architecture/ADR-pilot-readiness-owner-decision.md` (DOC-413) records the owner decision of 2026-10-25: the maintainer decides when and how the code runs in a pilot; the code does not require an independent external review before that. `release_profiles_v1.yaml` gains `owner_decisions` (id, decider, date, record) and `CONTROLLED_PILOT` requires `OD-2026-10-25-controlled-pilot` plus REM-020, REM-022 and REM-023; REM-021 is removed from its requirements. `scripts/check_document_governance.py` refuses a profile whose owner decision is not recorded with decider, ISO date and an existing record file (`tests/test_document_governance.py`).

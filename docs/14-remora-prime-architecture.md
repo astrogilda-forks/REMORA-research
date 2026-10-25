@@ -18,8 +18,9 @@ details.
 Proposed statements describe a system that does not exist. Every number in a
 proposal is a target to be falsified, never a result.
 
-The figures used for framing, 26.6 % legitimate autonomy and SHADOW_ONLY
-status, are taken from the current operating posture. They are not
+The figures used for framing, 26.6 % legitimate autonomy and the
+SHADOW_ONLY status of the time, are taken from the operating posture when
+this was written (the profile is `CONTROLLED_PILOT` since 2026-10-25). They are not
 re-derived here.
 
 ## 1. Gap analysis
@@ -94,7 +95,7 @@ mostly composed of things nobody declared in advance.
 
 ### G-5. No live production evidence
 
-Grounded, through the SHADOW_ONLY profile. The repository is scrupulous
+Grounded, through the shadow-first posture. The repository is scrupulous
 about this. The cost is that every behavioural claim concerns replay and
 benchmark, so the failure modes that appear only in production stay unknown.
 Clock skew across services, partial failure mid-lease, operators approving

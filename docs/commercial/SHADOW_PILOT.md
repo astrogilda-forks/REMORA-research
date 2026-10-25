@@ -1,8 +1,9 @@
 # REMORA Shadow Pilot
 
-The Shadow Pilot is the primary sellable offering at the current release
-profile (`SHADOW_PILOT` in
-[`../assurance/release_profiles_v1.yaml`](../assurance/release_profiles_v1.yaml)).
+The Shadow Pilot is the zero-enforcement offering. The release profile in
+[`../assurance/release_profiles_v1.yaml`](../assurance/release_profiles_v1.yaml)
+is `CONTROLLED_PILOT` since 2026-10-25, so a partner may also start with a
+bounded controlled pilot; the Shadow Pilot is the lower-risk first step.
 REMORA observes and decides; it never enforces. The pilot's deliverable is
 **evidence**: what governance would have done on the customer's real agent
 actions, with tamper-evident records.
@@ -26,9 +27,9 @@ actions, with tamper-evident records.
    chain-verification results, and every negative finding included.
 8. Go / no-go: the customer decides whether the measured behavior
    justifies moving toward enforcement.
-9. Controlled-enforcement roadmap: if go: the register-gated path in
-   `PRODUCT_PACKAGING.md` (REM-020/021/022/023 closed, capability ladder
-   raised) before any action is ever blocked or executed by REMORA.
+9. Controlled-enforcement roadmap: if go, a bounded controlled pilot under
+   the `controlled_pilot` runtime profile (`PRODUCT_PACKAGING.md`), with a
+   human approval on every non-accept outcome, before any wider enforcement.
 
 ## What the pilot explicitly does not do
 

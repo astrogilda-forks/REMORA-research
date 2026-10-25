@@ -1,8 +1,9 @@
 # REMORA deployment options
 
-Options available at the current release profile (`SHADOW_PILOT`). All
-enforcement-shaped deployment is out of scope until the register-gated stages
-in `PRODUCT_PACKAGING.md` open.
+Options available at the current release profile (`CONTROLLED_PILOT`, owner
+decision 2026-10-25). A bounded controlled pilot may enforce under the
+`controlled_pilot` runtime profile; wider enforcement stays out of scope until
+the register-gated stages in `PRODUCT_PACKAGING.md` open.
 
 ## 1. Customer-hosted shadow deployment (recommended)
 

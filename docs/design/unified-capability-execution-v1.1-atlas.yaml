@@ -43,7 +43,7 @@ gates:
   name: Roles and keys
   mapping: REM-022, REM-023, CAP-009
   status: warn
-  status_text: REM-023 in progress
+  status_text: REM-023 done 2026-10-25 on its code criteria; external RBAC confirmation open under REM-021
   missing: IdP, reviewer separation, protected keys, rotation
 - id: G06
   name: Effect
@@ -88,7 +88,7 @@ gates:
   name: Commercial and legal
   mapping: PRODUCT_PACKAGING.md
   status: crit
-  status_text: CONTROLLED_PILOT not offered
+  status_text: CONTROLLED_PILOT offered as a bounded pilot by owner decision (2026-10-25)
   missing: Pilot agreement, DPA, licensed package
 repair_order:
 - step: 1
@@ -126,8 +126,9 @@ repair_order:
   - CAP-003
 - step: 6
   work: >-
-    Finish flow binding, the flow race and the freshness contract (IFC-06 in progress; IFC-11
-    and IFC-12 not started).
+    Finish flow binding, the flow race and the freshness contract (IFC-06 fenced in #1063, the
+    TLA+ model missing; IFC-11 done for the repository's surfaces in #1066; IFC-12 slice 1 in
+    #1067).
   acceptance: >-
     Controlled arguments match the actual tool input; changed authority or flow stops the
     action within the declared contract.
