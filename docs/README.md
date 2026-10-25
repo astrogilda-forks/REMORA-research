@@ -95,8 +95,6 @@ Several topics have more than one document. This table says which to open.
 | [deployment/authority-key-topology.md](deployment/authority-key-topology.md) | Pre-split signing topology of the Cloudflare deployment (historical), read from source |
 | [enterprise/audit-anchoring-guide.md](enterprise/audit-anchoring-guide.md) | Audit-chain anchoring guide |
 | [enterprise/togaf-enterprise-rollout-plan.md](enterprise/togaf-enterprise-rollout-plan.md) | TOGAF rollout plan |
-| [TOGAF enterprise architecture (Markdown)](enterprise/no/REMORA_TOGAF_Enterprise_Architecture_v1.0.md) | Norwegian TOGAF source document |
-| [TOGAF enterprise architecture (PDF)](enterprise/no/REMORA_TOGAF_Enterprise_Architecture_v1.0.pdf) | Norwegian TOGAF-aligned architecture PDF |
 | [security/pre-deployment-review.md](security/pre-deployment-review.md) | Pre-deployment security review |
 | [security/owasp_genai_mapping.md](security/owasp_genai_mapping.md) | OWASP GenAI mapping |
 | [security/non-transitivity-of-authority.md](security/non-transitivity-of-authority.md) | Non-Transitivity of Authority (NTA-1, NTA-2): principle, enforcement, conformance vectors, limits |

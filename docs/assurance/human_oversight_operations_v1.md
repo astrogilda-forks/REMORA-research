@@ -3,7 +3,8 @@
 **Status:** DESIGN / PROTOCOL. Not an implemented or certified capability.
 **Created:** 2026-07-20
 **Relationship to gates:** extends, does not replace, [REM-021](remediation_register.yaml)
-(independent human review, `NOT_STARTED`). REM-021's own scope
+(independent human review, `NOT_STARTED`; it gates `EXTERNALLY_VERIFIED` and
+`PRODUCTION`, not the controlled pilot, since 2026-10-25). REM-021's own scope
 ([independent_review_protocol_v1.md](independent_review_protocol_v1.md)) is a
 one-off methodology-and-claims review that *excludes* live deployment; this
 document specifies the **ongoing operational oversight** a live deployment would

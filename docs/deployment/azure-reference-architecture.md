@@ -3,7 +3,7 @@
 REMORA on Azure: mapping each component to the appropriate Azure service for enterprise deployment in regulated environments.
 
 > **Illustrative reference design.** REMORA is a research-grade governance
-> overlay running in `SHADOW_ONLY` mode; it is **not** currently deployed on
+> overlay (release profile `CONTROLLED_PILOT`); it is **not** currently deployed on
 > Azure and is not production-certified. The services, commands, and cost
 > figures below are a reference mapping for a hypothetical deployment, not a
 > record of a live system.

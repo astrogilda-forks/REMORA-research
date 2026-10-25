@@ -13,16 +13,17 @@ Nothing here may advertise a stage stronger than the CI-validated
 |---|---|---|
 | Research / Evaluation | `RESEARCH_REFERENCE` | Yes — source-available repository |
 | **REMORA Shadow Pilot** | `SHADOW_PILOT` (= `SHADOW_ONLY`) | **Yes — primary offering** |
-| REMORA Controlled Enforcement | `CONTROLLED_PILOT` | No — gated on REM-020/021/022/023 and CAP ladder per the register |
+| REMORA Controlled Enforcement | `CONTROLLED_PILOT` | Yes, as a bounded pilot by owner decision (2026-10-25); the deployment prerequisites of the `controlled_pilot` runtime profile apply |
 | REMORA Enterprise | `LIMITED_ENFORCEMENT` / `PRODUCTION` | No — roadmap; requires externally verified decision engine |
 | REMORA OEM / Embedded | (no profile declared) | No — by separate agreement only |
 
-The declared profile is currently **`SHADOW_PILOT`**: shadow-mode operation on
-real agent action logs; decisions, DecisionEnvelopes and counterfactual
-deltas with **zero enforcement**. Any stage that enforces is not offered until
-the corresponding register state exists; CI recomputes the profile from the
-capability and remediation registers, so a stronger stage cannot be claimed by
-editing this document.
+The declared profile is **`CONTROLLED_PILOT`** since 2026-10-25, by owner
+decision ([ADR](../architecture/ADR-pilot-readiness-owner-decision.md)): a bounded pilot with a human approval
+on every non-accept outcome may be run. The Shadow Pilot stays available for
+partners who want decisions and counterfactual deltas with zero enforcement.
+`LIMITED_ENFORCEMENT` and `PRODUCTION` are not offered until the register state
+exists; CI recomputes the profile from the capability and remediation
+registers, so a stronger stage cannot be claimed by editing this document.
 
 ## What the Shadow Pilot contains
 

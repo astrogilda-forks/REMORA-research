@@ -15,7 +15,7 @@ artifact on disk, cited once, and points at every regime function it serves. The
 NIST AI RMF and OWASP GenAI documents are alternative views on the same control
 set.
 
-Because REMORA is a research-grade governance overlay in `SHADOW_ONLY` mode,
+Because REMORA is a research-grade governance overlay (release profile `CONTROLLED_PILOT`),
 **"Implemented" means the control exists in code and is tested; it does not mean
 the obligation is discharged for any specific deployment.** A deployer remains
 responsible for its own risk classification, DPIA/FRIA, and conformity work.

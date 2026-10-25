@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Version | 1.1-draft, 2026-10-24 |
-| Status | PROPOSED / NOT IMPLEMENTED |
+| Status | PROPOSED at `d94eecf9`; progress since: P0 items 1 to 8 merged (#1053 to #1057, #1063), ADR-UE-03 accepted (#1065) with its first slice (#1068), IFC-11 for the repository's surfaces (#1066), IFC-12 slice 1 (#1067), `CONTROLLED_PILOT` by owner decision (#1070). The text below is the specification as written. |
 | Owner | REMORA research: architecture and release governance |
 | Source revision | `d94eecf916dda6ee7cd8598e100a2ee64b690958` |
 | Supersedes | 1.0-draft (source revision `58ca22d46ace1ee82b6a741fdd29d4823d5fe07f`) |

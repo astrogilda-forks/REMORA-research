@@ -536,7 +536,7 @@ Et eksternt PDP/OPA-lag kan brukes, men må ikke kunne svekke det deterministisk
 
 ## 8.4 Enterprise deployment
 
-Repositoryets genererte status klassifiserer løsningen som `SHADOW_PILOT` / `SHADOW_ONLY`. Sterkere profil krever åpne remediation-items og uavhengig review.
+Repositoryets genererte status klassifiserer løsningen som `CONTROLLED_PILOT` etter eierbeslutning 2026-10-25. Sterkere profiler (`LIMITED_ENFORCEMENT`, `PRODUCTION`) krever åpne remediation-items og uavhengig review.
 
 En forsvarlig enterprise-innføring bør følge denne rekkefølgen:
 

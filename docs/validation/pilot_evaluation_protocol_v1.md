@@ -9,9 +9,11 @@ example targets below are starting points to be calibrated per domain
 so the pilot design is versioned and reviewable like everything else.
 Companion documents: [external-review.md](external-review.md) (how to review
 the research), [release_gates.md](../assurance/release_gates.md) (what gates
-a profile promotion), REM-021/REM-023 in the
-[remediation register](../assurance/remediation_register.yaml) (what still
-blocks `CONTROLLED_PILOT`).
+a profile promotion), and the
+[owner decision of 2026-10-25](../architecture/ADR-pilot-readiness-owner-decision.md) that opened
+`CONTROLLED_PILOT`; REM-021 in the
+[remediation register](../assurance/remediation_register.yaml) gates
+`EXTERNALLY_VERIFIED` and `PRODUCTION`.
 
 ---
 

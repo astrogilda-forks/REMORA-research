@@ -4,7 +4,7 @@
 **Date:** 2026-06-30
 **Author:** Agent D (security/RBAC audit)
 **Scope:** `darklordVirtual/REMORA-research` at commit `2cd573d` (master branch)
-**Related gates:** REM-022 (DONE with recorded deviation, 2026-06-30) and REM-023 (follow-through, IN_PROGRESS), the RBAC audit is a required production deployment gate
+**Related gates:** REM-022 (DONE with recorded deviation, 2026-06-30) and REM-023 (follow-through, DONE 2026-10-25 on its code and test criteria by owner decision), the RBAC audit is a required production deployment gate
 
 **IMPORTANT:** This document describes the RBAC design that REMORA needs; the
 implemented subset and the deviation from this design's own DONE criteria are
@@ -94,7 +94,7 @@ exist in code; roles in the "Infrastructure layer" column require external IAM c
 | `policy_approver` | Can approve and activate policy bundle changes | Application | NOT implemented |
 | `deploy` | Can trigger wrangler deploy of Cloudflare Workers | Infrastructure | Requires GitHub environment with required reviewers |
 | `key_admin` | Can rotate signing keys; requires KMS/HSM access | Infrastructure | NOT implemented; requires KMS |
-| `production_executor` | Can authorize actual (non-shadow) agent action execution | Application | NOT implemented; blocked by SHADOW_ONLY status |
+| `production_executor` | Can authorize actual (non-shadow) agent action execution | Application | NOT implemented; no non-shadow executor role exists yet |
 
 ---
 
@@ -308,7 +308,7 @@ acceptance criteria.
 | 7 | Document D1 row-level tenant isolation verification | Test or audit artifact |
 | 8 | Create test: no cross-tenant data leakage via API | ✅ DONE 2026-07-03, `tests/test_rbac_isolation.py` |
 | 9 | Enumerate admin permissions (remove wildcard) | ✅ DONE 2026-07-03, explicit set in `servers/api.py` + both `risk-profiles.yaml`; `"*"` branch removed; `default_role` admin→viewer |
-| 10 | External review of this RBAC design | OPEN, folded into REM-021 |
+| 10 | External review of this RBAC design | OPEN, recorded under REM-021; no longer a closure criterion of REM-023 (owner decision 2026-10-25) |
 
 REM-022 is DONE when: all steps above have artifacts committed, an external reviewer
 has confirmed the design, and the artifact is at `docs/assurance/rbac_policy_v1.md`

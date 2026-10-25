@@ -33,7 +33,7 @@ compositional authority work packages CAPR-03 to CAPR-05 and CAPR-09
 | 6 | IFC-07 Extraction with capacity accounting | P1 | NOT_STARTED | | |
 | 6 | IFC-08 Endorsement and grants | P1 | NOT_STARTED | | |
 | 6 | IFC-09 Respond sink | P1 | NOT_STARTED | | |
-| 6 | IFC-11 rest, IFC-13 rest, IFC-14 rest | | IN_PROGRESS | IFC-11 rest in this change | The IFC-11 inventory covers every surface §4 names (row 3); IFC-13 and IFC-14 are not started. |
+| 6 | IFC-13 rest, IFC-14 rest | | NOT_STARTED | | The rest of IFC-11 landed in #1066 (row 3). |
 | 6 | IFC-10 Formal model | P1 | NOT_STARTED | | |
 | 7 | EVAL-02 Adaptive white-box attacker | | NOT_STARTED | | |
 | 7 | EVAL-03 Scheming-agent track | | NOT_STARTED | | |
