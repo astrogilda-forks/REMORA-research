@@ -20,6 +20,7 @@ because a governance API handles tool arguments, approvals and credentials:
 
 Settings: ``SENTRY_DSN``, ``SENTRY_ENVIRONMENT`` (default ``REMORA_ENV``),
 ``SENTRY_RELEASE`` (default the package version), ``SENTRY_TRACES_SAMPLE_RATE``.
+The default environment is ``REMORA_ENV`` as ``remora.profiles`` reads it.
 The audit chain is unaffected: Sentry is an operational view, never evidence.
 """
 from __future__ import annotations
@@ -43,6 +44,16 @@ def scrub_event(event: dict[str, Any], _hint: Any = None) -> dict[str, Any]:
             request.pop(field, None)
     event.pop("user", None)
     return event
+
+
+def _deployment_environment() -> str:
+    """``REMORA_ENV`` through its one parser; a value it refuses reads as unknown."""
+    from remora.profiles import deployment_environment
+
+    try:
+        return deployment_environment()
+    except Exception:
+        return "unknown"
 
 
 def _sample_rate(raw: str) -> float:
@@ -91,7 +102,7 @@ def init_sentry_from_env(*, release: str = "") -> bool:
     options = sentry_options(
         dsn,
         environment=(os.environ.get("SENTRY_ENVIRONMENT", "").strip()
-                     or os.environ.get("REMORA_ENV", "").strip() or "development"),
+                     or _deployment_environment()),
         release=os.environ.get("SENTRY_RELEASE", "").strip() or release,
         traces_sample_rate=_sample_rate(
             os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0").strip() or "0"),

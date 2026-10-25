@@ -46,7 +46,7 @@ def test_a_blank_dsn_is_unset(fake_sdk, monkeypatch):
 
 def test_with_a_dsn_the_sdk_gets_the_privacy_preserving_options(fake_sdk, monkeypatch):
     monkeypatch.setenv("SENTRY_DSN", "https://public@o1.ingest.example/1")
-    monkeypatch.setenv("REMORA_ENV", "production")
+    monkeypatch.setattr("remora.profiles.deployment_environment", lambda: "production")
     assert rs.init_sentry_from_env(release="0.12.0") is True
     (options,) = fake_sdk
     assert options["dsn"] == "https://public@o1.ingest.example/1"
@@ -131,3 +131,13 @@ def test_the_api_initialises_sentry_at_import():
 
     source = (Path(__file__).resolve().parents[1] / "servers" / "api.py").read_text(encoding="utf-8")
     assert "_init_sentry(release=_PACKAGE_VERSION)" in source
+
+
+def test_an_environment_the_parser_refuses_reads_as_unknown(fake_sdk, monkeypatch):
+    def refuse():
+        raise ValueError("REMORA_ENV='staging' is unknown")
+
+    monkeypatch.setenv("SENTRY_DSN", "https://public@o1.ingest.example/1")
+    monkeypatch.setattr("remora.profiles.deployment_environment", refuse)
+    assert rs.init_sentry_from_env() is True
+    assert fake_sdk[0]["environment"] == "unknown"
