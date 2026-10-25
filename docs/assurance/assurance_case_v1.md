@@ -5,9 +5,11 @@
 **Argument class:** *control* (see §6). REMORA does not argue that the underlying
 models are incapable of harm, nor that they are trustworthy, nor does it yet
 claim external credit.
-**Deployment status:** `SHADOW_ONLY`, `policy_relaxation_allowed = false`. One
-production gate ([REM-021](remediation_register.yaml) independent human review)
-remains open.
+**Deployment status:** release profile `CONTROLLED_PILOT` since 2026-10-25, by
+owner decision ([ADR](../architecture/ADR-pilot-readiness-owner-decision.md)).
+`policy_relaxation_allowed = false`. [REM-021](remediation_register.yaml)
+(independent human review) has not taken place. It gates `EXTERNALLY_VERIFIED`
+and `PRODUCTION`.
 
 This document is a structured safety argument in the tradition of Goal
 Structuring Notation (GSN) modernised per *Assurance 2.0*, that is, with

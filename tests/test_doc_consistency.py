@@ -80,7 +80,8 @@ def test_architecture_converged_threshold_matches_code() -> None:
 def test_architecture_declares_shadow_only_scope() -> None:
     """External-review readiness: the doc must state the honest maturity scope."""
     text = _arch_text()
-    assert "SHADOW_ONLY" in text, "ARCHITECTURE.md must state deployment status SHADOW_ONLY"
+    assert "CONTROLLED_PILOT" in text, "ARCHITECTURE.md must state the release profile"
+    assert "no production-certified" in text, "ARCHITECTURE.md must deny production certification"
     assert "tamper-evident" in text.lower(), (
         "ARCHITECTURE.md must describe the audit chain as tamper-evident (not tamper-proof)"
     )

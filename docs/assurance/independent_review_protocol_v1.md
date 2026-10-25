@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** 2026-06-30  
-**Gate:** REM-021 (Independent human review, required before leaving SHADOW_ONLY)  
+**Gate:** REM-021 (Independent human review; gates `EXTERNALLY_VERIFIED` and `PRODUCTION`. Not a precondition for `CONTROLLED_PILOT` since the owner decision of 2026-10-25, [ADR](../architecture/ADR-pilot-readiness-owner-decision.md))  
 **Status:** NOT_STARTED  
 **Contact:** Stian Skogbrott, support@luftfiber.no
 

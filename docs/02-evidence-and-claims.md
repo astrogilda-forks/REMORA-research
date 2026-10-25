@@ -211,9 +211,9 @@ are first-class here, see `NEGATIVE_RESULTS.md` and
 ## Status, and what is not proven
 
 <!-- BEGIN GENERATED: status, source: assurance registers, via scripts/generate_readme_status.py --check. DO NOT EDIT. -->
-**Deployment profile:** `SHADOW_PILOT` (= `SHADOW_ONLY`), recomputed from the capability and remediation registers by CI; a profile cannot be raised by editing prose.
+**Deployment profile:** `CONTROLLED_PILOT` (= `CONTROLLED_PILOT`), recomputed from the capability and remediation registers by CI; a profile cannot be raised by editing prose.
 
-**To reach `CONTROLLED_PILOT`, still open:** REM-021, REM-023.
+**To reach `LIMITED_ENFORCEMENT`, still open:** REM-024, REM-030, CAP-003≥ENFORCED_PRODUCTION, CAP-004≥ENFORCED_PRODUCTION, CAP-007≥PERSISTED_ATOMIC.
 
 **Capabilities:** 16 of 32 wired to the API path or deeper ([wiring register](assurance/capability_register_v1.yaml)); full gate status in [release_gates.md](assurance/release_gates.md), maturity ladder in [release_profiles_v1.yaml](assurance/release_profiles_v1.yaml).
 <!-- END GENERATED: status -->
