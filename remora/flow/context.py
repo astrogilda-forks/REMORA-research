@@ -550,24 +550,31 @@ class FlowContextStore:
         raise FlowStoreUnavailable("flow label raise lost every retry under contention")
 
     def begin_dispatch(self, tenant_id: str, principal: str, context_id: str, *,
-                       proposal_id: str, expires_at: float, now: float) -> str | None:
+                       expected_seq: int, proposal_id: str, expires_at: float,
+                       now: float) -> str | None:
         """Hold the context for one dispatch (IFC-06); None when another holds it.
 
-        One attempt at the sequence the caller's check saw: a context held by
-        an unexpired dispatch of another proposal, or an append lost to any
-        concurrent writer (another dispatch, a raise, a charge on a root
-        context), is contention, and the caller refuses before its tool runs.
-        The holder's expiry bounds a process that dies mid-call; an expired
-        hold is ignored, not removed. Returns the dispatch id to end with.
+        One attempt at ``expected_seq``, the sequence the caller's check read:
+        a stream that moved since that read (a raise, another dispatch, a
+        charge on a root context), a context held by an unexpired dispatch of
+        another proposal, or an append lost to a concurrent writer is
+        contention, and the caller refuses before its tool runs. Loading the
+        context afresh and appending at that load's sequence would let a raise
+        that landed after the check through, with the call dispatched on a
+        verdict computed from the old label. The holder's expiry bounds a
+        process that dies mid-call; an expired hold is ignored, not removed.
+        Returns the dispatch id to end with.
         """
         state = self.load(tenant_id, principal, context_id)
+        if state.seq != expected_seq:
+            return None
         if state.holding(now, proposal_id=proposal_id) is not None:
             return None
         dispatch_id = uuid.uuid4().hex
         event = FlowEvent("dispatch", {"dispatch_id": dispatch_id, "proposal_id": proposal_id,
                                        "expires_at": float(expires_at)})
         if not self._store.append_if(tenant_id=tenant_id, context_id=context_id,
-                                     expected_seq=state.seq, event=event):
+                                     expected_seq=expected_seq, event=event):
             return None
         return dispatch_id
 

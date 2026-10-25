@@ -3296,7 +3296,8 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     digest the flow check had when the call was decided. If the context's
     label moved since, or the check now differs, the call is refused before a
     lease is minted. The check then takes the dispatch fence: one ``dispatch``
-    event on the context stream at the sequence the check saw. A context held
+    event on the context stream at the sequence the check read, so a raise
+    that lands between the check and the fence refuses. A context held
     by another proposal's unexpired dispatch, or a fence lost to a concurrent
     writer, refuses as ``flow_dispatch_contended`` before anything is spent;
     so two calls judged at the same epoch cannot both run, and a raise that
@@ -3325,7 +3326,7 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     if flow is None or not principal or not context_id:
         return "flow_state_unavailable", None, None, None, None
     contexts, handles = _flow_contexts(), _flow_handles()
-    ok, reason, resolved = verify_flow_at_dispatch(
+    ok, reason, resolved, checked_seq = verify_flow_at_dispatch(
         contexts=contexts, handles=handles, tenant_id=tenant, principal=principal,
         context_id=context_id, flow=flow, arguments=tool_call.arguments,
         expected_epoch=expected[0], expected_digest=expected[1])
@@ -3340,8 +3341,8 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     now = _time.time()
     try:
         dispatch_id = contexts.begin_dispatch(
-            tenant, principal, context_id, proposal_id=proposal_id,
-            expires_at=now + DEFAULT_LEASE_TTL_SECONDS, now=now)
+            tenant, principal, context_id, expected_seq=checked_seq,
+            proposal_id=proposal_id, expires_at=now + DEFAULT_LEASE_TTL_SECONDS, now=now)
     except Exception:
         return "flow_state_unavailable", None, None, None, None
     if dispatch_id is None:

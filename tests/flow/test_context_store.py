@@ -369,11 +369,17 @@ def test_the_fold_refuses_a_stream_it_cannot_trust():
 # ── the dispatch fence (IFC-06) ───────────────────────────────────────────
 
 
+def _seq(store, ctx: str) -> int:
+    """The sequence a caller's check would have read just now."""
+    return store.load(TENANT, ALICE, ctx).seq
+
+
 def test_the_fold_tracks_open_dispatches_and_moves_seq_not_epoch():
     store = _contexts(InMemoryFlowEventStore())
     ctx = _mint(store).context_id
     before = store.load(TENANT, ALICE, ctx)
-    held = store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=100.0, now=0.0)
+    held = store.begin_dispatch(TENANT, ALICE, ctx, expected_seq=before.seq, proposal_id="p-1",
+                                expires_at=100.0, now=0.0)
     assert held is not None
     state = store.load(TENANT, ALICE, ctx)
     assert (state.seq, state.epoch) == (before.seq + 1, before.epoch)
@@ -392,29 +398,45 @@ def test_the_fold_tracks_open_dispatches_and_moves_seq_not_epoch():
 def test_a_second_proposal_cannot_begin_while_a_live_dispatch_holds_the_context():
     store = _contexts(InMemoryFlowEventStore())
     ctx = _mint(store).context_id
-    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=100.0, now=0.0)
-    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-2", expires_at=100.0,
-                                now=10.0) is None
-    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=100.0,
-                                now=10.0) is not None            # same proposal, another hop
-    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="", expires_at=100.0,
-                                now=10.0) is None                # an empty id never matches
-    assert store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-2", expires_at=200.0,
-                                now=150.0) is not None           # the holds expired
+    def begin(proposal_id: str, *, expires_at: float, now: float) -> str | None:
+        return store.begin_dispatch(TENANT, ALICE, ctx, expected_seq=_seq(store, ctx),
+                                    proposal_id=proposal_id, expires_at=expires_at, now=now)
 
+    assert begin("p-1", expires_at=100.0, now=0.0)
+    assert begin("p-2", expires_at=100.0, now=10.0) is None
+    assert begin("p-1", expires_at=100.0, now=10.0) is not None   # same proposal, another hop
+    assert begin("", expires_at=100.0, now=10.0) is None          # an empty id never matches
+    assert begin("p-2", expires_at=200.0, now=150.0) is not None  # the holds expired
+
+
+
+def test_a_fence_at_a_sequence_the_stream_has_moved_past_is_refused():
+    """The fence is taken at the sequence the caller's check read. A raise
+    committed after that read moves the stream, so the fence refuses and
+    appends nothing, even though no other dispatch holds the context."""
+    store = _contexts(InMemoryFlowEventStore())
+    ctx = _mint(store).context_id
+    checked = _seq(store, ctx)
+    moved = store.raise_label(TENANT, ALICE, ctx, Label([USER, MODEL], Integrity.TRUSTED))
+    assert moved.seq == checked + 1
+    assert store.begin_dispatch(TENANT, ALICE, ctx, expected_seq=checked, proposal_id="p-1",
+                                expires_at=1e12, now=0.0) is None
+    after = store.load(TENANT, ALICE, ctx)
+    assert after.seq == moved.seq and after.open_dispatches == ()
 
 def test_postgres_and_every_backend_let_exactly_one_dispatch_begin(backend):
     store = _contexts(backend)
     ctx = _mint(store).context_id
     n = 8
+    seq = _seq(store, ctx)   # every beginner's check read the same state
     barrier = threading.Barrier(n)
     results: list[str | None] = []
     lock = threading.Lock()
 
     def beginner(i: int) -> None:
         barrier.wait()
-        held = store.begin_dispatch(TENANT, ALICE, ctx, proposal_id=f"p-{i}", expires_at=1e12,
-                                    now=0.0)
+        held = store.begin_dispatch(TENANT, ALICE, ctx, expected_seq=seq, proposal_id=f"p-{i}",
+                                    expires_at=1e12, now=0.0)
         with lock:
             results.append(held)
 
@@ -430,7 +452,8 @@ def test_postgres_and_every_backend_let_exactly_one_dispatch_begin(backend):
 def test_a_raise_in_the_fold_still_moves_epoch_with_a_dispatch_open():
     store = _contexts(InMemoryFlowEventStore())
     ctx = _mint(store).context_id
-    held = store.begin_dispatch(TENANT, ALICE, ctx, proposal_id="p-1", expires_at=1e12, now=0.0)
+    held = store.begin_dispatch(TENANT, ALICE, ctx, expected_seq=_seq(store, ctx),
+                                proposal_id="p-1", expires_at=1e12, now=0.0)
     raised = store.raise_label(TENANT, ALICE, ctx, Label([USER, MODEL], Integrity.TRUSTED))
     assert raised.epoch == raised.seq and len(raised.open_dispatches) == 1
     store.end_dispatch(TENANT, ALICE, ctx, held)

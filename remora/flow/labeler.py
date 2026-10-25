@@ -388,9 +388,15 @@ def verify_flow_at_dispatch(
     expected_epoch: int,
     expected_digest: str,
     resource_acl: Callable[[str], Iterable[str]] | None = None,
-) -> tuple[bool, str, dict[str, Any]]:
+) -> tuple[bool, str, dict[str, Any], int]:
     """Re-verify ``flow_epoch``, ``flow_digest`` and resolved arguments right
     before dispatch (SDD v2 WP-04 / AR-018, IFC-06).
+
+    Returns ``(ok, reason, resolved_arguments, seq)``. ``seq`` is the stream
+    sequence of the context state the verdict was computed on (0 on a
+    refusal); the dispatch fence is taken at exactly that sequence
+    (``FlowContextStore.begin_dispatch(expected_seq=...)``), so a context that
+    moved after the check refuses instead of dispatching on a stale verdict.
     """
     from remora.flow.check import flow_check
     from remora.flow.observe import _lineage
@@ -399,15 +405,15 @@ def verify_flow_at_dispatch(
         state = contexts.load(tenant_id, principal, context_id)
         lineage = _lineage(lambda cid: contexts.load(tenant_id, principal, cid), state)
     except Exception:
-        return False, "flow_state_unavailable", {}
+        return False, "flow_state_unavailable", {}, 0
     if state.epoch != expected_epoch:
-        return False, "flow_epoch_changed", {}
+        return False, "flow_epoch_changed", {}, 0
     if handles is not None:
         try:
             res = handles.resolve(tenant_id, lineage, arguments, context_label=state.label)
             resolved_args, value_labels = res.args, res.value_labels
         except Exception:
-            return False, "flow_handle_invalid", {}
+            return False, "flow_handle_invalid", {}, 0
     else:
         resolved_args, value_labels = dict(arguments), {}
     verdict = flow_check(
@@ -419,8 +425,8 @@ def verify_flow_at_dispatch(
         resource_acl=resource_acl,
     )
     if verdict.digest != expected_digest:
-        return False, "flow_digest_changed", {}
+        return False, "flow_digest_changed", {}, 0
     if not verdict.clean:
-        return False, "flow_violation_at_dispatch", {}
-    return True, "ok", resolved_args
+        return False, "flow_violation_at_dispatch", {}, 0
+    return True, "ok", resolved_args, state.seq
 

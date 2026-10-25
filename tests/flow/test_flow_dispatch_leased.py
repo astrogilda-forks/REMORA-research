@@ -349,8 +349,10 @@ def test_an_expired_fence_does_not_hold_the_context(executor):
     context_id = _context(executor)
     call = _call(context_id)
     contexts = exec_mod._flow_contexts()
-    held = contexts.begin_dispatch("acme", "employee-1", context_id, proposal_id="p-dead",
-                                   expires_at=1.0, now=0.0)
+    held = contexts.begin_dispatch(
+        "acme", "employee-1", context_id,
+        expected_seq=contexts.load("acme", "employee-1", context_id).seq,
+        proposal_id="p-dead", expires_at=1.0, now=0.0)
     assert held is not None
     assert len(contexts.load("acme", "employee-1", context_id).open_dispatches) == 1
     body = _post(executor, _lease(executor, call), call=call).json()
@@ -367,8 +369,10 @@ def test_a_live_fence_of_another_proposal_refuses_before_the_tool(executor):
     lease = _lease(executor, call)
     contexts = exec_mod._flow_contexts()
     now = time.time()
-    held = contexts.begin_dispatch("acme", "employee-1", context_id, proposal_id="p-other",
-                                   expires_at=now + 60, now=now)
+    held = contexts.begin_dispatch(
+        "acme", "employee-1", context_id,
+        expected_seq=contexts.load("acme", "employee-1", context_id).seq,
+        proposal_id="p-other", expires_at=now + 60, now=now)
     assert held is not None
     body = _post(executor, lease, call=call).json()["tool_execution"]
     assert (body["executed"], body["refusal_reason"]) == (False, "flow_dispatch_contended")
