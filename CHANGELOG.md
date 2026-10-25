@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### The provenance register fingerprints identically on every supported interpreter
+
+- `scripts/provenance_register.py` folds the f-string pieces that Python 3.12 and later emit (PEP 701: start, middle, end and the replacement fields' own tokens; 3.14 does the same for t-strings) into the one `S` token that 3.11 yields, so a module's winnowing fingerprints no longer depend on the interpreter that computed them. The register records the rule under `method.strings`, and `docs/assurance/provenance_register_v1.json` is regenerated at the same snapshot (`register_sha256` changes; the concepts, first commits and markers are unchanged).
+- Why now: the full suite's `pytest` job fetches the whole history since the change-scoped selection landed, which un-skipped `test_register_reproduces_from_git_history`; the committed register had been written on 3.12+ and the Python 3.11 leg on master failed at `9d4261cf`. The regenerated register is checked under Python 3.11.16 in a container and under 3.14 on the host.
+- `tests/test_provenance_register.py` pins that an f-string normalises to one token and fingerprints like a plain string.
+
 ### The flow check and the dispatch are one step: the dispatch fence (IFC-06; SDD unified capability execution v1.1, P0 item 6)
 
 - After the dispatch-time flow re-check passes, the call holds the context with a `dispatch` event on its flow stream at the sequence it checked (`FlowContextStore.begin_dispatch`); the commit releases it (`dispatch_end`), and so does every refusing path, so a refused or raising call does not hold the context. A context held by another proposal's unexpired dispatch, or a fence lost to a concurrent writer, refuses as `flow_dispatch_contended` before the tool runs and before a nonce, a limit reservation or a recorder intent is spent. Two dispatches judged at the same epoch therefore run exactly one tool; before this change both ran and one result was withheld.
