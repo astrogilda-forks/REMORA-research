@@ -1755,9 +1755,23 @@ class GovernedToolDispatcher:
         # IFC-12: the recipient set this executor computed for the call must
         # be the one the authority signed; a set that differs means the flow
         # spec or the arguments moved, and the mediator would narrow effects
-        # to a set nobody judged. Compared only when both exist: a lease
-        # judged under flow control presented to an executor with flow
-        # control off is checked as before, as the flow fields are.
+        # to a set nobody judged. A recipient-bound lease for a MEDIATED tool
+        # presented without a set (an executor with flow control off) is
+        # refused: running it would widen the tool's effects from the signed
+        # set to its whole ceiling. An unmediated tool has no effects for the
+        # set to narrow, so it is checked as before.
+        if lease.flow_recipients_digest and flow_recipients is None \
+                and tool_name in self._mediated:
+            governance_event(
+                "dispatch.refused", level=logging.WARNING,
+                reason="flow_recipients_required", tenant_id=tenant_id,
+                tool_name=tool_name, proposal_id=proposal_id,
+                grant_jti=lease.grant_jti,
+            )
+            return DispatchResult(
+                executed=False, refusal_reason="flow_recipients_required",
+                proposal_id=proposal_id,
+            )
         if lease.flow_recipients_digest and flow_recipients is not None:
             from remora.enforcement.flow_recipients import recipients_digest
 

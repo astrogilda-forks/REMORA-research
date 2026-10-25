@@ -57,7 +57,9 @@ def _key(monkeypatch):
     ("network.http.post", "ext://partner.example", PARTNER),
     ("database.read", "database://reporting-eu/monthly", None),           # not a recipient
     ("filesystem.write", "workspace://reports/x.pdf", None),
-    ("network.http.post", "workspace://reports/x.pdf", None),             # not a host
+    ("network.tcp.connect", "tcp://partner.example:443", PARTNER),        # any network scheme
+    ("network.dns.query", "dns://exfil.example", "ext://exfil.example"),
+    ("network.http.post", "workspace://reports/x.pdf", "ext://reports"),  # names its authority
     ("network.http.post", "https://partner.example/../x", None),          # ambiguous: refused upstream
 ])
 def test_the_recipient_a_mediated_effect_names(capability, resource, recipient):
@@ -217,15 +219,36 @@ def test_a_recipient_set_that_differs_from_the_signed_digest_refuses_before_the_
     assert again.executed is True
 
 
-def test_an_executor_without_flow_control_checks_a_recipient_bound_lease_as_before():
+def test_a_recipient_bound_lease_for_a_mediated_tool_needs_a_recipient_set():
+    """External review 2026-10-25, F-02: an executor with flow control off
+    passes no set. Running the mediated tool then would widen its effects
+    from the signed set to its whole ceiling, so it refuses before anything is
+    spent; the same lease runs once the set is presented."""
     parent, calls = _parent(), []
     lease = _lease(parent, flow_epoch=1, flow_digest="d" * 64,
                    flow_recipients_digest=recipients_digest({PARTNER}))
-    result = _dispatcher(_report, calls).dispatch(
-        lease, "report.generate", ARGS, tenant_id="acme", target_environment="prod",
-        actor_identity="agent-42", capability_set=parent)
-    assert result.executed is True
-    assert calls == ["https://partner.example/hook", "https://exfil.example/drop"]
+    d = _dispatcher(_report, calls)
+    result = d.dispatch(lease, "report.generate", ARGS, tenant_id="acme",
+                        target_environment="prod", actor_identity="agent-42",
+                        capability_set=parent)
+    assert (result.executed, result.refusal_reason) == (False, "flow_recipients_required")
+    assert calls == []
+    again = d.dispatch(lease, "report.generate", ARGS, tenant_id="acme",
+                       target_environment="prod", actor_identity="agent-42",
+                       capability_set=parent, flow_recipients=frozenset({PARTNER}))
+    assert again.executed is True and calls == ["https://partner.example/hook"]
+
+
+def test_a_recipient_bound_lease_for_an_unmediated_tool_is_checked_as_before():
+    parent, ran = _parent(), []
+    lease = _lease(parent, flow_epoch=1, flow_digest="d" * 64,
+                   flow_recipients_digest=recipients_digest({PARTNER}))
+    d = GovernedToolDispatcher("b1")
+    d.register("report.generate", lambda arguments: ran.append(1) or "ok")
+    result = d.dispatch(lease, "report.generate", ARGS, tenant_id="acme",
+                        target_environment="prod", actor_identity="agent-42",
+                        capability_set=parent)
+    assert result.executed is True and ran == [1]
 
 
 # ── the effect domain ──────────────────────────────────────────────────────
