@@ -3287,7 +3287,8 @@ _EXEC_TRACER = get_remora_tracer(service_name="remora-execution")
 
 def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[int, str],
                       proposal_id: str,
-                      ) -> tuple[str | None, Any, dict[str, Any] | None, Callable[[], None] | None]:
+                      ) -> tuple[str | None, Any, dict[str, Any] | None, Callable[[], None] | None,
+                                 frozenset[str] | None]:
     """Re-check the flow decision right before dispatch, hold the context, and
     bind the result commit.
 
@@ -3307,7 +3308,8 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     the call's arguments with every handle resolved to its value, which is
     what the tool receives; the fourth releases the fence, and the caller runs
     it on every path that does not commit, so a refusal or a raising tool
-    does not hold the context until the fence expires (the lease TTL).
+    does not hold the context until the fence expires (the lease TTL). The
+    fifth is the recipient set the verdict approved (IFC-12).
     """
     import time as _time
 
@@ -3321,23 +3323,29 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     flow = _flow_spec(tool_call.tool_name)
     principal, context_id = _FLOW_PRINCIPAL.get(), tool_call.context_id
     if flow is None or not principal or not context_id:
-        return "flow_state_unavailable", None, None, None
+        return "flow_state_unavailable", None, None, None, None
     contexts, handles = _flow_contexts(), _flow_handles()
     ok, reason, resolved = verify_flow_at_dispatch(
         contexts=contexts, handles=handles, tenant_id=tenant, principal=principal,
         context_id=context_id, flow=flow, arguments=tool_call.arguments,
         expected_epoch=expected[0], expected_digest=expected[1])
     if not ok:
-        return reason, None, None, None
+        return reason, None, None, None, None
+    # IFC-12: the recipients the clean verdict approved for this call, for
+    # the lease (signed as a digest) and for the mediator, which admits a
+    # network effect only on a host among them.
+    from remora.flow.check import recipients as _recipients_of
+
+    approved, _unresolved = _recipients_of(flow, resolved)
     now = _time.time()
     try:
         dispatch_id = contexts.begin_dispatch(
             tenant, principal, context_id, proposal_id=proposal_id,
             expires_at=now + DEFAULT_LEASE_TTL_SECONDS, now=now)
     except Exception:
-        return "flow_state_unavailable", None, None, None
+        return "flow_state_unavailable", None, None, None, None
     if dispatch_id is None:
-        return "flow_dispatch_contended", None, None, None
+        return "flow_dispatch_contended", None, None, None, None
     released = False
 
     def release() -> None:
@@ -3365,7 +3373,7 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
                                       "epoch": done.new_epoch,
                                       "minted_handles": len(done.minted_handle_ids)}
 
-    return None, commit, resolved, release
+    return None, commit, resolved, release, approved
 
 
 def _dispatch_under_lease(
@@ -3432,9 +3440,10 @@ def _dispatch_under_lease(
     result_commit = None
     resolved_arguments: dict[str, Any] | None = None
     release_fence: Callable[[], None] | None = None
+    flow_recipients: frozenset[str] | None = None
     if flow_expected is not None:
-        flow_refusal, result_commit, resolved_arguments, release_fence = _flow_at_dispatch(
-            tenant, tool_call, flow_expected, proposal_id)
+        (flow_refusal, result_commit, resolved_arguments, release_fence,
+         flow_recipients) = _flow_at_dispatch(tenant, tool_call, flow_expected, proposal_id)
         if flow_refusal is not None:
             return {"executed": False, "refusal_reason": flow_refusal,
                     "proposal_id": proposal_id}
@@ -3445,7 +3454,7 @@ def _dispatch_under_lease(
             grant_jti=grant_jti, presented_lease=presented_lease, task_identity=task_identity,
             plan=plan, capability_set=capability_set, report_lease=report_lease,
             not_after=not_after, flow_expected=flow_expected, result_commit=result_commit,
-            resolved_arguments=resolved_arguments)
+            resolved_arguments=resolved_arguments, flow_recipients=flow_recipients)
     finally:
         if release_fence is not None:
             # The commit released it on the executed path; every other path
@@ -3474,6 +3483,7 @@ def _dispatch_under_lease_fenced(
     flow_expected: tuple[int, str] | None,
     result_commit: Any,
     resolved_arguments: dict[str, Any] | None,
+    flow_recipients: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """The rest of ``_dispatch_under_lease`` once the flow fence is held.
 
@@ -3547,6 +3557,7 @@ def _dispatch_under_lease_fenced(
                 else None),
             not_after=not_after,
             flow_binding=flow_binding,
+            flow_recipients=flow_recipients,
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):

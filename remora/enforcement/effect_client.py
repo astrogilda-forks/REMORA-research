@@ -70,16 +70,26 @@ class RemoteEffectClient:
         self._post = post
 
     def executors_for(self, lease: ExecutionLease, capability_set: EffectiveCapabilitySet,
-                      capabilities: Iterable[str]) -> dict[str, Callable[..., Any]]:
-        """One forwarding executor per capability the worker's mediator may try."""
+                      capabilities: Iterable[str], *,
+                      flow_recipients: Iterable[str] | None = None,
+                      ) -> dict[str, Callable[..., Any]]:
+        """One forwarding executor per capability the worker's mediator may try.
+
+        ``flow_recipients`` (IFC-12) is the recipient set the flow check
+        approved; the domain verifies it against the lease's digest.
+        """
         wire_lease, wire_set = lease.to_dict(), capability_set.to_dict()
+        wire_recipients = (sorted(set(flow_recipients))
+                           if flow_recipients is not None else None)
 
         def forward(capability: str) -> Callable[[str, Mapping[str, Any]], Any]:
             def run(resource: str, arguments: Mapping[str, Any]) -> Any:
                 answer = self._post(EFFECTS_PATH, {
                     "lease": wire_lease, "capability_set": wire_set,
                     "capability": capability, "resource": resource,
-                    "arguments": dict(arguments)})
+                    "arguments": dict(arguments),
+                    **({"flow_recipients": wire_recipients}
+                       if wire_recipients is not None else {})})
                 state = answer.get("state")
                 if state == "EXECUTED":
                     return answer.get("result")

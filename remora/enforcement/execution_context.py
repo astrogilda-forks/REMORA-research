@@ -15,6 +15,7 @@ section 11).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from remora.capabilities.model import EffectiveCapabilitySet
@@ -37,12 +38,17 @@ class ExecutionContext:
     capability_digest: str
     runtime_identity_hash: str
     parent_lease_digest: str
+    #: IFC-12: the recipients the flow check approved for this call, sorted,
+    #: or None when the call was not judged under flow control. A network
+    #: effect on a host outside the set is refused by the mediator.
+    flow_recipients: tuple[str, ...] | None = None
 
     @classmethod
     def for_dispatch(cls, *, tool_name: str, capability_set: EffectiveCapabilitySet,
                      proposal_id: str, policy_bundle_hash: str, toolspec_hash: str,
                      lease_digest: str, context_id: str = "", task_id: str = "",
-                     runtime_identity_hash: str = "") -> ExecutionContext:
+                     runtime_identity_hash: str = "",
+                     flow_recipients: Iterable[str] | None = None) -> ExecutionContext:
         """The context for dispatching ``tool_name`` under ``capability_set``."""
         return cls(
             execution_id=str(uuid.uuid4()),
@@ -58,4 +64,6 @@ class ExecutionContext:
             capability_digest=capability_set.digest,
             runtime_identity_hash=runtime_identity_hash,
             parent_lease_digest=lease_digest,
+            flow_recipients=(tuple(sorted(set(flow_recipients)))
+                             if flow_recipients is not None else None),
         )

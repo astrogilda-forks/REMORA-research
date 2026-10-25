@@ -137,3 +137,47 @@ def test_only_the_effect_domain_serves_effects(effect, monkeypatch, role, path, 
     monkeypatch.setenv("REMORA_EXECUTION_DOMAIN_ROLE", role)
     response = client.post(path, json={})
     assert (response.status_code != 404) is served
+
+
+def test_the_effect_domain_holds_a_network_effect_to_the_recipients_the_lease_signs(effect):
+    """IFC-12: a lease judged under flow control carries the digest of the
+    approved recipient set; the worker presents the set. A host outside it
+    is refused before the ceiling is consulted, and a worker that presents
+    no set, or another set, gets nothing."""
+    from remora.enforcement.flow_recipients import recipients_digest
+
+    client, store = effect
+    capability_set = CapabilityResolver(CapabilityPolicy.from_dict(POLICY)).resolve(
+        principal_id="agent-1", tenant_id="acme", environment="staging",
+        task_type="monitoring", now=datetime.now(UTC))
+    approved = ["ext://partner.example"]
+    lease = ExecutionLease.issue(
+        decision="accept", tenant_id="acme", actor_identity="agent-1",
+        tool_name="read_telemetry", arguments={"asset": "P-1"},
+        target_environment="staging", policy_bundle_hash="b1",
+        issued_at=datetime.now(UTC).isoformat(), capability_set=capability_set,
+        flow_epoch=1, flow_digest="d" * 64, flow_recipients_digest=recipients_digest(approved))
+    store.try_consume(lease.nonce, tenant_id="acme")
+
+    def post(resource, **extra):
+        body = {**_body(lease, capability_set, resource), "capability": "network.http.post", **extra}
+        answer = client.post("/v1/execution/effects", json=body)
+        assert answer.status_code == 200, answer.text
+        return answer.json()
+
+    # The execution opens on the first request: a worker that presents no
+    # set, or another set, opens nothing.
+    missing = post("https://partner.example/hook")
+    assert (missing["state"], missing["refusal"]) == ("REFUSED", "flow_recipients_mismatch")
+    wider = post("https://partner.example/hook", flow_recipients=approved + ["ext://collector.example"])
+    assert (wider["state"], wider["refusal"]) == ("REFUSED", "flow_recipients_mismatch")
+    leak = post("https://collector.example/upload", flow_recipients=approved)
+    assert (leak["state"], leak["refusal"]) == ("REFUSED", "capability_recipient_not_approved")
+    # inside the set, the ceiling decides as before (network.http.post is not declared here)
+    inside = post("https://partner.example/hook", flow_recipients=approved)
+    assert (inside["state"], inside["refusal"]) == ("REFUSED", "capability_not_allowed")
+    # once open, the execution keeps the signed set: a later request that
+    # leaves it out or widens it is judged under the set that opened it
+    later = post("https://collector.example/upload", flow_recipients=approved + ["ext://collector.example"])
+    assert (later["state"], later["refusal"]) == ("REFUSED", "capability_recipient_not_approved")
+    assert mediated_registry.EFFECT_CALLS == []

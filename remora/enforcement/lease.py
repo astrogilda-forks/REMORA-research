@@ -263,6 +263,12 @@ class ExecutionLease:
     flow_epoch: int = 0
     flow_digest: str = ""
     resolved_tool_call_hash: str = ""
+    #: IFC-12: the digest of the recipient set the flow check approved for
+    #: this call (:mod:`remora.enforcement.flow_recipients`). Signed only
+    #: when set, and only beside ``flow_digest``. The executor compares the
+    #: set it computes against it, and the effect domain admits a network
+    #: effect only on a host in the set the worker presents under it.
+    flow_recipients_digest: str = ""
 
     @classmethod
     def issue(
@@ -293,6 +299,7 @@ class ExecutionLease:
         flow_epoch: int | None = None,
         flow_digest: str = "",
         resolved_tool_call_hash: str = "",
+        flow_recipients_digest: str = "",
     ) -> ExecutionLease:
         """Issue a lease for an ACCEPTED decision; refuse everything else.
 
@@ -375,6 +382,10 @@ class ExecutionLease:
             fields["flow_digest"] = flow_digest
         if resolved_tool_call_hash:
             fields["resolved_tool_call_hash"] = resolved_tool_call_hash
+        if flow_recipients_digest:
+            if not flow_digest:
+                raise ValueError("flow_recipients_digest needs the flow decision it belongs to")
+            fields["flow_recipients_digest"] = flow_recipients_digest
         task_event_fields: dict[str, Any] = dict(task_fields(task_identity))
         alg = _signing.issuer_algorithm()
         if alg is None:
@@ -507,6 +518,8 @@ class ExecutionLease:
             fields["flow_digest"] = self.flow_digest
         if self.resolved_tool_call_hash:
             fields["resolved_tool_call_hash"] = self.resolved_tool_call_hash
+        if self.flow_recipients_digest:
+            fields["flow_recipients_digest"] = self.flow_recipients_digest
         return fields
 
     def task_identity(self) -> "TaskIdentity | None":
@@ -708,7 +721,7 @@ class ExecutionLease:
             return LeaseVerificationResult(False, "task_identity_malformed")
         # IFC-06: an epoch without the digest it belongs to names no flow
         # decision; issue() never signs one, so it is a malformed lease.
-        if self.flow_epoch and not self.flow_digest:
+        if (self.flow_epoch or self.flow_recipients_digest) and not self.flow_digest:
             return LeaseVerificationResult(False, "flow_binding_malformed")
         if task_identity is not None:
             if bound_task is None:
@@ -730,7 +743,7 @@ class ExecutionLease:
         "context_id", "task_id", "resolved_effect_hash", "plan_binding_hash",
         "surface_digest", "capability_digest",
         "execution_context_hash",
-        "flow_epoch", "flow_digest", "resolved_tool_call_hash",
+        "flow_epoch", "flow_digest", "resolved_tool_call_hash", "flow_recipients_digest",
     })
 
     @classmethod
@@ -1459,7 +1472,9 @@ class GovernedToolDispatcher:
 
     def _prepare_mediation(self, lease: ExecutionLease, tool_name: str,
                            capability_set: EffectiveCapabilitySet | None,
-                           now: str | None) -> tuple[Any, str | None]:
+                           now: str | None,
+                           flow_recipients: frozenset[str] | None = None,
+                           ) -> tuple[Any, str | None]:
         """The mediator for a mediated tool, or why the call is refused.
 
         Runs before the nonce is spent. The effect authority is derived from
@@ -1496,9 +1511,11 @@ class GovernedToolDispatcher:
             proposal_id=lease.proposal_id, policy_bundle_hash=lease.policy_bundle_hash,
             toolspec_hash=lease.toolspec_hash, lease_digest=lease.digest(),
             context_id=lease.context_id, task_id=lease.task_id,
-            runtime_identity_hash=lease.runtime_identity_hash)
+            runtime_identity_hash=lease.runtime_identity_hash,
+            flow_recipients=flow_recipients)
         executors = (self._effect_domain.executors_for(
-                         lease, capability_set, [c.capability for c in ceiling.capabilities])
+                         lease, capability_set, [c.capability for c in ceiling.capabilities],
+                         flow_recipients=flow_recipients)
                      if self._effect_domain is not None else self._effect_executors)
         return CapabilityMediator(
             context, authority, executors=executors,
@@ -1572,6 +1589,7 @@ class GovernedToolDispatcher:
         capability_set: EffectiveCapabilitySet | None = None,
         execution_context: ExecutionContextV1 | None = None,
         invocation_arguments: Any = None,
+        flow_recipients: frozenset[str] | None = None,
     ) -> DispatchResult:
         """Execute ``tool_name`` iff the lease covers this exact call.
 
@@ -1733,6 +1751,27 @@ class GovernedToolDispatcher:
                     executed=False, refusal_reason="resolved_call_mismatch",
                     proposal_id=proposal_id,
                 )
+        # IFC-12: the recipient set this executor computed for the call must
+        # be the one the authority signed; a set that differs means the flow
+        # spec or the arguments moved, and the mediator would narrow effects
+        # to a set nobody judged. Compared only when both exist: a lease
+        # judged under flow control presented to an executor with flow
+        # control off is checked as before, as the flow fields are.
+        if lease.flow_recipients_digest and flow_recipients is not None:
+            from remora.enforcement.flow_recipients import recipients_digest
+
+            if not hmac.compare_digest(recipients_digest(flow_recipients),
+                                       lease.flow_recipients_digest):
+                governance_event(
+                    "dispatch.refused", level=logging.WARNING,
+                    reason="flow_recipients_changed", tenant_id=tenant_id,
+                    tool_name=tool_name, proposal_id=proposal_id,
+                    grant_jti=lease.grant_jti,
+                )
+                return DispatchResult(
+                    executed=False, refusal_reason="flow_recipients_changed",
+                    proposal_id=proposal_id,
+                )
         check: dict[str, Any] | None = None
         if lease.execution_context_hash or execution_context is not None or self._require_execution_context:
             from remora.enforcement.runtime_identity import (
@@ -1829,7 +1868,7 @@ class GovernedToolDispatcher:
         # NTA-2: the mediated execution's authority, prepared before anything
         # is spent so a refusal here leaves the nonce unspent too.
         mediator, mediation_refusal = self._prepare_mediation(
-            lease, tool_name, capability_set, now)
+            lease, tool_name, capability_set, now, flow_recipients)
         if mediation_refusal is not None:
             governance_event(
                 "dispatch.refused", level=logging.WARNING,

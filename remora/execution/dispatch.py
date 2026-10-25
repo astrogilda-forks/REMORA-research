@@ -76,6 +76,7 @@ def dispatch_under_lease(
     invocation_arguments: Any = None,
     not_after: datetime | None = None,
     flow_binding: tuple[int, str, str] | None = None,
+    flow_recipients: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -176,6 +177,7 @@ def dispatch_under_lease(
                 surface_digest=surface_digest,
                 not_after=not_after,
                 flow_binding=flow_binding,
+                flow_recipients=flow_recipients,
             )
         except (LeaseRefused, ValueError, SigningUnavailable) as exc:
             # SigningUnavailable belongs here, and its absence was a live 500.
@@ -261,6 +263,10 @@ def dispatch_under_lease(
         task_kwargs["capability_set"] = capability_set
     if invocation_arguments is not None:
         task_kwargs["invocation_arguments"] = invocation_arguments
+    if flow_recipients is not None:
+        # IFC-12: the recipients the flow check approved, for the mediator
+        # and for the comparison with the lease's signed digest.
+        task_kwargs["flow_recipients"] = flow_recipients
     context = _execution_context(semantic)
     if context is not None:
         task_kwargs["execution_context"] = context
@@ -393,6 +399,7 @@ def issue_execution_lease(
     plan: PlanBinding | None = None,
     capability_set: EffectiveCapabilitySet | None = None,
     flow_binding: tuple[int, str, str] | None = None,
+    flow_recipients: frozenset[str] | None = None,
 ) -> ExecutionLease:
     """Mint a lease. The authority domain's half of the custody split.
 
@@ -410,6 +417,7 @@ def issue_execution_lease(
         plan=plan,
         capability_set=capability_set,
         flow_binding=flow_binding,
+        flow_recipients=flow_recipients,
     )
 
 
@@ -431,7 +439,10 @@ def _issue_local_lease(
     surface_digest: str = "",
     not_after: datetime | None = None,
     flow_binding: tuple[int, str, str] | None = None,
+    flow_recipients: frozenset[str] | None = None,
 ) -> ExecutionLease:
+    from remora.enforcement.flow_recipients import recipients_digest
+
     execution_context = _execution_context(semantic)
     # ADR-D: the runtime this lease is granted for. An execution context names
     # it (and ExecutionLease.issue takes it from there). Without one, the
@@ -474,6 +485,9 @@ def _issue_local_lease(
             flow_epoch=flow_binding[0] if flow_binding is not None else None,
             flow_digest=flow_binding[1] if flow_binding is not None else "",
             resolved_tool_call_hash=flow_binding[2] if flow_binding is not None else "",
+            flow_recipients_digest=(recipients_digest(flow_recipients)
+                                    if flow_recipients is not None and flow_binding is not None
+                                    else ""),
         )
 
 

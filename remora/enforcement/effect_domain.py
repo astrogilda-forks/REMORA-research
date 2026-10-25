@@ -43,6 +43,7 @@ execution stays closed until its lease can no longer open one.
 """
 from __future__ import annotations
 
+import hmac
 import threading
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
@@ -59,6 +60,7 @@ from remora.enforcement.capability_mediator import (
 )
 from remora.enforcement.effect_capability import derive_effect_authority
 from remora.enforcement.execution_context import ExecutionContext
+from remora.enforcement.flow_recipients import recipients_digest
 from remora.enforcement.lease import ExecutionLease
 
 __all__ = ["EffectDomain", "effect_to_wire"]
@@ -216,6 +218,20 @@ class EffectDomain:
             return CapabilityRefusal.DIGEST_MISMATCH.value
         if not lease.capability_digest or capability_set.digest != lease.capability_digest:
             return CapabilityRefusal.DIGEST_MISMATCH.value
+        # IFC-12: a lease judged under flow control carries the digest of the
+        # recipient set; the worker presents the set and it must match. A
+        # worker that leaves it out, or presents another set, gets nothing.
+        # A lease without the digest was not judged under flow control and a
+        # presented set is ignored: the lease, not the worker, narrows.
+        recipients: frozenset[str] | None = None
+        if lease.flow_recipients_digest:
+            raw = request.get("flow_recipients")
+            if not isinstance(raw, list) or not all(isinstance(r, str) for r in raw):
+                return "flow_recipients_mismatch"
+            recipients = frozenset(raw)
+            if not hmac.compare_digest(recipients_digest(recipients),
+                                       lease.flow_recipients_digest):
+                return "flow_recipients_mismatch"
         try:
             ceiling = self._ceilings(lease.tool_name)
         except Exception:
@@ -242,7 +258,8 @@ class EffectDomain:
             tool_name=lease.tool_name, capability_set=capability_set,
             proposal_id=lease.proposal_id, policy_bundle_hash=lease.policy_bundle_hash,
             toolspec_hash=lease.toolspec_hash, lease_digest=lease.digest(),
-            context_id=lease.context_id, task_id=lease.task_id)
+            context_id=lease.context_id, task_id=lease.task_id,
+            flow_recipients=recipients)
         return CapabilityMediator(context, authority,
                                   executors=self._slotted(lease.digest(), lease.tenant_id),
                                   epochs=self._epochs, state_reader=self._reader,
