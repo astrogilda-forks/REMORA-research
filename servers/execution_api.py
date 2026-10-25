@@ -3705,10 +3705,19 @@ def execute_accepted(req: ExecuteAcceptedRequest, request: Request) -> dict[str,
             status_code=409, detail=f"malformed execution token: {exc}"
         ) from exc
 
+    # Flow contexts belong to the proposer. A delegate the proposal named
+    # (and only that delegate) redeems in the proposer's context, as the
+    # review path and the worker do; anyone else reads its own context and,
+    # if it is not the proposer, is refused later as context_mismatch.
+    from remora.execution.service import _acting_for, _assessed_payload
+
+    flow_principal = _acting_for(
+        _assessed_payload(_CHAIN, tenant, str(token.request_id or "")), principal) or principal
+
     # Orchestration lives in remora.execution.service (issue #241, slice 9);
     # this route binds the module's ambient state and maps domain errors.
     try:
-        response = _redeem_accept_token(
+        response = _with_flow_principal(flow_principal, lambda: _redeem_accept_token(
             tenant=tenant, principal=principal, token=token,
             tool_call=req.tool_call,
             chain=_CHAIN, gate=_GATE, outbox=_outbox,
@@ -3725,7 +3734,7 @@ def execute_accepted(req: ExecuteAcceptedRequest, request: Request) -> dict[str,
             ws1_gate=_ws1_gate(),
             ws1_capability=_ws1_capability(tenant),
             admission=_admission(),
-        )
+        ))
     except ExecutionContextRefused as exc:
         raise HTTPException(status_code=409, detail=exc.reason) from exc
     except ToolSpecChanged as exc:
@@ -3812,6 +3821,17 @@ def dispatch_leased(req: DispatchLeasedRequest, request: Request) -> dict[str, A
     if _flow_control_enabled():
         from remora.execution.service import _flow_refusal
 
+        # The flow check below takes the context's dispatch fence, a write to
+        # its event stream. A lease whose signature, decision or window does
+        # not verify must not get that far: it is refused here with the
+        # reason the dispatcher would give, and the stream is untouched.
+        authentic = lease.verify_authenticity(now=now.isoformat())
+        if not authentic.verified:
+            api_mod.record_execution_execute(executed=False, refusal=authentic.reason)
+            return {"outcome": "refused",
+                    "tool_execution": {"executed": False,
+                                       "refusal_reason": authentic.reason,
+                                       "proposal_id": lease.proposal_id}}
         # IFC-06: the expected epoch and digest come from the SIGNED lease,
         # what the authority judged when it granted the call. Until this
         # change they were computed here, a moment before being compared
