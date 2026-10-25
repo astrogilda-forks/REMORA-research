@@ -364,8 +364,8 @@ reason a key leaks.
 ### Error reporting to Sentry (opt-in)
 
 Set `SENTRY_DSN` to the DSN of the deployment's Sentry project and install the
-`sentry` extra (`pip install -e ".[sentry]"`); without the DSN nothing is
-initialised, and with the DSN but without the package the API starts and logs
+`sentry` extra (`pip install -e ".[sentry]"`). Without the DSN nothing is
+initialised. With the DSN but without the package, the API starts and logs
 one warning. `SENTRY_ENVIRONMENT` defaults to `REMORA_ENV`, `SENTRY_RELEASE` to
 the package version, and `SENTRY_TRACES_SAMPLE_RATE` to 0 (errors only).
 
