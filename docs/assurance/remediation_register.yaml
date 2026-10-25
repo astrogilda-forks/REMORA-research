@@ -3,7 +3,7 @@
 # Gate definitions: P0 (critical) → P1 (empirical) → P2 (external) → P3 (reproducibility) → P4 (hardening/roadmap)
 
 schema_version: "1"
-last_updated: "2026-08-03T23:00Z"
+last_updated: "2026-10-25T18:00Z"
 
 items:
   - id: REM-001
