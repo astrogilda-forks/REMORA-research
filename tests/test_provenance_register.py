@@ -145,6 +145,21 @@ def test_fingerprints_ignore_formatting_and_comments() -> None:
     assert PR.fingerprints(a) == PR.fingerprints(b)
 
 
+def test_an_f_string_is_one_string_token_on_every_interpreter() -> None:
+    """Python 3.12 (PEP 701) splits an f-string into start, middle and end
+    tokens with the replacement fields' own tokens between them; 3.11 yields
+    one STRING. The register must fingerprint identically on both, or the
+    committed register reproduces on one interpreter and not another (the
+    3.11 leg of the full suite failed this way on 2026-10-24)."""
+    plain = 'x = "a"\n'
+    formatted = 'x = f"a {b!r:>{w}} {c[0]} d"\n'
+    assert PR.normalised_tokens(plain) == ["V", "=", "S", ";"]
+    assert PR.normalised_tokens(formatted) == PR.normalised_tokens(plain)
+    assert PR.fingerprints(formatted * 4) == PR.fingerprints(plain * 4)
+    # a run inside a call keeps the tokens around it
+    assert PR.normalised_tokens('f(f"{x}", 1)\n') == ["V", "(", "S", ",", "N", ")", ";"]
+
+
 def test_signature_status_reads_the_commit_object_not_the_local_keyring(monkeypatch: pytest.MonkeyPatch) -> None:
     """%G? said E with gpg and N without it for the same commit; the gpgsig header says the same everywhere."""
     signed = ("tree 0\nparent 1\nauthor a <a> 0 +0000\ncommitter a <a> 0 +0000\n"

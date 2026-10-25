@@ -54,6 +54,14 @@ K = 12
 W = 8
 _PATH_CAP = 8
 _SKIP = {tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER}
+#: Python 3.12 (PEP 701) tokenises an f-string as FSTRING_START, its pieces and
+#: FSTRING_END, and 3.14 does the same for t-strings; 3.11 yields one STRING. The
+#: register folds the run back into one ``S`` so a fingerprint does not depend on
+#: the interpreter that computed it.
+_STRING_RUN_STARTS = {getattr(tokenize, n) for n in ("FSTRING_START", "TSTRING_START")
+                      if hasattr(tokenize, n)}
+_STRING_RUN_ENDS = {getattr(tokenize, n) for n in ("FSTRING_END", "TSTRING_END")
+                    if hasattr(tokenize, n)}
 _TEXT_SUFFIXES = {".py", ".md", ".yml", ".yaml", ".json", ".toml", ".ts", ".js", ".go", ".rs", ".java"}
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 _MAX_MARKER_BYTES = 1_000_000
@@ -72,11 +80,26 @@ def term_pattern(term: str) -> str:
 
 
 def normalised_tokens(source: str) -> list[str]:
-    """The token stream with identifiers, strings and numbers reduced to their kind."""
+    """The token stream with identifiers, strings and numbers reduced to their kind.
+
+    An f-string (or t-string) is one ``S`` whatever the interpreter: the pieces
+    that Python 3.12 and later emit between its start and end tokens, nested
+    runs included, are folded into it.
+    """
     out: list[str] = []
+    run_depth = 0
     try:
         for tok in tokenize.generate_tokens(io.StringIO(source).readline):
             if tok.type in _SKIP:
+                continue
+            if tok.type in _STRING_RUN_STARTS:
+                if run_depth == 0:
+                    out.append("S")
+                run_depth += 1
+                continue
+            if run_depth:
+                if tok.type in _STRING_RUN_ENDS:
+                    run_depth -= 1
                 continue
             if tok.type == tokenize.NAME:
                 out.append(tok.string if keyword.iskeyword(tok.string) else "V")
@@ -196,6 +219,7 @@ def build() -> dict:
         "snapshot_committed": _git("show", "-s", "--format=%cI", snapshot).stdout.strip(),
         "method": {
             "fingerprint": "winnowing over normalised Python tokens",
+            "strings": "an f-string is one token on every interpreter; PEP 701 pieces are folded",
             "k": K,
             "window": W,
             "term_search": "word-boundary git log -G; a term inside a longer token does not count",
