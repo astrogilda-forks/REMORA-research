@@ -405,6 +405,12 @@ items:
         5. Claim hygiene — docs/05-claim-hygiene.md compliance across README and paper.
       Artifact to commit when closed: docs/assurance/independent_review_v1.md.
         Must include: reviewer name/affiliation, scope covered, findings, verdict.
+      Owner decision 2026-10-25 (docs/architecture/ADR-pilot-readiness-owner-decision.md):
+        no longer a precondition for the CONTROLLED_PILOT release profile. The
+        maintainer decides when and how the code runs in a pilot. This item stays
+        open as the recorded fact that no independent review has taken place; it
+        gates EXTERNALLY_VERIFIED on any capability and, through gate P3, PRODUCTION.
+        Step 10 of REM-023 (external confirmation of the RBAC design) remains here.
 
   - id: REM-022
     section: "§5.A-B"
@@ -434,7 +440,8 @@ items:
     section: "§5.A-B (follow-through)"
     title: "RBAC follow-through — isolation test, admin wildcard, external confirmation"
     gate: P3
-    status: IN_PROGRESS
+    status: DONE
+    completed: "2026-10-25"
     artifacts:
       - tests/test_rbac_isolation.py
       - servers/api.py
@@ -458,6 +465,10 @@ items:
       authorizes from the authenticated token role, not the X-Remora-Role header.
       Remaining to close REM-023: only the external RBAC-design confirmation
       (REM-021). Code/test criteria (steps 8 & 9) are complete.
+      CLOSED 2026-10-25 by owner decision (docs/architecture/ADR-pilot-readiness-owner-decision.md):
+      the item closes on its code and test criteria (steps 8 and 9). Step 10, the
+      external confirmation of the RBAC design, is no longer a closure criterion
+      and stays recorded under REM-021 as work not done.
 
   # External security audit remediation (2026-07-03).
   # Full disposition: docs/assurance/ai_assisted_adversarial_security_review_v1.md.

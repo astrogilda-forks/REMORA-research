@@ -12,14 +12,29 @@
 # by editing prose — only by changing register state backed by evidence.
 #
 # Authority note: requirements follow this repository's own gate semantics
-# (docs/assurance/release_gates.md): leaving SHADOW_ONLY — i.e. ANY
-# enforcement, including a controlled pilot — requires every production
-# deployment gate including REM-021 (independent human review). Generic
-# maturity templates that defer independent review to full production are
-# deliberately not followed here.
+# (docs/assurance/release_gates.md). Leaving SHADOW_ONLY for a controlled
+# pilot is the maintainer's decision, recorded below under owner_decisions
+# and in docs/architecture/ADR-pilot-readiness-owner-decision.md
+# (2026-10-25); CI refuses a profile whose owner_decision is not recorded
+# with its decider, date and record. Independent human review (REM-021) is
+# not a precondition for the pilot. It stays the gate for EXTERNALLY_VERIFIED
+# on any capability and, through gate P3, for PRODUCTION.
 
 schema_version: "1"
-updated: "2026-07-20"
+updated: "2026-10-25"
+
+# Owner decisions a profile may require. Each names who decided, when, and
+# the record that states the decision and what it does not change.
+owner_decisions:
+  - id: OD-2026-10-25-controlled-pilot
+    decided_by: repository owner (maintainer)
+    decided_on: "2026-10-25"
+    record: docs/architecture/ADR-pilot-readiness-owner-decision.md
+    statement: >
+      Pilot readiness is the maintainer's decision. CONTROLLED_PILOT does not
+      require an independent external review; REM-021 stays open as a recorded
+      fact and gates EXTERNALLY_VERIFIED and PRODUCTION. Running a pilot is an
+      operational decision taken outside this repository.
 
 # Cumulative capability ladder (from capability_register_v1.yaml).
 capability_ladder:
@@ -37,9 +52,13 @@ rem_satisfied_prefixes:
 
 # Declared current profile — CI-validated against the computed profile.
 # SHADOW_PILOT corresponds to deployment_status = SHADOW_ONLY: shadow-mode
-# operation on real logs is permitted; no enforcement is.
-current_profile: SHADOW_PILOT
-deployment_status_equivalent: SHADOW_ONLY
+# operation on real logs is permitted; no enforcement is. CONTROLLED_PILOT
+# corresponds to deployment_status = CONTROLLED_PILOT: the repository may be
+# run as a bounded pilot with a human approval on every non-accept outcome.
+# Whether one runs is the maintainer's operational decision; no running pilot
+# is claimed here.
+current_profile: CONTROLLED_PILOT
+deployment_status_equivalent: CONTROLLED_PILOT
 
 profiles:
   - name: RESEARCH_REFERENCE
@@ -74,13 +93,15 @@ profiles:
     includes: SHADOW_PILOT
     description: >
       First enforcement on a low-consequence, high-volume action class with a
-      human approval on every non-accept outcome. This is "leaving
-      SHADOW_ONLY", so every production deployment gate in release_gates.md
-      applies — including independent human review (REM-021).
+      human approval on every non-accept outcome. Leaving SHADOW_ONLY for this
+      profile is the maintainer's recorded decision (owner_decisions above);
+      the technical gates REM-020, REM-022 and REM-023 and the capability
+      levels below still apply. Independent human review (REM-021) is not
+      required here; it gates EXTERNALLY_VERIFIED and PRODUCTION.
     requires:
+      owner_decision: OD-2026-10-25-controlled-pilot
       rem_done:
         - REM-020
-        - REM-021
         - REM-022
         - REM-023
       capabilities:

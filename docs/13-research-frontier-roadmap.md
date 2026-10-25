@@ -584,9 +584,9 @@ E[L(λ̂)] ≤ α + 1/(n+1) bound (do not describe it as CRC-with-guarantee);
 caller/AROMER layer (the engine is stateless), and flags online threshold
 adaptation as a new attack surface (adversarial stream manipulation drags the
 threshold) that must be covered before shipping. Deployment-gate reality: the
-SHADOW_PILOT→CONTROLLED_PILOT gate set is REM-020+021+022+023
-(`docs/assurance/release_profiles_v1.yaml`); progression is blocked on REM-021
-(independent human review, NOT_STARTED), not on statistics.
+profile is CONTROLLED_PILOT since 2026-10-25 by owner decision
+(`docs/assurance/release_profiles_v1.yaml`); REM-021 (independent human review,
+NOT_STARTED) gates EXTERNALLY_VERIFIED and PRODUCTION, not the pilot.
 
 **Literature.**
 
@@ -649,8 +649,8 @@ has a supplementary anytime-valid bound; extend, don't duplicate).
 **Verdict after grounding: defer (was P1 in the draft).** (1) The calibration
 target no longer exists; the rebenchmark protocol must first yield a selector
 that survives fresh-data validation. (2) The anytime-valid half is largely
-shipped for the only gate that needed it. (3) Deployment progression is
-blocked on REM-021 human review, not statistics; this WP closes no gate on
+shipped for the only gate that needed it. (3) Progression past the pilot is
+gated by REM-021 human review, not statistics; this WP closes no gate on
 the critical path. Revisit as "soon" once the rebenchmark round validates a
 selector; the first slice then is `adaptive_conformal.py` implementing the
 Gibbs–Candès recursion with a shadow-replay coverage-under-induced-shift

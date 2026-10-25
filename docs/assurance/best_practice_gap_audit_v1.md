@@ -10,8 +10,9 @@
 > register wins and this file is the bug.
 >
 > **Deployment reality (unchanged):** nothing here is `ENFORCED_PRODUCTION` or
-> `EXTERNALLY_VERIFIED`. The system is `SHADOW_ONLY` until REM-021 (independent
-> review) closes. See the generated Status block in the README.
+> `EXTERNALLY_VERIFIED`. The release profile is `CONTROLLED_PILOT` by owner
+> decision (2026-10-25); `EXTERNALLY_VERIFIED` still needs REM-021 (independent
+> review), which has not taken place. See the generated Status block.
 
 ## How to read this
 

@@ -65,7 +65,7 @@ def test_profile_declaration_cannot_drift(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     inflated.write_text(
-        original.replace("current_profile: SHADOW_PILOT", "current_profile: PRODUCTION"),
+        original.replace("current_profile: CONTROLLED_PILOT", "current_profile: PRODUCTION"),
         encoding="utf-8",
     )
     mod.PROFILES = inflated
@@ -376,7 +376,7 @@ def test_release_gates_table_accepts_matching_status(tmp_path: Path) -> None:
         "| ID | Gate | Status | What DONE means |\n"
         "|----|------|--------|-----------------|\n"
         "| REM-021 | Independent human review | **NOT STARTED** | ... |\n"
-        "| REM-023 | RBAC follow-through | **IN_PROGRESS** (folded into REM-021) | ... |\n",
+        "| REM-023 | RBAC follow-through | **DONE** (2026-10-25, owner decision) | ... |\n",
         encoding="utf-8",
     )
     mod.RELEASE_GATES = gates
@@ -385,15 +385,62 @@ def test_release_gates_table_accepts_matching_status(tmp_path: Path) -> None:
     assert errors == [], errors
 
 
-def test_declared_current_profile_is_shadow_pilot() -> None:
+def test_declared_current_profile_is_controlled_pilot_by_owner_decision() -> None:
+    """Owner decision of 2026-10-25 (docs/architecture/ADR-pilot-readiness-owner-decision.md):
+    the controlled pilot rests on the technical gates and a recorded owner
+    decision, not on REM-021. REM-021 still gates PRODUCTION through P3."""
     import yaml
 
     with open(
         ROOT / "docs" / "assurance" / "release_profiles_v1.yaml", encoding="utf-8"
     ) as f:
         prof = yaml.safe_load(f)
-    assert prof["current_profile"] == "SHADOW_PILOT"
-    assert prof["deployment_status_equivalent"] == "SHADOW_ONLY"
+    assert prof["current_profile"] == "CONTROLLED_PILOT"
+    assert prof["deployment_status_equivalent"] == "CONTROLLED_PILOT"
+    by_name = {p["name"]: p for p in prof["profiles"]}
+    pilot = by_name["CONTROLLED_PILOT"]["requires"]
+    assert "REM-021" not in pilot["rem_done"]
+    assert pilot["owner_decision"] == "OD-2026-10-25-controlled-pilot"
+    assert [d["id"] for d in prof["owner_decisions"]] == ["OD-2026-10-25-controlled-pilot"]
+    assert by_name["PRODUCTION"]["requires"]["all_rem_items_with_gate_at_most"] == "P3"
+
+
+def _profiles_with(tmp_path: Path, **over: str) -> Path:
+    original = (ROOT / "docs" / "assurance" / "release_profiles_v1.yaml").read_text(
+        encoding="utf-8"
+    )
+    for old, new in over.items():
+        assert original.count(old) == 1, old
+        original = original.replace(old, new)
+    path = tmp_path / "profiles.yaml"
+    path.write_text(original, encoding="utf-8")
+    return path
+
+
+def test_a_profile_resting_on_an_unrecorded_owner_decision_is_not_satisfied(tmp_path: Path) -> None:
+    mod = _load_module()
+    mod.PROFILES = _profiles_with(
+        tmp_path, **{"  - id: OD-2026-10-25-controlled-pilot\n": "  - id: OD-other\n"})
+    errors: list[str] = []
+    mod.check_release_profiles(errors)
+    assert any("owner_decisions does not record" in e for e in errors), errors
+    assert any("current_profile is CONTROLLED_PILOT" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("field, broken, fragment", [
+    ("    decided_by: repository owner (maintainer)\n", "    decided_by: ''\n", "no decided_by"),
+    ('    decided_on: "2026-10-25"\n', '    decided_on: "yesterday"\n', "not an ISO date"),
+    ("    record: docs/architecture/ADR-pilot-readiness-owner-decision.md\n",
+     "    record: docs/architecture/ADR-does-not-exist.md\n", "is not a file"),
+])
+def test_an_owner_decision_without_decider_date_or_record_does_not_count(
+        tmp_path: Path, field: str, broken: str, fragment: str) -> None:
+    mod = _load_module()
+    mod.PROFILES = _profiles_with(tmp_path, **{field: broken})
+    errors: list[str] = []
+    mod.check_release_profiles(errors)
+    assert any("owner decision" in e and fragment in e for e in errors), errors
+    assert any("current_profile is CONTROLLED_PILOT" in e for e in errors), errors
 
 
 # ---------------------------------------------------------------------------
