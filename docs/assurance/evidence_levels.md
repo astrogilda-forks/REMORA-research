@@ -185,10 +185,11 @@ operational consequences (not simulation, not replay).
 > "Observed in production deployment at [operator] over [period]. N=[X] real
 > agent actions. Limitations: [..."
 
-**Status in REMORA:** No claims at this level. REMORA is `SHADOW_ONLY` as of
-2026-06-30. One production gate remains (REM-021, independent human review)
-before any deployment outside shadow mode; REM-020 closed 2026-07-17 and
-REM-022 closed 2026-06-30 with recorded deviation (REM-023).
+**Status in REMORA:** No claims at this level. REMORA was `SHADOW_ONLY` from
+2026-06-30; the release profile is `CONTROLLED_PILOT` since 2026-10-25 by owner
+decision, with REM-020, REM-022 and REM-023 DONE. REM-021 (independent human
+review) has not taken place and is not a precondition for the pilot; it gates
+`EXTERNALLY_VERIFIED` and `PRODUCTION`.
 
 **Promotion path:** Promote to `externally_validated` when an independent
 external party formally validates the field result.

@@ -10,7 +10,7 @@
 | Repository | `darklordVirtual/REMORA-research` |
 | Primary gate | REM-021 — independent human review |
 | Related gates | REM-023, REM-024, REM-025, REM-026, REM-027, REM-030, REM-031, REM-037, REM-045, REM-046 |
-| Current profile | `SHADOW_PILOT` / `SHADOW_ONLY` |
+| Current profile | `CONTROLLED_PILOT` (owner decision 2026-10-25; REM-021 gates `EXTERNALLY_VERIFIED` and `PRODUCTION`, not the pilot) |
 | Owner | Stian Skogbrott |
 
 > **Decision:** REMORA is too broad for any single person to issue a credible

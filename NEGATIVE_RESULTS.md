@@ -389,6 +389,13 @@ still stands, and the fingerprint backend remains the default.
 > pending REM-021 verification). One production gate remains: REM-021
 > (independent human review). Deployment stays SHADOW_ONLY until it closes.
 
+> **Updated (2026-10-25):** by owner decision
+> (`docs/architecture/ADR-pilot-readiness-owner-decision.md`) REM-021 no longer
+> gates the `CONTROLLED_PILOT` profile; REM-023 closed on its code and test
+> criteria; the profile is `CONTROLLED_PILOT`. REM-021 stays open: no
+> independent review has taken place, and every value above is still
+> self-reported.
+
 AROMER reached `interpretation_nuanced = "TRAINED_SHADOW_ONLY"` on 2026-06-26 with AII ≈ 0.820
 (smoothed), after all five interpretation gates cleared. Progression: CAPABLE_SHADOW_ONLY
 (AII≈0.629) on 2026-06-26 → TRAINED_SHADOW_ONLY (AII≈0.820) same day, via world model seeding.
@@ -1022,6 +1029,7 @@ to the test report. See `Makefile` credibility-pack target.
 **Overall:** REMORA is approvable as a policy-gated governance prototype with strong claim hygiene.
 It is not approvable as a demonstrated AI safety result. `deployment_status: SHADOW_ONLY`,
 `policy_relaxation_allowed: false`. One production gate remains open: REM-021 (not started). REM-020 closed 2026-07-17 (7-day criterion, fail-closed tooling); REM-022 DONE 2026-06-30 with recorded deviation (REM-023).
+**Updated 2026-10-25:** the release profile is `CONTROLLED_PILOT` by owner decision (`docs/architecture/ADR-pilot-readiness-owner-decision.md`). REM-021 is not a precondition for the pilot. It remains not started and gates `EXTERNALLY_VERIFIED` and `PRODUCTION`. The sentence above is the status at its date.
 
 ---
 

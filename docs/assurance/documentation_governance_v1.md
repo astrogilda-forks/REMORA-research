@@ -88,9 +88,12 @@ machine-checkable requirements against capability-ladder levels and REM
 statuses. CI recomputes the highest satisfied profile from the registers and
 fails if the declared `current_profile` drifts. **A profile can only be
 claimed by changing register state backed by evidence, never by editing
-prose.** The current profile is `SHADOW_PILOT` (= `deployment_status
-SHADOW_ONLY`): shadow-mode operation is permitted, enforcement is not,
-because `CONTROLLED_PILOT` requires REM-021 (independent review) per
+prose.** The current profile is `CONTROLLED_PILOT` (= `deployment_status
+CONTROLLED_PILOT`): the repository may be run as a bounded pilot, by owner
+decision of 2026-10-25 recorded in `release_profiles_v1.yaml` and
+[its ADR](../architecture/ADR-pilot-readiness-owner-decision.md); CI refuses
+a profile whose owner decision is not recorded with decider, date and record.
+REM-021 (independent review) gates `EXTERNALLY_VERIFIED` and `PRODUCTION`, per
 [`release_gates.md`](release_gates.md).
 
 ## 4. What CI enforces today
@@ -171,9 +174,10 @@ load-bearing cases mechanical (profiles, claims, capability language).
   and the numeric claims are bound via claim anchors. Generating the *entire*
   README (prose included) is deliberately not done; the narrative is
   hand-written for readability; only the drift-prone facts are generated.
-- Approval workflow for status changes: single-maintainer repository;
+- Approval workflow for status changes: single-maintainer repository; the
+  maintainer decides, and records owner decisions in the profiles file.
   CODEOWNERS routes register changes for review the day a second reviewer
-  exists (REM-021).
+  exists.
 - **MkDocs site, split human-index/generated-catalog, per-release
   documentation manifests**: a presentation-plane program. A root
   `mkdocs.yml` with a hand-written 16-entry nav exists but is itself

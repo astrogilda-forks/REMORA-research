@@ -13,7 +13,10 @@
 #   EXTERNALLY_VERIFIED  - independently verified (REM-021 or later)
 #
 # NOTE: nothing in this repository is ENFORCED_PRODUCTION or
-# EXTERNALLY_VERIFIED — deployment_status is SHADOW_ONLY until REM-021.
+# EXTERNALLY_VERIFIED. The release profile is CONTROLLED_PILOT by owner
+# decision (2026-10-25, docs/architecture/ADR-pilot-readiness-owner-decision.md):
+# the repository may be run as a bounded pilot. EXTERNALLY_VERIFIED still
+# needs REM-021, which has not taken place.
 #
 # Hook binding (SDD unified capability execution v1.1 §3, phase P1): each
 # capability carries `hook.primary`, one of ADMISSION, AUTHORITY_INPUT, POLICY,

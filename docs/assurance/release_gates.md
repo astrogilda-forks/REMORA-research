@@ -110,24 +110,28 @@ AII dropping below TRAINED threshold does NOT block operation by itself
 (the world model adapts continuously). It triggers investigation, not halt.
 Only FAR > 0 is an unconditional stop.
 
-## Production deployment gates (required before leaving SHADOW_ONLY)
+## Production deployment gates
 
-The system holds `deployment_status = SHADOW_ONLY`. Leaving shadow-only mode requires every
-production deployment gate below to be DONE in addition to the P0 safety gates above.
-
-**Two gates remain: REM-021 and REM-023.** `release_profiles_v1.yaml` requires
-REM-020, REM-021, REM-022 and REM-023 for `CONTROLLED_PILOT`. REM-020 and
-REM-022 are DONE; REM-021 is NOT_STARTED and REM-023 is IN_PROGRESS (its one
-open step, external confirmation of the RBAC design, is folded into REM-021).
-Corrected 2026-09-03: this document previously implied REM-021 was the only
-remaining gate.
+The release profile is `CONTROLLED_PILOT` (`deployment_status =
+CONTROLLED_PILOT`) since 2026-10-25, by owner decision
+([ADR](../architecture/ADR-pilot-readiness-owner-decision.md)): the repository
+may be run as a bounded pilot with a human approval on every non-accept
+outcome. `release_profiles_v1.yaml` requires REM-020, REM-022 and REM-023 for
+`CONTROLLED_PILOT`, together with the recorded owner decision
+`OD-2026-10-25-controlled-pilot`; all three items are DONE. Independent human
+review (REM-021) is not a precondition for the pilot. It remains the gate for
+`EXTERNALLY_VERIFIED` on any capability and, through gate P3, for
+`PRODUCTION`, and it has not taken place. Whether a pilot runs is the
+maintainer's operational decision; no running pilot is claimed here. Until
+2026-10-25 this section required REM-021 and REM-023 before leaving
+`SHADOW_ONLY` (corrected 2026-09-03 to name both).
 
 | ID | Gate | Status | What "DONE" means |
 |----|------|--------|-------------------|
 | REM-020 | Longitudinal stability audit | **DONE (internally attested, REM-021 verification required)** | Criterion: AII (EMA-smoothed) ≥ 0.80 with FAR = 0.0% for 7 consecutive days from gate opening 2026-06-28; eligible close no earlier than 2026-07-05. **Why 7 days is the criterion:** it is the original pre-registered definition (created 2026-06-29; the 2026-06-30 elevation row "0.43d/7d" evidences it predates the 30-day variant, which appeared in a 2026-07-02 consolidation). The 2026-07-17 owner decision *reverted to the pre-registered criterion*; it did not lower a target after the fact. Closed 2026-07-17 by `close_rem020.py --close` (fail-closed; the closure tool lives in the main implementation repository and is not committed here): days_elapsed=19 of 7 required, n_operational_fa=0, AII=0.9914. **Evidence form (stated plainly):** the committed artifact (`results/longitudinal_stability_v1.json`, status=PASS) attests the live worker's day counter and current values; it does NOT contain the full 7-day time series, the worker retains ~168 adapt cycles (~0.58 days) in its queryable history, and the complete series lives in the worker's D1 longitudinal store. Independent reproduction of the 7-day window from that store is in scope for REM-021, which is why the status is *internally attested*, not independently verified. Supplementary anytime-valid bound (2026-07-02): 0/168 cycles → 95% time-uniform upper bound 4.72% (`results/far_confidence_sequence_v1.json`, CLAIM-011). *(Corrected 2026-09-03: this cell claimed "15/15 rem020_gate tests pass". No `rem020_gate` pytest marker exists in this repository, so the count cannot be checked from here and is withdrawn rather than restated.)* |
 | REM-021 | Independent human review | **NOT STARTED** | Reviewer not on REMORA team reviews: decision engine logic, PDP/PEP separation, REM-019 regression proof, REM-014 AgentHarm benchmark, claim hygiene. Written report committed: `docs/assurance/independent_review_v1.md`. |
 | REM-022 | RBAC access control audit | **DONE** (with recorded deviation) | Policy v1 committed: `docs/assurance/rbac_policy_v1.md`. Covers asset inventory, 8-role matrix, key management, D1 access controls, rotation policy, audit log retention. Acknowledged gaps in §8 (KMS/HSM, RFC 3161, CI/CD-only deploy), consistent with TRL 3–4. Completed 2026-06-30. **Closure deviation (2026-07-02):** rbac_design_v1.md's own DONE criteria (isolation test, admin-wildcard removal, external confirmation) were not met at closure, the unmet steps are tracked as **REM-023** in the remediation register, now **IN_PROGRESS** (the REM-023 row below is authoritative). |
-| REM-023 | RBAC follow-through | **IN_PROGRESS** | The three REM-022 design criteria unmet at closure. Steps 8–9 DONE 2026-07-03: `tests/test_rbac_isolation.py` (no cross-tenant leakage) and admin-wildcard removal in `servers/api.py`. Remaining: external confirmation of the RBAC design (folded into REM-021). See remediation register REM-023 for detail. |
+| REM-023 | RBAC follow-through | **DONE** (2026-10-25, owner decision) | The three REM-022 design criteria unmet at closure. Steps 8–9 DONE 2026-07-03: `tests/test_rbac_isolation.py` (no cross-tenant leakage) and admin-wildcard removal in `servers/api.py`. Step 10, external confirmation of the RBAC design, is no longer a closure criterion (owner decision 2026-10-25) and stays recorded under REM-021 as work not done. |
 
 ## Record of gate elevation
 
@@ -137,6 +141,7 @@ remaining gate.
 | 2026-06-29 | REM-019 created P0 | User direction: versioned regression proof for 169 historical false accepts is a hard safety floor |
 | 2026-06-29 | REM-014 CLOSED | AgentHarm FAR=0.0%, N=208. Both P0 blockers DONE. |
 | 2026-06-29 | REM-020/021/022 created P3 | Formal production deployment gates defined for SHADOW_ONLY exit |
+| 2026-10-25 | REM-021 removed from `CONTROLLED_PILOT`; REM-023 CLOSED; profile `CONTROLLED_PILOT` | Owner decision ([ADR](../architecture/ADR-pilot-readiness-owner-decision.md)): the maintainer decides when the code runs in a pilot; independent review is not a precondition for it. REM-021 stays open and gates `EXTERNALLY_VERIFIED` and `PRODUCTION`. REM-023 closes on its code and test criteria. |
 | 2026-06-30 | REM-020 IN_PROGRESS | Longitudinal stability audit started; 0.43d/7d, AII EMA [0.9237, 0.9712], FAR=0.0% |
 | 2026-06-30 | REM-022 DONE | RBAC policy v1 committed; docs/assurance/rbac_policy_v1.md |
 | 2026-07-17 | REM-020 row refreshed; criterion conflict recorded | Previous row showed a 2026-06-30 snapshot ("0.43 days"). Fresh artifact committed (2026-07-17). A conflict between two canonical definitions is now recorded in the row: this repo's 7-day criterion (stale sweep 2026-07-03) vs the main repo's 30-day closure tooling (`close_rem020.py`, 2026-07-02). Under the 7-day definition the worker self-reports DONE; the 30-day tooling refuses closure. |
