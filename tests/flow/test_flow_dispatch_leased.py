@@ -442,3 +442,38 @@ def test_a_mediated_tool_may_send_the_payload_only_to_the_recipients_the_flow_ch
     assert execution["result"]["leak"] == "capability_recipient_not_approved"
     assert executor.registry.EFFECTS == [("network.http.post", "https://partner.example/hook")]
     assert execution["nested_effects"]["by_state"] == {"EXECUTED": 1, "REFUSED": 1}
+
+def test_a_raise_between_the_check_and_the_fence_refuses_before_the_tool(executor):
+    """The fence is taken at the sequence the dispatch check read, not at a
+    sequence of its own. A raise that commits after the check passed and
+    before the fence is appended moves the stream; the fence must then be
+    lost and the call refused before its tool runs. Before the fence took the
+    check's sequence, begin_dispatch loaded the context again, appended after
+    the raise, and the tool ran on a verdict computed from the old label."""
+    import servers.execution_api as exec_mod
+    import remora.flow.labeler as labeler_mod
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    lease = _lease(executor, call)
+    original = labeler_mod.verify_flow_at_dispatch
+    raised: list[int] = []
+
+    def check_then_raise(**kwargs):
+        verdict = original(**kwargs)
+        if not raised:
+            # A raise the flow still passes, so only the fence can refuse.
+            state = exec_mod._flow_contexts().raise_label(
+                "acme", "employee-1", context_id,
+                Label({USER, MODEL, "ext://work-orders.example"}, Integrity.TRUSTED))
+            raised.append(state.seq)
+        return verdict
+
+    executor.monkeypatch.setattr(labeler_mod, "verify_flow_at_dispatch", check_then_raise)
+    body = _post(executor, lease, call=call).json()["tool_execution"]
+    assert raised, "the check never ran"
+    assert (body["executed"], body.get("refusal_reason")) == (False, "flow_dispatch_contended"), body
+    assert executor.registry.CALLS == []
+    state = exec_mod._flow_contexts().load("acme", "employee-1", context_id)
+    assert state.open_dispatches == ()
+
