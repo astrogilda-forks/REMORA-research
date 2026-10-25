@@ -481,3 +481,92 @@ def test_a_raise_between_the_check_and_the_fence_refuses_before_the_tool(executo
     state = exec_mod._flow_contexts().load("acme", "employee-1", context_id)
     assert state.open_dispatches == ()
 
+
+def _hold_first_call(executor):
+    """Hold the first tool call inside the tool until ``proceed`` is set;
+    later calls run straight through."""
+    import threading
+
+    inside, proceed = threading.Event(), threading.Event()
+    seen: list[int] = []
+
+    def hold(_arguments):
+        seen.append(1)
+        if len(seen) == 1:
+            inside.set()
+            assert proceed.wait(timeout=30)
+
+    executor.registry.BEFORE_CALL.append(hold)
+    return inside, proceed
+
+
+def test_a_tool_running_past_the_fence_ttl_still_holds_the_context(executor):
+    """The fence's expiry bounds a process that died mid-call, not a call
+    that is still running. With a fence TTL of one second the first tool is
+    held for well past it; a second proposal in the same context must still
+    be refused before its tool runs, and the first call's result is released.
+    Before the fence was renewed while the tool ran, the hold expired, the
+    second proposal began, and both tools ran at once."""
+    import threading
+    import time
+
+    import remora.enforcement.lease as lease_mod
+
+    context_id = _context(executor)
+    calls = [dict(_call(context_id), arguments={"work_order_id": f"WO-{i}", "status": "closed"})
+             for i in (1, 2)]
+    leases = [_lease(executor, call) for call in calls]
+    ttl = 1.0
+    executor.monkeypatch.setattr(lease_mod, "DEFAULT_LEASE_TTL_SECONDS", ttl)
+    inside, proceed = _hold_first_call(executor)
+    first: dict = {}
+    worker = threading.Thread(
+        target=lambda: first.update(_post(executor, leases[0], call=calls[0]).json()))
+    try:
+        worker.start()
+        assert inside.wait(timeout=30), "the first dispatch never reached the tool"
+        time.sleep(3 * ttl)
+        second = _post(executor, leases[1], call=calls[1]).json()["tool_execution"]
+        assert (second["executed"], second.get("refusal_reason")) == (
+            False, "flow_dispatch_contended"), second
+        assert len(executor.registry.CALLS) == 0   # the first is still inside its tool
+    finally:
+        proceed.set()
+        worker.join(timeout=30)
+        executor.registry.BEFORE_CALL.clear()
+    assert first["tool_execution"]["executed"] is True
+    assert "result" in first["tool_execution"], first
+    assert len(executor.registry.CALLS) == 1
+
+
+def test_a_commit_whose_fence_expired_withholds_the_result(executor):
+    """If the hold could not be kept alive (the renewal failed, the process
+    was paused past the TTL), another proposal may have run in the context
+    meanwhile, so the commit refuses and the result is withheld."""
+    import threading
+    import time
+
+    import remora.enforcement.lease as lease_mod
+    from remora.flow.context import FlowContextStore
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    lease = _lease(executor, call)
+    ttl = 1.0
+    executor.monkeypatch.setattr(lease_mod, "DEFAULT_LEASE_TTL_SECONDS", ttl)
+    executor.monkeypatch.setattr(FlowContextStore, "renew_dispatch",
+                                 lambda self, *a, **k: False, raising=False)
+    inside, proceed = _hold_first_call(executor)
+    first: dict = {}
+    worker = threading.Thread(target=lambda: first.update(_post(executor, lease, call=call).json()))
+    try:
+        worker.start()
+        assert inside.wait(timeout=30), "the dispatch never reached the tool"
+        time.sleep(2 * ttl)
+    finally:
+        proceed.set()
+        worker.join(timeout=30)
+        executor.registry.BEFORE_CALL.clear()
+    body = first["tool_execution"]
+    assert body["executed"] is True and "result" not in body, body
+    assert body.get("result_withheld") == "flow_dispatch_fence_expired", body
