@@ -48,14 +48,21 @@ unestablished_properties:
     evidence: tests/flow/test_mediation_surface.py
     caveat: >-
       IFC-11 premise A1 (every tool result reaches the model only through the governed
-      dispatcher under the flow check) is held as a tested property for the execution API
-      only: the 28 routes of servers/execution_api.py are classified, the three dispatching
-      routes and the async worker are held statically to _dispatch_under_lease, and forged,
-      foreign and replayed contexts are refused on /dispatch-leased
-      (scripts/check_flow_mediation_surface.py). Not covered: servers/mcp_remora.py
-      tools/call, the MCP gateway, the SDK as a surface, and any MCP server registered
-      outside REMORA. A deployment that adds a tool path outside these routes is outside
-      the property.
+      dispatcher under the flow check) is held as a tested property of the repository's
+      surfaces (scripts/check_flow_mediation_surface.py): the 28 routes of
+      servers/execution_api.py are classified and the three dispatching routes and the
+      async worker are held statically to _dispatch_under_lease; servers/api.py reaches no
+      dispatcher; the 14 tools/call handlers of servers/mcp_remora.py run no governed tool
+      (one forwards to the agent-control worker); the SDK and the two TypeScript workers
+      name only served routes. Probes: forged, foreign and replayed contexts on
+      /dispatch-leased, an SDK call under flow control (refused, no context), a governed
+      tool named at the MCP server (unknown), a foreign tool presented to the execution
+      API (unknown_tool). Not covered, so the property stays NOT_ESTABLISHED as a whole:
+      the agent-control worker's own in-worker tools, whose results reach the agent through
+      the MCP server without a flow context; the SDK cannot name a flow context, so flow
+      control is unreachable through it; an MCP server registered outside REMORA; and any
+      running deployment. A deployment that adds a tool path outside these surfaces is
+      outside the property.
   - id: flow_enforced_egress
     phase: RESEARCH
     status: NOT_ESTABLISHED
