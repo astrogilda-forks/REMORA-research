@@ -3399,6 +3399,6 @@ _build_executor_dispatcher_at_startup()
 
 # Opt-in error reporting (SENTRY_DSN), after every route is mounted; off by
 # default and never fatal (remora/observability/sentry.py).
-from remora.observability.sentry import init_sentry_from_env as _init_sentry  # noqa: E402
+from remora.observability.sentry import init_sentry_from_env as _init_sentry
 
 _init_sentry(release=_PACKAGE_VERSION)
