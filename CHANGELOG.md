@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Five findings of an external review of 2026-10-25, verified and fixed
+
+- A named delegate redeeming an ACCEPT token on `/execute-accepted` under `REMORA_FLOW_CONTROL=1` read its own flow context instead of the proposer's and was refused `flow_context_unknown`; the route now runs the redemption in the proposer's context for the delegate the assessed record names, as the review path and the worker already did. Another actor still reads its own context.
+- Under the custody split the authority committed a forwarded result the execution domain had already committed, and withheld it when that commit had raised the label; a forwarded result carrying `flow_commit` or `result_withheld` is returned as the execution domain answered it.
+- A recipient-bound lease (`flow_recipients_digest`) for a mediated tool presented to an executor without a recipient set refuses `flow_recipients_required` before anything is spent, instead of letting the tool reach its whole ceiling; unmediated tools are checked as before.
+- `/dispatch-leased` under flow control verifies the lease's signature, decision and window before the flow check takes the context's fence, so an unauthentic lease writes nothing to the flow stream.
+- `effect_recipient` names the host of every `network.*` effect whatever its scheme (`tcp://`, `dns://`), not only http(s).
+- Register timestamps brought up to date. Confirmed and already recorded: the per-process handle store, and the absent resource ACL on the commit path (both refuse).
+
 ### IFC-12 on the execution path: the authority mints the recipient set, the split executor holds to it
 
 - `tests/capabilities/test_mediation_flow_recipients_server_path.py`: on `/execute-accepted` with `REMORA_FLOW_CONTROL=1`, nothing hand-minted: the ACCEPT token is redeemed on the real route, the lease the authority mints carries `flow_recipients_digest` for the set the flow verdict approved, the mediated tool's declared effect runs and its collector effect is refused `capability_recipient_not_approved` before the ceiling; with flow control off the same tool, token and ceiling refuse the collector for the ceiling and the lease carries no digest.
