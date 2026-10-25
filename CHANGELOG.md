@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### OT pilot battery: named limit refusals count as refusals; a cumulative-limit case; a recorded run
+
+- `deploy/ot-pilot/run_ot_battery.py`: a 409 with a named reason at assess (the cumulative limits refuse there, before any decision) is recorded as `refused_at_assess` with its reason instead of as an HTTP error. Three cases had been reported as failures although the system refused them: the unknown tool (`limit_coverage_unknown`), the loop the plant does not report (`limit_observation_unavailable`) and the injection case, whose 65-point valve move was stopped by the travel limit rather than by the injection guard. Those two limit cases now expect their named refusal; the injection case moves the valve 5 points, inside the limit, so the guard is what it tests (it resolves to ESCALATE). A new case moves PIC-101 past its hourly cap and expects `limit_exceeded`. 16 cases.
+- `artifacts/pilot-pack/runs/ot-battery-2026-10-25/`: a run of the 16 cases against the production-mode pilot built from master `0f30a49e` (16 of 16 as specified, 6 side effects, both chains valid), described in the pilot pack README with what it does not show. `tests/test_ot_battery_evidence.py` pins the judge and the case list. The console button says 16 cases.
 ### Release profile CONTROLLED_PILOT by owner decision; REM-021 no longer gates the pilot
 
 - `docs/architecture/ADR-pilot-readiness-owner-decision.md` (DOC-413) records the owner decision of 2026-10-25: the maintainer decides when and how the code runs in a pilot; the code does not require an independent external review before that. `release_profiles_v1.yaml` gains `owner_decisions` (id, decider, date, record) and `CONTROLLED_PILOT` requires `OD-2026-10-25-controlled-pilot` plus REM-020, REM-022 and REM-023; REM-021 is removed from its requirements. `scripts/check_document_governance.py` refuses a profile whose owner decision is not recorded with decider, ISO date and an existing record file (`tests/test_document_governance.py`).
