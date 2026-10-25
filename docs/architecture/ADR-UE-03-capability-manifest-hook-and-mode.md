@@ -1,10 +1,12 @@
 # ADR-UE-03: Capability activation manifest, and where hook and mode live
 
-- Status: **proposed** (2026-10-24). The SDD names the approval owner as
-  code owner / security
+- Status: **accepted as proposed** (2026-10-25, owner decision). Proposed
+  2026-10-24. The SDD names the approval owner as code owner / security
   ([unified capability execution v1.1](../design/unified-capability-execution-v1.1.md)
-  §13, decision ADR-UE-03). Nothing below is decided until that owner
-  accepts, amends or rejects it.
+  §13, decision ADR-UE-03). The seven particulars below stand as written;
+  the two choices the proposal left open are resolved under "Owner
+  resolution". No code implements the manifest yet; the slices at the end
+  are the work.
 - Deciders: repository owner, security
 - Related: SDD §3 (Capability Activation Contract), §6 (read-only API
   contracts) and §10 (phase P1 "Inventory + CAM"). The
@@ -79,9 +81,9 @@ changes what runs. No wildcard enablement and no automatic promotion. The
 effective mode snapshotted into the decision. Compatibility with the policy
 identity and the lease format that exist.
 
-## Decision (proposed)
+## Decision
 
-Option A, with these particulars for the owner to confirm or amend:
+Option A, accepted with these particulars as proposed:
 
 1. **Hook.** The register's `hook` block is the record of where a capability
    binds (#1058). The atlas keeps `sdd_hook` as assessment, and the checker
@@ -121,18 +123,32 @@ Option A, with these particulars for the owner to confirm or amend:
    the flag must agree, or startup refuses; neither silently wins. Flags that
    are prerequisites rather than modes (keys, DSNs, bundles) stay flags.
 
+### Owner resolution (2026-10-25)
+
+The owner accepted the seven particulars as proposed and resolved the two
+open choices:
+
+- **Digest placement.** `cam_digest` is a signed-when-set lease field beside
+  `policy_bundle_hash`, as item 5 proposes. It does not enter the policy
+  identity: a CAM change then changes no decision identity of a deployment
+  whose policy files did not change, and the two digests are compared
+  separately. Folding it in later would be an amendment to this ADR.
+- **Key custody.** The CAM has its own trusted-key setting,
+  `REMORA_CAM_TRUSTED_KEYS`, as item 2 proposes. An operator may point it at
+  the limit-policy key material; the setting stays separate so the two
+  artefacts can be rotated apart.
+
 ## Consequences
 
 - The register gains no deployment fact, and no deployment file gains a
   repository fact. The checker in #1058 enforces the first half today.
 - A CAM is one more signed artefact an operator maintains, with the same key
-  custody questions as the limit policy. The owner decides whether the CAM
-  key is the limits key or a separate one.
+  custody questions as the limit policy. Its trusted keys are its own setting
+  (owner resolution above).
 - Until the CAM exists, every catalogue output carries `mode:
   NOT_ESTABLISHED`. Nothing may present a flag's value as a mode.
 - SDD §10 forbids manifest-driven enforcement before P0 items 1 to 7 close.
-  They closed on 2026-10-24 (#1053 to #1057), so the slices below may start
-  once this ADR is accepted.
+  They closed on 2026-10-24 (#1053 to #1057), so the slices below may start.
 
 ## Slices after acceptance
 

@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### ADR-UE-03 accepted as proposed: capability activation manifest, hook in the register, mode in the manifest
+
+- The owner accepted `docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md` (DOC-412) on 2026-10-25 with its seven particulars as written, and resolved the two choices the proposal left open: `cam_digest` is a signed-when-set lease field beside `policy_bundle_hash`, not folded into the policy identity; the manifest's trusted keys are their own setting, `REMORA_CAM_TRUSTED_KEYS`. The register entry moves from proposal to canonical.
+- Nothing runs differently: no manifest, mode, signature or `/v1/system/capabilities` route exists yet. The five slices named in the ADR are the implementation work and each lands with its own tests.
+
 ### The flow check and the dispatch are one step: the dispatch fence (IFC-06; SDD unified capability execution v1.1, P0 item 6)
 
 - After the dispatch-time flow re-check passes, the call holds the context with a `dispatch` event on its flow stream at the sequence it checked (`FlowContextStore.begin_dispatch`); the commit releases it (`dispatch_end`), and so does every refusing path, so a refused or raising call does not hold the context. A context held by another proposal's unexpired dispatch, or a fence lost to a concurrent writer, refuses as `flow_dispatch_contended` before the tool runs and before a nonce, a limit reservation or a recorder intent is spent. Two dispatches judged at the same epoch therefore run exactly one tool; before this change both ran and one result was withheld.
