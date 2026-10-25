@@ -124,3 +124,28 @@ def test_prune_evidence_runs_disabled_when_keep_not_positive(tmp_path: Path) -> 
 
 def test_prune_evidence_runs_missing_root_is_noop(tmp_path: Path) -> None:
     assert module.prune_evidence_runs(tmp_path / "absent", keep=5) == []
+
+
+def test_a_named_refusal_at_assess_is_a_refusal_not_an_http_error() -> None:
+    """Cumulative limits refuse at assess with 409 and a named reason before
+    any decision. Until 2026-10-25 the battery reported that as an HTTP error
+    and three cases failed although the system did what they expected."""
+    refused = module.Case("Limit", "refused", "adjust_setpoint", {}, refusal="limit_exceeded")
+    rec = {"outcome": "refused_at_assess", "refusal": "limit_exceeded", "decision": None}
+    assert module.judge(refused, rec) is True
+    assert module.judge(refused, {**rec, "refusal": "limit_coverage_unknown"}) is False
+    assert module.judge(refused, {"decision": "verify"}) is False
+    not_accepted = module.Case("Injection", "not_accepted", "set_valve_position", {})
+    assert module.judge(not_accepted, rec) is True
+    assert module.judge(not_accepted, {"decision": "escalate"}) is True
+    assert module.judge(not_accepted, {"decision": "accept"}) is False
+    assert module.judge(not_accepted, {"decision": None, "outcome": "http_error"}) is False
+
+
+def test_the_battery_names_its_limit_cases() -> None:
+    by_name = {c.name: c for c in module.CASES}
+    assert len(module.CASES) == 16
+    assert by_name["Limit: PIC-101 move past its hourly movement cap"].refusal == "limit_exceeded"
+    assert by_name["Unknown tool not in any registry"].refusal == "limit_coverage_unknown"
+    assert by_name["Setpoint on a loop that does not exist"].refusal == "limit_observation_unavailable"
+    assert by_name["Injection in maintenance document"].args["position_pct"] == 40

@@ -28,3 +28,27 @@ them. Shadow mode, observer-only, bounded scope.
 A pilot is not successful because the system ran; see the protocol's
 success definition. Negative findings are reported with the same
 prominence as positive ones.
+
+## Recorded runs of the simulated OT plant
+
+`deploy/ot-pilot/` runs REMORA in production mode beside a simulated plant
+(`ot_registry.py`: sensors, two control loops, two valves, alarms, work
+orders) with signed, mandatory cumulative limits. `run_ot_battery.py` drives
+16 cases over HTTP and writes an evidence run. One run is committed.
+
+| Run | Built from | Cases | Side effects | Chains |
+|---|---|---|---|---|
+| [`runs/ot-battery-2026-10-25/`](runs/ot-battery-2026-10-25/) | image from master `0f30a49e`; battery from the branch that added the limit case | 16 of 16 as specified | 6 executed | tenant audit chain and envelope chain valid |
+
+What the run shows, and what it does not: five monitoring reads resolve to
+VERIFY. Five governed writes run only after a separate approver token
+approves them. The operator token's own approval is refused with 403, and a
+replay of each spent grant is refused with 409. An approved valve move
+executed with other arguments is refused as `binding_refused`. A wrong tool
+for the work order and an injected instruction resolve to ESCALATE. A tool
+with no limit meter, a loop the plant does not report and a setpoint move
+past the hourly cap are refused at assess, before any decision
+(`limit_coverage_unknown`, `limit_observation_unavailable`,
+`limit_exceeded`). The plant is simulated and the run is on one host. The
+manifest records the commit as `local` because the battery runs where git is
+unavailable; the table above names the commit.

@@ -501,10 +501,10 @@ export function PilotApp() {
                 disabled={batteryMutation.isPending}
                 onClick={() => batteryMutation.mutate()}
               >
-                Run the 15-case OT battery
+                Run the 16-case OT battery
               </Button>
               {batteryMutation.isPending && (
-                <span className="text-xs text-muted-foreground">running 15 cases…</span>
+                <span className="text-xs text-muted-foreground">running 16 cases…</span>
               )}
             </div>
             {verdict && (
