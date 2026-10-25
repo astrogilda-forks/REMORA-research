@@ -233,8 +233,10 @@ Group the backlog into deliverable work packages, each with a clear owner:
 
 Incremental, gated increments, each a usable Transition Architecture:
 
-- **T0, Shadow-only research (current).** PDP decides; enforcement optional;
-  claim-provenance gate green. Gates open: REM-021 (production gate) and REM-023 (follow-through; external confirmation folded into REM-021). REM-020 closed 2026-07-17.
+- **T0, Shadow-only research.** PDP decides; enforcement optional;
+  claim-provenance gate green. Passed 2026-10-25: REM-023 closed on its code
+  and test criteria and the profile is `CONTROLLED_PILOT` by owner decision;
+  REM-021 stays open as the production gate. REM-020 closed 2026-07-17.
 - **T1, Governed pilot (single business unit).** WP1+WP2+WP5: mandatory PEP,
   signed leases, GitOps policy, real OIDC. Exit criteria: 100% of pilot tool
   calls through the PEP; RBAC isolation test passing; REM-021 external review

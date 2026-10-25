@@ -34,7 +34,7 @@ those sources differ, the sources win.
 
 ## Current-stage honesty
 
-At `SHADOW_PILOT` nothing is enforced, so the pilot's security exposure is
+In a Shadow Pilot nothing is enforced, so the pilot's security exposure is
 read-path only: the mirrored action metadata the customer chooses to send.
 The default MCP integration profile is `local` and sends nothing off the
 machine; remote profiles require explicit opt-in (`DATA_HANDLING.md`).

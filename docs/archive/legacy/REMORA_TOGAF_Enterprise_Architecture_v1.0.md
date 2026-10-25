@@ -1,3 +1,7 @@
+> **Historical, archived 2026-10-25.** Norwegian TOGAF source document of v1.0;
+> it states the release profile and gates of its time. Superseded by
+> `docs/enterprise/togaf-enterprise-rollout-plan.md`. Do not cite it as current.
+
 <table>
 <colgroup>
 <col style="width: 100%" />

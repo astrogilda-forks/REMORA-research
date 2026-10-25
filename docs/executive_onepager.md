@@ -68,9 +68,10 @@ requests.
 
 ## Limitations: stated, not buried
 
-Research-grade, `SHADOW_ONLY`. All benchmarks internally run; the
-independent-review gate is open and blocks any enforcement mode, tracked in a
-public gate register (`docs/assurance/release_gates.md`). The audit chain is
+Research-grade; release profile `CONTROLLED_PILOT` by owner decision
+(2026-10-25), so a bounded pilot may enforce. All benchmarks internally run;
+the independent-review gate is open and blocks wider enforcement and
+production, tracked in a public gate register (`docs/assurance/release_gates.md`). The audit chain is
 tamper-evident, not tamper-proof. This is an architecture proof intended to
 be shadow-run against real agent logs before any enforcement is enabled.
 

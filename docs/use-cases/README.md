@@ -1,7 +1,7 @@
 # REMORA use cases
 
 > ⚠️ **Illustrative, not deployment results.** REMORA is a research-grade
-> governance overlay in **SHADOW_ONLY** mode; not production-certified and not
+> governance overlay (release profile `CONTROLLED_PILOT`); not production-certified and not
 > deployed in any sector below. These are illustrative scenarios; any numbers
 > are illustrative unless they link to a committed artifact in `results/` or
 > `artifacts/`. REMORA governs whether a proposed **action** may proceed
