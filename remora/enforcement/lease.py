@@ -1515,7 +1515,8 @@ class GovernedToolDispatcher:
             flow_recipients=flow_recipients)
         executors = (self._effect_domain.executors_for(
                          lease, capability_set, [c.capability for c in ceiling.capabilities],
-                         flow_recipients=flow_recipients)
+                         **({"flow_recipients": flow_recipients}
+                            if flow_recipients is not None else {}))
                      if self._effect_domain is not None else self._effect_executors)
         return CapabilityMediator(
             context, authority, executors=executors,
