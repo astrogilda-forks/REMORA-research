@@ -153,7 +153,10 @@ open choices:
 ## Slices after acceptance
 
 1. CAM schema, loader and signature verification as a library module with
-   its own tests; no runtime reads it yet.
+   its own tests; no runtime reads it yet. Delivered 2026-10-25:
+   `remora/governance/activation_manifest.py`,
+   `schemas/capability_activation_manifest_v1.yaml`,
+   `scripts/sign_capability_manifest.py`, `tests/test_activation_manifest.py`.
 2. Effective-mode computation and the startup validation of item 4, behind
    an opt-in setting, with the premises registry naming what each premise
    checks.
