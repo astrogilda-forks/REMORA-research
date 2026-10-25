@@ -1,0 +1,116 @@
+# Capability Activation Manifest, contract `capability-activation/v1`.
+#
+# SDD unified capability execution v1.1 §3: every registered capability appears
+# in a signed, deployment-owned manifest that carries per-deployment fields
+# only. Maturity, evidence and the primary hook stay in
+# docs/assurance/capability_register_v1.yaml (ADR-UE-03, accepted 2026-10-25),
+# so a manifest that carries `hook`, `status`, `maturity`, `evidence`,
+# `caveat`, `verified_at_sha`, `verified_by`, `name`, `mode` or
+# `effective_mode` is refused: one owner per fact.
+#
+# The parser (remora/governance/activation_manifest.py) is the authority on
+# what is refused; this schema restates the shape so a manifest can be checked
+# before it reaches REMORA. The signed envelope (`capability-activation-signed/v1`)
+# wraps this document as `manifest` beside `signed_at` and an Ed25519
+# `signature` under REMORA/CAPABILITY-MANIFEST/v1 (scripts/sign_capability_manifest.py).
+# The canonical digest is the SHA-256 of the sorted, compact JSON of this
+# document, domain-separated; later slices pin it as `cam_digest`.
+#
+# No runtime reads a manifest yet. The effective mode is computed by the
+# server from the runtime profile, the verified premises and the signed
+# requested mode (the next slice); until then every mode is NOT_ESTABLISHED.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://remora.example/schemas/capability_activation_manifest_v1
+title: capability-activation/v1
+type: object
+additionalProperties: false
+required: [schema, deployment, capabilities]
+properties:
+  schema:
+    const: capability-activation/v1
+  deployment:
+    description: The deployment this manifest is about; a lower-case identifier.
+    type: string
+    pattern: "^[a-z][a-z0-9_.:-]*$"
+  capabilities:
+    description: One entry per registered capability. Order does not matter; the parser sorts by id.
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/activation"
+$defs:
+  mode:
+    description: SDD §3. ENFORCE is reached only through the activation state machine.
+    enum: [DISABLED, OFFLINE, SHADOW, VERIFY, ENFORCE, EVIDENCE_ONLY]
+  identifier:
+    type: string
+    pattern: "^[a-z][a-z0-9_.:-]*$"
+  activation:
+    type: object
+    additionalProperties: false
+    required:
+      - capability_id
+      - component_version
+      - implementation_ref
+      - requested_mode
+      - allowed_modes
+      - required_premises
+      - trust_source_ids
+      - api_contract
+      - sdk_surface
+      - health_probe
+      - fail_mode
+      - claim_ceiling
+      - evidence_refs
+    properties:
+      capability_id:
+        description: A register id, CAP-001 to CAP-031 or CAP-META.
+        type: string
+        pattern: "^CAP-([0-9]{3}|META)$"
+      component_version:
+        type: string
+        minLength: 1
+      implementation_ref:
+        description: The module or path that binds the capability; no whitespace.
+        type: string
+        pattern: "^\\S+$"
+      requested_mode:
+        $ref: "#/$defs/mode"
+      allowed_modes:
+        description: Must contain requested_mode; no repeats.
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/mode"
+      required_premises:
+        description: Premise ids the server verifies before a mode is effective; may be empty.
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/identifier"
+      trust_source_ids:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/identifier"
+      api_contract:
+        description: Proposed contract name; may be empty while none exists.
+        type: string
+      sdk_surface:
+        type: string
+      health_probe:
+        type: string
+      fail_mode:
+        description: What the capability does on a degraded dependency. Never ALLOW (SDD §3).
+        enum: [DENY, HOLD, DENY_OR_HOLD, DISABLE]
+      claim_ceiling:
+        description: A property id from docs/interop/remora-capabilities-v1.yaml, or the narrower ceiling this deployment claims.
+        type: string
+        minLength: 1
+      evidence_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
