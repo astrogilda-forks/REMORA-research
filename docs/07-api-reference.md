@@ -1042,6 +1042,22 @@ restart-proven by test.
   tamper-evident transitions) and `g4_refuses()`.
 - `remora/governance/a2a_envelope.py`, `A2AGovernanceEnvelope`, `RegisteredKey`
   (principal-bound per-link keys), `sign_delegation_link()`.
+- `remora/governance/activation_manifest.py`: the Capability Activation
+  Manifest of SDD unified capability execution v1.1 §3 (ADR-UE-03), contract
+  `capability-activation/v1` (`schemas/capability_activation_manifest_v1.yaml`).
+  `CapabilityManifest.from_dict` parses one entry per registered capability
+  with the per-deployment fields only. It refuses a restated register fact
+  (`hook`, `status`, `evidence`), a mode outside the vocabulary, a requested
+  mode outside `allowed_modes` and `ALLOW` as a fail mode. `digest` is the
+  SHA-256 of the sorted, compact body, which later slices pin as `cam_digest`.
+  `sign_manifest` and `verify_signed_manifest` use Ed25519 under
+  `REMORA/CAPABILITY-MANIFEST/v1` (`scripts/sign_capability_manifest.py`).
+  `load_manifest_from_env` reads `REMORA_CAM_FILE` and the public keys in
+  `REMORA_CAM_TRUSTED_KEYS`; it refuses an unsigned manifest under a strict
+  profile and a signed one it cannot check. No runtime reads the manifest
+  yet. The effective mode, the startup validation, the lease field and the
+  catalogue route are the next slices, and every mode is NOT_ESTABLISHED
+  until they land.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.
