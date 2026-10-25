@@ -4,6 +4,9 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Opt-in error reporting to Sentry
+
+- `remora/observability/sentry.py` initialises `sentry-sdk` when `SENTRY_DSN` is set, with `send_default_pii` off, no local variables in frames, no request bodies, and a `before_send` that removes request headers, cookies, body, query string and user from every event and transaction. `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE` and `SENTRY_TRACES_SAMPLE_RATE` (default 0, bounded to [0, 1]) are read; a missing package or a refused DSN is a warning, never a failed start. `servers/api.py` calls it once, after every route is mounted. New extra `sentry`; `SENTRY_DSN` is declared in the credential topology as a transport credential. `tests/test_observability_sentry.py` (13). The execution quickstart documents it.
 ### Documentation brought in line with the release profile and the delivered SDD work
 
 - Twenty statements outside the files #1070 touched still described the earlier rule (`SHADOW_ONLY` until REM-021, REM-023 in progress, `CONTROLLED_PILOT` not offered) or called delivered SDD work open: the commercial packaging, deployment options, Shadow Pilot and security overview; the pilot evaluation protocol; the RBAC design and policy; the oversight operations note; the reference architecture, executive one-pager, use-case and EU AI Act notes, the Azure reference, the REMORA Prime note, the research monograph and the TOGAF rollout plan; the SDD's status line; the atlas step 6 and gates G05 and G12; the IFC status row 6. Each now says what holds.
