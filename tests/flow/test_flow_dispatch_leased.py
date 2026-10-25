@@ -447,6 +447,7 @@ def test_a_mediated_tool_may_send_the_payload_only_to_the_recipients_the_flow_ch
     assert executor.registry.EFFECTS == [("network.http.post", "https://partner.example/hook")]
     assert execution["nested_effects"]["by_state"] == {"EXECUTED": 1, "REFUSED": 1}
 
+
 def test_a_raise_between_the_check_and_the_fence_refuses_before_the_tool(executor):
     """The fence is taken at the sequence the dispatch check read, not at a
     sequence of its own. A raise that commits after the check passed and
