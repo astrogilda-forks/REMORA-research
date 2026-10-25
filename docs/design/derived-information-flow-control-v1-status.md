@@ -107,6 +107,20 @@ in the schema file and here:
   effects are not narrowed. The refusal names
   (`capability_recipient_not_approved`, `flow_recipients_changed`,
   `flow_recipients_mismatch`) are not in §3.5.1.
+- External review of 2026-10-25 (five findings verified against the code,
+  fixed with regression tests in
+  `tests/flow/test_flow_review_findings_2026_10_25.py` and
+  `tests/capabilities/test_flow_recipients.py`). A delegate redeeming an
+  ACCEPT token now reads the proposer's flow context. The authority no
+  longer commits a result the execution domain committed. A
+  recipient-bound lease for a mediated tool without a recipient set
+  refuses `flow_recipients_required`. `/dispatch-leased` verifies the
+  lease's signature before the fence. Every `network.*` effect names its
+  host. Two findings were already recorded and are unchanged. The handle
+  store is per process (F2), so a handle does not cross the custody
+  split. The commit and the dispatch-time check pass no resource ACL or
+  source metadata: a `resource_acl` reader rule yields no readers and a
+  `resource_of` sink is unresolved, and both refuse.
 - IFC-03a (`52cbcd35`, #913): `schemas/tool_spec_v4.yaml` adds three fields
   beyond the SDD's §5.1 excerpt (`provider`, argument kinds and
   `disclosure`), because lint rules the SDD assigns to the linter cannot be

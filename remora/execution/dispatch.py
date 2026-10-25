@@ -216,6 +216,14 @@ def dispatch_under_lease(
             )
             if result_commit is None or not forwarded.get("executed"):
                 return forwarded
+            if forwarded.get("flow_commit") is not None or forwarded.get("result_withheld"):
+                # The execution domain ran the flow check and committed the
+                # result's labels itself (/dispatch-leased under flow
+                # control), or withheld it. Committing again here would label
+                # the rendered result a second time and, when the first
+                # commit raised the context label, withhold it as
+                # flow_epoch_changed_during_dispatch.
+                return forwarded
             envelope = forwarded.pop("result_envelope", None) or {}
             raw = forwarded.pop("result", None)
             if envelope.get("truncated", True):
