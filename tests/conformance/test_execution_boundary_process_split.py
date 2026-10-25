@@ -38,6 +38,10 @@ Case identifiers used in the conformance assessment:
     P6  the execution domain cannot mint its own authority
     P7  a lease spent on one executor is refused by another, over a shared durable store
     P8  a lease spent before an executor restart is refused after it
+    P9  an operator stop refuses valid leases across a restart
+    P10 a process holding only verification material cannot mint
+    P11 a mediated tool's effect to a host the flow check did not approve is
+        refused by the executor's mediator, and the world confirms one delivery
 """
 from __future__ import annotations
 
@@ -131,6 +135,10 @@ def split():
     executor_env = {
         "CONFORMANCE_EFFECT_TOKEN": EFFECT_TOKEN,
         "CONFORMANCE_EFFECT_URL": effect_url,
+        # The same service under another loopback address: a host the
+        # mediated tool can name, inside its ceiling, that no flow check
+        # approved (P11). Nothing listens there; the refusal comes first.
+        "CONFORMANCE_LEAK_URL": f"http://127.0.0.2:{effect_port}",
         "CONFORMANCE_POLICY_BUNDLE_HASH": BUNDLE,
         "REMORA_LEASE_VERIFY_KEY_ED25519_PUBLIC": public_key,
         # Explicitly cleared: the execution domain must not be able to sign.
@@ -160,6 +168,7 @@ def split():
     try:
         yield {
             "effect_url": effect_url,
+            "leak_url": f"http://127.0.0.2:{effect_port}",
             "executor_url": f"http://127.0.0.1:{executor_port}",
         }
     finally:
@@ -577,3 +586,70 @@ def test_p10_a_process_holding_only_verification_material_cannot_mint() -> None:
                             text=True, timeout=120, check=False)
     assert result.returncode == 3, (result.returncode, result.stdout, result.stderr)
     assert result.stdout.startswith("refused: ")
+
+
+# --------------------------------------------------------------------------
+# P11: IFC-12 across the split. The authority (this process) judges the call
+# under flow control and signs the approved recipient set into the lease; the
+# executor (its own process, holding the credential) computes the same set,
+# hands it to its mediator, and refuses the effect the tool tries on a host
+# outside it. The mailbox, not the dispatch answer, is the evidence.
+
+
+def _mediated_lease_and_set(arguments: dict, recipients: set[str]):
+    from remora.capabilities import CapabilityPolicy, CapabilityResolver
+    from remora.enforcement.flow_recipients import recipients_digest
+
+    tools = ["send_mail_mediated"]
+    capability_set = CapabilityResolver(CapabilityPolicy.from_dict({
+        "policy_version": "p", "registry_version": "r", "registry": {t: ["prod"] for t in tools},
+        "principals": {"agent-1": tools}, "tasks": {"mail": tools}, "tenants": {"t1": tools},
+        "environments": {"prod": tools}})).resolve(
+            principal_id="agent-1", tenant_id="t1", environment="prod", task_type="mail",
+            now=datetime.now(timezone.utc))
+    lease = ExecutionLease.issue(
+        decision="accept", tenant_id="t1", actor_identity="agent-1",
+        tool_name="send_mail_mediated", arguments=arguments, target_environment="prod",
+        policy_bundle_hash=BUNDLE, issued_at=datetime.now(timezone.utc).isoformat(),
+        expires_at=(datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
+        capability_set=capability_set, flow_epoch=1, flow_digest="d" * 64,
+        flow_recipients_digest=recipients_digest(recipients))
+    return lease.to_dict(), capability_set.to_dict()
+
+
+def _dispatch_mediated(split, lease: dict, capability_set: dict, arguments: dict,
+                       recipients: list[str]) -> dict:
+    return _post(split["executor_url"] + "/dispatch", {
+        "lease": lease, "tool_name": "send_mail_mediated", "arguments": arguments,
+        "tenant_id": "t1", "target_environment": "prod", "actor_identity": "agent-1",
+        "capability_set": capability_set, "flow_recipients": recipients})
+
+
+def test_p11_an_effect_to_a_host_the_flow_check_did_not_approve_is_refused_and_one_delivery_happens(
+        split) -> None:
+    before = len(_mailbox(split))
+    approved = "ext://127.0.0.1"                      # the relay's host, as the flow check names it
+    arguments = {"to": APPROVED, "leak_to": split["leak_url"] + "/send"}
+    lease, capability_set = _mediated_lease_and_set(arguments, {approved})
+    answer = _dispatch_mediated(split, lease, capability_set, arguments, [approved])
+    assert answer["executed"] is True, answer
+    assert answer["result"]["sent"] == "EXECUTED"
+    assert answer["result"]["leak"] == "capability_recipient_not_approved"
+    assert answer["nested_effects"]["by_state"] == {"EXECUTED": 1, "REFUSED": 1}
+    delivered = _mailbox(split)
+    assert len(delivered) == before + 1 and delivered[-1]["to"] == APPROVED
+
+
+def test_p11_an_executor_whose_recipient_set_differs_from_the_lease_refuses_before_the_tool(
+        split) -> None:
+    before = len(_mailbox(split))
+    arguments = {"to": APPROVED}
+    lease, capability_set = _mediated_lease_and_set(arguments, {"ext://127.0.0.1"})
+    answer = _dispatch_mediated(split, lease, capability_set, arguments,
+                                ["ext://127.0.0.1", "ext://127.0.0.2"])
+    assert (answer["executed"], answer["refusal_reason"]) == (False, "flow_recipients_changed")
+    assert len(_mailbox(split)) == before
+    # the nonce is unspent: the same lease runs with the set it was signed over
+    again = _dispatch_mediated(split, lease, capability_set, arguments, ["ext://127.0.0.1"])
+    assert again["executed"] is True, again
+    assert len(_mailbox(split)) == before + 1
