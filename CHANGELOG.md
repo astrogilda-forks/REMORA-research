@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Five findings of an external review of 2026-10-25, verified and fixed
+
+- A named delegate redeeming an ACCEPT token on `/execute-accepted` under `REMORA_FLOW_CONTROL=1` read its own flow context instead of the proposer's and was refused `flow_context_unknown`; the route now runs the redemption in the proposer's context for the delegate the assessed record names, as the review path and the worker already did. Another actor still reads its own context.
+- Under the custody split the authority committed a forwarded result the execution domain had already committed, and withheld it when that commit had raised the label; a forwarded result carrying `flow_commit` or `result_withheld` is returned as the execution domain answered it.
+- A recipient-bound lease (`flow_recipients_digest`) for a mediated tool presented to an executor without a recipient set refuses `flow_recipients_required` before anything is spent, instead of letting the tool reach its whole ceiling; unmediated tools are checked as before.
+- `/dispatch-leased` under flow control verifies the lease's signature, decision and window before the flow check takes the context's fence, so an unauthentic lease writes nothing to the flow stream.
+- `effect_recipient` names the host of every `network.*` effect whatever its scheme (`tcp://`, `dns://`), not only http(s).
+- Register timestamps brought up to date. Confirmed and already recorded: the per-process handle store, and the absent resource ACL on the commit path (both refuse).
+
 ### Capability Activation Manifest: schema, digest, signature and loader (SDD unified capability execution v1.1 §3; ADR-UE-03 slice 1)
 
 - `remora/governance/activation_manifest.py` parses a `capability-activation/v1` manifest: one entry per registered capability with the per-deployment fields of §3 (`requested_mode`, `allowed_modes`, `required_premises`, `trust_source_ids`, `api_contract`, `sdk_surface`, `health_probe`, `fail_mode`, `claim_ceiling`, `evidence_refs`, `component_version`, `implementation_ref`). It refuses a register fact restated in the manifest (`hook`, `status`, `maturity`, `evidence`, `caveat`, `mode`; one owner per fact, ADR-UE-03), a mode outside the §3 vocabulary, a requested mode outside the allowed ones, `ALLOW` as a fail mode, a malformed or duplicate capability id, and unknown or missing fields. Entries are sorted; `digest` is the domain-separated SHA-256 of the canonical body, which later slices pin as `cam_digest`. `coverage(known_ids)` reports the entries the register does not have and the registered capabilities the manifest leaves out.
