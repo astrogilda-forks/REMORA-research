@@ -318,6 +318,9 @@ def test_every_route_is_classified_into_a_surface(monkeypatch) -> None:
         "/v1/policy/version", "/v1/evidence",
         # Flow contexts (IFC-02b): no oracle, no retrieval store.
         "/v1/contexts",
+        # The capability catalogue (ADR-UE-03 slice 4): packaged data and the
+        # startup report, no oracle, no retrieval store.
+        "/v1/system/capabilities",
     }
     unclassified = (
         served - api._ASSESS_SURFACE_PATHS - known_execution_and_infra

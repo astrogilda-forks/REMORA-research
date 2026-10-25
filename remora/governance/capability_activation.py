@@ -58,6 +58,8 @@ from remora.governance.activation_manifest import (
 
 __all__ = [
     "BLOCKED",
+    "NOT_ESTABLISHED",
+    "catalogue_view",
     "CATALOGUE_PATH",
     "ENFORCE_ELIGIBLE",
     "PREMISES",
@@ -80,6 +82,9 @@ CATALOGUE_PATH = Path(__file__).with_name("capability_catalogue_v1.json")
 ENFORCE_ELIGIBLE = frozenset({"WIRED_API_PATH", "PERSISTED_ATOMIC", "ENFORCED_PRODUCTION",
                               "EXTERNALLY_VERIFIED"})
 _ENFORCING = frozenset({"ENFORCE", "VERIFY"})
+#: The mode every catalogue entry shows while no manifest is loaded
+#: (ADR-UE-03 consequences: nothing may present a flag's value as a mode).
+NOT_ESTABLISHED = "NOT_ESTABLISHED"
 _DOWNGRADE_ORDER = ("SHADOW", "EVIDENCE_ONLY", "OFFLINE")
 
 
@@ -283,3 +288,38 @@ def validate_activation_at_startup(*, catalogue_path: Path = CATALOGUE_PATH,
                  report.manifest_digest[:12], "signed" if report.signed else "unsigned",
                  len(blocked), sum(a.effective_mode == "DISABLED" for a in report.activations))
     return report
+
+
+def catalogue_view(report: ActivationReport | None,
+                   catalogue: Mapping[str, Mapping[str, str]] | None = None) -> dict[str, Any]:
+    """The read-only catalogue ``GET /v1/system/capabilities`` serves (slice 4).
+
+    One row per registered capability: id, name, registered maturity, primary
+    hook, and, under a loaded manifest, the requested and effective mode with
+    the reasons and premise results. Without a manifest every mode is
+    ``NOT_ESTABLISHED``. No signer key id, key or credential is included.
+    """
+    catalogue = load_catalogue() if catalogue is None else catalogue
+    rows = []
+    for cid in sorted(catalogue):
+        entry = catalogue[cid]
+        row: dict[str, Any] = {"capability_id": cid, "name": entry.get("name", ""),
+                               "registered_status": entry.get("status", ""),
+                               "hook": entry.get("hook", "")}
+        activation = report.get(cid) if report is not None else None
+        if activation is None:
+            row.update(requested_mode=NOT_ESTABLISHED, effective_mode=NOT_ESTABLISHED,
+                       reasons=["no_manifest_loaded"] if report is None else [],
+                       premises={})
+        else:
+            row.update(requested_mode=activation.requested_mode or NOT_ESTABLISHED,
+                       effective_mode=activation.effective_mode,
+                       reasons=list(activation.reasons), premises=dict(activation.premises))
+        rows.append(row)
+    return {
+        "schema": "remora-system-capabilities/v1",
+        "manifest": ({"loaded": False} if report is None else
+                     {"loaded": True, "digest": report.manifest_digest, "signed": report.signed,
+                      "unknown": list(report.unknown), "missing": list(report.missing)}),
+        "capabilities": rows,
+    }

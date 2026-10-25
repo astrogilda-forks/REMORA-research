@@ -3411,3 +3411,21 @@ from remora.governance.capability_activation import (
 )
 
 CAPABILITY_ACTIVATION = _validate_activation()
+
+
+@app.get("/v1/system/capabilities", response_model=dict, tags=["governance"])
+def system_capabilities(request: Request) -> dict:
+    """The capability catalogue joined with this deployment's activation manifest.
+
+    ADR-UE-03 slice 4. One row per registered capability: its registered
+    maturity and primary hook from the packaged catalogue, and the requested
+    and effective mode computed at startup from the signed manifest, with the
+    reasons and premise results. Without a manifest every mode is
+    ``NOT_ESTABLISHED``. Tenant-authenticated, ``read`` capability; no signer
+    or credential material is returned. Read-only: nothing here changes a mode.
+    """
+    from remora.governance.capability_activation import catalogue_view
+
+    tenant_id, role = _authenticate(request)
+    _require_tenant_capability(role, tenant_id, "read")
+    return catalogue_view(CAPABILITY_ACTIVATION)
