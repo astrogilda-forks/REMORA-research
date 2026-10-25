@@ -592,21 +592,22 @@ selective routing is phase-aware rather than a single global threshold. See
 REMORA is a **research-grade reference architecture**, not a certified product,
 not a guarantee of safety, and not a replacement for domain authority.
 
-- **Deployment status: SHADOW_ONLY.** The system is intended to be run beside an
-  agent (Shadow Mode) and does not have a production-certified enforcement mode.
+- **Release profile: CONTROLLED_PILOT** (since 2026-10-25, by owner decision,
+  [ADR](docs/architecture/ADR-pilot-readiness-owner-decision.md)). The
+  repository may be run as a bounded pilot beside an agent with a human
+  approval on every non-accept outcome; it was `SHADOW_ONLY` before that date,
+  and it has no production-certified enforcement mode. Whether a pilot runs is
+  the maintainer's operational decision, taken outside this repository.
 - Production gates: `REM-020` (longitudinal stability) is **DONE**
   (2026-07-17, closed by fail-closed tooling under the owner-reconciled 7-day
-  criterion; self-reported values pending independent verification).
+  criterion; self-reported values, not independently verified).
   `REM-022` (RBAC audit) is **DONE** (2026-06-30, with a recorded deviation
-  whose follow-through is tracked as `REM-023`, still **IN_PROGRESS**).
-  `REM-021` (independent human review) is **NOT_STARTED**. **Two gates remain,
-  `REM-021` and `REM-023`.** `release_profiles_v1.yaml` requires REM-020,
-  REM-021, REM-022 and REM-023 for `CONTROLLED_PILOT`. REM-023's one open step,
-  external confirmation of the RBAC design, is folded into REM-021.
-  Statuses are held in
+  whose follow-through, `REM-023`, is **DONE** 2026-10-25 on its code and test
+  criteria). `REM-021` (independent human review) is **NOT_STARTED**: it is
+  not a precondition for the pilot and gates `EXTERNALLY_VERIFIED` and
+  `PRODUCTION`. Statuses are held in
   [`remediation_register.yaml`](docs/assurance/remediation_register.yaml), which
-  is what CI recomputes the README's deployment profile from.
-  Deployment status cannot advance past SHADOW_ONLY until both are cleared.
+  is what CI recomputes the deployment profile from.
 - **External replication is pending.** All benchmarks are internally run; no
   external live-agent validation has been conducted.
 - Result scope: reported results are simulator-scoped or post-hoc over

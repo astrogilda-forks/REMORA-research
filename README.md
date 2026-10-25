@@ -20,7 +20,7 @@ REMORA is a governance overlay that sits between a tool-using agent and the tool
 
 An approval covers only the exact call it was given for. It can be used once, and policy is checked again at the moment of dispatch. A model's confidence can never override a hard block. The enforcing surface is `POST /v1/execution/*`.
 
-> **Status:** research and shadow-mode software with no production certification. External replication is pending; every deployment still needs its own validation.
+> **Status:** research software, ready for a bounded controlled pilot by maintainer decision (2026-10-25); no production certification and no independent review. External replication is pending; every deployment still needs its own validation.
 
 ## Try it in two minutes
 

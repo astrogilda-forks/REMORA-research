@@ -51,11 +51,12 @@ def test_every_evidence_path_exists() -> None:
 
 
 def test_no_capability_claims_production_or_external_status() -> None:
-    """SHADOW_ONLY invariant: until REM-021 closes, nothing may claim the two
-    top rungs. Loosening this test is itself a release decision."""
+    """Until REM-021 closes, nothing may claim the two top rungs: the owner
+    decision of 2026-10-25 opened the controlled pilot, not these statuses.
+    Loosening this test is itself a release decision."""
     for cap in _load()["capabilities"]:
         assert cap["status"] not in {"ENFORCED_PRODUCTION", "EXTERNALLY_VERIFIED"}, (
-            f"{cap['id']} claims {cap['status']} while deployment is SHADOW_ONLY"
+            f"{cap['id']} claims {cap['status']} without independent verification"
         )
 
 

@@ -389,6 +389,38 @@ def _rem_gates() -> dict[str, str]:
     return out
 
 
+def _owner_decisions(prof: dict, errors: list[str]) -> set[str]:
+    """The ids of well-formed owner decisions in the profiles file.
+
+    Each needs ``id``, ``decided_by``, ``decided_on`` (an ISO date) and a
+    ``record`` that exists in the repository; a malformed entry is reported and
+    does not count, so a profile resting on it is not satisfied.
+    """
+    out: set[str] = set()
+    for entry in prof.get("owner_decisions") or []:
+        if not isinstance(entry, dict):
+            errors.append("release-profiles: owner_decisions holds a non-mapping entry")
+            continue
+        did = str(entry.get("id") or "")
+        problems = []
+        if not did:
+            problems.append("no id")
+        if not str(entry.get("decided_by") or "").strip():
+            problems.append("no decided_by")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(entry.get("decided_on") or "")):
+            problems.append("decided_on is not an ISO date")
+        record = str(entry.get("record") or "")
+        if not record or not (ROOT / record).is_file():
+            problems.append(f"record {record!r} is not a file in the repository")
+        if did in out:
+            problems.append("duplicate id")
+        if problems:
+            errors.append(f"release-profiles: owner decision {did or '?'}: {'; '.join(problems)}")
+            continue
+        out.add(did)
+    return out
+
+
 def check_release_profiles(errors: list[str]) -> None:
     prof = _load(PROFILES)
     ladder: list[str] = prof["capability_ladder"]
@@ -414,6 +446,7 @@ def check_release_profiles(errors: list[str]) -> None:
 
     by_name = {p["name"]: p for p in prof["profiles"]}
     satisfied: dict[str, bool] = {}
+    decisions = _owner_decisions(prof, errors)
 
     for p in sorted(prof["profiles"], key=lambda x: x["order"]):
         ok = True
@@ -432,6 +465,18 @@ def check_release_profiles(errors: list[str]) -> None:
                 errors.append(f"release-profiles: {p['name']}: unknown {rid}")
                 ok = False
             elif not rem_ok(rid):
+                ok = False
+        decision = p.get("requires", {}).get("owner_decision")
+        if decision is not None:
+            # A profile that rests on an owner decision needs that decision
+            # recorded with its decider, date and record; prose cannot
+            # substitute for the entry, and the entry cannot substitute for
+            # the record it names.
+            if decision not in decisions:
+                errors.append(
+                    f"release-profiles: {p['name']} requires owner decision "
+                    f"{decision!r}, which owner_decisions does not record"
+                )
                 ok = False
         for cid, level in (p.get("requires", {}).get("capabilities") or {}).items():
             if cid not in caps:

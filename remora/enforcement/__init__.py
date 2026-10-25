@@ -27,7 +27,7 @@ PDP/PEP token flow is wired into the execution API (servers/execution_api.py,
 /v1/execution/*); see capability_register CAP-003. Outside that API path the
 deployment pattern above is prescriptive, not a description of current
 wiring — remora/adapters/action_gate.py calls the PDP directly. This is
-consistent with deployment_status=SHADOW_ONLY (ARCHITECTURE.md §10); do not
+consistent with the release profile (ARCHITECTURE.md §10); do not
 cite this package as evidence of integrated, unbypassable enforcement.
 
 ExecutionLease + GovernedToolDispatcher (lease.py) extend the token pattern
