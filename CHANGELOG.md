@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### `GET /v1/system/capabilities`: the capability catalogue joined with the activation manifest (ADR-UE-03 slice 4)
+
+- A read-only, tenant-authenticated route (`read` capability) serving one row per registered capability from the packaged catalogue: registered maturity, primary hook, and, under the manifest loaded at startup, the requested and effective mode with the reasons and premise results, plus the manifest's digest and whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`. No signer key id or credential is returned, and nothing on the route changes a mode. It is distinct from the agent-facing `/v1/execution/capabilities`.
+- `schemas/openapi.json` (41 paths) and `frontend/src/generated/remora-api.ts` regenerated; the route is classified as an execution/infrastructure path in `tests/test_enabled_surfaces.py`.
+- `tests/test_capability_activation.py` gains the view without and with a manifest, the live catalogue's 32 rows, and the route for a reader and without the capability (403).
+
 ### Effective capability modes and the startup validation (ADR-UE-03 slice 2)
 
 - `remora/governance/capability_activation.py` computes each capability's effective mode from the signed manifest's requested mode, the premises this process can verify and the registered maturity. Absent from the manifest: `DISABLED`. A required premise that fails, or that the registry cannot verify (`reconciliation_authority`, for example, has no check): the entry's fail mode, `DISABLED` or `BLOCKED`, never allow. An enforcing request (`ENFORCE`, `VERIFY`) for a capability registered below `WIRED_API_PATH`: the highest non-enforcing allowed mode, or `BLOCKED`. Otherwise the requested mode. `PREMISES` names eight checks and what each establishes (most read whether a setting is configured; its own startup check makes the value meaningful).

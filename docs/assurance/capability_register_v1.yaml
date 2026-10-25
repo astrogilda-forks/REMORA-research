@@ -182,8 +182,9 @@ capabilities:
   - id: CAP-001
     name: "Decision engine (hard guards -> conditional gates -> trust routing)"
     status: WIRED_API_PATH
-    verified_at_sha: aa702883ad4adff0582d33a9b2fe60e28011827a
+    verified_at_sha: 663e38c7b4415c8d7521a437e4e198ceeb6b8a86
     verified_by: >-
+      re-audited 2026-10-25 at 663e38c (SYSTEM CAPABILITIES ROUTE, read-only), from aa70288: servers/api.py appends GET /v1/system/capabilities, a tenant-authenticated read of the packaged catalogue and the startup activation report; no decision, dispatch or refusal reads or changes it
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from f5f3363: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
       re-audited 2026-10-22 at f5f3363 (LIMITS BOUND TO AUTHORITY AND APPROVAL, opt-in), from 71d7a23: remora/execution/service.py records the digest of the cumulative-limit policy in the assessed record and refuses an approval on /execute and in the async worker when that policy was turned off or replaced (limits_changed); servers/api.py adds the digest to the policy identity and the coverage block (cumulative_limits), so ACCEPT tokens and leases bind it; servers/execution_api.py verifies Ed25519-signed limit policies against REMORA_LIMITS_TRUSTED_KEYS and refuses startup under REMORA_REQUIRE_LIMITS without signed all_writes limits; remora/crypto/domain_signing.py adds the LIMIT_POLICY domain. Without REMORA_LIMITS_FILE the policy identity and every path are unchanged. Strictly narrowing. Tests: tests/limits/test_limits_binding.py (the rollback reproduced, then refused), tests/limits/test_limits_unit.py. Status and scope unchanged.
@@ -831,8 +832,9 @@ capabilities:
   - id: CAP-009
     name: "RBAC (nine-role capability matrix, credential-bound audit identity)"
     status: WIRED_API_PATH
-    verified_at_sha: aa702883ad4adff0582d33a9b2fe60e28011827a
+    verified_at_sha: 663e38c7b4415c8d7521a437e4e198ceeb6b8a86
     verified_by: >-
+      re-audited 2026-10-25 at 663e38c (SYSTEM CAPABILITIES ROUTE, read-only), from aa70288: servers/api.py appends GET /v1/system/capabilities, a tenant-authenticated read of the packaged catalogue and the startup activation report; no decision, dispatch or refusal reads or changes it
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from f5f3363: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
       re-audited 2026-10-22 at f5f3363 (LIMITS BOUND TO AUTHORITY AND APPROVAL, opt-in), from 71d7a23: remora/execution/service.py records the digest of the cumulative-limit policy in the assessed record and refuses an approval on /execute and in the async worker when that policy was turned off or replaced (limits_changed); servers/api.py adds the digest to the policy identity and the coverage block (cumulative_limits), so ACCEPT tokens and leases bind it; servers/execution_api.py verifies Ed25519-signed limit policies against REMORA_LIMITS_TRUSTED_KEYS and refuses startup under REMORA_REQUIRE_LIMITS without signed all_writes limits; remora/crypto/domain_signing.py adds the LIMIT_POLICY domain. Without REMORA_LIMITS_FILE the policy identity and every path are unchanged. Strictly narrowing. Tests: tests/limits/test_limits_binding.py (the rollback reproduced, then refused), tests/limits/test_limits_unit.py. Status and scope unchanged.
@@ -1251,8 +1253,9 @@ capabilities:
   - id: CAP-017
     name: "Production fail-closed on signing keys"
     status: WIRED_API_PATH
-    verified_at_sha: aa702883ad4adff0582d33a9b2fe60e28011827a
+    verified_at_sha: 663e38c7b4415c8d7521a437e4e198ceeb6b8a86
     verified_by: >-
+      re-audited 2026-10-25 at 663e38c (SYSTEM CAPABILITIES ROUTE, read-only), from aa70288: servers/api.py appends GET /v1/system/capabilities, a tenant-authenticated read of the packaged catalogue and the startup activation report; no decision, dispatch or refusal reads or changes it
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from f5f3363: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
       re-audited 2026-10-22 at f5f3363 (LIMITS BOUND TO AUTHORITY AND APPROVAL, opt-in), from 71d7a23: remora/execution/service.py records the digest of the cumulative-limit policy in the assessed record and refuses an approval on /execute and in the async worker when that policy was turned off or replaced (limits_changed); servers/api.py adds the digest to the policy identity and the coverage block (cumulative_limits), so ACCEPT tokens and leases bind it; servers/execution_api.py verifies Ed25519-signed limit policies against REMORA_LIMITS_TRUSTED_KEYS and refuses startup under REMORA_REQUIRE_LIMITS without signed all_writes limits; remora/crypto/domain_signing.py adds the LIMIT_POLICY domain. Without REMORA_LIMITS_FILE the policy identity and every path are unchanged. Strictly narrowing. Tests: tests/limits/test_limits_binding.py (the rollback reproduced, then refused), tests/limits/test_limits_unit.py. Status and scope unchanged.
@@ -2487,8 +2490,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: aa702883ad4adff0582d33a9b2fe60e28011827a
+    verified_at_sha: 663e38c7b4415c8d7521a437e4e198ceeb6b8a86
     verified_by: >-
+      re-audited 2026-10-25 at 663e38c (SYSTEM CAPABILITIES ROUTE, read-only), from aa70288: servers/api.py appends GET /v1/system/capabilities, a tenant-authenticated read of the packaged catalogue and the startup activation report; no decision, dispatch or refusal reads or changes it
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from 0dc01c8: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites

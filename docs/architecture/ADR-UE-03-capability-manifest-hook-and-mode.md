@@ -166,7 +166,10 @@ open choices:
 3. `cam_digest` in the lease and the decision record, signed only when set,
    with the completeness contract extended as the flow fields were.
 4. The packaged catalogue artefact and `GET /v1/system/capabilities`, with
-   the OpenAPI document and the typed client regenerated.
+   the OpenAPI document and the typed client regenerated. Delivered
+   2026-10-26: the route in `servers/api.py`, `catalogue_view` in
+   `remora/governance/capability_activation.py`, `schemas/openapi.json` and
+   `frontend/src/generated/remora-api.ts` regenerated.
 5. The environment-flag migration of item 7, one flag per change, each with
    the agreement test.
 

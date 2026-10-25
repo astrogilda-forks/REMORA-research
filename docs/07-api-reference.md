@@ -10,7 +10,7 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 40 paths). CI fails on drift between it and the routes, so it is
+(OpenAPI 3.1, 41 paths). CI fails on drift between it and the routes, so it is
 the authority for request and response shapes; this document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
@@ -1077,8 +1077,12 @@ restart-proven by test.
   allowed mode. `servers/api.py` computes the report at startup
   (`CAPABILITY_ACTIVATION`). With `REMORA_CAM_REQUIRED=1` startup refuses
   without a loadable manifest, with an entry the catalogue does not have, and,
-  under a strict profile, with a registered capability left out. No
-  enforcement path reads the report yet.
+  under a strict profile, with a registered capability left out.
+  `GET /v1/system/capabilities` (`read`) serves the catalogue joined with the
+  report: per capability its registered maturity, primary hook, requested and
+  effective mode, reasons and premise results, and the manifest's digest and
+  whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`.
+  No signer key id or credential is returned.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.
