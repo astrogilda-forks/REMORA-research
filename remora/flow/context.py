@@ -562,8 +562,9 @@ class FlowContextStore:
         context afresh and appending at that load's sequence would let a raise
         that landed after the check through, with the call dispatched on a
         verdict computed from the old label. The holder's expiry bounds a
-        process that dies mid-call; an expired hold is ignored, not removed.
-        Returns the dispatch id to end with.
+        process that dies mid-call (the holder renews it while its tool runs,
+        ``renew_dispatch``); an expired hold is ignored, not removed. Returns
+        the dispatch id to end with.
         """
         state = self.load(tenant_id, principal, context_id)
         if state.seq != expected_seq:
@@ -577,6 +578,31 @@ class FlowContextStore:
                                      expected_seq=expected_seq, event=event):
             return None
         return dispatch_id
+
+    def renew_dispatch(self, tenant_id: str, principal: str, context_id: str,
+                       dispatch_id: str, *, expires_at: float, now: float) -> bool:
+        """Extend the hold ``begin_dispatch`` took to ``expires_at``; False when
+        the hold is gone.
+
+        The holder renews while its tool runs, so the expiry bounds a process
+        that died mid-call and never a call that is still running. A hold that
+        has ended or already expired is not revived: another proposal may have
+        begun in the context since, and the holder's commit refuses instead.
+        The renewal re-appends the hold's ``dispatch`` event with the later
+        expiry, and the fold keeps the latest; retried under contention.
+        """
+        for _ in range(_MAX_RETRIES):
+            state = self.load(tenant_id, principal, context_id)
+            held = next((o for o in state.open_dispatches if o.dispatch_id == dispatch_id), None)
+            if held is None or held.expires_at <= now:
+                return False
+            event = FlowEvent("dispatch", {
+                "dispatch_id": dispatch_id, "proposal_id": held.proposal_id,
+                "expires_at": max(float(expires_at), held.expires_at)})
+            if self._store.append_if(tenant_id=tenant_id, context_id=context_id,
+                                     expected_seq=state.seq, event=event):
+                return True
+        raise FlowStoreUnavailable("flow dispatch renewal lost every retry under contention")
 
     def end_dispatch(self, tenant_id: str, principal: str, context_id: str,
                      dispatch_id: str) -> None:

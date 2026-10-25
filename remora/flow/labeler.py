@@ -311,6 +311,7 @@ def commit_labeled_result(
     raw_result: Any,
     source_metadata: Mapping[str, Mapping[str, Iterable[str]]] | None = None,
     expected_epoch: int | None = None,
+    dispatch_id: str | None = None,
 ) -> CommittedFlowResult:
     """Compute labels, persist handles and context raise BEFORE returning
     ``rendered_result`` to the agent (SDD v2 WP-04 / AR-017, IFC-04b).
@@ -319,19 +320,31 @@ def commit_labeled_result(
     rendered payload attached. With *expected_epoch* (the epoch the dispatch
     check passed on), a context whose label moved in between is refused as
     ``flow_epoch_changed_during_dispatch``: the call ran, and its result is
-    not released under a flow decision made on a stale label.
+    not released under a flow decision made on a stale label. With
+    *dispatch_id* (the dispatch fence the call holds, IFC-06), a fence that
+    is no longer held unexpired is refused as ``flow_dispatch_fence_expired``:
+    another proposal may have run in the context while the hold had lapsed,
+    so the result is not released as if the call had run alone.
     """
     import hashlib
+    import time
+
     from remora.flow.observe import _lineage
 
     failed = False
-    moved = False
+    reason: str | None = None
     updated: Any = None
     try:
         state = contexts.load(tenant_id, principal, context_id)
         if expected_epoch is not None and state.epoch != expected_epoch:
-            moved = True
-            raise FlowCommitFailed("flow_epoch_changed_during_dispatch")
+            reason = "flow_epoch_changed_during_dispatch"
+            raise FlowCommitFailed(reason)
+        if dispatch_id is not None:
+            now = time.time()
+            if not any(o.dispatch_id == dispatch_id and o.expires_at > now
+                       for o in state.open_dispatches):
+                reason = "flow_dispatch_fence_expired"
+                raise FlowCommitFailed(reason)
         lineage = _lineage(lambda cid: contexts.load(tenant_id, principal, cid), state)
         if handles is not None:
             res = handles.resolve(tenant_id, lineage, arguments, context_label=state.label)
@@ -363,8 +376,8 @@ def commit_labeled_result(
         failed = True
     # Raise outside the handler: neither cause nor implicit exception context
     # may retain a store exception containing raw tool data.
-    if moved:
-        raise FlowCommitFailed("flow_epoch_changed_during_dispatch") from None
+    if reason is not None:
+        raise FlowCommitFailed(reason) from None
     if failed or updated is None:
         raise FlowCommitFailed("flow_result_commit_failed") from None
     return CommittedFlowResult(
