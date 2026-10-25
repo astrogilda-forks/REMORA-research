@@ -3313,7 +3313,7 @@ documents:
   claims: []
 - id: DOC-412
   path: docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md
-  status: proposal
+  status: canonical
   topic: docs_architecture_ADR-UE-03-capability-manifest-hook-and-mode_md
   code_synced: verified
   verdict: pending
@@ -3321,7 +3321,7 @@ documents:
   audience:
   - maintainers
   - evaluators
-  last_reviewed: '2026-10-24'
+  last_reviewed: '2026-10-25'
   validates_against: []
   claims: []
 topics:
