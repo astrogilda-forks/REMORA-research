@@ -5,7 +5,7 @@
 #   docker compose -f deploy/ot-pilot/docker-compose.yml up --build -d
 #
 # Then open http://localhost:8081 — operator console with live metrics, the
-# scenario buttons and a one-click run of the 15-case OT battery.
+# scenario buttons and a one-click run of the 16-case OT battery.
 # Swagger is at http://localhost:8080/docs (press Authorize, paste `ot-agent`).
 #
 #   docker compose -f deploy/ot-pilot/docker-compose.yml down -v   # tear down

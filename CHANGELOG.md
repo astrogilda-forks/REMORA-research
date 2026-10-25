@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### OT pilot battery: named limit refusals count as refusals; a cumulative-limit case; a recorded run
+
+- `deploy/ot-pilot/run_ot_battery.py`: a 409 with a named reason at assess (the cumulative limits refuse there, before any decision) is recorded as `refused_at_assess` with its reason instead of as an HTTP error. Three cases had been reported as failures although the system refused them: the unknown tool (`limit_coverage_unknown`), the loop the plant does not report (`limit_observation_unavailable`) and the injection case, whose 65-point valve move was stopped by the travel limit rather than by the injection guard. Those two limit cases now expect their named refusal; the injection case moves the valve 5 points, inside the limit, so the guard is what it tests (it resolves to ESCALATE). A new case moves PIC-101 past its hourly cap and expects `limit_exceeded`. 16 cases.
+- `artifacts/pilot-pack/runs/ot-battery-2026-10-25/`: a run of the 16 cases against the production-mode pilot built from master `0f30a49e` (16 of 16 as specified, 6 side effects, both chains valid), described in the pilot pack README with what it does not show. `tests/test_ot_battery_evidence.py` pins the judge and the case list. The console button says 16 cases.
+
 ### IFC-12 on the execution path: the authority mints the recipient set, the split executor holds to it
 
 - `tests/capabilities/test_mediation_flow_recipients_server_path.py`: on `/execute-accepted` with `REMORA_FLOW_CONTROL=1`, nothing hand-minted: the ACCEPT token is redeemed on the real route, the lease the authority mints carries `flow_recipients_digest` for the set the flow verdict approved, the mediated tool's declared effect runs and its collector effect is refused `capability_recipient_not_approved` before the ceiling; with flow control off the same tool, token and ceiling refuse the collector for the ceiling and the lease carries no digest.
