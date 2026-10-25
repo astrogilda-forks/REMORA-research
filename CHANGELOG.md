@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Opt-in error reporting to Sentry
+
+- `remora/observability/sentry.py` initialises `sentry-sdk` when `SENTRY_DSN` is set, with `send_default_pii` off, no local variables in frames, no request bodies, and a `before_send` that removes request headers, cookies, body, query string and user from every event and transaction. `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE` and `SENTRY_TRACES_SAMPLE_RATE` (default 0, bounded to [0, 1]) are read; a missing package or a refused DSN is a warning, never a failed start. `servers/api.py` calls it once, after every route is mounted. New extra `sentry`; `SENTRY_DSN` is declared in the credential topology as a transport credential. `tests/test_observability_sentry.py` (13). The execution quickstart documents it.
+
 ### IFC-12 on the execution path: the authority mints the recipient set, the split executor holds to it
 
 - `tests/capabilities/test_mediation_flow_recipients_server_path.py`: on `/execute-accepted` with `REMORA_FLOW_CONTROL=1`, nothing hand-minted: the ACCEPT token is redeemed on the real route, the lease the authority mints carries `flow_recipients_digest` for the set the flow verdict approved, the mediated tool's declared effect runs and its collector effect is refused `capability_recipient_not_approved` before the ceiling; with flow control off the same tool, token and ceiling refuse the collector for the ceiling and the lease carries no digest.

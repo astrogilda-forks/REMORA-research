@@ -361,6 +361,19 @@ identifier (`token_jti`), a digest (`tool_args_hash`) or a boolean
 (`token_verified`); never the value. A logging call must never become the
 reason a key leaks.
 
+### Error reporting to Sentry (opt-in)
+
+Set `SENTRY_DSN` to the DSN of the deployment's Sentry project and install the
+`sentry` extra (`pip install -e ".[sentry]"`); without the DSN nothing is
+initialised, and with the DSN but without the package the API starts and logs
+one warning. `SENTRY_ENVIRONMENT` defaults to `REMORA_ENV`, `SENTRY_RELEASE` to
+the package version, and `SENTRY_TRACES_SAMPLE_RATE` to 0 (errors only).
+
+Events leave without request headers, cookies, bodies, query strings, users or
+local variables (`remora/observability/sentry.py`), because the API handles
+tool arguments, approvals and credentials. Sentry is an operational view: the
+tenant audit chain stays the governance record.
+
 ## Known limits
 
 - REMORA cannot enforce a tool the agent can reach through another credential
