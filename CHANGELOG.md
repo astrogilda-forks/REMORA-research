@@ -8,6 +8,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 - The owner accepted `docs/architecture/ADR-UE-03-capability-manifest-hook-and-mode.md` (DOC-412) on 2026-10-25 with its seven particulars as written, and resolved the two choices the proposal left open: `cam_digest` is a signed-when-set lease field beside `policy_bundle_hash`, not folded into the policy identity; the manifest's trusted keys are their own setting, `REMORA_CAM_TRUSTED_KEYS`. The register entry moves from proposal to canonical.
 - Nothing runs differently: no manifest, mode, signature or `/v1/system/capabilities` route exists yet. The five slices named in the ADR are the implementation work and each lands with its own tests.
+### The provenance register fingerprints identically on every supported interpreter
+
+- `scripts/provenance_register.py` folds the f-string pieces that Python 3.12 and later emit (PEP 701: start, middle, end and the replacement fields' own tokens; 3.14 does the same for t-strings) into the one `S` token that 3.11 yields, so a module's winnowing fingerprints no longer depend on the interpreter that computed them. The register records the rule under `method.strings`, and `docs/assurance/provenance_register_v1.json` is regenerated at the same snapshot (`register_sha256` changes; the concepts, first commits and markers are unchanged).
+- Why now: the full suite's `pytest` job fetches the whole history since the change-scoped selection landed, which un-skipped `test_register_reproduces_from_git_history`; the committed register had been written on 3.12+ and the Python 3.11 leg on master failed at `9d4261cf`. The regenerated register is checked under Python 3.11.16 in a container and under 3.14 on the host.
+- `tests/test_provenance_register.py` pins that an f-string normalises to one token and fingerprints like a plain string.
 
 ### The flow check and the dispatch are one step: the dispatch fence (IFC-06; SDD unified capability execution v1.1, P0 item 6)
 
