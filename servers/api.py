@@ -3402,3 +3402,12 @@ _build_executor_dispatcher_at_startup()
 from remora.observability.sentry import init_sentry_from_env as _init_sentry
 
 _init_sentry(release=_PACKAGE_VERSION)
+
+# Capability Activation Manifest (ADR-UE-03 slice 2): effective modes computed
+# once at startup. Refuses to start only with REMORA_CAM_REQUIRED=1; no
+# enforcement path reads the report yet.
+from remora.governance.capability_activation import (
+    validate_activation_at_startup as _validate_activation,
+)
+
+CAPABILITY_ACTIVATION = _validate_activation()

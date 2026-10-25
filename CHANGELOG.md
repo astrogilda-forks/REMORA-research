@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Effective capability modes and the startup validation (ADR-UE-03 slice 2)
+
+- `remora/governance/capability_activation.py` computes each capability's effective mode from the signed manifest's requested mode, the premises this process can verify and the registered maturity. Absent from the manifest: `DISABLED`. A required premise that fails, or that the registry cannot verify (`reconciliation_authority`, for example, has no check): the entry's fail mode, `DISABLED` or `BLOCKED`, never allow. An enforcing request (`ENFORCE`, `VERIFY`) for a capability registered below `WIRED_API_PATH`: the highest non-enforcing allowed mode, or `BLOCKED`. Otherwise the requested mode. `PREMISES` names eight checks and what each establishes (most read whether a setting is configured; its own startup check makes the value meaningful).
+- `remora/governance/capability_catalogue_v1.json` packages what the server needs from the register (id, name, status, primary hook), so the server never reads `docs/` (ADR-UE-03 item 6); `scripts/build_capability_catalogue.py --check` holds it to the register.
+- `servers/api.py` computes the report once at startup (`CAPABILITY_ACTIVATION`). With `REMORA_CAM_REQUIRED=1` the process refuses to start without a loadable manifest, with an entry the catalogue does not have, and, under a strict profile, with a registered capability left out. Without it, a configured manifest is reported and a problem is logged. No enforcement path reads the report yet; `cam_digest` in the lease and the catalogue route are the next slices.
+- `tests/test_capability_activation.py` (24): every rule and its order, the premise checks against their settings, the report, the startup matrix, and the API refusing to start in a separate interpreter when a manifest is required and none is configured.
+
 ### Opt-in error reporting to Sentry
 
 - `remora/observability/sentry.py` initialises `sentry-sdk` when `SENTRY_DSN` is set, with `send_default_pii` off, no local variables in frames, no request bodies, and a `before_send` that removes request headers, cookies, body, query string and user from every event and transaction. `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE` and `SENTRY_TRACES_SAMPLE_RATE` (default 0, bounded to [0, 1]) are read; a missing package or a refused DSN is a warning, never a failed start. `servers/api.py` calls it once, after every route is mounted. New extra `sentry`; `SENTRY_DSN` is declared in the credential topology as a transport credential. `tests/test_observability_sentry.py` (13). The execution quickstart documents it.

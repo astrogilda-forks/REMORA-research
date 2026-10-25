@@ -159,7 +159,10 @@ open choices:
    `scripts/sign_capability_manifest.py`, `tests/test_activation_manifest.py`.
 2. Effective-mode computation and the startup validation of item 4, behind
    an opt-in setting, with the premises registry naming what each premise
-   checks.
+   checks. Delivered 2026-10-25: `remora/governance/capability_activation.py`
+   (`REMORA_CAM_REQUIRED=1`), the packaged catalogue
+   `remora/governance/capability_catalogue_v1.json` built by
+   `scripts/build_capability_catalogue.py`, `tests/test_capability_activation.py`.
 3. `cam_digest` in the lease and the decision record, signed only when set,
    with the completeness contract extended as the flow fields were.
 4. The packaged catalogue artefact and `GET /v1/system/capabilities`, with
