@@ -84,10 +84,8 @@ _DOWNGRADE_ORDER = ("SHADOW", "EVIDENCE_ONLY", "OFFLINE")
 
 
 def _setting(*names: str) -> bool:
-    # The runtime profile's own reader: a configured, non-blank value.
-    from remora.toolcall.runtime_profile import _configured
-
-    return _configured(*names)
+    """Whether any of ``names`` is configured (non-blank). Presence only."""
+    return any(os.environ.get(name, "").strip() for name in names)
 
 
 def _strict_profile() -> bool:
