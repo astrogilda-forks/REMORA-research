@@ -58,15 +58,15 @@ from remora.governance.activation_manifest import (
 
 __all__ = [
     "BLOCKED",
-    "NOT_ESTABLISHED",
-    "catalogue_view",
     "CATALOGUE_PATH",
     "ENFORCE_ELIGIBLE",
+    "NOT_ESTABLISHED",
     "PREMISES",
     "Activation",
     "ActivationReport",
     "Premise",
     "activation_report",
+    "catalogue_view",
     "effective_activation",
     "load_catalogue",
     "validate_activation_at_startup",
