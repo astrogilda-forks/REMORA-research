@@ -1,0 +1,198 @@
+{
+ "capabilities": [
+  {
+   "hook": "POLICY",
+   "id": "CAP-001",
+   "name": "Decision engine (hard guards -> conditional gates -> trust routing)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "POLICY",
+   "id": "CAP-002",
+   "name": "OPA/Rego delegation with full input parity and monotone floors",
+   "status": "WIRED_REFERENCE_PATH"
+  },
+  {
+   "hook": "PRE_DISPATCH",
+   "id": "CAP-003",
+   "name": "Signed PDP->PEP token (mandatory expiry, jti one-time consumption, audience, max age)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "PRE_DISPATCH",
+   "id": "CAP-004",
+   "name": "Tool-call payload binding (canonical hash, recomputed before execution)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "AUDIT",
+   "id": "CAP-005",
+   "name": "Audit chain (hash-chained decision history)",
+   "status": "PERSISTED_ATOMIC"
+  },
+  {
+   "hook": "AUTHORITY_INPUT",
+   "id": "CAP-006",
+   "name": "A2A delegation envelope (principal-bound keys, attenuation, replay, payload binding)",
+   "status": "WIRED_REFERENCE_PATH"
+  },
+  {
+   "hook": "POLICY",
+   "id": "CAP-007",
+   "name": "Review queue with TTL-to-ABSTAIN and approval freshness re-gate",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "OPS",
+   "id": "CAP-008",
+   "name": "Degradation ladder G0-G4 with tamper-evident transition log",
+   "status": "WIRED_REFERENCE_PATH"
+  },
+  {
+   "hook": "ADMISSION",
+   "id": "CAP-009",
+   "name": "RBAC (nine-role capability matrix, credential-bound audit identity)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "OPS",
+   "id": "CAP-010",
+   "name": "Shared-engine concurrency safety (request-local cancellation, locked correlation reads)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "OPS",
+   "id": "CAP-011",
+   "name": "OTel GenAI telemetry (gen_ai.* + remora.* spans, pinned schema)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "ADVISORY",
+   "id": "CAP-012",
+   "name": "AROMER cross-domain transfer measurement (abstract harm-prior backoff)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "EXECUTION",
+   "id": "CAP-013",
+   "name": "Governed tool dispatch (lease-bound, app-side credentials, deployment-config registry)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "POLICY",
+   "id": "CAP-014",
+   "name": "Declared-effect consistency (expected_effect_matches tri-state authority)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "POLICY",
+   "id": "CAP-015",
+   "name": "Runtime invariant enforcement (CORE_INVARIANTS evaluated on every decision)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "OPS",
+   "id": "CAP-016",
+   "name": "Structured governance events (operational logging in the safety core)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "ADMISSION",
+   "id": "CAP-017",
+   "name": "Production fail-closed on signing keys",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "AUTHORITY_INPUT",
+   "id": "CAP-018",
+   "name": "Task-bound authority and non-decaying loop safety on the execution API",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "AUDIT",
+   "id": "CAP-019",
+   "name": "Evidence coverage verdicts on the evidence export",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "PRE_DISPATCH",
+   "id": "CAP-020",
+   "name": "Pre-dispatch premise checks: resolved effect, plan premises, procedure obligations",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "AUDIT",
+   "id": "CAP-021",
+   "name": "Independent recorder: evidence captured outside the executing process",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "AUTHORITY_INPUT",
+   "id": "CAP-022",
+   "name": "Runtime surface reference path: surface binding, closure identity, issuer scope, durable evidence",
+   "status": "WIRED_REFERENCE_PATH"
+  },
+  {
+   "hook": "ADMISSION",
+   "id": "CAP-023",
+   "name": "Capability minimization: task-scoped capability sets enforced at assess, execution and dispatch",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "EXECUTION",
+   "id": "CAP-024",
+   "name": "Capability mediation for implementation effects, with an effect domain for strict deployments (NTA-2 phases 1 to 3)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "ADMISSION",
+   "id": "CAP-025",
+   "name": "Evidence admission for sufficiency premises (CoSAI §7.4: visibility, coverage, vantage, binding, prior commitment)",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "FEDERATION",
+   "id": "CAP-026",
+   "name": "Federation Bridge: native federation envelope, transport capability declarations, loss-aware claim projection and projection records",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "FEDERATION",
+   "id": "CAP-027",
+   "name": "federation-port/v0 adapter: REMORA authorization evidence verified inside an unmodified federation-port runtime",
+   "status": "WIRED_REFERENCE_PATH"
+  },
+  {
+   "hook": "FEDERATION",
+   "id": "CAP-028",
+   "name": "Federation report-specific binding: subject, evidence selection and native result signed with each Federation result",
+   "status": "IMPLEMENTED_LIBRARY"
+  },
+  {
+   "hook": "FEDERATION",
+   "id": "CAP-029",
+   "name": "federation-port/v0 report-result component: a new action gated on REMORA's native result for one explicitly requested report",
+   "status": "WIRED_REFERENCE_PATH"
+  },
+  {
+   "hook": "ADVISORY",
+   "id": "CAP-030",
+   "name": "WS1 execution preconditions and monitor composition on the execution API (opt-in)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "PRE_DISPATCH",
+   "id": "CAP-031",
+   "name": "Cumulative limits per principal or resource, reserved before dispatch (opt-in)",
+   "status": "WIRED_API_PATH"
+  },
+  {
+   "hook": "ASSURANCE",
+   "id": "CAP-META",
+   "name": "Metatesting of the evidence regime (audit gates are mutation-tested)",
+   "status": "IMPLEMENTED_LIBRARY"
+  }
+ ],
+ "schema": "remora-capability-catalogue/v1",
+ "source": "docs/assurance/capability_register_v1.yaml"
+}
