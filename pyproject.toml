@@ -448,6 +448,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_lease_refusal_hooks_contract.py",
     "tests/test_lease_runtime_binding_without_context.py",
     "tests/test_lease_signing_contracts.py",
+    "tests/test_cam_dispatch_mode_gate.py",
     "tests/test_cam_lease_binding.py",
     "tests/test_lease_verification_completeness.py",
     "tests/test_lease_verification_contracts.py",

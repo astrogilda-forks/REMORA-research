@@ -1310,6 +1310,29 @@ def _cam_digest() -> str | None:
     return str(report.manifest_digest) if report is not None else None
 
 
+def _cam_mode_refusal() -> str | None:
+    """Why the loaded manifest does not let a dispatch run, or None.
+
+    RMR-AUD-26-004: with a manifest loaded, the capabilities that authorize
+    a dispatch (``DISPATCH_AUTHORITY``, plus CAP-031 while cumulative limits
+    are configured) must be effective ENFORCE. A manifest named by
+    ``REMORA_CAM_FILE`` that did not load (a bad signature, an unreadable
+    file) refuses as ``cam_not_loaded`` instead of running as if none were
+    configured. Without ``REMORA_CAM_FILE`` nothing changes.
+    """
+    from remora.governance.capability_activation import (
+        DISPATCH_AUTHORITY,
+        dispatch_mode_refusal,
+    )
+    from servers import api as api_mod
+
+    report = getattr(api_mod, "CAPABILITY_ACTIVATION", None)
+    if report is None:
+        return "cam_not_loaded" if _os.environ.get("REMORA_CAM_FILE", "").strip() else None
+    required = DISPATCH_AUTHORITY + (("CAP-031",) if _limit_guard() is not None else ())
+    return dispatch_mode_refusal(report, required)
+
+
 def _limits_policy_hash() -> str | None:
     """The digest of the cumulative-limit policy in force, or None without one."""
     from servers import api as api_mod
@@ -2008,6 +2031,8 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                 # this process runs under. Bound always, so a lease minted
                 # under a manifest refuses where none is loaded.
                 dispatcher.bind_cam_digest(_cam_digest)
+                # RMR-AUD-26-004: the effective modes, not only the digest.
+                dispatcher.bind_mode_gate(_cam_mode_refusal)
                 spec = _os.environ.get("REMORA_TOOL_REGISTRY_MODULE", "").strip()
                 if spec:
                     import importlib
