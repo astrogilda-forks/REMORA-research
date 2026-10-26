@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Documentation: the API path count and the nonce store's history (RMR-AUD-26-007, RMR-AUD-26-009)
+
+- `docs/07-api-reference.md` said "OpenAPI 3.1, 41 paths" after `GET /v1/ready` made it 42 (43 operations). The count is now left to the schema. `tests/test_api_count_claims.py` refuses any live document that states an OpenAPI path or operation count differing from `schemas/openapi.json`, and pins the IFC-11 row's "28 routes" for the execution API. On master's text before this change it finds the 41.
+- The `remora/enforcement/nonce_store.py` docstring described the per-process lease ledger as the current state. It now dates that to before #351 (2026-08-24). It then says how `_lease_nonce_store` builds the durable store from `REMORA_PG_DSN`, `REMORA_CHAIN_DB` or `REMORA_STATE_ENDPOINT`, and that without them the in-process ledger and its per-process limit remain. It also says what is tested: SQLite, a real PostgreSQL server, and separate processes on one host. Dispatchers on separate hosts have not been run. No code changed.
 ### Documentation: statements that outlived the controlled-pilot decision, and a gate against the next one
 
 - An external documentation review of 2026-10-26 found active documents still describing the state before the owner decision of 2026-10-25. Each finding was checked against master, and these were corrected:

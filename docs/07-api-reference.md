@@ -10,8 +10,9 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 41 paths). CI fails on drift between it and the routes, so it is
-the authority for request and response shapes; this document explains them.
+(OpenAPI 3.1). CI fails on drift between it and the routes, so it is the
+authority for request and response shapes, and for how many there are; this
+document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
 path to a 200 before the strict-profile prerequisites are configured:
