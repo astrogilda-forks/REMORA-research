@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Governance: the activation manifest's effective modes gate dispatch (RMR-AUD-26-004, ADR-UE-03 slice 6)
+
+- A loaded manifest reached the dispatcher only as a digest. Effective modes were computed and reported, but nothing at the execution boundary read them, so a manifest setting the lease dispatch to `SHADOW` still let every lease run.
+- `remora/governance/capability_activation.py` now states the mode contract (`MODE_CONTRACT`): only `ENFORCE` authorizes an effect at dispatch. `dispatch_mode_refusal` requires the capabilities that authorize every dispatch to be effective `ENFORCE`: CAP-003 and CAP-013, plus CAP-031 while limits are configured. An absent capability counts as `DISABLED`.
+- `GovernedToolDispatcher.bind_mode_gate` reads the gate on every dispatch, after the digest check and before the nonce, so a refusal spends nothing (`capability_not_enforcing:<CAP>:<mode>`). A gate that raises refuses as `cam_mode_unverifiable`.
+- A manifest named by `REMORA_CAM_FILE` that did not load now refuses every dispatch (`cam_not_loaded`) instead of running as if none were set.
+- Without `REMORA_CAM_FILE` nothing changes, and no shipped deployment loads a manifest. No mode can raise a decision.
+- Still open: the per-capability mode snapshot in the decision record; strict profiles implying `REMORA_CAM_REQUIRED`, which waits for the owner's timing; further flag migrations.
+- Tests: `tests/test_cam_dispatch_mode_gate.py` (24). In `tests/test_cam_lease_binding.py`, the API fixture's report now carries effective modes.
+
 ### Interop matrix: one edge per claim, and the Federation documents brought up to date
 
 - An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.

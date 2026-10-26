@@ -1102,6 +1102,20 @@ restart-proven by test.
   effective mode, reasons and premise results, and the manifest's digest and
   whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`.
   No signer key id or credential is returned.
+- **Effective modes at dispatch.** With a manifest loaded, every dispatch
+  requires the capabilities that authorize it to be effective `ENFORCE`:
+  CAP-003 (the signed grant) and CAP-013 (lease dispatch), plus CAP-031 while
+  cumulative limits are configured. Any other mode refuses before the nonce,
+  so nothing is spent: `capability_not_enforcing:<CAP>:<mode>`, and a
+  capability absent from the manifest counts as `DISABLED`. Only `ENFORCE`
+  authorizes an effect. `VERIFY` sends outcomes to human review on the
+  decision path, and `SHADOW`, `EVIDENCE_ONLY`, `OFFLINE`, `DISABLED` and
+  `BLOCKED` authorize nothing (`MODE_CONTRACT` in
+  `remora/governance/capability_activation.py`). A manifest named by
+  `REMORA_CAM_FILE` that did not load, for example on a bad signature,
+  refuses every dispatch as `cam_not_loaded`. Without `REMORA_CAM_FILE`
+  nothing changes. Other capabilities are not checked at dispatch, because
+  most are evidence, research or observation mechanisms.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.
