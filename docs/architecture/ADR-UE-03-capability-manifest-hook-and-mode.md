@@ -5,8 +5,11 @@
   ([unified capability execution v1.1](../design/unified-capability-execution-v1.1.md)
   §13, decision ADR-UE-03). The seven particulars below stand as written;
   the two choices the proposal left open are resolved under "Owner
-  resolution". No code implements the manifest yet; the slices at the end
-  are the work.
+  resolution". When this was accepted no code implemented the manifest;
+  the slices at the end were the work. Context below describes `master` as
+  it was then. Slices 1 to 4 have since landed (#1068, #1075 to #1077), and
+  slice 5 for its first flag, `REMORA_REQUIRE_LIMITS` (#1078). The record of
+  each is at the end. No shipped deployment loads a manifest.
 - Deciders: repository owner, security
 - Related: SDD §3 (Capability Activation Contract), §6 (read-only API
   contracts) and §10 (phase P1 "Inventory + CAM"). The

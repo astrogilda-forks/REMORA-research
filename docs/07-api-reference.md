@@ -10,8 +10,9 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 41 paths). CI fails on drift between it and the routes, so it is
-the authority for request and response shapes; this document explains them.
+(OpenAPI 3.1). CI fails on drift between it and the routes, so it is the
+authority for request and response shapes, and for how many there are; this
+document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
 path to a 200 before the strict-profile prerequisites are configured:
@@ -651,7 +652,10 @@ by other means changes a decision.
 
 **WS1 execution preconditions (#953, opt-in, default off):**
 `REMORA_WS1_MODE` is `off`, `shadow` or `enforce`; any other value refuses
-startup. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
+startup. Under the `review` and `controlled_pilot` runtime profiles, `enforce`
+also requires `REMORA_WS1_ADMISSION=atomic`: legacy admission spends the grant
+after the WS1 re-gate, so evidence that lapsed in between would still be
+spent. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
 exposing `build_ws1_deployment()`: the precondition registry, verifiers,
 resolvers, read capabilities, monitor profile and budget. `/assess` then runs
 the WS1 loop after every other component, records it under `ws1` in the chain
@@ -678,7 +682,12 @@ On Postgres every ledger transaction takes one advisory lock. Two hosts
 reserving against the same limit are therefore serialized, as one host's
 SQLite transactions are, and the schema is created on first open under that
 lock.
-Either one without the other refuses startup.
+Either one without the other refuses startup. A SQLite ledger beside
+authority state on `REMORA_PG_DSN` refuses startup under every profile unless
+`REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs
+executors. That pairing is the shape a second executor host can join, and that
+host would keep its own budget. With the authority state on SQLite as well,
+nothing needs declaring.
 
 The policy has four parts. `meters` says what one call of a tool consumes. A
 `sum` meter reads an amount argument, a `count` meter charges `per_call`, and
