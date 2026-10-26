@@ -206,7 +206,7 @@ workflow_capabilities:
     limitations:
       - Durability depends on configured storage; the default is in-process.
       - The frozen fixture contract does not establish the trustworthiness of a deployed clock or global revocation propagation.
-      - No external run record exists for this contract.
+      - One external fixture run exists for fresh-authority-v1 (Probity, second implementation, NOT_INDEPENDENT; artifacts/interop/index.json). It reproduces the frozen fixtures, not this runtime capability, so externally_reproduced stays false.
     composition:
       capability_class: fresh_authority_at_dispatch
       provider_role: candidate
@@ -744,7 +744,7 @@ capability_audit:
     - id: fresh_authority_at_dispatch
       disposition: DECLARED
       evidence: [CAP-003, CAP-004, CAP-007, artifacts/interop/fresh-authority-v1]
-      reason: Re-gating and dispatch-time lease checks are wired; external runs remain absent.
+      reason: Re-gating and dispatch-time lease checks are wired; the one external fixture run is not independent and does not reach the runtime.
     - id: single_use_execution_authorization
       disposition: DECLARED
       evidence: [CAP-003, CAP-013, tests/test_token_hardening.py, tests/test_lease_nonce_durability.py]
@@ -792,7 +792,7 @@ capability_audit:
     - id: production_field_enforcement
       disposition: NOT_DECLARED
       evidence: [docs/assurance/release_profiles_v1.yaml, docs/assurance/capability_register_v1.yaml]
-      reason: Current release profile is SHADOW_PILOT and deployment status is SHADOW_ONLY.
+      reason: The current release profile is CONTROLLED_PILOT, a bounded pilot by owner decision (2026-10-25); no field enforcement or production status is established.
 
 runtime_self_service_procedures:
   - id: execution_boundary_primitive_fixtures
