@@ -211,9 +211,16 @@ manifest until AgentAvow confirms or corrects it.
 lifecycle states and the run records. Status is derived: a declared stage
 when no record exists, `AUTHOR_RUN` for L0, `REPRODUCED` for L1,
 `SECOND_IMPLEMENTATION` for L2, `INDEPENDENTLY_ESTABLISHED` for L3 or L4, and
-`CONTRADICTED` as soon as one record says so. CI refuses a committed matrix
-that differs from the records, so proposed, specified, self-tested and
-independently reproduced cannot be confused by editing a table.
+`CONTRADICTED` as soon as one record says so. An edge is one claim of one
+contract and counts only that claim's records, so a result for one claim can
+neither raise nor contradict another claim of the same contract. Every claim
+of a contract with an edge has its own edge, and the generator refuses a
+record that falls on none. Until 2026-10-26 an edge counted every record of
+its contract (E-ECB carried the `single_use_authorization` records, E-EE-V2
+three other claims); no derived status changed when that was corrected,
+because every such record is L0. CI refuses a committed matrix that differs
+from the records, so proposed, specified, self-tested and independently
+reproduced cannot be confused by editing a table.
 
 ## Maturity of a claim
 
@@ -235,6 +242,15 @@ beyond `MUTATION_TESTED`, which is the point of publishing the fixtures. The
 next step for each is one second implementation and one externally operated
 reproduction, with a neutral evaluator recording the level; the claim
 register is upgraded only when such records exist, never before.
+
+Recorded since that snapshot, as of 2026-10-26: the successor contracts
+`exact-call-binding-v1.1`, `effect-evidence-v1.1` and `effect-evidence-v2`
+(which adds `effect_call_binding`, `effect_decision_correspondence` and
+`effect_observer_independence`) have L0 author records only and stay `DRAFT`.
+`runtime-surface-e7-v0.1` reached the package lifecycle `EXTERNALLY_VERIFIED`
+on two external Probity runs; that covers its fixture premises, not REMORA's
+runtime. No `interop-result-v1` record above L0 exists for any claim, and the
+levels above are not raised by this note.
 
 ## Producer contract
 
