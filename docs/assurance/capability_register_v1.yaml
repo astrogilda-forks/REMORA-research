@@ -962,8 +962,9 @@ capabilities:
       - tests/test_effect_receipt_atomicity.py
       - tests/test_effect_record_endpoint.py
       - docs/deployment/authority-custody-evidence.md
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 2557d6023358e270d673ebd237d50c6276d6076b
     verified_by: >-
+      re-audited 2026-10-26 at 2557d60 (NONCE STORE DOCSTRING), from c898567: remora/enforcement/nonce_store.py changes its module docstring only: the per-process lease ledger is dated to before #351, and the current configuration-dependent guarantee and its test coverage are stated. No code changed. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
