@@ -4,6 +4,13 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Interop matrix: one edge per claim, and the Federation documents brought up to date
+
+- An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.
+- An edge now counts only records for its `(contract, claim)` pair. Every claim of a contract with an edge needs its own edge, every record must fall on exactly one, and the generator refuses otherwise. Six edges are added: E-ECB-SU, E-ECB-V1-1-SU, E-EE-V2-CALL, E-EE-V2-DEC, E-EE-V2-OBS and E7-EXCL (`exclusive_effect_path`, no record, `SPECIFIED`). No derived status changed, because every affected record is L0. No record, fixture or package digest is touched.
+- `FEDERATION.yaml` no longer says that no contract reached `EXTERNALLY_VERIFIED`: `runtime-surface-e7-v0.1` has, for its fixture premises only. `CAPABILITY_DISCOVERY.md` describes the implemented activation manifest instead of calling it proposed, without claiming that any deployment loads one. `FEDERATION.md` keeps its 2026-10-04 maturity snapshot and records what has happened since, raising no level.
+- Tests: two in `tests/test_interop_result_contract.py`. A result for one claim leaves another claim's row unchanged, and the edges partition every claim and every record.
+
 ### Research control matrix: bound to the capability register, with lines for cumulative limits and capability activation
 
 - An external review of 2026-10-26 found the matrix dated 2026-10-18 and silent on the cumulative limits (CAP-031) and the capability activation manifest (ADR-UE-03). Both are now research lines: RES-025 (escrow-style reservation before the effect, O'Neil 1986) and RES-026 (fail-safe defaults for activation, Saltzer and Schroeder 1975), each with code, tests, evidence, a scope boundary and a section in `docs/09-related-work.md` (§17, §18). RES-026 states that no shipped deployment loads a manifest yet.
