@@ -641,15 +641,15 @@ capabilities:
     class: 'Core: identity'
     purpose: Decides who may do what, and ties every audit record to a credential.
     does: Nine-role capability matrix; tenant isolation; credential-bound identity.
-    now: Symmetric bearer tokens; OIDC/MFA are roadmap. REM-022 is DONE, REM-023 IN_PROGRESS.
+    now: Symmetric bearer tokens; OIDC/MFA are roadmap. REM-022 and REM-023 are DONE (REM-023 on 2026-10-25, on its code criteria); external RBAC confirmation is open under REM-021.
     necessity: Critical
-    necessity_rationale: CONTROLLED_PILOT requires WIRED_API_PATH and REM-023 finished.
+    necessity_rationale: CONTROLLED_PILOT requires WIRED_API_PATH and REM-023 DONE, both met.
     sdd_hook: ADMISSION / REVIEW
     sdd_mode: ENFORCE
     sdd_change: >-
       OIDC workload identity, MFA for high-risk approval, a token provider in the SDK.
     reachable_rung: ENFORCED_PRODUCTION
-    reachable_rung_text: ENFORCED_PRODUCTION after REM-023 and a verified IdP integration.
+    reachable_rung_text: ENFORCED_PRODUCTION after a verified IdP integration.
     risk:
       likelihood: M
       consequence: H

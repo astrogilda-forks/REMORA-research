@@ -18,6 +18,8 @@ loosening, the checks split into two tiers:
       recomputed from the capability and remediation registers.
     * Release-gates table — every REM status row in release_gates.md mirrors
       remediation_register.yaml.
+    * Current-profile statements — a canonical, generated or supporting
+      document that names a profile as current names the declared one.
 
   ADVISORY (warn only, never fail) — review hygiene, not correctness:
     * Document-register coverage (a tracked file with no entry, or an entry
@@ -635,6 +637,55 @@ def check_readme_budget(errors: list[str], warnings: list[str]) -> None:
         )
 
 
+#: Live statuses whose text is read as current fact. A proposal states a
+#: target and a historical document a past state, so neither is scanned.
+PROFILE_SCANNED_STATUSES = {"canonical", "generated", "supporting"}
+
+
+def current_profile_mentions(text: str, profiles: list[str]) -> list[tuple[int, str]]:
+    """(line, profile) for each sentence that names a profile as current.
+
+    Matches "current (release|declared) profile ... X" within one clause, and
+    "X (current profile)". A dated statement ("the profile at d94eecf9 was
+    X") does not match, which is how a snapshot says what it describes.
+    """
+    names = "|".join(map(re.escape, profiles))
+    patterns = (
+        re.compile(rf"(?i)\bcurrent(?:ly)?\s+(?:declared\s+|release\s+)?profile\b[^.\n|]{{0,60}}?`?({names})\b"),
+        re.compile(rf"(?i)`?({names})`?\s*\((?:the\s+)?current(?:\s+release)?\s+profile\)"),
+    )
+    hits: list[tuple[int, str]] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        for pattern in patterns:
+            hits.extend((number, m.group(1).upper()) for m in pattern.finditer(line))
+    return hits
+
+
+def check_current_profile_statements(errors: list[str]) -> None:
+    """HARD: a live document may not name another profile as current.
+
+    External review 2026-10-26: after the owner decision of 2026-10-25,
+    remora-capabilities-v1.yaml still gave SHADOW_PILOT as the current release
+    profile, and the generated atlas said so in its header. The register
+    marked both current, and no check read what they said.
+    """
+    prof = _load(PROFILES)
+    declared = prof["current_profile"]
+    names = [p["name"] for p in prof["profiles"]]
+    for entry in _load(DOC_REGISTER).get("documents", []):
+        if entry.get("status") not in PROFILE_SCANNED_STATUSES:
+            continue
+        path = ROOT / entry.get("path", "")
+        if not path.is_file():
+            continue
+        for number, named in current_profile_mentions(path.read_text(encoding="utf-8"), names):
+            if named != declared:
+                errors.append(
+                    f"current-profile: {entry['path']}:{number} names {named} as the current "
+                    f"profile; release_profiles_v1.yaml declares {declared}"
+                )
+
+
 def main() -> int:
     errors: list[str] = []
     warnings: list[str] = []
@@ -642,6 +693,7 @@ def main() -> int:
     check_document_verification(errors, warnings)
     check_register_id_uniqueness(errors)
     check_release_profiles(errors)
+    check_current_profile_statements(errors)
     check_release_gates_table(errors)
     check_index_completeness(errors)
     check_readme_budget(errors, warnings)
