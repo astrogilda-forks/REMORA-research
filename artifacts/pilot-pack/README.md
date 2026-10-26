@@ -57,7 +57,7 @@ unavailable; the table above names the commit.
 
 `deploy/ot-pilot/run_fault_injection.py` breaks the running pilot while it
 works and records what the chain did. It drives the API over HTTP and the
-stack through `docker compose`. Each of nine faults states what the system
+stack through `docker compose`. Each fault states what the system
 must do, and a fault that does otherwise is reported as a failure.
 
 1. The API restarts between an approval and its execution.
@@ -69,6 +69,8 @@ must do, and a fault that does otherwise is reported as a failure.
 7. Execution is stopped between an approval and its execution.
 8. A tool fails after dispatch began.
 9. An approver is revoked after approving.
+10. PostgreSQL stays stopped until Docker marks the API unhealthy (added
+    with the readiness healthcheck; it runs fifth, after fault 4).
 
 Every run records the configuration it ran against: the sha256 of the
 compose file, Dockerfile, limit policy, work orders, plant registry and
@@ -81,6 +83,7 @@ writes that should have run, and the human steps the run needed.
 |---|---|---|---|---|
 | [`runs/fault-injection-2026-10-26-before-fixes/`](runs/fault-injection-2026-10-26-before-fixes/) | master `92aa1e3e` with this runner, the compose file and the plant registry copied in; fingerprint `f8c7d3f7` | 7 of 9 as specified | 7 of 8 | both valid, 44 execution records |
 | [`runs/fault-injection-2026-10-26/`](runs/fault-injection-2026-10-26/) | `fcdb1e2b`: master `e6e5a765` (#1079, #1080) with this runner, configuration files unmodified; fingerprint `ff870253` | 9 of 9 as specified | 8 of 8, no false refusals, 14 human steps | both valid, 44 execution records |
+| [`runs/fault-injection-2026-10-26-b6d8841f/`](runs/fault-injection-2026-10-26-b6d8841f/) | `dd5ae6db`: master `2594d08b` with the Dockerfile healthcheck on `/v1/ready` and fault 10; fingerprint `b79463b6` | 10 of 10 as specified | 8 of 8, no false refusals, 14 human steps | both valid, 44 execution records |
 
 The first run found two defects, and both were fixed before the second run:
 
@@ -98,6 +101,17 @@ The first run found two defects, and both were fixed before the second run:
 The same run directory holds a battery run on a fresh stack with the same
 configuration: 16 of 16 cases, 6 side effects, both chains valid
 (`battery-same-configuration.json`).
+
+The third run checks what an orchestrator sees during an outage. Before it,
+the image's healthcheck probed `/v1/health`, which stays 200 while
+PostgreSQL is down, so Docker kept calling the API healthy while it could
+only refuse. The healthcheck now probes `/v1/ready`. With PostgreSQL
+stopped, readiness answered 503 `not_ready` after 2.7 s, liveness stayed
+200, and Docker marked the API unhealthy after 55 s (five failed probes ten
+seconds apart). The container kept running with no restart. After
+PostgreSQL started, readiness returned in 2.0 s and Docker's health in
+7.4 s. Compose has no restart policy, so "unhealthy" gates `depends_on` and
+restarts nothing.
 
 The faults also show what holds:
 

@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Deploy: the container healthcheck probes readiness (RMR-AUD-26-005)
+
+- The OT pilot and reference images probed `/v1/health`, which answers `ok` while PostgreSQL is down. Docker therefore reported the API healthy while it could only refuse. Both images now probe `/v1/ready`, and `/v1/health` stays liveness. Neither compose file sets a restart policy, so "unhealthy" restarts nothing and only gates `depends_on`.
+- `run_fault_injection.py` gains a tenth fault, which keeps PostgreSQL stopped until Docker marks the API unhealthy. The run at `dd5ae6db` (`artifacts/pilot-pack/runs/fault-injection-2026-10-26-b6d8841f/`, fingerprint `b79463b6`) is 10 of 10:
+  - readiness answered 503 `not_ready` after 2.7 s while liveness stayed 200;
+  - Docker marked the API unhealthy after 55 s, and the container kept running with no restart;
+  - after PostgreSQL started, readiness returned in 2.0 s and health in 7.4 s;
+  - 8 of 8 writes ran, both chains are valid.
+- Not checked: any orchestrator other than Docker and compose on one host.
+- Tests: `tests/test_ot_fault_injection.py` (+6): both Dockerfiles probe `/v1/ready`, neither compose file restarts, the `docker inspect` reader, and the order of the new fault.
 ### Documentation: the API path count and the nonce store's history (RMR-AUD-26-007, RMR-AUD-26-009)
 
 - `docs/07-api-reference.md` said "OpenAPI 3.1, 41 paths" after `GET /v1/ready` made it 42 (43 operations). The count is now left to the schema. `tests/test_api_count_claims.py` refuses any live document that states an OpenAPI path or operation count differing from `schemas/openapi.json`, and pins the IFC-11 row's "28 routes" for the execution API. On master's text before this change it finds the 41.
