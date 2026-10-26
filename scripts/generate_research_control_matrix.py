@@ -50,6 +50,36 @@ REQUIRED_FIELDS = (
 )
 
 
+#: The capability register. A line's ``capabilities`` names entries in it; the
+#: register, not this matrix, holds their maturity.
+CAPABILITY_REGISTER = ROOT / "docs" / "assurance" / "capability_register_v1.yaml"
+
+
+def _capability_names() -> dict[str, str]:
+    with open(CAPABILITY_REGISTER, encoding="utf-8") as f:
+        caps = (yaml.safe_load(f) or {}).get("capabilities") or []
+    return {str(c["id"]): str(c.get("name", "")) for c in caps}
+
+
+def _validate_capabilities(data: dict) -> list[str]:
+    """``capabilities`` is optional; when present every id must be registered."""
+    errors: list[str] = []
+    known = _capability_names()
+    for e in data.get("entries", []):
+        caps = e.get("capabilities")
+        if caps is None:
+            continue
+        if not isinstance(caps, list) or not caps:
+            errors.append(f"{e.get('id')}: capabilities must be a non-empty list when present")
+            continue
+        for cap in caps:
+            if cap not in known:
+                errors.append(f"{e.get('id')}: capability {cap!r} is not in the capability register")
+        if len(set(caps)) != len(caps):
+            errors.append(f"{e.get('id')}: capabilities lists an id twice")
+    return errors
+
+
 def _load() -> dict:
     with open(REGISTER, encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -96,6 +126,7 @@ def validate(data: dict) -> list[str]:
     for dup in sorted({i for i in ids if ids.count(i) > 1}):
         errors.append(f"duplicate entry id: {dup}")
     errors.extend(_validate_updated_date(data))
+    errors.extend(_validate_capabilities(data))
     errors.extend(_validate_landscape(data))
     errors.extend(_validate_bibliography(data, set(ids)))
     return errors
@@ -507,6 +538,28 @@ def _reverse_indexes(entries: list[dict]) -> list[str]:
         lines.append(f"| `{c}` | {res_s} | {code_s} |")
     lines.append("")
 
+    # Capability -> research lines
+    cap_to_res: dict[str, list[str]] = {}
+    for e in entries:
+        for c in e.get("capabilities") or []:
+            cap_to_res.setdefault(c, []).append(e["id"])
+    if cap_to_res:
+        names = _capability_names()
+        lines.append("## Reverse index: capability → research")
+        lines.append("")
+        lines.append(
+            "Capability register entries that a research line grounds. A "
+            "capability absent here has no research line of its own; its status "
+            "is in the register, not here."
+        )
+        lines.append("")
+        lines.append("| Capability | Name | Research line(s) |")
+        lines.append("|------------|------|------------------|")
+        for c in sorted(cap_to_res, key=lambda x: (x == "CAP-META", x)):
+            res = ", ".join(sorted(set(cap_to_res[c])))
+            lines.append(f"| {c} | {names.get(c, '?')} | {res} |")
+        lines.append("")
+
     # Claim -> research lines (claims referenced in the evidence text)
     claim_to_res: dict[str, list[str]] = {}
     for e in entries:
@@ -763,6 +816,17 @@ def render(data: dict) -> str:
         f"(schema {data.get('schema_version')}, updated {data.get('updated')})."
     )
     lines.append("")
+    lines.append(
+        "Three maturity notions are kept apart. A line's **maturity** here says "
+        "how far the research idea is implemented and tested. The capability "
+        "register (`docs/assurance/capability_register_v1.yaml`) says how far a "
+        "mechanism is wired: library, reference path, API path. The activation "
+        "manifest (ADR-UE-03) says what a deployment runs it as; "
+        "`GET /v1/system/capabilities` reports that effective mode. A line "
+        "naming a capability inherits none of its status, and neither raises "
+        "the other."
+    )
+    lines.append("")
     lines.append("## Summary")
     lines.append("")
     lines.append("| ID | Research line | Controls | Maturity |")
@@ -787,6 +851,10 @@ def render(data: dict) -> str:
             lines.append(f"  - builds on: {b}")
         lines.append(f"- Concepts: {', '.join(e['concepts'])}")
         lines.append(f"- REMORA controls: {', '.join(e['controls'])}")
+        if e.get("capabilities"):
+            names = _capability_names()
+            lines.append("- Capability register: " + "; ".join(
+                f"{c} ({names.get(c, '?')})" for c in e["capabilities"]))
         lines.append("- Code: " + ", ".join(_code_link(p) for p in e["code"]))
         tests = e.get("tests") or []
         lines.append(

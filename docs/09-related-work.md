@@ -684,6 +684,28 @@ credentials that an effect domain holds and the tool's process does not.
 REMORA takes the principle, not an object-capability language or runtime.
 The mediation is enforced only on paths that register a tool as mediated.
 
+## 17. Cumulative Limits Reserved Before the Effect
+
+A check on one call cannot see that small moves add up. Escrow transactions
+(O'Neil, 1986) bound an aggregate quantity by reserving each transaction's
+share before it commits, so concurrent updates cannot jointly pass a bound
+that none of them passes alone. REMORA's cumulative limits apply the idea to
+governed tool calls. A call's declared quantity is reserved before dispatch
+and settled or released afterwards. While its outcome is unknown the
+reservation is held, until a reviewer's resolution is checked against the
+deployment's evidence reader. REMORA takes the reservation discipline, not a
+transaction manager, and the bounds are the deployment's own declaration.
+
+## 18. Fail-Safe Defaults for Capability Activation
+
+Saltzer and Schroeder (1975) ask that access decisions rest on permission
+rather than exclusion, so that the default is no access. REMORA's capability
+activation manifest (ADR-UE-03) applies that principle to its own mechanisms.
+A signed manifest requests a mode per capability. A capability it does not
+name is disabled, and a premise that fails or cannot be verified gives a
+disabled or blocked mode, never allow. The manifest's digest is signed into
+each lease. No shipped deployment loads a manifest yet.
+
 ## Positioning Statement
 
 REMORA is a nested governance control plane for long-running agentic AI:
