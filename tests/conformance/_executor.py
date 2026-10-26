@@ -188,7 +188,11 @@ def main() -> int:
     # _lease_nonce_store), so this fixture cannot claim a durability the
     # deployment path does not have.
     dsn = os.environ.get("REMORA_PG_DSN", "").strip()
-    db_path = os.environ.get("REMORA_CHAIN_DB", "").strip()
+    # PostgreSQL wins when both are set, as in servers/execution_api.py
+    # (_stop_epochs): AuthorityEpochs takes exactly one of them, and an
+    # executor started with both refused to start (seen 2026-10-26 with
+    # REMORA_PG_DSN in the developer's environment).
+    db_path = "" if dsn else os.environ.get("REMORA_CHAIN_DB", "").strip()
     _DISPATCHER = GovernedToolDispatcher(
         expected_policy_bundle_hash=os.environ[BUNDLE_ENV],
         nonce_store=(
