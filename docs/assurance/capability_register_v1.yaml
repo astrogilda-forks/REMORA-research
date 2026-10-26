@@ -182,8 +182,9 @@ capabilities:
   - id: CAP-001
     name: "Decision engine (hard guards -> conditional gates -> trust routing)"
     status: WIRED_API_PATH
-    verified_at_sha: 566ba09d09659f2ce84ff899aa0ce5945a7eeff7
+    verified_at_sha: 6892a4e30692f35c340c8bdccbd872d72df40f7c
     verified_by: >-
+      re-audited 2026-10-26 at 6892a4e (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from aa70288: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from f5f3363: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
@@ -836,8 +837,9 @@ capabilities:
   - id: CAP-009
     name: "RBAC (nine-role capability matrix, credential-bound audit identity)"
     status: WIRED_API_PATH
-    verified_at_sha: 566ba09d09659f2ce84ff899aa0ce5945a7eeff7
+    verified_at_sha: 6892a4e30692f35c340c8bdccbd872d72df40f7c
     verified_by: >-
+      re-audited 2026-10-26 at 6892a4e (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from aa70288: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from f5f3363: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
@@ -1258,8 +1260,9 @@ capabilities:
   - id: CAP-017
     name: "Production fail-closed on signing keys"
     status: WIRED_API_PATH
-    verified_at_sha: 566ba09d09659f2ce84ff899aa0ce5945a7eeff7
+    verified_at_sha: 6892a4e30692f35c340c8bdccbd872d72df40f7c
     verified_by: >-
+      re-audited 2026-10-26 at 6892a4e (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from aa70288: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
       re-audited 2026-10-25 at 3a1aba3 (MERGE WITH MASTER after #1072, Sentry init), from f5f3363: servers/api.py keeps the appended opt-in Sentry initialiser; master's external-review fixes are merged unchanged
@@ -2503,8 +2506,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: 566ba09d09659f2ce84ff899aa0ce5945a7eeff7
+    verified_at_sha: 6892a4e30692f35c340c8bdccbd872d72df40f7c
     verified_by: >-
+      re-audited 2026-10-26 at 6892a4e (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from 2075b5d: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from aa70288: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
