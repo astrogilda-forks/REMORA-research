@@ -101,6 +101,12 @@ _ENFORCING = frozenset({"ENFORCE", "VERIFY"})
 NOT_ESTABLISHED = "NOT_ESTABLISHED"
 _DOWNGRADE_ORDER = ("SHADOW", "EVIDENCE_ONLY", "OFFLINE")
 
+
+def _setting(*names: str) -> bool:
+    """Whether any of ``names`` is configured (non-blank). Presence only."""
+    return any(os.environ.get(name, "").strip() for name in names)
+
+
 #: What each effective mode permits at the execution boundary (RMR-AUD-26-004).
 #: Only ``ENFORCE`` lets a capability authorize an effect. ``VERIFY`` is an
 #: enforcing request for the decision path, whose human step the review queue
@@ -143,11 +149,6 @@ def dispatch_mode_refusal(report: ActivationReport | None,
         if mode not in AUTHORIZING_MODES:
             return f"capability_not_enforcing:{capability_id}:{mode}"
     return None
-
-
-def _setting(*names: str) -> bool:
-    """Whether any of ``names`` is configured (non-blank). Presence only."""
-    return any(os.environ.get(name, "").strip() for name in names)
 
 
 def _strict_profile() -> bool:
