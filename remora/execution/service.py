@@ -244,6 +244,7 @@ def assess_proposal(
     token_ttl_seconds: int,
     policy_bundle_hash: Callable[[], str] | None = None,
     limits_policy_hash: Callable[[], str | None] | None = None,
+    cam_digest: Callable[[], str | None] | None = None,
     loop_safety: Any = None,
     capability_gate: Callable[[Any], dict[str, Any] | None] | None = None,
     semantic_shadow: Callable[[dict[str, Any]], None] | None = None,
@@ -409,6 +410,11 @@ def assess_proposal(
         # The limits this decision was made under; an approval of it is not
         # executed under other limits, or none (limits_binding_refusal).
         record["limits_policy_hash"] = bound_limits
+    bound_cam = cam_digest() if cam_digest is not None else None
+    if bound_cam:
+        # ADR-UE-03 item 3: the activation manifest this decision was made
+        # under, beside the policy identity.
+        record["cam_digest"] = bound_cam
     if task is not None:
         record["context_id"] = task.context_id
         record["task_id"] = task.task_id

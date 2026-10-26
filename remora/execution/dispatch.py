@@ -77,6 +77,7 @@ def dispatch_under_lease(
     not_after: datetime | None = None,
     flow_binding: tuple[int, str, str] | None = None,
     flow_recipients: frozenset[str] | None = None,
+    cam_digest: str = "",
 ) -> dict[str, Any]:
     """Dispatch one authorized call through the governed dispatcher.
 
@@ -178,6 +179,7 @@ def dispatch_under_lease(
                 not_after=not_after,
                 flow_binding=flow_binding,
                 flow_recipients=flow_recipients,
+                cam_digest=cam_digest,
             )
         except (LeaseRefused, ValueError, SigningUnavailable) as exc:
             # SigningUnavailable belongs here, and its absence was a live 500.
@@ -408,6 +410,7 @@ def issue_execution_lease(
     capability_set: EffectiveCapabilitySet | None = None,
     flow_binding: tuple[int, str, str] | None = None,
     flow_recipients: frozenset[str] | None = None,
+    cam_digest: str = "",
 ) -> ExecutionLease:
     """Mint a lease. The authority domain's half of the custody split.
 
@@ -426,6 +429,7 @@ def issue_execution_lease(
         capability_set=capability_set,
         flow_binding=flow_binding,
         flow_recipients=flow_recipients,
+        cam_digest=cam_digest,
     )
 
 
@@ -448,6 +452,7 @@ def _issue_local_lease(
     not_after: datetime | None = None,
     flow_binding: tuple[int, str, str] | None = None,
     flow_recipients: frozenset[str] | None = None,
+    cam_digest: str = "",
 ) -> ExecutionLease:
     from remora.enforcement.flow_recipients import recipients_digest
 
@@ -496,6 +501,7 @@ def _issue_local_lease(
             flow_recipients_digest=(recipients_digest(flow_recipients)
                                     if flow_recipients is not None and flow_binding is not None
                                     else ""),
+            cam_digest=cam_digest,
         )
 
 
