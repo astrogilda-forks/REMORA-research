@@ -4,6 +4,17 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Deploy: the container healthcheck probes readiness (RMR-AUD-26-005)
+
+- The OT pilot and reference images probed `/v1/health`, which answers `ok` while PostgreSQL is down. Docker therefore reported the API healthy while it could only refuse. Both images now probe `/v1/ready`, and `/v1/health` stays liveness. Neither compose file sets a restart policy, so "unhealthy" restarts nothing and only gates `depends_on`.
+- `run_fault_injection.py` gains a tenth fault, which keeps PostgreSQL stopped until Docker marks the API unhealthy. The run at `dd5ae6db` (`artifacts/pilot-pack/runs/fault-injection-2026-10-26-b6d8841f/`, fingerprint `b79463b6`) is 10 of 10:
+  - readiness answered 503 `not_ready` after 2.7 s while liveness stayed 200;
+  - Docker marked the API unhealthy after 55 s, and the container kept running with no restart;
+  - after PostgreSQL started, readiness returned in 2.0 s and health in 7.4 s;
+  - 8 of 8 writes ran, both chains are valid.
+- Not checked: any orchestrator other than Docker and compose on one host.
+- Tests: `tests/test_ot_fault_injection.py` (+6): both Dockerfiles probe `/v1/ready`, neither compose file restarts, the `docker inspect` reader, and the order of the new fault.
+
 ### Interop matrix: one edge per claim, and the Federation documents brought up to date
 
 - An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.
