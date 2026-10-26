@@ -4,6 +4,14 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### API: a readiness probe that reads the durable store
+
+- Fault injection on the OT pilot stopped PostgreSQL while `GET /v1/health` kept answering `ok`, so an orchestrator would have kept routing writes to a process that could only refuse them. `/v1/health` stays a liveness probe.
+- `GET /v1/ready` connects to `REMORA_PG_DSN` (or opens `REMORA_CHAIN_DB` read-only, never creating it) with a two-second bound. It answers 200 `ready`, or 503 `not_ready` with `checks.durable_state: unavailable`, and never the driver's message. Without a durable store it reports `not_configured`, and for the Worker state endpoint alone `not_checked`.
+- It takes no token, so one answer is reused for a second rather than opening a connection per unauthenticated request.
+- Exercised on the OT pilot stack: 200 with PostgreSQL up, 503 within 2.7 s with it stopped, 200 again after it started. The pilot's compose healthcheck still probes liveness; its committed fault-injection evidence pins those files byte for byte.
+- `tests/test_readiness_probe.py` (14).
+
 ### Research control matrix: bound to the capability register, with lines for cumulative limits and capability activation
 
 - An external review of 2026-10-26 found the matrix dated 2026-10-18 and silent on the cumulative limits (CAP-031) and the capability activation manifest (ADR-UE-03). Both are now research lines: RES-025 (escrow-style reservation before the effect, O'Neil 1986) and RES-026 (fail-safe defaults for activation, Saltzer and Schroeder 1975), each with code, tests, evidence, a scope boundary and a section in `docs/09-related-work.md` (§17, §18). RES-026 states that no shipped deployment loads a manifest yet.
