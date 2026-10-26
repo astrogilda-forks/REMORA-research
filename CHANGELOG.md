@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### A PostgreSQL outage answers 503 `durable_state_unavailable`, not a bare 500
+
+- Found by the OT pilot's fault-injection run on 2026-10-26: with Postgres stopped, `/v1/execution/assess` and `/v1/execution/execute` refused and nothing executed, but both answered 500 "An internal error occurred". The catch-all handler in `servers/api.py` now answers 503 `durable_state_unavailable`, with the same correlation id, when the exception is a PostgreSQL driver's `OperationalError` (psycopg v3 or psycopg2). Other errors, SQL errors and SQLite's `OperationalError` included, stay 500. Neither body carries the driver's message.
+- `tests/test_durable_state_outage_503.py` (5).
+
 ### Environment flags and the activation manifest must agree: `REMORA_REQUIRE_LIMITS` first (ADR-UE-03 slice 5)
 
 - `FLAG_AGREEMENTS` in `remora/governance/capability_activation.py` holds the flags migrated so far, one per change. The first is `REMORA_REQUIRE_LIMITS` against CAP-031 (cumulative limits): set, the manifest must request CAP-031 enforcing (`ENFORCE`, `VERIFY`); unset, it must not. A loaded manifest that disagrees refuses startup, whether or not `REMORA_CAM_REQUIRED` is set, so neither the flag nor the manifest silently wins. A manifest that leaves CAP-031 out is not compared.
