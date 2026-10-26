@@ -1430,6 +1430,13 @@ entries:
       is measured from what the plant reports. The OT pilot runs a signed
       policy with coverage all_writes and REMORA_REQUIRE_LIMITS=1; its battery
       run of 2026-10-25 refuses a setpoint move past the hourly cap at assess.
+      The fault-injection run of 2026-10-26
+      (artifacts/pilot-pack/runs/fault-injection-2026-10-26/) shows the
+      ledger still counting a move made before an API restart. A tool that
+      failed after dispatch began left its reservation held as UNKNOWN until
+      a reviewer resolved it, and the resolution was checked against the
+      plant's log. The same run shows a proposal approved twice running
+      twice, because the pilot declares no idempotency keys.
     maturity: implemented_and_tested
     scope_boundary: >-
       Opt-in. The bounds are a deployment declaration that REMORA enforces but
@@ -1481,6 +1488,8 @@ entries:
       REMORA_REQUIRE_LIMITS flag that disagrees with a loaded manifest refuses
       startup either way. The dispatcher refuses a lease minted under another
       manifest before anything is spent.
+      The OT pilot's fault-injection run of 2026-10-26 records in its frozen
+      configuration that no manifest was loaded (manifest_loaded false).
     maturity: implemented_and_tested
     scope_boundary: >-
       No shipped deployment loads a manifest yet, the OT pilot included, so
