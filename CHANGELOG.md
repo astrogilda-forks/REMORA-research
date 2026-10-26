@@ -8,6 +8,25 @@ This file lists externally relevant changes by release. Fine-grained development
 
 - An external review of 2026-10-26 found the matrix dated 2026-10-18 and silent on the cumulative limits (CAP-031) and the capability activation manifest (ADR-UE-03). Both are now research lines: RES-025 (escrow-style reservation before the effect, O'Neil 1986) and RES-026 (fail-safe defaults for activation, Saltzer and Schroeder 1975), each with code, tests, evidence, a scope boundary and a section in `docs/09-related-work.md` (§17, §18). RES-026 states that no shipped deployment loads a manifest yet.
 - A line may name the capability register entries its research grounds (`capabilities:`); `scripts/generate_research_control_matrix.py` refuses an unregistered id, and the generated view adds a capability → research index. Twelve lines name one. The view states that matrix maturity, register status and the manifest's effective mode are three different statements and that naming a capability inherits none of its status. No maturity was changed.
+### OT pilot: fault injection through the whole chain, a frozen configuration and operator measurements
+
+- `deploy/ot-pilot/run_fault_injection.py` injects nine faults into the running pilot over HTTP and `docker compose`:
+  - a restart between approval and execution;
+  - a replay of a spent grant after a restart;
+  - limits across a restart;
+  - PostgreSQL stopped during a governed write;
+  - four racing executions of one approval;
+  - the same proposal approved twice;
+  - a stop between approval and execution;
+  - a tool failing after dispatch began;
+  - an approver revoked after approving.
+- Each run freezes the configuration it ran against: the file digests, the API image id, the commit and the policy hash, with one fingerprint over them. It also measures latency by route (calls made during a fault are counted apart), writes completed against writes intended, false refusals and human steps.
+- Two runs are committed under `artifacts/pilot-pack/runs/`:
+  - before the fixes, 7 of 9: the stop spent the approval, and a store outage answered a bare 500;
+  - after #1079 and #1080, 9 of 9, with 8 of 8 writes, no false refusals and both chains valid. The same directory holds a battery run at 16 of 16 on that configuration.
+- The pilot gains a second admin token (`ot-supervisor`), because a principal cannot revoke themself, and `actor_id` on every token. It also gains `REMORA_LIMITS_EVIDENCE_MODULE: ot_registry`, whose `check_limit_evidence` answers from the plant's log and refuses to answer for an operation older than the plant process. Without it, an unknown outcome's reservation could never be resolved.
+- Still open: a proposal approved twice runs twice, because the pilot's limit policy declares no idempotency keys. Re-signing it needs the pilot limit authority's key.
+- `tests/test_ot_fault_injection.py` (17): the fingerprint, the measurements and the plant evidence checker.
 
 ### A PostgreSQL outage answers 503 `durable_state_unavailable`, not a bare 500
 
