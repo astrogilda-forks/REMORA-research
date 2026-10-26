@@ -13,6 +13,60 @@ This file lists externally relevant changes by release. Fine-grained development
   - The class default is unchanged, so existing `except` clauses still match.
 - **Async parity.** The async `record_effect` posted the verification without its dispatch binding (`tool_call_hash`, `grant_jti`), which the sync client reads from the proposal's lifecycle. Both now share `dispatch_binding` and `bind_verification`.
 - Tests: `tests/test_review_sdk_transport_errors.py` (+10), and `tests/test_sdk_async_client.py`, whose async wire test now requires the binding. The public API snapshot is unchanged.
+### Governance: the activation manifest's effective modes gate dispatch (RMR-AUD-26-004, ADR-UE-03 slice 6)
+
+- A loaded manifest reached the dispatcher only as a digest. Effective modes were computed and reported, but nothing at the execution boundary read them, so a manifest setting the lease dispatch to `SHADOW` still let every lease run.
+- `remora/governance/capability_activation.py` now states the mode contract (`MODE_CONTRACT`): only `ENFORCE` authorizes an effect at dispatch. `dispatch_mode_refusal` requires the capabilities that authorize every dispatch to be effective `ENFORCE`: CAP-003 and CAP-013, plus CAP-031 while limits are configured. An absent capability counts as `DISABLED`.
+- `GovernedToolDispatcher.bind_mode_gate` reads the gate on every dispatch, after the digest check and before the nonce, so a refusal spends nothing (`capability_not_enforcing:<CAP>:<mode>`). A gate that raises refuses as `cam_mode_unverifiable`.
+- A manifest named by `REMORA_CAM_FILE` that did not load now refuses every dispatch (`cam_not_loaded`) instead of running as if none were set.
+- Without `REMORA_CAM_FILE` nothing changes, and no shipped deployment loads a manifest. No mode can raise a decision.
+- Still open: the per-capability mode snapshot in the decision record; strict profiles implying `REMORA_CAM_REQUIRED`, which waits for the owner's timing; further flag migrations.
+- Tests: `tests/test_cam_dispatch_mode_gate.py` (24). In `tests/test_cam_lease_binding.py`, the API fixture's report now carries effective modes.
+### Limits: a host-local ledger beside shared authority state must be declared (RMR-AUD-26-010)
+
+- The OT pilot keeps its cumulative-limit ledger in a SQLite file while its other authority state is on PostgreSQL. That holds on one host. A second API host joining the same PostgreSQL would keep its own budget and could spend the whole limit. The strict profiles already refused the pairing, but the OT pilot runs the research profile.
+- Under every profile, the execution API now refuses to start with a SQLite `REMORA_LIMITS_LEDGER` beside `REMORA_PG_DSN`, unless `REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs executors (`cumulative_limits.ledger_topology_problem`). Any other scope value is refused. A PostgreSQL ledger, or authority state on SQLite too, needs nothing.
+- The OT pilot's compose file declares `single_host`. Verified on the stack:
+  - with the line, the battery passes 16 of 16;
+  - without it, the API exits 1 and names the problem.
+- The committed fault-injection runs predate the line, and their fingerprints name the earlier compose file. No shared ledger is introduced, and no ledger data is migrated.
+- Tests: `tests/limits/test_limits_ledger_topology.py` (10). The limits suites in the PostgreSQL CI jobs pass against a local PostgreSQL 16.
+### WS1: strict profiles require atomic admission when WS1 enforces (RMR-AUD-26-003)
+
+- On legacy admission the WS1 re-gate and the grant spend are separate steps. Evidence that lapses between them is still spent: control 2b in `tests/test_ws1_gate_controls.py` records that as the documented residual. The M4 ADR said the strict profile must refuse it, and nothing did.
+- `review` and `controlled_pilot` now refuse to start with `REMORA_WS1_MODE=enforce` unless `REMORA_WS1_ADMISSION=atomic` (`remora/toolcall/runtime_profile.py::_check_ws1_admission`). Atomic admission's own prerequisites, a transactional store and `REMORA_MAX_CLOCK_SKEW_MS`, are still refused at import when missing, and there is no fallback to legacy.
+- WS1 `off` and `shadow` are unchanged, because shadow changes no decision. So is the research profile, where control 2b still documents the residual.
+- Migration: a strict deployment that enforces WS1 on legacy admission refuses to start until it sets `REMORA_WS1_ADMISSION=atomic`, and it needs PostgreSQL or SQLite for that. No shipped deployment does this.
+- Tests: `tests/test_runtime_profile.py` (+13).
+### Deploy: the container healthcheck probes readiness (RMR-AUD-26-005)
+
+- The OT pilot and reference images probed `/v1/health`, which answers `ok` while PostgreSQL is down. Docker therefore reported the API healthy while it could only refuse. Both images now probe `/v1/ready`, and `/v1/health` stays liveness. Neither compose file sets a restart policy, so "unhealthy" restarts nothing and only gates `depends_on`.
+- `run_fault_injection.py` gains a tenth fault, which keeps PostgreSQL stopped until Docker marks the API unhealthy. The run at `dd5ae6db` (`artifacts/pilot-pack/runs/fault-injection-2026-10-26-b6d8841f/`, fingerprint `b79463b6`) is 10 of 10:
+  - readiness answered 503 `not_ready` after 2.7 s while liveness stayed 200;
+  - Docker marked the API unhealthy after 55 s, and the container kept running with no restart;
+  - after PostgreSQL started, readiness returned in 2.0 s and health in 7.4 s;
+  - 8 of 8 writes ran, both chains are valid.
+- Not checked: any orchestrator other than Docker and compose on one host.
+- Tests: `tests/test_ot_fault_injection.py` (+6): both Dockerfiles probe `/v1/ready`, neither compose file restarts, the `docker inspect` reader, and the order of the new fault.
+### Documentation: the API path count and the nonce store's history (RMR-AUD-26-007, RMR-AUD-26-009)
+
+- `docs/07-api-reference.md` said "OpenAPI 3.1, 41 paths" after `GET /v1/ready` made it 42 (43 operations). The count is now left to the schema. `tests/test_api_count_claims.py` refuses any live document that states an OpenAPI path or operation count differing from `schemas/openapi.json`, and pins the IFC-11 row's "28 routes" for the execution API. On master's text before this change it finds the 41.
+- The `remora/enforcement/nonce_store.py` docstring described the per-process lease ledger as the current state. It now dates that to before #351 (2026-08-24). It then says how `_lease_nonce_store` builds the durable store from `REMORA_PG_DSN`, `REMORA_CHAIN_DB` or `REMORA_STATE_ENDPOINT`, and that without them the in-process ledger and its per-process limit remain. It also says what is tested: SQLite, a real PostgreSQL server, and separate processes on one host. Dispatchers on separate hosts have not been run. No code changed.
+### Documentation: statements that outlived the controlled-pilot decision, and a gate against the next one
+
+- An external documentation review of 2026-10-26 found active documents still describing the state before the owner decision of 2026-10-25. Each finding was checked against master, and these were corrected:
+  - `remora-capabilities-v1.yaml` gave `SHADOW_PILOT` as the current release profile, and said no external run exists for `fresh-authority-v1`. One exists: Probity, second implementation, not independent, fixtures only. `externally_reproduced` stays false.
+  - `CAPABILITY_DISCOVERY.md` said E7 has no external run record. It has two.
+  - `plain_language_overview.md` called shadow mode the current profile.
+  - `external_review_panel_v1.md` listed open REM-021 as a blocker for its own level B sign-off. Level B is how REM-021 is completed, and it is not a precondition of the owner's `CONTROLLED_PILOT`.
+  - The atlas data said REM-023 is `IN_PROGRESS`; it is `DONE`. The atlas page is a dated snapshot of `d94eecf9`, and its header and summary now say "at d94eecf9" instead of "current" and "today", and link to the change.
+  - `best_practice_gap_audit_v1.md` called REM-021 the shadow-mode exit gate.
+  - The ADR-UE-03 status marks its "no code implements the manifest" as describing the time of acceptance.
+- SDD v1.1 gains "Implementation status, 2026-10-26". It is a table of what changed since `d94eecf9`, and the registers win where they disagree with it. The specification text is unchanged.
+- `check_document_governance.py` gains a HARD check. A canonical, generated or supporting document that names a profile as current must name the declared `current_profile`. On master before this change it finds both the capability declaration and the atlas. `tests/test_document_governance.py` (+3).
+- Two of the review's findings did not hold:
+  - `docs/sdk.md`, `PRODUCT_PACKAGING.md`, `SECURITY_OVERVIEW.md`, `DEPLOYMENT_OPTIONS.md`, `product_truth_contract.yaml` and the conformance benchmark are all registered, and no file under `docs/` lacks an entry.
+  - Register coverage stays advisory by design.
 
 ### Interop matrix: one edge per claim, and the Federation documents brought up to date
 

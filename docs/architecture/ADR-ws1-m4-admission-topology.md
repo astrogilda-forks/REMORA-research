@@ -124,7 +124,11 @@ evidence expiry with database time.
   and epochs, consume the grant, insert the intent, enqueue the audit row,
   commit.
 - Control 2b becomes M4-T02. In the strict profile it must refuse; outside the
-  strict profile it keeps documenting the residual.
+  strict profile it keeps documenting the residual. Enforced since
+  2026-10-26 (RMR-AUD-26-003): `review` and `controlled_pilot` refuse to
+  start with `REMORA_WS1_MODE=enforce` unless `REMORA_WS1_ADMISSION=atomic`
+  (`remora/toolcall/runtime_profile.py::_check_ws1_admission`). Off and
+  shadow keep legacy, because there WS1 changes no decision.
 - Throughput is serialized per tenant. This is acceptable for the research
   profile and is measured before any per-subject locking is proposed.
 - D1 deployments keep today's behaviour and cannot claim INV-M4-01 or
