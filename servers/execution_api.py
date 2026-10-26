@@ -1193,6 +1193,13 @@ def _limit_guard() -> Any:
         return None
     if not path or not ledger:
         raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
+    from remora.enforcement.cumulative_limits import ledger_topology_problem
+
+    problem = ledger_topology_problem(
+        ledger, authority_dsn=_os.environ.get("REMORA_PG_DSN", "").strip(),
+        scope=_os.environ.get("REMORA_LIMITS_LEDGER_SCOPE", "").strip())
+    if problem:
+        raise ValueError(problem)
     if _LIMIT_GUARD is None or _LIMIT_GUARD[0] != settings:
         import yaml
 

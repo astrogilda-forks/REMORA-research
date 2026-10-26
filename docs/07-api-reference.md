@@ -682,7 +682,12 @@ On Postgres every ledger transaction takes one advisory lock. Two hosts
 reserving against the same limit are therefore serialized, as one host's
 SQLite transactions are, and the schema is created on first open under that
 lock.
-Either one without the other refuses startup.
+Either one without the other refuses startup. A SQLite ledger beside
+authority state on `REMORA_PG_DSN` refuses startup under every profile unless
+`REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs
+executors. That pairing is the shape a second executor host can join, and that
+host would keep its own budget. With the authority state on SQLite as well,
+nothing needs declaring.
 
 The policy has four parts. `meters` says what one call of a tool consumes. A
 `sum` meter reads an amount argument, a `count` meter charges `per_call`, and

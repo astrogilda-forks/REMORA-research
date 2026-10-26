@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Limits: a host-local ledger beside shared authority state must be declared (RMR-AUD-26-010)
+
+- The OT pilot keeps its cumulative-limit ledger in a SQLite file while its other authority state is on PostgreSQL. That holds on one host. A second API host joining the same PostgreSQL would keep its own budget and could spend the whole limit. The strict profiles already refused the pairing, but the OT pilot runs the research profile.
+- Under every profile, the execution API now refuses to start with a SQLite `REMORA_LIMITS_LEDGER` beside `REMORA_PG_DSN`, unless `REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs executors (`cumulative_limits.ledger_topology_problem`). Any other scope value is refused. A PostgreSQL ledger, or authority state on SQLite too, needs nothing.
+- The OT pilot's compose file declares `single_host`. Verified on the stack:
+  - with the line, the battery passes 16 of 16;
+  - without it, the API exits 1 and names the problem.
+- The committed fault-injection runs predate the line, and their fingerprints name the earlier compose file. No shared ledger is introduced, and no ledger data is migrated.
+- Tests: `tests/limits/test_limits_ledger_topology.py` (10). The limits suites in the PostgreSQL CI jobs pass against a local PostgreSQL 16.
 ### WS1: strict profiles require atomic admission when WS1 enforces (RMR-AUD-26-003)
 
 - On legacy admission the WS1 re-gate and the grant spend are separate steps. Evidence that lapses between them is still spent: control 2b in `tests/test_ws1_gate_controls.py` records that as the documented residual. The M4 ADR said the strict profile must refuse it, and nothing did.
