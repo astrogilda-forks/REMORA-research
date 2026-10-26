@@ -229,6 +229,13 @@ single-use per process rather than globally. That is the library and research
 configuration. A deployment running more than one dispatcher must configure a
 backend.
 
+When the PostgreSQL store stops answering, a request that needs it answers
+503 `durable_state_unavailable` with a `correlation_id`. The driver raised
+`OperationalError` (psycopg v3 or psycopg2), and nothing was decided or
+executed. The request can be retried once the store is back. Other unhandled
+errors stay 500, and neither body carries the driver's message.
+`GET /v1/health` is a liveness probe and does not read the store.
+
 ---
 
 ## PolicyObservation, input contract
