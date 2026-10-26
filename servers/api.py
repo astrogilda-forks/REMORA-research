@@ -348,7 +348,7 @@ def _custom_openapi() -> dict:
     schema["security"] = [{"bearerAuth": []}]
     # Liveness and navigation must stay reachable without a credential: a
     # health probe that needs a token is not a health probe.
-    for path in ("/", "/v1/health"):
+    for path in ("/", "/v1/health", "/v1/ready"):
         for operation in schema.get("paths", {}).get(path, {}).values():
             if isinstance(operation, dict):
                 operation["security"] = []
@@ -2410,6 +2410,7 @@ def index() -> dict:
             "docs": "/docs",
             "openapi": "/openapi.json",
             "health": "/v1/health",
+            "ready": "/v1/ready",
             "metrics": "/v1/metrics",
             "prometheus": "/metrics",
             "policy_version": "/v1/policy/version",
@@ -3467,3 +3468,124 @@ def _unhandled_response(exc: Exception) -> JSONResponse:
         "detail": "durable_state_unavailable",
         "correlation_id": body["correlation_id"],
     })
+
+
+# Fault injection on the OT pilot (2026-10-26): with Postgres stopped,
+# /v1/health kept answering ok, so an orchestrator would have kept routing
+# writes to a process that could only refuse them. Liveness stays as it is;
+# readiness reads the durable store the execution layer writes to.
+
+#: Bound on the readiness connection attempt, so a probe cannot hang.
+_READINESS_TIMEOUT_SECONDS = 2
+#: An answer is reused this long. The route takes no token, and without the
+#: cache every unauthenticated request would open a database connection.
+_READINESS_CACHE_SECONDS = 1.0
+_READINESS_LOCK = threading.Lock()
+_READINESS_CACHE: tuple[float, tuple[str, str, str], dict[str, Any]] | None = None
+
+
+def _readiness_clock() -> float:
+    return time.monotonic()
+
+
+def _reset_readiness_cache() -> None:
+    """Test hook: forget the cached readiness answer."""
+    global _READINESS_CACHE
+    with _READINESS_LOCK:
+        _READINESS_CACHE = None
+
+
+def _probe_postgres(dsn: str) -> str:
+    try:
+        import psycopg
+
+        with psycopg.connect(dsn, connect_timeout=_READINESS_TIMEOUT_SECONDS) as conn:
+            conn.execute("SELECT 1")
+    except Exception as exc:
+        # The class only: a driver message can name the host and the user.
+        logger.warning("readiness: durable state unavailable (%s)", type(exc).__name__)
+        return "unavailable"
+    return "ok"
+
+
+def _probe_sqlite(chain_db: str) -> str:
+    """Open an existing file read-only; a file not yet written needs a
+    directory the process can write. The probe never creates the store."""
+    import sqlite3
+
+    path = Path(_sqlite_path_from_dsn(chain_db) or chain_db)
+    if not path.exists():
+        if path.parent.is_dir() and os.access(path.parent, os.W_OK):
+            return "ok"
+        logger.warning("readiness: REMORA_CHAIN_DB directory is missing or read-only")
+        return "unavailable"
+    try:
+        conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True,
+                               timeout=_READINESS_TIMEOUT_SECONDS)
+        try:
+            conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        logger.warning("readiness: durable state unavailable (%s)", type(exc).__name__)
+        return "unavailable"
+    return "ok"
+
+
+def _readiness() -> dict[str, Any]:
+    """The readiness answer: the backend and whether its store answers.
+
+    ``not_configured`` without a durable store, which production mode
+    already refuses at startup; ``not_checked`` for the Worker state
+    endpoint alone, which this probe does not reach.
+    """
+    global _READINESS_CACHE
+    dsn = os.getenv("REMORA_PG_DSN", "").strip()
+    chain_db = os.getenv("REMORA_CHAIN_DB", "").strip()
+    key = (dsn, chain_db, os.getenv("REMORA_STATE_ENDPOINT", "").strip())
+    with _READINESS_LOCK:
+        now = _readiness_clock()
+        cached = _READINESS_CACHE
+        if cached is not None and cached[1] == key and now - cached[0] < _READINESS_CACHE_SECONDS:
+            return cached[2]
+        backend = _execution_state_backend()
+        if dsn:
+            state = _probe_postgres(dsn)
+        elif chain_db:
+            state = _probe_sqlite(chain_db)
+        elif backend == "state_endpoint_partial":
+            state = "not_checked"
+        else:
+            state = "not_configured"
+        answer = {
+            "status": "not_ready" if state == "unavailable" else "ready",
+            "backend": backend,
+            "checks": {"durable_state": state},
+        }
+        _READINESS_CACHE = (now, key, answer)
+        return answer
+
+
+class ReadinessResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    backend: str
+    checks: dict[str, str]
+
+
+@app.get(
+    "/v1/ready", response_model=ReadinessResponse, tags=["infrastructure"],
+    responses={503: {"model": ReadinessResponse,
+                     "description": "The durable store does not answer."}},
+)
+def ready() -> JSONResponse:
+    """Readiness probe: 503 ``not_ready`` while the durable store is down.
+
+    ``/v1/health`` is liveness and answers ``ok`` while the process runs.
+    This route connects to ``REMORA_PG_DSN`` (or opens ``REMORA_CHAIN_DB``
+    read-only) with a two-second bound and reports only ``ok`` or
+    ``unavailable``, never the driver's message. No token: an orchestrator
+    must be able to ask. An answer is reused for one second.
+    """
+    answer = _readiness()
+    return JSONResponse(status_code=503 if answer["status"] == "not_ready" else 200,
+                        content=answer)

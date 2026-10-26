@@ -965,6 +965,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description Readiness probe: 503 ``not_ready`` while the durable store is down.
+         *
+         *     ``/v1/health`` is liveness and answers ``ok`` while the process runs.
+         *     This route connects to ``REMORA_PG_DSN`` (or opens ``REMORA_CHAIN_DB``
+         *     read-only) with a two-second bound and reports only ``ok`` or
+         *     ``unavailable``, never the driver's message. No token: an orchestrator
+         *     must be able to ask. An answer is reused for one second.
+         */
+        get: operations["ready_v1_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/rerun": {
         parameters: {
             query?: never;
@@ -1772,6 +1798,20 @@ export interface components {
             risk_estimate: number | null;
             /** Source Of Decision */
             source_of_decision: string;
+        };
+        /** ReadinessResponse */
+        ReadinessResponse: {
+            /** Backend */
+            backend: string;
+            /** Checks */
+            checks: {
+                [key: string]: string;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "not_ready";
         };
         /**
          * ReceiptSignatureModel
@@ -4078,6 +4118,35 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    ready_v1_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+            /** @description The durable store does not answer. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
                 };
             };
         };

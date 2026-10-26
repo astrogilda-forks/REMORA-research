@@ -182,8 +182,9 @@ capabilities:
   - id: CAP-001
     name: "Decision engine (hard guards -> conditional gates -> trust routing)"
     status: WIRED_API_PATH
-    verified_at_sha: 7cfcfed49e2ae94707be344c7017ed5c2fd9cab6
+    verified_at_sha: dde0b418682aafef317835adb283e61887adfee9
     verified_by: >-
+      re-audited 2026-10-26 at dde0b41 (READINESS PROBE), from 7cfcfed: servers/api.py appends GET /v1/ready, an unauthenticated readiness probe that connects to REMORA_PG_DSN or opens REMORA_CHAIN_DB read-only with a two-second bound and answers 503 not_ready while the store does not answer; one answer is reused for a second, and the root index and the OpenAPI no-token list name the route. No decision, refusal, token, lease or audit path reads it. Tests: tests/test_readiness_probe.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at 7cfcfed (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from aa70288: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
@@ -841,8 +842,9 @@ capabilities:
   - id: CAP-009
     name: "RBAC (nine-role capability matrix, credential-bound audit identity)"
     status: WIRED_API_PATH
-    verified_at_sha: 7cfcfed49e2ae94707be344c7017ed5c2fd9cab6
+    verified_at_sha: dde0b418682aafef317835adb283e61887adfee9
     verified_by: >-
+      re-audited 2026-10-26 at dde0b41 (READINESS PROBE), from 7cfcfed: servers/api.py appends GET /v1/ready, an unauthenticated readiness probe that connects to REMORA_PG_DSN or opens REMORA_CHAIN_DB read-only with a two-second bound and answers 503 not_ready while the store does not answer; one answer is reused for a second, and the root index and the OpenAPI no-token list name the route. No decision, refusal, token, lease or audit path reads it. Tests: tests/test_readiness_probe.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at 7cfcfed (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from aa70288: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
@@ -1265,8 +1267,9 @@ capabilities:
   - id: CAP-017
     name: "Production fail-closed on signing keys"
     status: WIRED_API_PATH
-    verified_at_sha: 7cfcfed49e2ae94707be344c7017ed5c2fd9cab6
+    verified_at_sha: dde0b418682aafef317835adb283e61887adfee9
     verified_by: >-
+      re-audited 2026-10-26 at dde0b41 (READINESS PROBE), from 7cfcfed: servers/api.py appends GET /v1/ready, an unauthenticated readiness probe that connects to REMORA_PG_DSN or opens REMORA_CHAIN_DB read-only with a two-second bound and answers 503 not_ready while the store does not answer; one answer is reused for a second, and the root index and the OpenAPI no-token list name the route. No decision, refusal, token, lease or audit path reads it. Tests: tests/test_readiness_probe.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at 7cfcfed (outage 503), from 566ba09: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from aa70288: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged
       re-audited 2026-10-25 at aa70288 (EFFECTIVE MODE REPORT AT STARTUP, opt-in), from 3a1aba3: servers/api.py appends one call to remora.governance.capability_activation.validate_activation_at_startup after every route; it refuses startup only with REMORA_CAM_REQUIRED=1 and no route, decision or refusal reads it
@@ -2518,8 +2521,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: 7cfcfed49e2ae94707be344c7017ed5c2fd9cab6
+    verified_at_sha: dde0b418682aafef317835adb283e61887adfee9
     verified_by: >-
+      re-audited 2026-10-26 at dde0b41 (READINESS PROBE), from 7cfcfed: servers/api.py appends GET /v1/ready, an unauthenticated readiness probe that connects to REMORA_PG_DSN or opens REMORA_CHAIN_DB read-only with a two-second bound and answers 503 not_ready while the store does not answer; one answer is reused for a second, and the root index and the OpenAPI no-token list name the route. No decision, refusal, token, lease or audit path reads it. Tests: tests/test_readiness_probe.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at 7cfcfed (outage 503), from c898567: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 566ba09: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 566ba09 (MERGE WITH MASTER after #1076, system capabilities route), from 2075b5d: servers/api.py keeps the appended read-only GET /v1/system/capabilities; master's cam_digest lease binding is merged unchanged

@@ -10,6 +10,13 @@ This file lists externally relevant changes by release. Fine-grained development
 - An edge now counts only records for its `(contract, claim)` pair. Every claim of a contract with an edge needs its own edge, every record must fall on exactly one, and the generator refuses otherwise. Six edges are added: E-ECB-SU, E-ECB-V1-1-SU, E-EE-V2-CALL, E-EE-V2-DEC, E-EE-V2-OBS and E7-EXCL (`exclusive_effect_path`, no record, `SPECIFIED`). No derived status changed, because every affected record is L0. No record, fixture or package digest is touched.
 - `FEDERATION.yaml` no longer says that no contract reached `EXTERNALLY_VERIFIED`: `runtime-surface-e7-v0.1` has, for its fixture premises only. `CAPABILITY_DISCOVERY.md` describes the implemented activation manifest instead of calling it proposed, without claiming that any deployment loads one. `FEDERATION.md` keeps its 2026-10-04 maturity snapshot and records what has happened since, raising no level.
 - Tests: two in `tests/test_interop_result_contract.py`. A result for one claim leaves another claim's row unchanged, and the edges partition every claim and every record.
+### API: a readiness probe that reads the durable store
+
+- Fault injection on the OT pilot stopped PostgreSQL while `GET /v1/health` kept answering `ok`, so an orchestrator would have kept routing writes to a process that could only refuse them. `/v1/health` stays a liveness probe.
+- `GET /v1/ready` connects to `REMORA_PG_DSN` (or opens `REMORA_CHAIN_DB` read-only, never creating it) with a two-second bound. It answers 200 `ready`, or 503 `not_ready` with `checks.durable_state: unavailable`, and never the driver's message. Without a durable store it reports `not_configured`, and for the Worker state endpoint alone `not_checked`.
+- It takes no token, so one answer is reused for a second rather than opening a connection per unauthenticated request.
+- Exercised on the OT pilot stack: 200 with PostgreSQL up, 503 within 2.7 s with it stopped, 200 again after it started. The pilot's compose healthcheck still probes liveness; its committed fault-injection evidence pins those files byte for byte.
+- `tests/test_readiness_probe.py` (14).
 
 ### Research control matrix: bound to the capability register, with lines for cumulative limits and capability activation
 
