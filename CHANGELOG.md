@@ -4,6 +4,22 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Documentation: statements that outlived the controlled-pilot decision, and a gate against the next one
+
+- An external documentation review of 2026-10-26 found active documents still describing the state before the owner decision of 2026-10-25. Each finding was checked against master, and these were corrected:
+  - `remora-capabilities-v1.yaml` gave `SHADOW_PILOT` as the current release profile, and said no external run exists for `fresh-authority-v1`. One exists: Probity, second implementation, not independent, fixtures only. `externally_reproduced` stays false.
+  - `CAPABILITY_DISCOVERY.md` said E7 has no external run record. It has two.
+  - `plain_language_overview.md` called shadow mode the current profile.
+  - `external_review_panel_v1.md` listed open REM-021 as a blocker for its own level B sign-off. Level B is how REM-021 is completed, and it is not a precondition of the owner's `CONTROLLED_PILOT`.
+  - The atlas data said REM-023 is `IN_PROGRESS`; it is `DONE`. The atlas page is a dated snapshot of `d94eecf9`, and its header and summary now say "at d94eecf9" instead of "current" and "today", and link to the change.
+  - `best_practice_gap_audit_v1.md` called REM-021 the shadow-mode exit gate.
+  - The ADR-UE-03 status marks its "no code implements the manifest" as describing the time of acceptance.
+- SDD v1.1 gains "Implementation status, 2026-10-26". It is a table of what changed since `d94eecf9`, and the registers win where they disagree with it. The specification text is unchanged.
+- `check_document_governance.py` gains a HARD check. A canonical, generated or supporting document that names a profile as current must name the declared `current_profile`. On master before this change it finds both the capability declaration and the atlas. `tests/test_document_governance.py` (+3).
+- Two of the review's findings did not hold:
+  - `docs/sdk.md`, `PRODUCT_PACKAGING.md`, `SECURITY_OVERVIEW.md`, `DEPLOYMENT_OPTIONS.md`, `product_truth_contract.yaml` and the conformance benchmark are all registered, and no file under `docs/` lacks an entry.
+  - Register coverage stays advisory by design.
+
 ### API: a readiness probe that reads the durable store
 
 - Fault injection on the OT pilot stopped PostgreSQL while `GET /v1/health` kept answering `ok`, so an orchestrator would have kept routing writes to a process that could only refuse them. `/v1/health` stays a liveness probe.

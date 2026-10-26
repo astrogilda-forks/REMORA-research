@@ -102,7 +102,7 @@ language. Canonical metric definitions with exact denominators:
 | **Calibrated confidence** | Model confidence rescaled on held-out data so that "0.9" really does mean about 90% right. |
 | **Multi-oracle consensus** | Several independent models judging the same action, merged into one trust score. |
 | **Intent-gating vs interception** | Intent-gating judges what the agent *says* it will do. Interception would capture the call itself. The AgentHarm result is intent-gating. |
-| **Shadow mode** | Decisions are computed and logged but not enforced. REMORA's current profile. |
+| **Shadow mode** | Decisions are computed and logged but not enforced. The `SHADOW_PILOT` offering; since 2026-10-25 the declared profile is `CONTROLLED_PILOT`, a bounded pilot with a human approval on every non-accept outcome. |
 | **Lease / dispatcher (PEP)** | The dispatcher is the only component that actually runs a tool, and only under a single-use lease tied to tenant, tool, exact arguments and policy version. |
 | **Superseded claim** | A result a later round replaced. It is archived, never deleted, and may not be cited on the front page. |
 | **AROMER** | The experimental learning layer that sits on top. Nothing in the core depends on it. |

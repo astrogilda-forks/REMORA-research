@@ -143,7 +143,7 @@ for honest claims.
 | # | Gap | Priority | What would close it |
 |---|-----|----------|---------------------|
 | 1 | Structural prompt-injection defence + proven interception (Ch. 4) | **High** | Move beyond intent-gating: instruction/data separation or capability confinement (StruQ/CaMeL-style), and land the `inspect_tools_probe.py` result that proves true tool-call interception (per CLAUDE.md + INTERCEPTION_NOTES). This is the single biggest honesty caveat today. |
-| 2 | Independent verification (REM-021) | **High** | Cross-cutting blocker to `EXTERNALLY_VERIFIED`. Every ✅ above stays internally-attested until this closes. Already the known shadow-mode exit gate. |
+| 2 | Independent verification (REM-021) | **High** | Cross-cutting blocker to `EXTERNALLY_VERIFIED`. Every ✅ above stays internally-attested until this closes. It no longer gates the pilot: `CONTROLLED_PILOT` holds by owner decision since 2026-10-25. |
 | 3 | NLI semantic-entropy backend, actually evaluated (Ch. 1) | Medium | Wire the existing NLI backend into a reported run and record the result, closing the "built but unused" gap (NEGATIVE_RESULTS §3). |
 | 4 | Agentic detection & response layer (Ch. 4) | Medium | Deploy a collector + correlation over CAP-011 telemetry to detect a hijacked agent from tool-call/protocol traces. |
 | 5 | Decision-provenance & delegation hardening (Ch. 7) | Medium | External WORM/append-only audit storage; JWS/COSE + trust anchors for CAP-006; durable jti/queue stores for CAP-003/007. Needed for `ENFORCED_PRODUCTION`. |

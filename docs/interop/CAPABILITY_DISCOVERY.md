@@ -289,7 +289,8 @@ The Federation-facing
 is generated from that register and listed by the stable interop index. Pin
 confirmation, execution records, independence, claim results, production
 evidence and Federation adoption remain separate statuses. E7 has pinned
-fixtures but no external run record. It does not establish
+fixtures and two external Probity run records (2026-10-08 and 2026-10-09)
+that meet the independence contract for those fixtures. They do not establish
 `runtime_capability_surface_completeness`; no independent observation,
 production status or Federation adoption is implied.
 
