@@ -941,6 +941,7 @@ class GovernedToolDispatcher:
         self._capability_epochs: Any = None
         self._stop_source: Callable[[str], bool] | None = None
         self._cam_source: Callable[[], str | None] | None = None
+        self._mode_source: Callable[[], str | None] | None = None
         self._effect_resolver: "EffectResolver | None" = None
         self._revisions: "RevisionReader | None" = None
         self._recorder: "RecorderClient | None" = None
@@ -1231,6 +1232,27 @@ class GovernedToolDispatcher:
         before.
         """
         self._cam_source = source
+
+    def bind_mode_gate(self, source: Callable[[], str | None]) -> None:
+        """Refuse a dispatch the activation manifest does not let run
+        (ADR-UE-03, RMR-AUD-26-004).
+
+        ``source()`` returns a refusal reason, or None when the effective
+        modes of the capabilities that authorize a dispatch allow it. It is
+        read on every dispatch, after the manifest digest check and before
+        the nonce, a limit reservation or the recorder, so a refusal spends
+        nothing. A source that raises refuses as ``cam_mode_unverifiable``.
+        Without a bound source nothing changes.
+        """
+        self._mode_source = source
+
+    def _mode_refusal(self) -> str | None:
+        if self._mode_source is None:
+            return None
+        try:
+            return self._mode_source()
+        except Exception:
+            return "cam_mode_unverifiable"
 
     def _cam_refusal(self, lease: ExecutionLease) -> str | None:
         if self._cam_source is None:
@@ -1899,6 +1921,7 @@ class GovernedToolDispatcher:
         runtime_refusal = (
             self._stop_refusal(tenant_id)
             or self._cam_refusal(lease)
+            or self._mode_refusal()
             or self._durability_refusal()
             or self._policy_refusal(lease)
             or self._capability_refusal(lease, tool_name, tenant_id,

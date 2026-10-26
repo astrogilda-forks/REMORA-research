@@ -32,8 +32,11 @@ process refuses to start (``RuntimeProfileError``) without a loadable manifest,
 with an entry for a capability the catalogue does not have, and, under a
 strict runtime profile, with a registered capability left out. Without it, a
 manifest named by ``REMORA_CAM_FILE`` is still loaded and reported, and a
-problem is logged, not raised. No enforcement path reads the result yet: the
-lease field and the catalogue route are the next slices.
+problem is logged, not raised. At the execution boundary the dispatcher reads
+the result (``dispatch_mode_refusal``, ``MODE_CONTRACT``): with a manifest
+loaded, the capabilities that authorize a dispatch must be effective
+``ENFORCE``, and a manifest that is configured but did not load refuses every
+dispatch rather than running as if none were set.
 
 Migrated environment flags (``FLAG_AGREEMENTS``, ADR-UE-03 item 7) must
 agree with a loaded manifest: ``REMORA_REQUIRE_LIMITS`` set means CAP-031 is
@@ -62,8 +65,11 @@ from remora.governance.activation_manifest import (
 )
 
 __all__ = [
+    "AUTHORIZING_MODES",
     "BLOCKED",
     "CATALOGUE_PATH",
+    "DISPATCH_AUTHORITY",
+    "MODE_CONTRACT",
     "ENFORCE_ELIGIBLE",
     "FLAG_AGREEMENTS",
     "NOT_ESTABLISHED",
@@ -73,6 +79,7 @@ __all__ = [
     "Premise",
     "activation_report",
     "catalogue_view",
+    "dispatch_mode_refusal",
     "effective_activation",
     "flag_disagreements",
     "load_catalogue",
@@ -93,6 +100,49 @@ _ENFORCING = frozenset({"ENFORCE", "VERIFY"})
 #: (ADR-UE-03 consequences: nothing may present a flag's value as a mode).
 NOT_ESTABLISHED = "NOT_ESTABLISHED"
 _DOWNGRADE_ORDER = ("SHADOW", "EVIDENCE_ONLY", "OFFLINE")
+
+#: What each effective mode permits at the execution boundary (RMR-AUD-26-004).
+#: Only ``ENFORCE`` lets a capability authorize an effect. ``VERIFY`` is an
+#: enforcing request for the decision path, whose human step the review queue
+#: holds (CAP-007); it does not by itself let the dispatcher run anything. No
+#: mode raises a decision: the deterministic floor decides first, and a mode
+#: can only take authority away.
+MODE_CONTRACT: Mapping[str, str] = {
+    "ENFORCE": "runs on the authoritative path and may authorize an effect",
+    "VERIFY": "runs on the decision path; its outcomes go to human review; authorizes no effect at dispatch",
+    "SHADOW": "computes and records only; authorizes no effect",
+    "EVIDENCE_ONLY": "produces evidence only; authorizes no effect",
+    "OFFLINE": "does not run in this process; authorizes no effect",
+    "DISABLED": "off, or absent from the manifest; authorizes no effect",
+    BLOCKED: "a premise failed or could not be verified under a deny or hold fail mode; authorizes no effect",
+}
+AUTHORIZING_MODES = frozenset({"ENFORCE"})
+#: The capabilities whose mechanism authorizes every governed dispatch: the
+#: signed PDP-to-PEP grant (CAP-003) and the lease dispatch (CAP-013). The
+#: execution API adds CAP-031 while cumulative limits are configured. A
+#: capability observing or advising elsewhere is not checked here: most of
+#: the 32 are evidence, research or observation mechanisms by design.
+DISPATCH_AUTHORITY = ("CAP-003", "CAP-013")
+
+
+def dispatch_mode_refusal(report: ActivationReport | None,
+                          capability_ids: Iterable[str]) -> str | None:
+    """Why a dispatch may not run under this manifest, or None.
+
+    Without a report (no manifest loaded) nothing is refused: a deployment
+    without a manifest behaves exactly as before. With one, each capability
+    in ``capability_ids`` must be effective ``ENFORCE``; one absent from the
+    report counts as ``DISABLED`` (rule 1). The reason names the first that
+    is not: ``capability_not_enforcing:<id>:<mode>``.
+    """
+    if report is None:
+        return None
+    for capability_id in capability_ids:
+        activation = report.get(capability_id)
+        mode = activation.effective_mode if activation is not None else "DISABLED"
+        if mode not in AUTHORIZING_MODES:
+            return f"capability_not_enforcing:{capability_id}:{mode}"
+    return None
 
 
 def _setting(*names: str) -> bool:
