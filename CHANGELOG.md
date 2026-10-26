@@ -4,6 +4,16 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### SDK: a post-send failure on a state-changing call is not retryable, and the async client binds recorded effects
+
+- A capability audit of 2026-10-26 found two gaps in `remora.sdk`. Neither client retries on its own; both concern what the clients tell the caller.
+- **Retry flag.** A read timeout or dropped connection on a non-execution POST (`approve`, `reject`, `record_effect`, `resolve_unknown`) raised `RemoraUnavailableError` with `retryable=True`, although the request may already have been applied. It now raises the same type with `retryable=False`, and a message saying to read the state before sending again.
+  - Connect-stage failures, which send nothing, and GETs stay retryable.
+  - Execute paths still raise `UnknownExecutionStateError`.
+  - The class default is unchanged, so existing `except` clauses still match.
+- **Async parity.** The async `record_effect` posted the verification without its dispatch binding (`tool_call_hash`, `grant_jti`), which the sync client reads from the proposal's lifecycle. Both now share `dispatch_binding` and `bind_verification`.
+- Tests: `tests/test_review_sdk_transport_errors.py` (+10), and `tests/test_sdk_async_client.py`, whose async wire test now requires the binding. The public API snapshot is unchanged.
+
 ### Interop matrix: one edge per claim, and the Federation documents brought up to date
 
 - An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.

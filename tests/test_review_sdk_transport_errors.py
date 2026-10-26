@@ -106,3 +106,47 @@ def test_unknown_decision_value_is_typed():
     c = _sync(lambda r: httpx.Response(200, json=body))
     with pytest.raises(RemoraError):
         c.assess(CALL)
+
+
+# Review 2026-10-26: a read timeout on a non-execution POST (approve, reject,
+# record an effect, resolve a limit) was RemoraUnavailableError with
+# retryable=True although the request may already have been applied.
+
+APPLIED_MAYBE = [
+    ("approve", lambda c: c.approve("item")),
+    ("reject", lambda c: c.reject("item", reason="no")),
+    ("resolve_unknown", lambda c: c.resolve_unknown("op", executed=False,
+                                                    evidence_ref="plant-log:t:r", reason="r")),
+]
+
+
+@pytest.mark.parametrize("exc", POST_SEND)
+@pytest.mark.parametrize(("name", "call"), APPLIED_MAYBE)
+def test_a_post_send_failure_on_a_state_changing_call_is_not_retryable(exc, name, call):
+    with pytest.raises(RemoraUnavailableError) as e:
+        call(_sync(_raiser(exc)))
+    assert e.value.retryable is False, name
+    assert "read its state before sending it again" in str(e.value)
+
+
+@pytest.mark.parametrize("exc", POST_SEND)
+def test_the_async_client_classifies_the_same_way(exc):
+    with pytest.raises(RemoraUnavailableError) as e:
+        asyncio.run(_async(_raiser(exc)).approve("item"))
+    assert e.value.retryable is False
+
+
+def test_a_connect_failure_on_a_state_changing_call_stays_retryable():
+    with pytest.raises(RemoraUnavailableError) as e:
+        _sync(_raiser(httpx.ConnectError("refused"))).approve("item")
+    assert e.value.retryable is True
+
+
+def test_a_read_timeout_on_a_get_stays_retryable():
+    with pytest.raises(RemoraUnavailableError) as e:
+        _sync(_raiser(httpx.ReadTimeout("slow"))).get_proposal("p")
+    assert e.value.retryable is True
+
+
+def test_the_class_default_is_unchanged():
+    assert RemoraUnavailableError.retryable is True

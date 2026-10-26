@@ -146,6 +146,13 @@ def test_async_record_effect_matches_the_sync_wire_contract() -> None:
     seen: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            # The settled verdict's dispatch binding, read from the lifecycle
+            # exactly as the sync client reads it.
+            assert request.url.path == "/v1/execution/proposals/p-1/lifecycle"
+            return httpx.Response(200, json={"events": [{
+                "event": "execution_result",
+                "payload": {"tool_call_hash": "h" * 64, "grant_jti": "jti-1"}}]})
         seen["method"] = request.method
         seen["path"] = request.url.path
         seen["auth"] = request.headers.get("Authorization")
@@ -180,6 +187,8 @@ def test_async_record_effect_matches_the_sync_wire_contract() -> None:
     assert seen["body"]["verifier_identity"] == "acme.reader/v1"
     assert len(seen["body"]["expected_sha256"]) == 64
     assert "observed" not in seen["body"]
+    # Parity with the sync client: the verdict names the dispatch it observed.
+    assert (seen["body"]["tool_call_hash"], seen["body"]["grant_jti"]) == ("h" * 64, "jti-1")
     assert result.status is EffectStatus.VERIFIED
 
 
