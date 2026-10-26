@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Environment flags and the activation manifest must agree: `REMORA_REQUIRE_LIMITS` first (ADR-UE-03 slice 5)
+
+- `FLAG_AGREEMENTS` in `remora/governance/capability_activation.py` holds the flags migrated so far, one per change. The first is `REMORA_REQUIRE_LIMITS` against CAP-031 (cumulative limits): set, the manifest must request CAP-031 enforcing (`ENFORCE`, `VERIFY`); unset, it must not. A loaded manifest that disagrees refuses startup, whether or not `REMORA_CAM_REQUIRED` is set, so neither the flag nor the manifest silently wins. A manifest that leaves CAP-031 out is not compared.
+- The flow-control flag waits: flow control has no capability of its own in the register.
+- `tests/test_capability_activation.py`: the six flag/request combinations, an unnamed capability, and the startup refusal without `REMORA_CAM_REQUIRED`.
+
 ### `GET /v1/system/capabilities`: the capability catalogue joined with the activation manifest (ADR-UE-03 slice 4)
 
 - A read-only, tenant-authenticated route (`read` capability) serving one row per registered capability from the packaged catalogue: registered maturity, primary hook, and, under the manifest loaded at startup, the requested and effective mode with the reasons and premise results, plus the manifest's digest and whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`. No signer key id or credential is returned, and nothing on the route changes a mode. It is distinct from the agent-facing `/v1/execution/capabilities`.
