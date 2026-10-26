@@ -276,8 +276,9 @@ capabilities:
       - remora/enforcement/gate.py
       - tests/test_token_hardening.py
       - servers/execution_api.py
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -448,8 +449,9 @@ capabilities:
   - id: CAP-004
     name: "Tool-call payload binding (canonical hash, recomputed before execution)"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -563,8 +565,9 @@ capabilities:
   - id: CAP-005
     name: "Audit chain (hash-chained decision history)"
     status: PERSISTED_ATOMIC
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -700,8 +703,9 @@ capabilities:
   - id: CAP-007
     name: "Review queue with TTL-to-ABSTAIN and approval freshness re-gate"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -962,8 +966,9 @@ capabilities:
       - tests/test_effect_receipt_atomicity.py
       - tests/test_effect_record_endpoint.py
       - docs/deployment/authority-custody-evidence.md
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -1318,8 +1323,9 @@ capabilities:
   - id: CAP-018
     name: "Task-bound authority and non-decaying loop safety on the execution API"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -1448,8 +1454,9 @@ capabilities:
   - id: CAP-019
     name: "Evidence coverage verdicts on the evidence export"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -1556,8 +1563,9 @@ capabilities:
   - id: CAP-020
     name: "Pre-dispatch premise checks: resolved effect, plan premises, procedure obligations"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -1683,8 +1691,9 @@ capabilities:
   - id: CAP-021
     name: "Independent recorder: evidence captured outside the executing process"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -1867,8 +1876,9 @@ capabilities:
   - id: CAP-023
     name: "Capability minimization: task-scoped capability sets enforced at assess, execution and dispatch"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -2014,8 +2024,9 @@ capabilities:
   - id: CAP-024
     name: "Capability mediation for implementation effects, with an effect domain for strict deployments (NTA-2 phases 1 to 3)"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from c0c6d59: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -2400,8 +2411,9 @@ capabilities:
   - id: CAP-030
     name: "WS1 execution preconditions and monitor composition on the execution API (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: c898567517259cce7674b2754eece73442a93dff
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from c898567: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 2075b5d: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
       re-audited 2026-10-25 at 2075b5d (CAM DIGEST IN THE LEASE), from 0dc01c8: ExecutionLease gains cam_digest, signed only when set; GovernedToolDispatcher.bind_cam_digest refuses cam_changed, cam_unbound, cam_lease_unbound and cam_unverifiable between verify and the nonce; the execution API mints with and binds the startup manifest's digest; the assessed record carries it; without a manifest every path is unchanged, re-run by the execution-path suites
       re-audited 2026-10-25 at 0dc01c8 (EXTERNAL REVIEW 2026-10-25 FIXES), from ed4c590: delegated ACCEPT redemption reads the proposer's flow context; a forwarded result committed by the execution domain is not committed again; a recipient-bound lease for a mediated tool without a set refuses flow_recipients_required; dispatch-leased verifies authenticity before the flow fence; network effects name their host on any scheme; every refusal only adds, re-run by the flow, capability, delegation, dispatch, lease, custody and conformance suites
@@ -2521,8 +2533,9 @@ capabilities:
   - id: CAP-031
     name: "Cumulative limits per principal or resource, reserved before dispatch (opt-in)"
     status: WIRED_API_PATH
-    verified_at_sha: dde0b418682aafef317835adb283e61887adfee9
+    verified_at_sha: 7d806ebd8df53090d8ece5508ab4078411debcdd
     verified_by: >-
+      re-audited 2026-10-26 at 7d806eb (LIMIT LEDGER TOPOLOGY), from dde0b41: servers/execution_api.py::_limit_guard refuses to build the cumulative-limit guard when REMORA_LIMITS_LEDGER is a SQLite file beside REMORA_PG_DSN unless REMORA_LIMITS_LEDGER_SCOPE=single_host, through remora/enforcement/cumulative_limits.py::ledger_topology_problem; a PostgreSQL ledger, or authority state on SQLite, is unchanged. Strictly narrowing, startup only; no decision, token, lease or dispatch path changes. Tests: tests/limits/test_limits_ledger_topology.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at dde0b41 (READINESS PROBE), from 7cfcfed: servers/api.py appends GET /v1/ready, an unauthenticated readiness probe that connects to REMORA_PG_DSN or opens REMORA_CHAIN_DB read-only with a two-second bound and answers 503 not_ready while the store does not answer; one answer is reused for a second, and the root index and the OpenAPI no-token list name the route. No decision, refusal, token, lease or audit path reads it. Tests: tests/test_readiness_probe.py. Status, scope and caveats unchanged.
       re-audited 2026-10-26 at 7cfcfed (outage 503), from c898567: catch-all handler maps a PostgreSQL driver OperationalError to 503 durable_state_unavailable; other errors unchanged.
       re-audited 2026-10-26 at c898567 (stop pre-check), from 566ba09: execute and execute-accepted read the stop flag before the approval or token is spent (409 execution_stopped, 503 execution_stop_unverifiable); dispatcher check unchanged.
