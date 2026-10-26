@@ -57,6 +57,9 @@ def validate_runtime_profile_prerequisites() -> str:
       the execution domain holds no lease signing material;
     - an intent resolver (property D), so the provenance floor refuses
       unresolved intents rather than every intent.
+    - atomic WS1 admission whenever the WS1 gate enforces
+      (``REMORA_WS1_MODE=enforce``), so evidence is checked when the grant
+      is spent.
 
     The authority role additionally requires a ToolSpec signing key and a PDP
     signing key, so the strict PEP never receives an unsigned grant. Those are
@@ -158,6 +161,7 @@ def validate_runtime_profile_prerequisites() -> str:
         )
 
     _check_flow_control(profile)
+    _check_ws1_admission(profile)
 
     # Custody last, so its message is never the one hiding a plainer problem.
     assert_custody_split(strict=True)
@@ -213,6 +217,34 @@ def _check_limits_required(profile: str) -> None:
             "so REMORA_LIMITS_LEDGER must be a PostgreSQL DSN shared by every executor, not "
             "a host-local SQLite file"
         )
+
+
+def _check_ws1_admission(profile: str) -> None:
+    """A strict profile that runs the WS1 gate admits atomically (RMR-AUD-26-003).
+
+    On the legacy path the WS1 re-gate and the grant spend are separate steps,
+    so evidence that lapses between them is still spent: control 2b in
+    ``tests/test_ws1_gate_controls.py`` records it as the documented residual.
+    ``REMORA_WS1_ADMISSION=atomic`` checks the receipts at the database instant
+    in the transaction that spends the grant, and its prerequisites (a
+    transactional store and ``REMORA_MAX_CLOCK_SKEW_MS``) are refused at
+    import by ``servers/execution_api.py::_admission`` when missing. The ADR
+    (docs/architecture/ADR-ws1-m4-admission-topology.md) says the strict
+    profile must refuse 2b; before this check nothing made it. Only enforce
+    lets WS1 change a decision (``Ws1Gate`` leaves it alone in shadow), so
+    off and shadow keep legacy, and outside the strict profiles legacy stays
+    the documented default.
+    """
+    ws1 = os.getenv("REMORA_WS1_MODE", "").strip().lower() or "off"
+    if ws1 != "enforce":
+        return
+    admission = os.getenv("REMORA_WS1_ADMISSION", "").strip().lower() or "legacy"
+    if admission != "atomic":
+        raise RuntimeProfileError(
+            f"REMORA runtime profile {profile!r} with REMORA_WS1_MODE={ws1} requires "
+            f"REMORA_WS1_ADMISSION=atomic (got {admission!r}): legacy admission spends "
+            "the grant after the WS1 re-gate, so evidence that lapsed in between is "
+            "still spent")
 
 
 #: Derived information-flow control (SDD v1.3). ``1`` turns it on; any other
