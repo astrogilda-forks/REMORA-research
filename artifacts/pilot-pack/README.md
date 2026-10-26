@@ -119,7 +119,11 @@ What the runs do not show:
   signing key is held by the pilot's limit authority, not this repository.
 - **The setup is minimal.** The plant is simulated in the API process and
   resets on a restart. There is one host, one replica and the SQLite limit
-  ledger.
+  ledger. Since 2026-10-26 the compose file declares this with
+  `REMORA_LIMITS_LEDGER_SCOPE=single_host`. Without that line the API refuses
+  to start, because the rest of its authority state is on PostgreSQL. The
+  runs above predate the line, and their fingerprints name the earlier compose
+  file. A pilot on more than one host needs a PostgreSQL ledger.
 - **The latencies are not a performance claim.** They come from one local
   Docker host. Calls made while PostgreSQL was down are reported apart, under
   `[fault window]`.

@@ -105,6 +105,12 @@ services:
       # container; see NEGATIVE_RESULTS.md section 97.
       REMORA_LIMITS_FILE: /app/limits.json
       REMORA_LIMITS_LEDGER: /var/lib/remora/limits-ledger.db
+      # The ledger is this host's file while the rest of the authority state
+      # is on PostgreSQL, so a second API host would keep its own budget. The
+      # API refuses that pairing unless the deployment says one host runs
+      # executors. A multi-host pilot needs a PostgreSQL REMORA_LIMITS_LEDGER
+      # instead, and drops this line.
+      REMORA_LIMITS_LEDGER_SCOPE: single_host
       REMORA_LIMITS_OBSERVER_MODULE: ot_registry
       # A call whose outcome is unknown holds its budget until a reviewer
       # resolves it, and the resolution is checked against the plant's log

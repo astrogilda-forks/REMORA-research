@@ -488,6 +488,36 @@ def is_postgres_dsn(spec: str) -> bool:
     return spec.startswith(_PG_SCHEMES) or bool(_PG_KEYWORD.match(spec))
 
 
+#: The value of ``REMORA_LIMITS_LEDGER_SCOPE`` that declares a host-local
+#: ledger deliberate (RMR-AUD-26-010).
+LEDGER_SCOPE_SINGLE_HOST = "single_host"
+
+
+def ledger_topology_problem(ledger: str, *, authority_dsn: str, scope: str) -> str | None:
+    """Why this ledger does not fit the deployment's topology, or None.
+
+    A SQLite ledger is one host's file. Authority state on PostgreSQL
+    (``REMORA_PG_DSN``) is the shape a second executor host can join, and
+    each such host would then keep its own budget and could spend the whole
+    limit (SDD unified capability execution v1.1 section 7.1, G04). The
+    strict profiles refuse that combination outright; elsewhere it is
+    accepted only when the deployment declares the ledger single-host, so a
+    multi-host setup cannot reach it by copying a single-host configuration
+    and adding a replica. With the authority state on SQLite too, everything
+    is one host's by construction and nothing needs declaring.
+    """
+    if scope not in ("", LEDGER_SCOPE_SINGLE_HOST):
+        return (f"REMORA_LIMITS_LEDGER_SCOPE={scope!r} is not {LEDGER_SCOPE_SINGLE_HOST!r}; "
+                "leave it unset for a PostgreSQL ledger")
+    if is_postgres_dsn(ledger) or not authority_dsn or scope == LEDGER_SCOPE_SINGLE_HOST:
+        return None
+    return ("REMORA_LIMITS_LEDGER is a host-local SQLite file while REMORA_PG_DSN holds the "
+            "authority state, so a second executor host would keep its own budget and could "
+            "spend the whole limit. Use a PostgreSQL DSN for REMORA_LIMITS_LEDGER, or set "
+            f"REMORA_LIMITS_LEDGER_SCOPE={LEDGER_SCOPE_SINGLE_HOST} to declare that exactly "
+            "one host runs executors")
+
+
 class _PgConnection:
     """A psycopg connection that takes this module's ``?`` SQL.
 
