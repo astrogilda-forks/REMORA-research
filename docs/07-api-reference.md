@@ -10,7 +10,7 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 40 paths). CI fails on drift between it and the routes, so it is
+(OpenAPI 3.1, 41 paths). CI fails on drift between it and the routes, so it is
 the authority for request and response shapes; this document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
@@ -909,6 +909,7 @@ lease unspent. An unset setting leaves dispatch as it was.
 | `REMORA_STATE_REVISION_MODULE` (`read_revision(resource)`) | A call may carry `plan` (`plan_id`, `reads`, `depends_on`); its dependencies are re-read before the write | `stale_plan`, `plan_state_unverifiable` |
 | `REMORA_RECORDER_ADDRESS` with `REMORA_RECORDER_MANDATORY_TOOLS` | The intent is appended to the independent recorder (`python -m remora.audit.recorder`) before the named tools run | `recorder_unavailable` |
 | `REMORA_PROCEDURE_MODULE` (`contract()`, `trace_for(lease)`) | A step that would violate the procedure's safety obligations is refused before it runs | `procedure_violation`, `procedure_trace_unavailable` |
+| `REMORA_CAM_FILE` (ADR-UE-03) | The digest of the activation manifest the authority loaded at startup is signed into the lease as `cam_digest` and recorded in the `assessed` event; the executor compares it with the manifest it loaded. A manifest-bound lease where none is loaded, a lease without one where one is in force, and different manifests refuse | `cam_unbound`, `cam_lease_unbound`, `cam_changed`, `cam_unverifiable` |
 | `REMORA_FLOW_CONTROL=1` (IFC-06) | The flow decision the authority judged (context epoch, verdict digest, hash of the call with every handle resolved) is signed into the lease; the executing domain compares its live context and the arguments the tool is about to receive against it, never against a value of its own. The check then holds the context with a dispatch fence on its event stream, taken at the sequence the check read, until the result commits, so a raise after the check or a second call in the same context refuses before its tool runs; the fence is renewed while the tool runs and expires with the lease TTL only for a process that died mid-call, and a commit whose fence lapsed withholds the result (`result_withheld`). The recipients the verdict approved are signed into the lease as `flow_recipients_digest` (IFC-12, first slice): the mediator admits a network effect only on a host among them (`capability_recipient_not_approved` in the effect record), and the effect domain verifies the set the worker presents (`flow_recipients_mismatch`). A recipient-bound lease for a mediated tool presented without a set (an executor with flow control off) refuses `flow_recipients_required`. On `/dispatch-leased` a lease whose signature does not verify is refused before the flow check writes to the context | `flow_lease_unbound`, `flow_epoch_changed`, `flow_digest_changed`, `flow_dispatch_contended`, `resolved_call_mismatch`, `flow_recipients_changed`, `flow_recipients_required`; withheld: `flow_dispatch_fence_expired` |
 
 The evidence export (`GET /proposals/{proposal_id}/evidence`) carries an
@@ -1067,6 +1068,25 @@ restart-proven by test.
   yet. The effective mode, the startup validation, the lease field and the
   catalogue route are the next slices, and every mode is NOT_ESTABLISHED
   until they land.
+- `remora/governance/capability_activation.py`: the effective mode per
+  capability, from the signed requested mode, the premises this process can
+  verify (`PREMISES`, each stating what it checks) and the registered maturity
+  in the packaged catalogue `capability_catalogue_v1.json`. A capability absent
+  from the manifest is `DISABLED`. A failed or unverifiable premise applies the
+  entry's fail mode (`DISABLED`, or `BLOCKED`, never allow). An enforcing
+  request below `WIRED_API_PATH` is downgraded to the highest non-enforcing
+  allowed mode. `servers/api.py` computes the report at startup
+  (`CAPABILITY_ACTIVATION`). With `REMORA_CAM_REQUIRED=1` startup refuses
+  without a loadable manifest, with an entry the catalogue does not have, and,
+  under a strict profile, with a registered capability left out.
+  Migrated flags must agree with a loaded manifest: `REMORA_REQUIRE_LIMITS`
+  set means CAP-031 is requested `ENFORCE` or `VERIFY`, unset means it is not;
+  a disagreement refuses startup whether or not the manifest is required.
+  `GET /v1/system/capabilities` (`read`) serves the catalogue joined with the
+  report: per capability its registered maturity, primary hook, requested and
+  effective mode, reasons and premise results, and the manifest's digest and
+  whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`.
+  No signer key id or credential is returned.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.

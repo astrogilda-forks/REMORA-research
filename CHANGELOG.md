@@ -4,6 +4,35 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Environment flags and the activation manifest must agree: `REMORA_REQUIRE_LIMITS` first (ADR-UE-03 slice 5)
+
+- `FLAG_AGREEMENTS` in `remora/governance/capability_activation.py` holds the flags migrated so far, one per change. The first is `REMORA_REQUIRE_LIMITS` against CAP-031 (cumulative limits): set, the manifest must request CAP-031 enforcing (`ENFORCE`, `VERIFY`); unset, it must not. A loaded manifest that disagrees refuses startup, whether or not `REMORA_CAM_REQUIRED` is set, so neither the flag nor the manifest silently wins. A manifest that leaves CAP-031 out is not compared.
+- The flow-control flag waits: flow control has no capability of its own in the register.
+- `tests/test_capability_activation.py`: the six flag/request combinations, an unnamed capability, and the startup refusal without `REMORA_CAM_REQUIRED`.
+
+### `GET /v1/system/capabilities`: the capability catalogue joined with the activation manifest (ADR-UE-03 slice 4)
+
+- A read-only, tenant-authenticated route (`read` capability) serving one row per registered capability from the packaged catalogue: registered maturity, primary hook, and, under the manifest loaded at startup, the requested and effective mode with the reasons and premise results, plus the manifest's digest and whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`. No signer key id or credential is returned, and nothing on the route changes a mode. It is distinct from the agent-facing `/v1/execution/capabilities`.
+- `schemas/openapi.json` (41 paths) and `frontend/src/generated/remora-api.ts` regenerated; the route is classified as an execution/infrastructure path in `tests/test_enabled_surfaces.py`.
+- `tests/test_capability_activation.py` gains the view without and with a manifest, the live catalogue's 32 rows, and the route for a reader and without the capability (403).
+### The activation manifest's digest in the lease and the decision record (ADR-UE-03 slice 3)
+
+- `ExecutionLease.cam_digest`: the digest of the Capability Activation Manifest the authority loaded at startup, signed only when set and beside `policy_bundle_hash`, not folded into it (owner resolution of ADR-UE-03 item 5). Leases issued before it sign the same bytes. The completeness contract gains the field.
+- `GovernedToolDispatcher.bind_cam_digest`, bound by the execution API to the manifest this process loaded, refuses before anything is spent: a lease minted under a manifest where none is loaded (`cam_unbound`), a lease without one where one is in force (`cam_lease_unbound`), different manifests (`cam_changed`), and a source that raises (`cam_unverifiable`). Without a manifest anywhere nothing changes.
+- The `assessed` chain event records `cam_digest` when a manifest is loaded.
+- `tests/test_cam_lease_binding.py` (12): the signature, each refusal and the unspent nonce, the unchanged path, and on `/execute-accepted` that the minted lease and the assessment carry the digest.
+- Not yet: the effective mode of the tool's own capability in the decision record (there is no tool-to-capability map), and the catalogue route (slice 4).
+
+### Effective capability modes and the startup validation (ADR-UE-03 slice 2)
+
+- `remora/governance/capability_activation.py` computes each capability's effective mode from the signed manifest's requested mode, the premises this process can verify and the registered maturity. Absent from the manifest: `DISABLED`. A required premise that fails, or that the registry cannot verify (`reconciliation_authority`, for example, has no check): the entry's fail mode, `DISABLED` or `BLOCKED`, never allow. An enforcing request (`ENFORCE`, `VERIFY`) for a capability registered below `WIRED_API_PATH`: the highest non-enforcing allowed mode, or `BLOCKED`. Otherwise the requested mode. `PREMISES` names eight checks and what each establishes (most read whether a setting is configured; its own startup check makes the value meaningful).
+- `remora/governance/capability_catalogue_v1.json` packages what the server needs from the register (id, name, status, primary hook), so the server never reads `docs/` (ADR-UE-03 item 6); `scripts/build_capability_catalogue.py --check` holds it to the register.
+- `servers/api.py` computes the report once at startup (`CAPABILITY_ACTIVATION`). With `REMORA_CAM_REQUIRED=1` the process refuses to start without a loadable manifest, with an entry the catalogue does not have, and, under a strict profile, with a registered capability left out. Without it, a configured manifest is reported and a problem is logged. No enforcement path reads the report yet; `cam_digest` in the lease and the catalogue route are the next slices.
+- `tests/test_capability_activation.py` (24): every rule and its order, the premise checks against their settings, the report, the startup matrix, and the API refusing to start in a separate interpreter when a manifest is required and none is configured.
+
+### Opt-in error reporting to Sentry
+
+- `remora/observability/sentry.py` initialises `sentry-sdk` when `SENTRY_DSN` is set, with `send_default_pii` off, no local variables in frames, no request bodies, and a `before_send` that removes request headers, cookies, body, query string and user from every event and transaction. `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE` and `SENTRY_TRACES_SAMPLE_RATE` (default 0, bounded to [0, 1]) are read; a missing package or a refused DSN is a warning, never a failed start. `servers/api.py` calls it once, after every route is mounted. New extra `sentry`; `SENTRY_DSN` is declared in the credential topology as a transport credential. `tests/test_observability_sentry.py` (13). The execution quickstart documents it.
 ### Documentation brought in line with the release profile and the delivered SDD work
 
 - Twenty statements outside the files #1070 touched still described the earlier rule (`SHADOW_ONLY` until REM-021, REM-023 in progress, `CONTROLLED_PILOT` not offered) or called delivered SDD work open: the commercial packaging, deployment options, Shadow Pilot and security overview; the pilot evaluation protocol; the RBAC design and policy; the oversight operations note; the reference architecture, executive one-pager, use-case and EU AI Act notes, the Azure reference, the REMORA Prime note, the research monograph and the TOGAF rollout plan; the SDD's status line; the atlas step 6 and gates G05 and G12; the IFC status row 6. Each now says what holds.

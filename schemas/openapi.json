@@ -4666,6 +4666,30 @@
           "governance"
         ]
       }
+    },
+    "/v1/system/capabilities": {
+      "get": {
+        "description": "The capability catalogue joined with this deployment's activation manifest.\n\nADR-UE-03 slice 4. One row per registered capability: its registered\nmaturity and primary hook from the packaged catalogue, and the requested\nand effective mode computed at startup from the signed manifest, with the\nreasons and premise results. Without a manifest every mode is\n``NOT_ESTABLISHED``. Tenant-authenticated, ``read`` capability; no signer\nor credential material is returned. Read-only: nothing here changes a mode.",
+        "operationId": "system_capabilities_v1_system_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response System Capabilities V1 System Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "System Capabilities",
+        "tags": [
+          "governance"
+        ]
+      }
     }
   },
   "security": [

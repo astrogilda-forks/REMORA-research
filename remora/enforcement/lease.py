@@ -269,6 +269,11 @@ class ExecutionLease:
     #: set it computes against it, and the effect domain admits a network
     #: effect only on a host in the set the worker presents under it.
     flow_recipients_digest: str = ""
+    #: ADR-UE-03 item 5: the digest of the Capability Activation Manifest the
+    #: authority ran under when it minted this lease. Signed only when set,
+    #: beside the policy identity, not folded into it. The executor compares
+    #: it with its own manifest's digest before anything is spent.
+    cam_digest: str = ""
 
     @classmethod
     def issue(
@@ -300,6 +305,7 @@ class ExecutionLease:
         flow_digest: str = "",
         resolved_tool_call_hash: str = "",
         flow_recipients_digest: str = "",
+        cam_digest: str = "",
     ) -> ExecutionLease:
         """Issue a lease for an ACCEPTED decision; refuse everything else.
 
@@ -386,6 +392,8 @@ class ExecutionLease:
             if not flow_digest:
                 raise ValueError("flow_recipients_digest needs the flow decision it belongs to")
             fields["flow_recipients_digest"] = flow_recipients_digest
+        if cam_digest:
+            fields["cam_digest"] = cam_digest
         task_event_fields: dict[str, Any] = dict(task_fields(task_identity))
         alg = _signing.issuer_algorithm()
         if alg is None:
@@ -520,6 +528,8 @@ class ExecutionLease:
             fields["resolved_tool_call_hash"] = self.resolved_tool_call_hash
         if self.flow_recipients_digest:
             fields["flow_recipients_digest"] = self.flow_recipients_digest
+        if self.cam_digest:
+            fields["cam_digest"] = self.cam_digest
         return fields
 
     def task_identity(self) -> "TaskIdentity | None":
@@ -744,6 +754,7 @@ class ExecutionLease:
         "surface_digest", "capability_digest",
         "execution_context_hash",
         "flow_epoch", "flow_digest", "resolved_tool_call_hash", "flow_recipients_digest",
+        "cam_digest",
     })
 
     @classmethod
@@ -929,6 +940,7 @@ class GovernedToolDispatcher:
         self._capability_state: Callable[[str, Any], Any] | None = None
         self._capability_epochs: Any = None
         self._stop_source: Callable[[str], bool] | None = None
+        self._cam_source: Callable[[], str | None] | None = None
         self._effect_resolver: "EffectResolver | None" = None
         self._revisions: "RevisionReader | None" = None
         self._recorder: "RecorderClient | None" = None
@@ -1197,6 +1209,43 @@ class GovernedToolDispatcher:
         a flag that could not be read.
         """
         self._stop_source = source
+
+    def bind_cam_digest(self, source: Callable[[], str | None]) -> None:
+        """Compare each lease's ``cam_digest`` with this process's manifest
+        (ADR-UE-03 item 5).
+
+        ``source()`` returns the digest of the Capability Activation Manifest
+        this process loaded, or None. Checked between verification and the
+        nonce, so a refusal spends nothing:
+
+        * a lease minted under a manifest, presented where none is bound or
+          loaded: ``cam_unbound``. The executor cannot check what the
+          authority ran under, so it does not run;
+        * the two digests differ: ``cam_changed``;
+        * this process runs under a manifest and the lease names none:
+          ``cam_lease_unbound``. A lease minted without a manifest does not
+          run where one is in force;
+        * a source that raises: ``cam_unverifiable``.
+
+        Without a bound source a lease that names no manifest is checked as
+        before.
+        """
+        self._cam_source = source
+
+    def _cam_refusal(self, lease: ExecutionLease) -> str | None:
+        if self._cam_source is None:
+            return "cam_unbound" if lease.cam_digest else None
+        try:
+            current = self._cam_source() or ""
+        except Exception:
+            return "cam_unverifiable"
+        if lease.cam_digest and not current:
+            return "cam_unbound"
+        if current and not lease.cam_digest:
+            return "cam_lease_unbound"
+        if current and not hmac.compare_digest(current, lease.cam_digest):
+            return "cam_changed"
+        return None
 
     def _stop_refusal(self, tenant_id: str) -> str | None:
         if self._stop_source is None:
@@ -1849,6 +1898,7 @@ class GovernedToolDispatcher:
         # turn an authorization failure into an unknown-state incident.
         runtime_refusal = (
             self._stop_refusal(tenant_id)
+            or self._cam_refusal(lease)
             or self._durability_refusal()
             or self._policy_refusal(lease)
             or self._capability_refusal(lease, tool_name, tenant_id,

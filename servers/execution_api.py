@@ -1294,6 +1294,15 @@ def _verified_limit_policy(document: Any, required: bool) -> Any:
     return policy
 
 
+def _cam_digest() -> str | None:
+    """The digest of the Capability Activation Manifest this process loaded at
+    startup (``servers.api.CAPABILITY_ACTIVATION``), or None without one."""
+    from servers import api as api_mod
+
+    report = getattr(api_mod, "CAPABILITY_ACTIVATION", None)
+    return str(report.manifest_digest) if report is not None else None
+
+
 def _limits_policy_hash() -> str | None:
     """The digest of the cumulative-limit policy in force, or None without one."""
     from servers import api as api_mod
@@ -1969,6 +1978,10 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                 # can make the store unreachable.
                 if _stop_epochs() is not None:
                     dispatcher.bind_stop_source(lambda tenant: _execution_stopped(tenant))
+                # ADR-UE-03 item 5: a lease is checked against the manifest
+                # this process runs under. Bound always, so a lease minted
+                # under a manifest refuses where none is loaded.
+                dispatcher.bind_cam_digest(_cam_digest)
                 spec = _os.environ.get("REMORA_TOOL_REGISTRY_MODULE", "").strip()
                 if spec:
                     import importlib
@@ -2626,6 +2639,7 @@ def _assess_proposal_with_loop_state(
         token_ttl_seconds=EXECUTION_TOKEN_TTL_SECONDS,
         policy_bundle_hash=_current_policy_bundle_hash,
         limits_policy_hash=_limits_policy_hash,
+        cam_digest=_cam_digest,
         loop_safety=_loop_safety_monitor(),
         capability_gate=(lambda proposal: _capability_block(proposal, principal, tenant))
         if _capability_resolver() is not None else None,
@@ -3588,6 +3602,7 @@ def _dispatch_under_lease_fenced(
             not_after=not_after,
             flow_binding=flow_binding,
             flow_recipients=flow_recipients,
+            cam_digest=_cam_digest() or "",
         )
         _span.set_attribute("remora.executed", bool(result.get("executed")))
         if result.get("refusal_reason"):

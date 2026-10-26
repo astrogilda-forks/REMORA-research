@@ -63,6 +63,9 @@ entries:
   - pattern: "could not import '(numpy|datasets)'.*"
     class: optional_dependency
     note: "numpy (analysis extra) and Hugging Face datasets are not in the job's install set. Known gap: the analysis tests behind them do not run here. PyJWT and the OpenTelemetry SDK are installed through the identity and otel extras, so a missing jwt or opentelemetry.sdk fails the job."
+  - pattern: "could not import 'sentry_sdk'.*"
+    class: optional_dependency
+    note: "The sentry extra is opt-in error reporting and not in the job's install set. The test that skips checks only that the real SDK accepts REMORA's options; every other Sentry test runs against a stand-in module."
   - pattern: "Hugging Face datasets is not installed"
     class: optional_dependency
     note: "Standard benchmarks need the datasets extra."

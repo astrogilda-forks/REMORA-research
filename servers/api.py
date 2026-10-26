@@ -3395,3 +3395,37 @@ def _build_executor_dispatcher_at_startup() -> None:
 
 
 _build_executor_dispatcher_at_startup()
+
+
+# Opt-in error reporting (SENTRY_DSN), after every route is mounted; off by
+# default and never fatal (remora/observability/sentry.py).
+from remora.observability.sentry import init_sentry_from_env as _init_sentry
+
+_init_sentry(release=_PACKAGE_VERSION)
+
+# Capability Activation Manifest (ADR-UE-03 slice 2): effective modes computed
+# once at startup. Refuses to start only with REMORA_CAM_REQUIRED=1; no
+# enforcement path reads the report yet.
+from remora.governance.capability_activation import (
+    validate_activation_at_startup as _validate_activation,
+)
+
+CAPABILITY_ACTIVATION = _validate_activation()
+
+
+@app.get("/v1/system/capabilities", response_model=dict, tags=["governance"])
+def system_capabilities(request: Request) -> dict:
+    """The capability catalogue joined with this deployment's activation manifest.
+
+    ADR-UE-03 slice 4. One row per registered capability: its registered
+    maturity and primary hook from the packaged catalogue, and the requested
+    and effective mode computed at startup from the signed manifest, with the
+    reasons and premise results. Without a manifest every mode is
+    ``NOT_ESTABLISHED``. Tenant-authenticated, ``read`` capability; no signer
+    or credential material is returned. Read-only: nothing here changes a mode.
+    """
+    from remora.governance.capability_activation import catalogue_view
+
+    tenant_id, role = _authenticate(request)
+    _require_tenant_capability(role, tenant_id, "read")
+    return catalogue_view(CAPABILITY_ACTIVATION)

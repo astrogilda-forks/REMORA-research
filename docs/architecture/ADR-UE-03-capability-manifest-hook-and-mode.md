@@ -159,13 +159,27 @@ open choices:
    `scripts/sign_capability_manifest.py`, `tests/test_activation_manifest.py`.
 2. Effective-mode computation and the startup validation of item 4, behind
    an opt-in setting, with the premises registry naming what each premise
-   checks.
+   checks. Delivered 2026-10-25: `remora/governance/capability_activation.py`
+   (`REMORA_CAM_REQUIRED=1`), the packaged catalogue
+   `remora/governance/capability_catalogue_v1.json` built by
+   `scripts/build_capability_catalogue.py`, `tests/test_capability_activation.py`.
 3. `cam_digest` in the lease and the decision record, signed only when set,
-   with the completeness contract extended as the flow fields were.
+   with the completeness contract extended as the flow fields were. Delivered
+   2026-10-26: `ExecutionLease.cam_digest`,
+   `GovernedToolDispatcher.bind_cam_digest` (`cam_changed`, `cam_unbound`,
+   `cam_lease_unbound`, `cam_unverifiable`), the `assessed` record's
+   `cam_digest`, `tests/test_cam_lease_binding.py`.
 4. The packaged catalogue artefact and `GET /v1/system/capabilities`, with
-   the OpenAPI document and the typed client regenerated.
+   the OpenAPI document and the typed client regenerated. Delivered
+   2026-10-26: the route in `servers/api.py`, `catalogue_view` in
+   `remora/governance/capability_activation.py`, `schemas/openapi.json` and
+   `frontend/src/generated/remora-api.ts` regenerated.
 5. The environment-flag migration of item 7, one flag per change, each with
-   the agreement test.
+   the agreement test. First flag, 2026-10-26: `REMORA_REQUIRE_LIMITS`
+   against CAP-031 (`FLAG_AGREEMENTS` in
+   `remora/governance/capability_activation.py`). A loaded manifest that
+   disagrees refuses startup, required or not. The flow-control flag has no
+   capability of its own in the register, so it waits for one.
 
 ## What this ADR does not decide
 
