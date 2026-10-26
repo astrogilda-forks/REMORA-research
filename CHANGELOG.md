@@ -20,6 +20,13 @@ This file lists externally relevant changes by release. Fine-grained development
   - `docs/sdk.md`, `PRODUCT_PACKAGING.md`, `SECURITY_OVERVIEW.md`, `DEPLOYMENT_OPTIONS.md`, `product_truth_contract.yaml` and the conformance benchmark are all registered, and no file under `docs/` lacks an entry.
   - Register coverage stays advisory by design.
 
+### Interop matrix: one edge per claim, and the Federation documents brought up to date
+
+- An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.
+- An edge now counts only records for its `(contract, claim)` pair. Every claim of a contract with an edge needs its own edge, every record must fall on exactly one, and the generator refuses otherwise. Six edges are added: E-ECB-SU, E-ECB-V1-1-SU, E-EE-V2-CALL, E-EE-V2-DEC, E-EE-V2-OBS and E7-EXCL (`exclusive_effect_path`, no record, `SPECIFIED`). No derived status changed, because every affected record is L0. No record, fixture or package digest is touched.
+- `FEDERATION.yaml` no longer says that no contract reached `EXTERNALLY_VERIFIED`: `runtime-surface-e7-v0.1` has, for its fixture premises only. `CAPABILITY_DISCOVERY.md` describes the implemented activation manifest instead of calling it proposed, without claiming that any deployment loads one. `FEDERATION.md` keeps its 2026-10-04 maturity snapshot and records what has happened since, raising no level.
+- Tests: two in `tests/test_interop_result_contract.py`. A result for one claim leaves another claim's row unchanged, and the edges partition every claim and every record.
+- `FEDERATION_BRIDGE.md` and the contract-probes README now record that the read-only reconciliation candidate was merged upstream as aeoess/federation-port#9 (`9e85e96`, 2026-10-14) under `v1-candidates/`, written by REMORA's maintainer and outside the v0 runtime. Issue #2 stays open, and the components stay pinned to `3a2f6ce`. Checked on 2026-10-26: `src/` is unchanged between `3a2f6ce` and `9e85e96`. `reproduce.sh` gives 193 of 193 at the pin, and the candidate's own script gives 19 of 19 plus 54 of 54 upstream at `9e85e96`. Both are author runs.
 ### API: a readiness probe that reads the durable store
 
 - Fault injection on the OT pilot stopped PostgreSQL while `GET /v1/health` kept answering `ok`, so an orchestrator would have kept routing writes to a process that could only refuse them. `/v1/health` stays a liveness probe.

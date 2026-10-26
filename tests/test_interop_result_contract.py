@@ -313,11 +313,54 @@ def test_matrix_is_generated_from_the_records_and_derives_every_status(manifest:
 
 def test_one_contradicted_record_wins_and_independence_is_not_rounded_up(records: list[dict[str, Any]]) -> None:
     module = _module("build_interop_matrix")
-    edge = {"id": "X", "producer": "REMORA", "consumer": "any", "artifact": "a", "property": "p", "contract": records[0]["contract_id"], "declared": "SPECIFIED"}
-    mine = [r for r in records if r["contract_id"] == edge["contract"]]
+    edge = {"id": "X", "producer": "REMORA", "consumer": "any", "artifact": "a", "property": records[0]["claim"], "contract": records[0]["contract_id"], "declared": "SPECIFIED"}
+    mine = [r for r in records if r["contract_id"] == edge["contract"] and r["claim"] == edge["property"]]
     assert module.derive(edge, mine)["status"] == "AUTHOR_RUN"
     l2 = _with(_with(copy.deepcopy(mine[0]), "independence_level", "L2_SECOND_IMPLEMENTATION"), "evaluator.kind", "SECOND_IMPLEMENTATION")
     assert module.derive(edge, mine + [l2])["status"] == "SECOND_IMPLEMENTATION"
     contradicted = _with(copy.deepcopy(mine[0]), "status", "CONTRADICTED")
     assert module.derive(edge, mine + [l2, contradicted])["status"] == "CONTRADICTED"
     assert module.derive(edge, [])["status"] == "SPECIFIED"
+
+
+def _edge(manifest: dict[str, Any], edge_id: str) -> dict[str, Any]:
+    return next(e for e in manifest["edges"] if e["id"] == edge_id)
+
+
+def test_a_result_for_one_claim_moves_no_other_claim_of_the_contract(
+        manifest: dict[str, Any], records: list[dict[str, Any]]) -> None:
+    """The external review of 2026-10-26: E-ECB counted the
+    single_use_authorization records and E-EE-V2 three other claims, so an
+    independent result for one claim would have raised the row of another."""
+    module = _module("build_interop_matrix")
+    e_ecb, e_su = _edge(manifest, "E-ECB"), _edge(manifest, "E-ECB-SU")
+    su = next(r for r in records if r["contract_id"] == "exact-call-binding-v1" and r["claim"] == "single_use_authorization")
+    independent = _with(_with(copy.deepcopy(su), "independence_level", "L4_INDEPENDENT_HOST_RUN"), "evaluator.kind", "SECOND_IMPLEMENTATION")
+    contradicted = _with(copy.deepcopy(su), "status", "CONTRADICTED")
+    before = module.derive(e_ecb, records)
+    assert before == module.derive(e_ecb, records + [independent])
+    assert before == module.derive(e_ecb, records + [contradicted])
+    assert before["records"] == 2
+    assert module.derive(e_su, records + [independent])["status"] == "INDEPENDENTLY_ESTABLISHED"
+    assert module.derive(e_su, records + [contradicted])["status"] == "CONTRADICTED"
+    for edge_id in ("E-EE-V2", "E-EE-V2-CALL", "E-EE-V2-DEC", "E-EE-V2-OBS"):
+        assert module.derive(_edge(manifest, edge_id), records)["records"] == 2
+
+
+def test_the_edges_partition_every_claim_and_every_record(
+        manifest: dict[str, Any], index: dict[str, Any], records: list[dict[str, Any]]) -> None:
+    module = _module("build_interop_matrix")
+    claims = module._claims_by_contract(index)
+    edges = manifest["edges"]
+    assert module.coverage_problems(edges, records, claims) == []
+
+    without_su = [e for e in edges if e["id"] != "E-ECB-SU"]
+    problems = module.coverage_problems(without_su, records, claims)
+    assert "exact-call-binding-v1: claim 'single_use_authorization' has no edge" in problems
+    assert "record for ('exact-call-binding-v1', 'single_use_authorization') falls on no edge" in problems
+
+    twice = [*edges, {**_edge(manifest, "E-ECB"), "id": "E-ECB-AGAIN"}]
+    assert any("is already the edge E-ECB" in p for p in module.coverage_problems(twice, records, claims))
+
+    unknown = [*edges, {**_edge(manifest, "E-FA"), "id": "E-FA-X", "property": "not_a_claim"}]
+    assert "E-FA-X: 'not_a_claim' is not a claim of fresh-authority-v1" in module.coverage_problems(unknown, records, claims)
