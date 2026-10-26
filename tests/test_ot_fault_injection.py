@@ -99,10 +99,42 @@ def test_latency_summary_groups_by_route():
 
 def test_every_fault_states_what_it_expects():
     names = [f.name for f in runner.FAULTS]
-    assert len(names) == len(set(names)) == 9
+    assert len(names) == len(set(names)) == 10
     assert all(f.expect for f in runner.FAULTS)
     # Revocation leaves the approver revoked, so it must run last.
     assert runner.FAULTS[-1].run is runner.f_approver_revoked_after_approval
+
+
+# ── Readiness as the container healthcheck ──────────────────────────────────
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("dockerfile", ["deploy/ot-pilot/Dockerfile", "deploy/reference/Dockerfile"])
+def test_the_container_healthcheck_probes_readiness_not_liveness(dockerfile):
+    """Fault injection (2026-10-26): with PostgreSQL stopped, /v1/health kept
+    answering ok, so Docker reported the API healthy while it could only refuse."""
+    text = (REPO / dockerfile).read_text(encoding="utf-8")
+    probe = text[text.index("HEALTHCHECK "):text.index('CMD ["uvicorn"')]
+    assert "/v1/ready" in probe and "/v1/health" not in probe
+
+
+@pytest.mark.parametrize("compose", ["deploy/ot-pilot/docker-compose.yml", "deploy/reference/docker-compose.yml"])
+def test_no_service_restarts_on_its_own_so_unhealthy_cannot_loop(compose):
+    assert "restart:" not in (REPO / compose).read_text(encoding="utf-8")
+
+
+def test_container_state_reads_health_and_restarts():
+    state = runner.container_state(
+        '[{"RestartCount": 0, "State": {"Running": true, "StartedAt": "t0",'
+        ' "Health": {"Status": "unhealthy"}}}]')
+    assert state == {"health": "unhealthy", "running": True, "restart_count": 0, "started_at": "t0"}
+    assert runner.container_state('[{"State": {}}]')["health"] is None
+
+
+def test_the_readiness_fault_runs_before_the_revocation():
+    order = [f.run for f in runner.FAULTS]
+    assert order.index(runner.f_readiness_follows_the_store) == order.index(runner.f_store_outage_during_execute) + 1
 
 
 # ── The plant evidence checker ──────────────────────────────────────────────

@@ -2,12 +2,25 @@
 # SPDX-License-Identifier: BUSL-1.1
 """Durable single-use consumption for ExecutionLease nonces (ADR-B).
 
-``NonceLedger`` in ``lease.py`` is a ``threading.Lock`` and a ``set``, and says
-so honestly: a lease is single-use *per process*. On the Cloudflare deployment
-that is a live gap rather than a theoretical one — containers are ephemeral by
-design and are replaced on idle, so the one-time property of a lease currently
-has the lifetime of a container. A captured lease, re-presented inside its
-expiry window after a replacement, executes a second time.
+``NonceLedger`` in ``lease.py`` is a ``threading.Lock`` and a ``set``: a lease
+it guards is single-use *per process*. Until this module landed (#351,
+2026-08-24) that was the only ledger, and on the Cloudflare deployment the
+one-time property of a lease had the lifetime of a container. Containers are
+replaced on idle, so a captured lease re-presented inside its expiry window
+after a replacement executed a second time.
+
+Today ``servers/execution_api.py::_lease_nonce_store`` builds a
+``DurableNonceStore`` whenever ``REMORA_PG_DSN``, ``REMORA_CHAIN_DB`` or
+``REMORA_STATE_ENDPOINT`` is set, the same variables as the consumed-jti
+ledger. With none of them set the in-process ``NonceLedger`` remains, and the
+per-process limit above still holds; the strict runtime profiles and
+production mode refuse to start without durable execution state. What is
+tested: spend-once, tenant scoping, outage-is-unknown and replacement
+dispatchers on SQLite (``tests/test_lease_nonce_durability.py``), the same on
+a real PostgreSQL server (``tests/test_enforcement_ledgers_postgres.py``, the
+``postgres-contract`` CI job), and separate processes on one host
+(``tests/conformance/test_execution_boundary_process_split.py``). Dispatchers
+on separate hosts sharing one store have not been run.
 
 This is the same defect class as the consumed-jti ledger fix (#350) one layer
 up: a durable backend the deployment already runs, that one component learned

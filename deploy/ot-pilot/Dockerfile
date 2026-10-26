@@ -55,8 +55,12 @@ USER remora
 
 EXPOSE 8000
 
+# The healthcheck is readiness: /v1/ready answers 503 while the durable store
+# does not, and /v1/health stays the liveness answer for whoever needs one.
+# Docker and compose restart nothing on "unhealthy", so a store outage marks
+# the API unhealthy without a restart loop; it only gates depends_on.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=5 \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=4).status == 200 else 1)"
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/ready', timeout=4).status == 200 else 1)"
 
 CMD ["uvicorn", "servers.api:app", "--host", "0.0.0.0", "--port", "8000"]
 

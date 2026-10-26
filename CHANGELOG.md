@@ -11,6 +11,35 @@ This file lists externally relevant changes by release. Fine-grained development
 - WS1 `off` and `shadow` are unchanged, because shadow changes no decision. So is the research profile, where control 2b still documents the residual.
 - Migration: a strict deployment that enforces WS1 on legacy admission refuses to start until it sets `REMORA_WS1_ADMISSION=atomic`, and it needs PostgreSQL or SQLite for that. No shipped deployment does this.
 - Tests: `tests/test_runtime_profile.py` (+13).
+### Deploy: the container healthcheck probes readiness (RMR-AUD-26-005)
+
+- The OT pilot and reference images probed `/v1/health`, which answers `ok` while PostgreSQL is down. Docker therefore reported the API healthy while it could only refuse. Both images now probe `/v1/ready`, and `/v1/health` stays liveness. Neither compose file sets a restart policy, so "unhealthy" restarts nothing and only gates `depends_on`.
+- `run_fault_injection.py` gains a tenth fault, which keeps PostgreSQL stopped until Docker marks the API unhealthy. The run at `dd5ae6db` (`artifacts/pilot-pack/runs/fault-injection-2026-10-26-b6d8841f/`, fingerprint `b79463b6`) is 10 of 10:
+  - readiness answered 503 `not_ready` after 2.7 s while liveness stayed 200;
+  - Docker marked the API unhealthy after 55 s, and the container kept running with no restart;
+  - after PostgreSQL started, readiness returned in 2.0 s and health in 7.4 s;
+  - 8 of 8 writes ran, both chains are valid.
+- Not checked: any orchestrator other than Docker and compose on one host.
+- Tests: `tests/test_ot_fault_injection.py` (+6): both Dockerfiles probe `/v1/ready`, neither compose file restarts, the `docker inspect` reader, and the order of the new fault.
+### Documentation: the API path count and the nonce store's history (RMR-AUD-26-007, RMR-AUD-26-009)
+
+- `docs/07-api-reference.md` said "OpenAPI 3.1, 41 paths" after `GET /v1/ready` made it 42 (43 operations). The count is now left to the schema. `tests/test_api_count_claims.py` refuses any live document that states an OpenAPI path or operation count differing from `schemas/openapi.json`, and pins the IFC-11 row's "28 routes" for the execution API. On master's text before this change it finds the 41.
+- The `remora/enforcement/nonce_store.py` docstring described the per-process lease ledger as the current state. It now dates that to before #351 (2026-08-24). It then says how `_lease_nonce_store` builds the durable store from `REMORA_PG_DSN`, `REMORA_CHAIN_DB` or `REMORA_STATE_ENDPOINT`, and that without them the in-process ledger and its per-process limit remain. It also says what is tested: SQLite, a real PostgreSQL server, and separate processes on one host. Dispatchers on separate hosts have not been run. No code changed.
+### Documentation: statements that outlived the controlled-pilot decision, and a gate against the next one
+
+- An external documentation review of 2026-10-26 found active documents still describing the state before the owner decision of 2026-10-25. Each finding was checked against master, and these were corrected:
+  - `remora-capabilities-v1.yaml` gave `SHADOW_PILOT` as the current release profile, and said no external run exists for `fresh-authority-v1`. One exists: Probity, second implementation, not independent, fixtures only. `externally_reproduced` stays false.
+  - `CAPABILITY_DISCOVERY.md` said E7 has no external run record. It has two.
+  - `plain_language_overview.md` called shadow mode the current profile.
+  - `external_review_panel_v1.md` listed open REM-021 as a blocker for its own level B sign-off. Level B is how REM-021 is completed, and it is not a precondition of the owner's `CONTROLLED_PILOT`.
+  - The atlas data said REM-023 is `IN_PROGRESS`; it is `DONE`. The atlas page is a dated snapshot of `d94eecf9`, and its header and summary now say "at d94eecf9" instead of "current" and "today", and link to the change.
+  - `best_practice_gap_audit_v1.md` called REM-021 the shadow-mode exit gate.
+  - The ADR-UE-03 status marks its "no code implements the manifest" as describing the time of acceptance.
+- SDD v1.1 gains "Implementation status, 2026-10-26". It is a table of what changed since `d94eecf9`, and the registers win where they disagree with it. The specification text is unchanged.
+- `check_document_governance.py` gains a HARD check. A canonical, generated or supporting document that names a profile as current must name the declared `current_profile`. On master before this change it finds both the capability declaration and the atlas. `tests/test_document_governance.py` (+3).
+- Two of the review's findings did not hold:
+  - `docs/sdk.md`, `PRODUCT_PACKAGING.md`, `SECURITY_OVERVIEW.md`, `DEPLOYMENT_OPTIONS.md`, `product_truth_contract.yaml` and the conformance benchmark are all registered, and no file under `docs/` lacks an entry.
+  - Register coverage stays advisory by design.
 
 ### Interop matrix: one edge per claim, and the Federation documents brought up to date
 
