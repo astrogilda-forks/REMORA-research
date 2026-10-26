@@ -237,7 +237,12 @@ same fault. The fix, aeoess/federation-port#1, was reproduced and reviewed by
 its maintainer and merged on 2026-10-08 as `3a2f6ce`. After review it also made
 the deadline an authorization expiry. The four probes now assert the corrected
 behaviour at the new pin. Read-only reconciliation of an operation still
-`unknown` after the deadline is open upstream as aeoess/federation-port#2.
+`unknown` after the deadline is open upstream as aeoess/federation-port#2. A
+v1 candidate for it, written by REMORA's maintainer, was merged as
+aeoess/federation-port#9 on 2026-10-14 (`9e85e96`) under
+`v1-candidates/reconciliation`, outside the v0 runtime; `src/` is unchanged
+since `3a2f6ce`. It is an author candidate, not interop evidence, and REMORA's
+components stay pinned to `3a2f6ce`.
 
 The map also records how the SDD testplan FED-01 to FED-10 overlapped the
 existing suite. Of its 40 planned cases most were already covered: FED-01,
