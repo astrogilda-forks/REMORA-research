@@ -35,6 +35,7 @@ AUTH="Authorization: Bearer ${REMORA_API_BEARER_TOKEN}"
 
 # 1. Is it up, and what policy is it running?
 curl -s localhost:8000/v1/health
+curl -s localhost:8000/v1/ready
 curl -s localhost:8000/v1/policy/version -H "$AUTH"
 
 # 2. Gate a proposed tool call.
@@ -235,6 +236,13 @@ When the PostgreSQL store stops answering, a request that needs it answers
 executed. The request can be retried once the store is back. Other unhandled
 errors stay 500, and neither body carries the driver's message.
 `GET /v1/health` is a liveness probe and does not read the store.
+`GET /v1/ready` is the readiness probe. It connects to `REMORA_PG_DSN` (or
+opens `REMORA_CHAIN_DB` read-only) with a two-second bound and answers 200
+`ready`, or 503 `not_ready` with `checks.durable_state: unavailable` while the
+store does not answer. It reports `not_configured` without a durable store and
+`not_checked` for the Worker state endpoint alone, which it does not reach. It
+takes no token, so one answer is reused for a second instead of opening a
+connection per request.
 
 ---
 
