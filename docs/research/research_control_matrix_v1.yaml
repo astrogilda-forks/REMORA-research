@@ -56,12 +56,21 @@
 #   compendium_note: "..."  -> used when a line has no anchor in the local
 #     landscape, to state honestly WHY (e.g. its sources sit outside the
 #     compendium's scope) instead of leaving the gap unexplained.
+# Capability binding (added 2026-10-26):
+#   capabilities: [CAP-...] -> the capability register entries whose mechanism
+#     the line grounds, validated to exist in
+#     docs/assurance/capability_register_v1.yaml. A line names a capability;
+#     it inherits none of its status. Matrix maturity (how far the research
+#     idea is implemented), register status (how far the mechanism is wired)
+#     and the activation manifest's effective mode (what a deployment runs it
+#     as, GET /v1/system/capabilities) are three different statements.
+#
 # The top-level `landscape:` block below records which whole areas of the
 # compendium REMORA deliberately does NOT implement, and why; so the boundary
 # is documented, not invisible.
 
 schema_version: "1"
-updated: "2026-10-18"
+updated: "2026-10-26"
 
 maturity_levels:
   - implemented_and_tested
@@ -553,6 +562,8 @@ entries:
       - a2a_envelope_task_fields
       - a2a_declared_operation_subset
       - context_scoped_loop_safety_store
+    capabilities:
+      - CAP-018
     code:
       - remora/governance/task_identity.py
       - remora/enforcement/token.py
@@ -602,6 +613,8 @@ entries:
       - callable_closure_identity
       - issuer_observed_credential_scope
       - durable_surface_evidence
+    capabilities:
+      - CAP-022
     code:
       - remora/toolcall/runtime_surface.py
       - remora/toolcall/surface_runtime.py
@@ -679,6 +692,8 @@ entries:
     controls:
       - evidence_coverage_verdict
       - chain_derived_authenticity
+    capabilities:
+      - CAP-019
     code:
       - remora/governance/evidence_coverage.py
       - servers/execution_api.py
@@ -718,6 +733,8 @@ entries:
     controls:
       - resolved_effect_digest_in_lease
       - dispatch_time_re_resolution
+    capabilities:
+      - CAP-020
     code:
       - remora/enforcement/resolved_effect.py
       - remora/enforcement/lease.py
@@ -758,6 +775,8 @@ entries:
     controls:
       - plan_binding_digest_in_lease
       - dispatch_time_revision_recheck
+    capabilities:
+      - CAP-020
     code:
       - remora/governance/plan_binding.py
       - remora/enforcement/lease.py
@@ -794,6 +813,8 @@ entries:
     controls:
       - separate_process_append_only_recorder
       - record_before_effect_fail_closed
+    capabilities:
+      - CAP-021
     code:
       - remora/audit/recorder.py
       - remora/enforcement/lease.py
@@ -837,6 +858,8 @@ entries:
       - finite_state_obligation_monitor
       - pre_dispatch_procedure_refusal
       - overclaim_flag
+    capabilities:
+      - CAP-020
     code:
       - remora/governance/procedure.py
       - remora/enforcement/lease.py
@@ -920,6 +943,8 @@ entries:
       - subset_delegation
       - revocation_epochs
       - success_established_contract
+    capabilities:
+      - CAP-023
     code:
       - remora/capabilities/model.py
       - remora/capabilities/resolver.py
@@ -1233,6 +1258,8 @@ entries:
       - semantic_authority_unknown_floor
       - argument_value_grounding
       - deterministic_derivation_receipts
+    capabilities:
+      - CAP-014
     code:
       - remora/toolcall/routing/goal_match.py
       - remora/toolcall/routing/tool_contract.py
@@ -1315,6 +1342,8 @@ entries:
       - resolved_effect_graph
       - effect_domain_custody_split
       - direct_access_gate
+    capabilities:
+      - CAP-024
     code:
       - remora/capabilities/resource.py
       - remora/enforcement/capability_mediator.py
@@ -1359,6 +1388,120 @@ entries:
     in_code_citation: false
     compendium_refs: []
     compendium_note: "Internal design; its conceptual origin (confused deputy, object capabilities) predates the AI-assurance compendium's scope."
+
+  - id: RES-025
+    title: "Cumulative limits reserved before the effect: escrow-style quantity bounds across calls and principals"
+    source:
+      citation: "O'Neil, P. E. (1986). The Escrow Transactional Method. ACM Transactions on Database Systems 11(4):405-430."
+      sections:
+        - "docs/07-api-reference.md (cumulative limits, idempotency, unknown outcomes)"
+      builds_on:
+        - "REMORA internal design: the limit ledger reserves a call's declared quantity before dispatch and settles or releases it afterwards, so concurrent calls cannot jointly pass a bound that none of them passes alone."
+    concepts:
+      - reserve_before_commit
+      - bounded_aggregate_quantity
+      - unknown_outcome_holds_the_reservation
+      - operation_identity_by_declared_key
+    controls:
+      - cumulative_limit_guard
+      - signed_limit_policy
+      - observed_change_meter
+      - checked_outcome_resolution
+    capabilities:
+      - CAP-031
+    code:
+      - remora/enforcement/cumulative_limits.py
+      - scripts/sign_limit_policy.py
+      - deploy/ot-pilot/limits.json
+    tests:
+      - tests/limits/test_limits_unit.py
+      - tests/limits/test_limits_idempotency.py
+      - tests/limits/test_limits_binding.py
+      - tests/limits/test_limits_resolve_route.py
+      - tests/limits/test_limits_ot_pilot.py
+      - tests/limits/test_limits_postgres.py
+    evidence: >-
+      A call is charged against every limit it matches before dispatch, in
+      one serialized ledger transaction, and refused before any decision when
+      the reservation would pass a bound (limit_exceeded). A call whose
+      outcome is unknown keeps its reservation until a reviewer resolves it,
+      and the resolution is checked against a deployment-supplied evidence
+      reader rather than taken on trust. Movement on observed change meters
+      is measured from what the plant reports. The OT pilot runs a signed
+      policy with coverage all_writes and REMORA_REQUIRE_LIMITS=1; its battery
+      run of 2026-10-25 refuses a setpoint move past the hourly cap at assess.
+      The fault-injection run of 2026-10-26
+      (artifacts/pilot-pack/runs/fault-injection-2026-10-26/) shows the
+      ledger still counting a move made before an API restart. A tool that
+      failed after dispatch began left its reservation held as UNKNOWN until
+      a reviewer resolved it, and the resolution was checked against the
+      plant's log. The same run shows a proposal approved twice running
+      twice, because the pilot declares no idempotency keys.
+    maturity: implemented_and_tested
+    scope_boundary: >-
+      Opt-in. The bounds are a deployment declaration that REMORA enforces but
+      does not choose. Without declared idempotency.key_arguments, two
+      separately approved identical proposals are two operations;
+      REMORA_REQUIRE_IDEMPOTENCY closes that, and the OT pilot does not set
+      it. The SQLite ledger serves one host; several workers need the
+      PostgreSQL ledger. REMORA takes the reserve-before-commit discipline of
+      escrow transactions, not a transaction manager.
+    related_work_section: "docs/09-related-work.md §17"
+    in_code_citation: false
+    compendium_refs: []
+    compendium_note: "No anchor in the local compendium: its sources are AI-assurance works, and escrow-style quantity reservation comes from database transaction processing (O'Neil 1986), outside its scope."
+
+  - id: RES-026
+    title: "Fail-safe defaults for capability activation: a signed manifest decides what runs, and absence or doubt disables"
+    source:
+      citation: "Saltzer, J. H. & Schroeder, M. D. (1975). The Protection of Information in Computer Systems. Proceedings of the IEEE 63(9):1278-1308 (principle of fail-safe defaults)."
+      sections:
+        - "docs/design/unified-capability-execution-v1.1.md (ADR-UE-03)"
+      builds_on:
+        - "REMORA internal design (ADR-UE-03): each capability's effective mode is computed from a signed request, the premises this process can verify and the registered maturity, and every lease carries the manifest's digest."
+    concepts:
+      - activation_by_permission_not_exclusion
+      - effective_mode_from_request_premises_and_maturity
+      - manifest_bound_into_the_lease
+      - flag_and_manifest_must_agree
+    controls:
+      - capability_activation_manifest
+      - effective_mode_computation
+      - cam_digest_lease_binding
+      - startup_activation_validation
+    code:
+      - remora/governance/activation_manifest.py
+      - remora/governance/capability_activation.py
+      - remora/governance/capability_catalogue_v1.json
+      - scripts/sign_capability_manifest.py
+      - scripts/build_capability_catalogue.py
+    tests:
+      - tests/test_activation_manifest.py
+      - tests/test_capability_activation.py
+      - tests/test_cam_lease_binding.py
+    evidence: >-
+      A capability the manifest does not name is DISABLED. A required premise
+      that fails or cannot be verified gives the entry's fail mode, DISABLED
+      or BLOCKED, never allow. An enforcing request for a capability
+      registered below WIRED_API_PATH is lowered. With REMORA_CAM_REQUIRED=1
+      the API refuses to start without a loadable manifest, and a
+      REMORA_REQUIRE_LIMITS flag that disagrees with a loaded manifest refuses
+      startup either way. The dispatcher refuses a lease minted under another
+      manifest before anything is spent.
+      The OT pilot's fault-injection run of 2026-10-26 records in its frozen
+      configuration that no manifest was loaded (manifest_loaded false).
+    maturity: implemented_and_tested
+    scope_boundary: >-
+      No shipped deployment loads a manifest yet, the OT pilot included, so
+      every effective mode there is NOT_ESTABLISHED and nothing changes
+      behaviour. Most premises read whether a setting is configured; each
+      setting's own startup check gives it meaning. Only REMORA_REQUIRE_LIMITS
+      has been migrated to agree with the manifest. The effective mode of a
+      tool's own capability is not yet in the decision record.
+    related_work_section: "docs/09-related-work.md §18"
+    in_code_citation: false
+    compendium_refs:
+      - saltzer-schroeder-1975
 
 landscape:
   source: "docs/researchpapers/kompendium_ai_assurance_3utgave.md"

@@ -4,6 +4,10 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Research control matrix: bound to the capability register, with lines for cumulative limits and capability activation
+
+- An external review of 2026-10-26 found the matrix dated 2026-10-18 and silent on the cumulative limits (CAP-031) and the capability activation manifest (ADR-UE-03). Both are now research lines: RES-025 (escrow-style reservation before the effect, O'Neil 1986) and RES-026 (fail-safe defaults for activation, Saltzer and Schroeder 1975), each with code, tests, evidence, a scope boundary and a section in `docs/09-related-work.md` (§17, §18). RES-026 states that no shipped deployment loads a manifest yet.
+- A line may name the capability register entries its research grounds (`capabilities:`); `scripts/generate_research_control_matrix.py` refuses an unregistered id, and the generated view adds a capability → research index. Twelve lines name one. The view states that matrix maturity, register status and the manifest's effective mode are three different statements and that naming a capability inherits none of its status. No maturity was changed.
 ### OT pilot: fault injection through the whole chain, a frozen configuration and operator measurements
 
 - `deploy/ot-pilot/run_fault_injection.py` injects nine faults into the running pilot over HTTP and `docker compose`:
