@@ -35,6 +35,11 @@ manifest named by ``REMORA_CAM_FILE`` is still loaded and reported, and a
 problem is logged, not raised. No enforcement path reads the result yet: the
 lease field and the catalogue route are the next slices.
 
+Migrated environment flags (``FLAG_AGREEMENTS``, ADR-UE-03 item 7) must
+agree with a loaded manifest: ``REMORA_REQUIRE_LIMITS`` set means CAP-031 is
+requested enforcing, unset means it is not. A disagreement refuses startup
+whether or not the manifest is required.
+
 What a premise check establishes is stated beside it in ``PREMISES``. Most
 read whether a setting is configured; the startup checks of the settings
 themselves (signature verification, durability guards) are what make the
@@ -60,6 +65,7 @@ __all__ = [
     "BLOCKED",
     "CATALOGUE_PATH",
     "ENFORCE_ELIGIBLE",
+    "FLAG_AGREEMENTS",
     "NOT_ESTABLISHED",
     "PREMISES",
     "Activation",
@@ -68,6 +74,7 @@ __all__ = [
     "activation_report",
     "catalogue_view",
     "effective_activation",
+    "flag_disagreements",
     "load_catalogue",
     "validate_activation_at_startup",
 ]
@@ -151,6 +158,24 @@ PREMISES: dict[str, Premise] = {p.id: p for p in (
             "REMORA_FLOW_CONTROL=1: the flow check runs at assess and at dispatch",
             _flow_control),
 )}
+
+
+@dataclass(frozen=True)
+class FlagAgreement:
+    """An environment flag that selects a capability's mode today (ADR-UE-03
+    item 7). While both exist, the flag and the manifest must agree: the flag
+    set means an enforcing request, the flag unset means a non-enforcing one.
+    Neither silently wins."""
+
+    capability_id: str
+    flag: str
+    check: Callable[[], bool]
+
+
+#: The flags migrated so far, one per change (ADR-UE-03 slice 5).
+FLAG_AGREEMENTS: tuple[FlagAgreement, ...] = (
+    FlagAgreement("CAP-031", "REMORA_REQUIRE_LIMITS", lambda: _setting("REMORA_REQUIRE_LIMITS")),
+)
 
 
 @dataclass(frozen=True)
@@ -250,6 +275,27 @@ def activation_report(loaded: LoadedManifest, catalogue: Mapping[str, Mapping[st
     return ActivationReport(manifest.digest, loaded.signed, tuple(activations), unknown, missing)
 
 
+def flag_disagreements(loaded: LoadedManifest,
+                       agreements: Iterable[FlagAgreement] = FLAG_AGREEMENTS) -> list[str]:
+    """Each migrated flag whose value disagrees with the manifest's request.
+
+    A capability the manifest leaves out is not compared: its effective mode
+    is DISABLED, and the flag keeps its current meaning until the manifest
+    names it.
+    """
+    out = []
+    for agreement in agreements:
+        entry = loaded.manifest.get(agreement.capability_id)
+        if entry is None:
+            continue
+        flag_on = bool(agreement.check())
+        enforcing = entry.requested_mode in _ENFORCING
+        if flag_on != enforcing:
+            out.append(f"{agreement.flag} is {'set' if flag_on else 'unset'} but the manifest "
+                       f"requests {entry.requested_mode} for {agreement.capability_id}")
+    return out
+
+
 def validate_activation_at_startup(*, catalogue_path: Path = CATALOGUE_PATH,
                                    premises: Mapping[str, Premise] = PREMISES,
                                    ) -> ActivationReport | None:
@@ -279,6 +325,12 @@ def validate_activation_at_startup(*, catalogue_path: Path = CATALOGUE_PATH,
             refuse("REMORA_CAM_REQUIRED=1 and REMORA_CAM_FILE is unset")
         return None
     report = activation_report(loaded, load_catalogue(catalogue_path), premises=premises)
+    disagreements = flag_disagreements(loaded)
+    if disagreements:
+        # ADR-UE-03 item 7: a loaded manifest and a migrated flag that
+        # disagree refuse startup whether or not the manifest is required.
+        raise RuntimeProfileError("capability activation manifest and environment flag "
+                                  "disagree: " + "; ".join(disagreements))
     if report.unknown:
         refuse(f"entries for capabilities the catalogue does not have: {list(report.unknown)}")
     if report.missing and strict:

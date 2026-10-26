@@ -175,7 +175,11 @@ open choices:
    `remora/governance/capability_activation.py`, `schemas/openapi.json` and
    `frontend/src/generated/remora-api.ts` regenerated.
 5. The environment-flag migration of item 7, one flag per change, each with
-   the agreement test.
+   the agreement test. First flag, 2026-10-26: `REMORA_REQUIRE_LIMITS`
+   against CAP-031 (`FLAG_AGREEMENTS` in
+   `remora/governance/capability_activation.py`). A loaded manifest that
+   disagrees refuses startup, required or not. The flow-control flag has no
+   capability of its own in the register, so it waits for one.
 
 ## What this ADR does not decide
 

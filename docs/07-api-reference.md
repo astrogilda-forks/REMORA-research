@@ -1079,6 +1079,9 @@ restart-proven by test.
   (`CAPABILITY_ACTIVATION`). With `REMORA_CAM_REQUIRED=1` startup refuses
   without a loadable manifest, with an entry the catalogue does not have, and,
   under a strict profile, with a registered capability left out.
+  Migrated flags must agree with a loaded manifest: `REMORA_REQUIRE_LIMITS`
+  set means CAP-031 is requested `ENFORCE` or `VERIFY`, unset means it is not;
+  a disagreement refuses startup whether or not the manifest is required.
   `GET /v1/system/capabilities` (`read`) serves the catalogue joined with the
   report: per capability its registered maturity, primary hook, requested and
   effective mode, reasons and premise results, and the manifest's digest and

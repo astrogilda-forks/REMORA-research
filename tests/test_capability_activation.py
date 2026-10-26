@@ -240,6 +240,7 @@ def test_required_with_an_unloadable_manifest_refuses_and_not_required_logs(
 
 
 def test_required_refuses_an_entry_the_catalogue_does_not_have(tmp_path, monkeypatch):
+    monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")  # agrees with CAP-031 ENFORCE
     from remora.profiles import RuntimeProfileError
 
     _write_signed(tmp_path, monkeypatch, _entry("CAP-031"), _entry("CAP-001"), _entry("CAP-099"))
@@ -249,6 +250,7 @@ def test_required_refuses_an_entry_the_catalogue_does_not_have(tmp_path, monkeyp
 
 
 def test_a_strict_profile_needs_every_registered_capability(tmp_path, monkeypatch):
+    monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")  # agrees with CAP-031 ENFORCE
     from remora.profiles import RuntimeProfileError
 
     _write_signed(tmp_path, monkeypatch, _entry("CAP-031"))
@@ -261,6 +263,7 @@ def test_a_strict_profile_needs_every_registered_capability(tmp_path, monkeypatc
 
 
 def test_a_complete_signed_manifest_under_a_strict_profile_is_accepted(tmp_path, monkeypatch):
+    monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")  # agrees with CAP-031 ENFORCE
     _write_signed(tmp_path, monkeypatch, _entry("CAP-031", premises=["p"]),
                   _entry("CAP-001", requested="SHADOW", allowed=("SHADOW",)))
     monkeypatch.setenv("REMORA_CAM_REQUIRED", "1")
@@ -353,3 +356,40 @@ def test_the_route_serves_the_view_to_a_reader_and_refuses_without_the_capabilit
 
     monkeypatch.setattr(api_mod, "_require_tenant_capability", refuse)
     assert client.get("/v1/system/capabilities").status_code == 403
+
+
+# ── migrated flags must agree with the manifest (slice 5) ──────────────────
+
+
+@pytest.mark.parametrize("flag, requested, agrees", [
+    (True, "ENFORCE", True), (True, "VERIFY", True), (False, "SHADOW", True),
+    (False, "DISABLED", True), (True, "SHADOW", False), (False, "ENFORCE", False),
+])
+def test_require_limits_and_the_cap_031_request_must_agree(monkeypatch, flag, requested, agrees):
+    if flag:
+        monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")
+    allowed = ("SHADOW", "VERIFY", "ENFORCE", "DISABLED")
+    loaded = _loaded(_entry("CAP-031", requested=requested, allowed=allowed))
+    problems = ca.flag_disagreements(loaded)
+    assert (problems == []) is agrees, problems
+    if not agrees:
+        assert "REMORA_REQUIRE_LIMITS" in problems[0] and requested in problems[0]
+
+
+def test_a_capability_the_manifest_leaves_out_is_not_compared(monkeypatch):
+    monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")
+    assert ca.flag_disagreements(_loaded(_entry("CAP-001", requested="SHADOW",
+                                                allowed=("SHADOW",)))) == []
+
+
+def test_a_disagreement_refuses_startup_even_when_the_manifest_is_not_required(
+        tmp_path, monkeypatch):
+    from remora.profiles import RuntimeProfileError
+
+    _write_signed(tmp_path, monkeypatch, _entry("CAP-031", requested="SHADOW",
+                                                allowed=("SHADOW", "ENFORCE")))
+    monkeypatch.setenv("REMORA_REQUIRE_LIMITS", "1")
+    with pytest.raises(RuntimeProfileError, match="disagree"):
+        ca.validate_activation_at_startup(catalogue_path=_catalogue_file(tmp_path))
+    monkeypatch.delenv("REMORA_REQUIRE_LIMITS")
+    assert ca.validate_activation_at_startup(catalogue_path=_catalogue_file(tmp_path)) is not None
