@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### `GET /v1/system/capabilities`: the capability catalogue joined with the activation manifest (ADR-UE-03 slice 4)
+
+- A read-only, tenant-authenticated route (`read` capability) serving one row per registered capability from the packaged catalogue: registered maturity, primary hook, and, under the manifest loaded at startup, the requested and effective mode with the reasons and premise results, plus the manifest's digest and whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`. No signer key id or credential is returned, and nothing on the route changes a mode. It is distinct from the agent-facing `/v1/execution/capabilities`.
+- `schemas/openapi.json` (41 paths) and `frontend/src/generated/remora-api.ts` regenerated; the route is classified as an execution/infrastructure path in `tests/test_enabled_surfaces.py`.
+- `tests/test_capability_activation.py` gains the view without and with a manifest, the live catalogue's 32 rows, and the route for a reader and without the capability (403).
 ### The activation manifest's digest in the lease and the decision record (ADR-UE-03 slice 3)
 
 - `ExecutionLease.cam_digest`: the digest of the Capability Activation Manifest the authority loaded at startup, signed only when set and beside `policy_bundle_hash`, not folded into it (owner resolution of ADR-UE-03 item 5). Leases issued before it sign the same bytes. The completeness contract gains the field.

@@ -170,7 +170,10 @@ open choices:
    `cam_lease_unbound`, `cam_unverifiable`), the `assessed` record's
    `cam_digest`, `tests/test_cam_lease_binding.py`.
 4. The packaged catalogue artefact and `GET /v1/system/capabilities`, with
-   the OpenAPI document and the typed client regenerated.
+   the OpenAPI document and the typed client regenerated. Delivered
+   2026-10-26: the route in `servers/api.py`, `catalogue_view` in
+   `remora/governance/capability_activation.py`, `schemas/openapi.json` and
+   `frontend/src/generated/remora-api.ts` regenerated.
 5. The environment-flag migration of item 7, one flag per change, each with
    the agreement test.
 

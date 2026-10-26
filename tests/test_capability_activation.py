@@ -297,3 +297,59 @@ def test_a_catalogue_of_another_schema_is_refused(tmp_path):
     with pytest.raises(ManifestError) as exc:
         ca.load_catalogue(path)
     assert exc.value.reason == "catalogue_schema_unknown"
+
+
+# ── the read-only catalogue (slice 4) ──────────────────────────────────────
+
+
+def test_without_a_manifest_every_mode_is_not_established():
+    view = ca.catalogue_view(None, CATALOGUE)
+    assert view["schema"] == "remora-system-capabilities/v1"
+    assert view["manifest"] == {"loaded": False}
+    assert [r["capability_id"] for r in view["capabilities"]] == ["CAP-001", "CAP-031"]
+    for row in view["capabilities"]:
+        assert row["requested_mode"] == row["effective_mode"] == ca.NOT_ESTABLISHED
+        assert row["reasons"] == ["no_manifest_loaded"]
+    assert view["capabilities"][1]["hook"] == "PRE_DISPATCH"
+
+
+def test_under_a_manifest_the_view_shows_requested_and_effective_modes():
+    report = ca.activation_report(_loaded(_entry("CAP-031", premises=["p"]), signed=True),
+                                  CATALOGUE, premises=_premises(p=False))
+    view = ca.catalogue_view(report, CATALOGUE)
+    assert view["manifest"]["loaded"] is True and view["manifest"]["signed"] is True
+    assert view["manifest"]["digest"] == report.manifest_digest
+    assert view["manifest"]["missing"] == ["CAP-001"]
+    rows = {r["capability_id"]: r for r in view["capabilities"]}
+    assert rows["CAP-031"]["effective_mode"] == ca.BLOCKED
+    assert rows["CAP-031"]["premises"] == {"p": False}
+    assert rows["CAP-001"]["effective_mode"] == "DISABLED"
+    assert rows["CAP-001"]["requested_mode"] == ca.NOT_ESTABLISHED
+    text = json.dumps(view)
+    assert "kid" not in text and "signer" not in text and "key" not in text.lower()
+
+
+def test_the_live_view_covers_the_packaged_catalogue():
+    view = ca.catalogue_view(None)
+    assert len(view["capabilities"]) == 32
+
+
+def test_the_route_serves_the_view_to_a_reader_and_refuses_without_the_capability(monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi import HTTPException
+    from fastapi.testclient import TestClient
+
+    import servers.api as api_mod
+
+    monkeypatch.setattr(api_mod, "_authenticate", lambda request: ("acme", "viewer"))
+    monkeypatch.setattr(api_mod, "CAPABILITY_ACTIVATION", None)
+    client = TestClient(api_mod.app)
+    body = client.get("/v1/system/capabilities").json()
+    assert body["manifest"] == {"loaded": False} and len(body["capabilities"]) == 32
+
+    def refuse(role, tenant, capability):
+        assert capability == "read"
+        raise HTTPException(status_code=403, detail="no read")
+
+    monkeypatch.setattr(api_mod, "_require_tenant_capability", refuse)
+    assert client.get("/v1/system/capabilities").status_code == 403
