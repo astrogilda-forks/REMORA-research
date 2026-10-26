@@ -9,6 +9,13 @@ This file lists externally relevant changes by release. Fine-grained development
 - A read-only, tenant-authenticated route (`read` capability) serving one row per registered capability from the packaged catalogue: registered maturity, primary hook, and, under the manifest loaded at startup, the requested and effective mode with the reasons and premise results, plus the manifest's digest and whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`. No signer key id or credential is returned, and nothing on the route changes a mode. It is distinct from the agent-facing `/v1/execution/capabilities`.
 - `schemas/openapi.json` (41 paths) and `frontend/src/generated/remora-api.ts` regenerated; the route is classified as an execution/infrastructure path in `tests/test_enabled_surfaces.py`.
 - `tests/test_capability_activation.py` gains the view without and with a manifest, the live catalogue's 32 rows, and the route for a reader and without the capability (403).
+### The activation manifest's digest in the lease and the decision record (ADR-UE-03 slice 3)
+
+- `ExecutionLease.cam_digest`: the digest of the Capability Activation Manifest the authority loaded at startup, signed only when set and beside `policy_bundle_hash`, not folded into it (owner resolution of ADR-UE-03 item 5). Leases issued before it sign the same bytes. The completeness contract gains the field.
+- `GovernedToolDispatcher.bind_cam_digest`, bound by the execution API to the manifest this process loaded, refuses before anything is spent: a lease minted under a manifest where none is loaded (`cam_unbound`), a lease without one where one is in force (`cam_lease_unbound`), different manifests (`cam_changed`), and a source that raises (`cam_unverifiable`). Without a manifest anywhere nothing changes.
+- The `assessed` chain event records `cam_digest` when a manifest is loaded.
+- `tests/test_cam_lease_binding.py` (12): the signature, each refusal and the unspent nonce, the unchanged path, and on `/execute-accepted` that the minted lease and the assessment carry the digest.
+- Not yet: the effective mode of the tool's own capability in the decision record (there is no tool-to-capability map), and the catalogue route (slice 4).
 
 ### Effective capability modes and the startup validation (ADR-UE-03 slice 2)
 
