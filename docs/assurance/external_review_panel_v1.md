@@ -46,7 +46,7 @@ safe.
 | Purpose | Required staffing | Boundary |
 |---|---|---|
 | Research and claim review | R1 + R3 | Cannot attest enforcement or production readiness |
-| REM-021 / `CONTROLLED_PILOT` | R1 + R2 + R3 | R2 must cover the security architecture; a documentation-only review is not sufficient |
+| REM-021 / sign-off level B | R1 + R2 + R3 | R2 must cover the security architecture; a documentation-only review is not sufficient |
 | Production maturity | R1 + R2 + R3 + R4 | Requires that open production findings and the relevant release gates are actually closed |
 | License/IP | R5 | Separate legal workstream and separate conclusion |
 | Customer-specific industrial pilot | The panel above + the customer's independent domain/OT authority | The sign-off applies only to the assessed tool surface, risk class, and operating context |
@@ -385,10 +385,16 @@ A technical panel sign-off cannot replace this memorandum.
 | Level | Permitted conclusion | Required signatures | Absolute blockers |
 |---|---|---|---|
 | **A — Research claims reviewed** | "Method and claims have been externally reviewed for commit X" | R1 + R3 | Unresolved statistical error, overclaim, or missing claim evidence |
-| **B — Approved for controlled pilot** | "Approved for a bounded `CONTROLLED_PILOT`; not production-certified" | R1 + R2 + R3 | REM-021/023 open; relevant `CRITICAL`/`MAJOR`; unbounded tool/risk surface |
+| **B — Approved for controlled pilot** | "Approved for a bounded `CONTROLLED_PILOT`; not production-certified" | R1 + R2 + R3 | REM-023 not `DONE`; relevant `CRITICAL`/`MAJOR`; unbounded tool/risk surface |
 | **C — Approved for limited enforcement** | "Approved for named tools, environments, and risk classes" | R1 + R2 + R3 + R4 + the customer's domain authority | REM-024/030 open; PEP does not hold credentials; interception/replay not externally tested |
 | **D — Production assurance package complete** | "The panel finds the evidence package complete for the defined deployment" | R1 + R2 + R3 + R4 + domain authority | Unfinished P0–P3 gates, undocumented residual risk, missing durable state/audit/supply chain |
 | **L — Legal/IP cleared** | "License and IP basis legally cleared for the stated use/transaction" | R5 | Unclear chain of title, CLA, third-party terms, or conflicting license documents |
+
+Level B is the panel's own conclusion and is how REM-021 is completed. It is
+not a precondition of the repository's `CONTROLLED_PILOT` profile, which holds
+by owner decision since 2026-10-25 (`OD-2026-10-25-controlled-pilot` in
+`release_profiles_v1.yaml`); REM-021 gates `EXTERNALLY_VERIFIED` and
+`PRODUCTION`.
 
 None of the levels shall be described as accredited certification unless a
 competent certification / conformity-assessment process has explicitly

@@ -74,6 +74,8 @@ def _clear(monkeypatch) -> None:
         "REMORA_LIMITS_TRUSTED_KEYS",
         "REMORA_REQUIRE_LIMITS",
         "REMORA_REQUIRE_IDEMPOTENCY",
+        "REMORA_WS1_MODE",
+        "REMORA_WS1_ADMISSION",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -248,3 +250,54 @@ def test_controlled_pilot_on_postgres_requires_a_shared_limit_ledger(monkeypatch
         validate_runtime_profile_prerequisites()
     monkeypatch.setenv("REMORA_LIMITS_LEDGER", "postgresql://remora@db/remora")
     assert validate_runtime_profile_prerequisites() == "controlled_pilot"
+
+
+def _strict_profile(monkeypatch, profile: str) -> None:
+    _clear(monkeypatch)
+    _configure_strict(monkeypatch, profile)
+    monkeypatch.setenv("REMORA_ENV", "production")
+
+
+@pytest.mark.parametrize("profile", ["review", "controlled_pilot"])
+@pytest.mark.parametrize("admission", [None, "legacy", "LEGACY "])
+def test_a_strict_profile_enforcing_ws1_refuses_legacy_admission(monkeypatch, profile, admission) -> None:
+    """RMR-AUD-26-003: on legacy, evidence that lapses after the WS1 re-gate is
+    still spent (control 2b). The ADR says the strict profile must refuse it."""
+    _strict_profile(monkeypatch, profile)
+    monkeypatch.setenv("REMORA_WS1_MODE", "enforce")
+    if admission is not None:
+        monkeypatch.setenv("REMORA_WS1_ADMISSION", admission)
+    with pytest.raises(RuntimeProfileError, match="REMORA_WS1_ADMISSION=atomic"):
+        validate_runtime_profile_prerequisites()
+
+
+@pytest.mark.parametrize("profile", ["review", "controlled_pilot"])
+def test_a_strict_profile_enforcing_ws1_accepts_atomic_admission(monkeypatch, profile) -> None:
+    _strict_profile(monkeypatch, profile)
+    monkeypatch.setenv("REMORA_WS1_MODE", "enforce")
+    monkeypatch.setenv("REMORA_WS1_ADMISSION", "atomic")
+    assert validate_runtime_profile_prerequisites() == profile
+
+
+def test_an_unknown_admission_value_is_refused_by_the_profile_too(monkeypatch) -> None:
+    _strict_profile(monkeypatch, "controlled_pilot")
+    monkeypatch.setenv("REMORA_WS1_MODE", "enforce")
+    monkeypatch.setenv("REMORA_WS1_ADMISSION", "fast")
+    with pytest.raises(RuntimeProfileError, match="got 'fast'"):
+        validate_runtime_profile_prerequisites()
+
+
+@pytest.mark.parametrize("mode", [None, "off", "shadow"])
+def test_ws1_off_or_shadow_keeps_legacy_under_a_strict_profile(monkeypatch, mode) -> None:
+    """Shadow leaves the decision unchanged (Ws1Gate.apply), so legacy admits
+    nothing on WS1 evidence there."""
+    _strict_profile(monkeypatch, "controlled_pilot")
+    if mode is not None:
+        monkeypatch.setenv("REMORA_WS1_MODE", mode)
+    assert validate_runtime_profile_prerequisites() == "controlled_pilot"
+
+
+def test_the_research_profile_keeps_legacy_with_ws1_enforcing(monkeypatch) -> None:
+    _clear(monkeypatch)
+    monkeypatch.setenv("REMORA_WS1_MODE", "enforce")
+    assert validate_runtime_profile_prerequisites() == "research"

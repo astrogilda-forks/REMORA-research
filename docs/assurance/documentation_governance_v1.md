@@ -114,6 +114,13 @@ The `documentation-governance` gate checks, as HARD failures:
    invalid-YAML entries in the remediation register on its first run).
 4. Release-profile requirements reference only existing ids and ladder
    levels, and declared `current_profile` equals the computed profile.
+4a. A `canonical`, `generated` or `supporting` document that names a profile
+   as current ("the current release profile is X", "X (current profile)")
+   names the declared `current_profile`. Added 2026-10-26, after
+   `remora-capabilities-v1.yaml` and the generated atlas still named
+   `SHADOW_PILOT` a day after the owner decision. A dated statement ("the
+   profile at d94eecf9 was X") is not read as current. Prose that calls a
+   profile current without naming it is not caught.
 
 And as ADVISORY warnings (printed, never failing the build):
 
