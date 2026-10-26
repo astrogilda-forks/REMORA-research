@@ -4,6 +4,14 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### WS1: strict profiles require atomic admission when WS1 enforces (RMR-AUD-26-003)
+
+- On legacy admission the WS1 re-gate and the grant spend are separate steps. Evidence that lapses between them is still spent: control 2b in `tests/test_ws1_gate_controls.py` records that as the documented residual. The M4 ADR said the strict profile must refuse it, and nothing did.
+- `review` and `controlled_pilot` now refuse to start with `REMORA_WS1_MODE=enforce` unless `REMORA_WS1_ADMISSION=atomic` (`remora/toolcall/runtime_profile.py::_check_ws1_admission`). Atomic admission's own prerequisites, a transactional store and `REMORA_MAX_CLOCK_SKEW_MS`, are still refused at import when missing, and there is no fallback to legacy.
+- WS1 `off` and `shadow` are unchanged, because shadow changes no decision. So is the research profile, where control 2b still documents the residual.
+- Migration: a strict deployment that enforces WS1 on legacy admission refuses to start until it sets `REMORA_WS1_ADMISSION=atomic`, and it needs PostgreSQL or SQLite for that. No shipped deployment does this.
+- Tests: `tests/test_runtime_profile.py` (+13).
+
 ### Interop matrix: one edge per claim, and the Federation documents brought up to date
 
 - An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.

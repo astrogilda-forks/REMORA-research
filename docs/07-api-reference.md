@@ -651,7 +651,10 @@ by other means changes a decision.
 
 **WS1 execution preconditions (#953, opt-in, default off):**
 `REMORA_WS1_MODE` is `off`, `shadow` or `enforce`; any other value refuses
-startup. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
+startup. Under the `review` and `controlled_pilot` runtime profiles, `enforce`
+also requires `REMORA_WS1_ADMISSION=atomic`: legacy admission spends the grant
+after the WS1 re-gate, so evidence that lapsed in between would still be
+spent. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
 exposing `build_ws1_deployment()`: the precondition registry, verifiers,
 resolvers, read capabilities, monitor profile and budget. `/assess` then runs
 the WS1 loop after every other component, records it under `ws1` in the chain
