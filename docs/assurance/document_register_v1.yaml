@@ -3339,6 +3339,19 @@ documents:
   last_reviewed: '2026-10-25'
   validates_against: []
   claims: []
+- id: DOC-414
+  path: docs/assurance/fault_scenario_crosswalk_v1.md
+  status: canonical
+  topic: docs_assurance_fault_scenario_crosswalk_v1_md
+  code_synced: verified
+  verdict: current
+  owner: darklordVirtual
+  audience:
+  - maintainers
+  - evaluators
+  last_reviewed: '2026-10-26'
+  validates_against: []
+  claims: []
 topics:
 - provenance_README_md
 - provenance_prior-art-review-2026-10-04_md
@@ -3678,3 +3691,4 @@ topics:
 - docs_design_unified-capability-execution-v1.1-atlas_html
 - docs_architecture_ADR-UE-03-capability-manifest-hook-and-mode_md
 - docs_architecture_ADR-pilot-readiness-owner-decision_md
+- docs_assurance_fault_scenario_crosswalk_v1_md

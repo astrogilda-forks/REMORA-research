@@ -341,6 +341,8 @@ def two_executors(split, tmp_path_factory):
         "REMORA_LEASE_SIGNING_KEY": "",
         "REMORA_PDP_SIGNING_KEY": "",
         "REMORA_CHAIN_DB": str(db),
+        # A SQLite-chain test: not the PostgreSQL a developer may have exported.
+        "REMORA_PG_DSN": "",
     }
     procs, urls = [], []
     try:
@@ -415,6 +417,8 @@ def test_p8_a_lease_spent_before_a_restart_is_refused_after_it(
         "REMORA_LEASE_SIGNING_KEY": "",
         "REMORA_PDP_SIGNING_KEY": "",
         "REMORA_CHAIN_DB": str(db),
+        # A SQLite-chain test: not the PostgreSQL a developer may have exported.
+        "REMORA_PG_DSN": "",
     }
     arguments = {"to": APPROVED}
     lease = _issue("send_mail", arguments)
@@ -529,6 +533,8 @@ def test_p9_an_operator_stop_refuses_valid_leases_across_a_restart(
         "REMORA_LEASE_SIGNING_KEY": "",
         "REMORA_PDP_SIGNING_KEY": "",
         "REMORA_CHAIN_DB": str(db),
+        # A SQLite-chain test: not the PostgreSQL a developer may have exported.
+        "REMORA_PG_DSN": "",
     }
     arguments = {"to": APPROVED}
     lease = _issue("send_mail", arguments)

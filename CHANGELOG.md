@@ -4,6 +4,15 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Assurance: a fault-scenario crosswalk, and a process-split fixture that refused to start (RMR-AUD-26-011)
+
+- `docs/assurance/fault_scenario_crosswalk_v1.md` maps the adversarial review's scenario classes to the tests and OT pilot runs that exercise them. For each it records whether real PostgreSQL, a restart or several processes are involved, and what each returned on 2026-10-26: `2594d08b`, one Windows host, PostgreSQL 16 in a container.
+  - The scenario classes are retry, grant and nonce, store outage, stop, UNKNOWN, limits, tenants, API and SDK, CAM, and alternative ingress.
+  - Two hosts, a network partition, a real plant and other orchestrators are `NOT_RUN`.
+  - The review's F1 to F15 are `NOT_ESTABLISHED`, because their definitions are not in the findings file.
+- `tests/conformance/_executor.py` passed both `REMORA_PG_DSN` and `REMORA_CHAIN_DB` to `AuthorityEpochs`, which takes exactly one. With PostgreSQL exported in a developer's shell, the SQLite process-split tests inherited it and their executors refused to start.
+  - The executor now prefers the DSN, as the server does, and the three SQLite-chain tests clear it for their children. The file passes in both modes: 14 passed and 2 skipped without PostgreSQL, 16 passed with it.
+  - CI did not see the defect, because its PostgreSQL job runs only the tests named `postgres`.
 ### SDK: a post-send failure on a state-changing call is not retryable, and the async client binds recorded effects
 
 - A capability audit of 2026-10-26 found two gaps in `remora.sdk`. Neither client retries on its own; both concern what the clients tell the caller.
