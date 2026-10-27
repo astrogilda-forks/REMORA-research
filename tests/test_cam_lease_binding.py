@@ -138,10 +138,16 @@ def api(request, monkeypatch):
 
     monkeypatch.setattr(dispatch, "_issue_local_lease", recording)
 
-    def with_manifest(digest):
-        monkeypatch.setattr(api_mod, "CAPABILITY_ACTIVATION",
-                            None if digest is None else SimpleNamespace(manifest_digest=digest),
-                            raising=False)
+    def with_manifest(digest, modes=None):
+        """A loaded manifest with ``digest``; every capability ENFORCE unless
+        ``modes`` says otherwise (the dispatch mode gate reads them)."""
+        from remora.governance.capability_activation import Activation
+
+        modes = modes or {}
+        report = None if digest is None else SimpleNamespace(
+            manifest_digest=digest,
+            get=lambda cid: Activation(cid, "ENFORCE", modes.get(cid, "ENFORCE"), ()))
+        monkeypatch.setattr(api_mod, "CAPABILITY_ACTIVATION", report, raising=False)
 
     return SimpleNamespace(client=client, minted=minted, with_manifest=with_manifest)
 

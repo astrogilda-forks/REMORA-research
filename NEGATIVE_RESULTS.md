@@ -172,7 +172,9 @@ cites only `open` sections and that no `open` section is missing a theme.
    gate now enters the meet, but a risk signal on an abstained call still
    opens a review route, and raising a production write from medium to high
    risk lowers ESCALATE to VERIFY. The owner decided on 2026-10-18 to make
-   approvability monotone too; two strict xfails pin the gap.
+   approvability monotone too. Since 2026-10-20 the execution API runs a
+   strict monotone profile by default that closes both; the library default
+   keeps them so sealed replays reproduce, and two strict xfails pin it.
 19. **Cumulative limits hold only where a deployment declares them** (§97):
    REMORA as shipped executed three approved payments of 7000 past a 20000
    budget, and small setpoint moves that added up without bound. Opt-in
@@ -433,7 +435,8 @@ At the time of seeding (2026-06-26), the `deployment_status = "SHADOW_ONLY"` and
 
 **Gap 1, Closed 2026-06-27 (gate logic fixed 2026-06-27).** `n_harmful_independent = 169`
 as of 2026-06-27. 84 aradhye + 84 CaiZhiTech harmful episodes seeded via
-`scripts/aromer_seed_harmful_episodes.py`. A 36-case holdout was saved to
+`scripts/aromer_seed_harmful_episodes.py` (main implementation repository; not
+committed here). A 36-case holdout was saved to
 `artifacts/aromer/harmful_seed_holdout.json` (raw holdout file not committed to
 this repo; its evaluation results are committed as
 `artifacts/aromer/harmful_seed_holdout_eval.json`, n_cases=36). The worker now computes n_harmful_independent
@@ -459,7 +462,8 @@ is blocked on Cloudflare Workers AI beta access.
 <!-- finding-status: superseded -->
 
 When the AROMER world model is initialized from replay arena episodes via
-`scripts/aromer_seed_benign_outcomes.py`, concentrated benign correct_accept
+`scripts/aromer_seed_benign_outcomes.py` (main implementation repository; not
+committed here), concentrated benign correct_accept
 seeds fill the sliding 200-episode window with seeded entries. This temporarily
 drives `benign_review_rate = 0%` in the window metric and the quality gate to
 `INSUFFICIENT_SAFETY_EVIDENCE` (harmful cases pushed out of the window).
@@ -483,7 +487,8 @@ window, not new false accepts.
 **Provenance note:** The world model Bayesian priors updated by seeding ARE real
 improvements, p_harm for benign contexts drops from 0.50 (uniform) to 0.10–0.20
 (medium-confidence posterior), reducing future VERIFY rate for those contexts. The
-seeding methodology is documented in `scripts/aromer_seed_benign_outcomes.py`.
+seeding methodology is documented in `scripts/aromer_seed_benign_outcomes.py` in
+the main implementation repository.
 
 ---
 
@@ -2687,7 +2692,7 @@ sections again.
 | AgentHarm discrimination is lost between evidence and decision (§80) | CLAIM-002 tells 0 of 208 twin pairs apart; trimode mode 3 tells none of 44 apart where the oracle verdict tells 29. Harness repaired, no new run. Needs a graded evidence channel, a calibrated threshold and fresh paired data | Medium |
 | The BFCL intent extractor ignores negation and conditionals (§81) | A validity limit of the C-ext3 semantic arm, pinned by five strict xfails; no deployment bundle imports the extractor. Bundle v2 (C-ext4) handles negation but not conditionals or questions; v3 (#938) handles both and has no sealed run | Low |
 | The C-ext4 utility gain does not show generalisation to unseen tool families (§82) | 255 of 291 gold calls use tools seen in development (V2D 76, F1 12); on the other 36, V2D 11 and F1 8. A sealed tool catalogue the bundle was never developed against is needed | Medium |
-| Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. Two strict xfails; the owner decided on 2026-10-18 and the change is pending | Medium |
+| Approvability is not yet monotone (§90) | Every firing guard and gate enters the meet (#944). A risk signal on an abstained call still opens a review route, and medium-to-high risk lowers a production write from ESCALATE to VERIFY. The owner decided on 2026-10-18; the strict profile closes both on the execution API by default (2026-10-20), and two strict xfails pin the library default | Medium |
 | REMORA blocked 90 of 91 legitimate AgentDojo calls in a development dry run (§92) | E1 and E2 complete 11 of 29 tasks against 10 for refuse-all; 70 of the blocks are `semantic_authority_unknown_verify`. SAP v7 requires E1 to beat refuse-all; the IFC read path (CAPR-03) is the design response and is not built | **High** |
 | Study C holdout: utility recovered and authority held under defence-aware search; the monitor threshold decided how much (§96) | H_DET and H_COST 20/33 reads, H_EDV 32/33, H0 0/33; every loss a monitor veto at the threshold. No WS1 arm executed an attack goal, an out-of-scope call or a leak in 121 attack episodes each; arm A did | **High** |
 | REMORA did not stop a payment past its budget, and had nothing that could (§97) | Replayed through /assess, /approve and /execute, all three 7000 payments ran (21000 of 20000). Opt-in cumulative limits reserved at dispatch (CAP-031) now refuse the third, and cap setpoint movement, starts and runtime per unit; author's replays only, false refusals unmeasured | **High** |

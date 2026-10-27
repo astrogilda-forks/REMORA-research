@@ -439,3 +439,23 @@ def test_missing_id_is_rejected() -> None:
     data = _data()
     data["bibliography"]["works"][0].pop("id", None)
     assert any("missing id" in e for e in mod.validate(data))
+
+
+def test_named_capabilities_are_registered() -> None:
+    mod = _load_module()
+    assert mod._validate_capabilities(_data()) == []
+
+
+def test_an_unregistered_capability_is_rejected() -> None:
+    mod = _load_module()
+    data = _data()
+    data["entries"][0]["capabilities"] = ["CAP-999"]
+    assert any("CAP-999" in e for e in mod._validate_capabilities(data))
+    data["entries"][0]["capabilities"] = []
+    assert any("non-empty" in e for e in mod._validate_capabilities(data))
+
+
+def test_the_view_keeps_the_three_maturity_notions_apart() -> None:
+    text = GENERATED.read_text(encoding="utf-8")
+    assert "Three maturity notions are kept apart" in text
+    assert "## Reverse index: capability → research" in text

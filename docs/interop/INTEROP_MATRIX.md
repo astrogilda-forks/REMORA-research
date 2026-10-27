@@ -9,7 +9,8 @@ Status is derived. `PROPOSED` and `SPECIFIED` are declared stages with no
 record. `AUTHOR_RUN` is an L0 self-test by the producer and advances no
 contract. `REPRODUCED` (L1), `SECOND_IMPLEMENTATION` (L2) and
 `INDEPENDENTLY_ESTABLISHED` (L3 or L4) name the highest independence level
-among ESTABLISHED records. One CONTRADICTED record makes the edge
+among ESTABLISHED records. An edge is one claim of one contract and counts
+only that claim's records. One CONTRADICTED record makes the edge
 `CONTRADICTED` whatever else exists. `PRIOR_RECORD` points at an earlier
 record written before the result schema. `EXPERIMENTAL` marks an edge whose
 counterpart format is assumed rather than confirmed. No status implies
@@ -17,13 +18,19 @@ endorsement, production safety or authority (FED-INV-004).
 
 | Edge | Producer | Consumer | Artifact | Property | Contract (lifecycle) | Declared | Records | Highest level | Result | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| E-ECB | REMORA | any | ExecutionLease | `exact_call_binding` | [`exact-call-binding-v1`](../../artifacts/interop/exact-call-binding-v1/README.md) (REPRODUCED) | SPECIFIED | 4 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
-| E-ECB-V1-1 | REMORA | any | ExecutionLease | `exact_call_binding` | [`exact-call-binding-v1.1`](../../artifacts/interop/exact-call-binding-v1.1/README.md) (DRAFT) | SPECIFIED | 4 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-ECB | REMORA | any | ExecutionLease | `exact_call_binding` | [`exact-call-binding-v1`](../../artifacts/interop/exact-call-binding-v1/README.md) (REPRODUCED) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-ECB-SU | REMORA | any | ExecutionLease | `single_use_authorization` | [`exact-call-binding-v1`](../../artifacts/interop/exact-call-binding-v1/README.md) (REPRODUCED) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-ECB-V1-1 | REMORA | any | ExecutionLease | `exact_call_binding` | [`exact-call-binding-v1.1`](../../artifacts/interop/exact-call-binding-v1.1/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-ECB-V1-1-SU | REMORA | any | ExecutionLease | `single_use_authorization` | [`exact-call-binding-v1.1`](../../artifacts/interop/exact-call-binding-v1.1/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
 | E-FA | REMORA | any | PolicyDecisionToken, ExecutionLease | `fresh_authority_at_dispatch` | [`fresh-authority-v1`](../../artifacts/interop/fresh-authority-v1/README.md) (REPRODUCED) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
 | E-EE | REMORA | any | EffectVerification | `effect_state_distinction` | [`effect-evidence-v1`](../../artifacts/interop/effect-evidence-v1/README.md) (REPRODUCED) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
 | E-EE-V1-1 | REMORA | any | EffectVerification | `effect_state_distinction` | [`effect-evidence-v1.1`](../../artifacts/interop/effect-evidence-v1.1/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
-| E-EE-V2 | REMORA | any | EffectVerification | `effect_state_distinction` | [`effect-evidence-v2`](../../artifacts/interop/effect-evidence-v2/README.md) (DRAFT) | SPECIFIED | 8 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-EE-V2 | REMORA | any | EffectVerification | `effect_state_distinction` | [`effect-evidence-v2`](../../artifacts/interop/effect-evidence-v2/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-EE-V2-CALL | REMORA | any | EffectVerification | `effect_call_binding` | [`effect-evidence-v2`](../../artifacts/interop/effect-evidence-v2/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-EE-V2-DEC | REMORA | any | EffectVerification | `effect_decision_correspondence` | [`effect-evidence-v2`](../../artifacts/interop/effect-evidence-v2/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
+| E-EE-V2-OBS | REMORA | any | EffectVerification | `effect_observer_independence` | [`effect-evidence-v2`](../../artifacts/interop/effect-evidence-v2/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **AUTHOR_RUN** |
 | E7 | REMORA | Probity | runtime observation bundle | `bounded_observed_surface_matches_governed_set` | [`runtime-surface-e7-v0.1`](../../artifacts/interop/runtime-surface-e7-v0.1/README.md) (EXTERNALLY_VERIFIED) | SPECIFIED | 0 |  |  | **SPECIFIED** |
+| E7-EXCL | REMORA | Probity | runtime observation bundle | `exclusive_effect_path` | [`runtime-surface-e7-v0.1`](../../artifacts/interop/runtime-surface-e7-v0.1/README.md) (EXTERNALLY_VERIFIED) | SPECIFIED | 0 |  |  | **SPECIFIED** |
 | E8 | AgentAvow | REMORA | signed tool manifest | `attested_definition_binding` | [`agentavow-tool-manifest-e8-v0.1`](../../artifacts/interop/agentavow-tool-manifest-e8-v0.1/README.md) (DRAFT) | SPECIFIED | 2 | L0_SELF_TEST | ESTABLISHED | **EXPERIMENTAL, AUTHOR_RUN** |
 | APS-CANON | REMORA | APS | canonical bytes | `jcs_rfc8785_parity` | [record](../../artifacts/interop/aps-ba8e540-profile-v0.1/SOURCE.md) | PRIOR_RECORD | 0 |  |  | **PRIOR_RECORD** |
 | APS-ARB | REMORA | APS | action result binding | `action_result_binding` | [record](../../artifacts/interop/aps-b64cc8df-action-result-binding/REPORT.md) | PRIOR_RECORD | 0 |  |  | **PRIOR_RECORD** |

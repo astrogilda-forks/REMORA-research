@@ -41,8 +41,13 @@ claim_ceiling:
   external_validation_record: docs/assurance/external_adequacy_evidence_sufficiency_v1.md
   note: >-
     One external adequacy round has been run on a conformance corpus (#629).
-    No interop contract has reached EXTERNALLY_VERIFIED. A result under any
-    contract establishes only what that contract's claim packet names.
+    One interop contract, runtime-surface-e7-v0.1, has the package lifecycle
+    EXTERNALLY_VERIFIED: two external Probity run records (2026-10-08 and
+    2026-10-09) meet the independence contract for its frozen fixtures. That
+    lifecycle covers the fixture premises, not runtime verification of
+    REMORA, and runtime_capability_surface_completeness stays NOT_ESTABLISHED.
+    No other contract has reached it. A result under any contract
+    establishes only what that contract's claim packet names.
 
 result_schema: artifacts/interop/schemas/interop-result-v1.schema.json
 result_vocabulary: [ESTABLISHED, CONTRADICTED, NOT_ESTABLISHED]
@@ -94,6 +99,15 @@ edges:
       Superseded by E-ECB-V1-1 and retained: external runs pin this digest.
       Preserved negative result (#744 probes): no integer-versus-integral-float
       discriminator, and the verify-then-mutate boundary is not named.
+  - id: E-ECB-SU
+    producer: REMORA
+    consumer: any
+    artifact: ExecutionLease
+    property: single_use_authorization
+    contract: exact-call-binding-v1
+    declared: SPECIFIED
+    note: >-
+      Split from E-ECB on 2026-10-26: an edge names one claim, and until then E-ECB counted this claim's records too.
   - id: E-ECB-V1-1
     producer: REMORA
     consumer: any
@@ -102,6 +116,15 @@ edges:
     contract: exact-call-binding-v1.1
     declared: SPECIFIED
     note: Successor of E-ECB; adds scalar-type discriminators and names the temporal boundary.
+  - id: E-ECB-V1-1-SU
+    producer: REMORA
+    consumer: any
+    artifact: ExecutionLease
+    property: single_use_authorization
+    contract: exact-call-binding-v1.1
+    declared: SPECIFIED
+    note: >-
+      Split from E-ECB-V1-1 on 2026-10-26: an edge names one claim, and until then E-ECB-V1-1 counted this claim's records too.
   - id: E-FA
     producer: REMORA
     consumer: any
@@ -140,6 +163,33 @@ edges:
       Successor of E-EE-V1-1; adds the call binding, captured decision and
       observer identity that Probity's invocation_axes corpus (#918) showed
       the v1 input cannot carry.
+  - id: E-EE-V2-CALL
+    producer: REMORA
+    consumer: any
+    artifact: EffectVerification
+    property: effect_call_binding
+    contract: effect-evidence-v2
+    declared: SPECIFIED
+    note: >-
+      Split from E-EE-V2 on 2026-10-26: an edge names one claim, and until then E-EE-V2 counted this claim's records too.
+  - id: E-EE-V2-DEC
+    producer: REMORA
+    consumer: any
+    artifact: EffectVerification
+    property: effect_decision_correspondence
+    contract: effect-evidence-v2
+    declared: SPECIFIED
+    note: >-
+      Split from E-EE-V2 on 2026-10-26: an edge names one claim, and until then E-EE-V2 counted this claim's records too.
+  - id: E-EE-V2-OBS
+    producer: REMORA
+    consumer: any
+    artifact: EffectVerification
+    property: effect_observer_independence
+    contract: effect-evidence-v2
+    declared: SPECIFIED
+    note: >-
+      Split from E-EE-V2 on 2026-10-26: an edge names one claim, and until then E-EE-V2 counted this claim's records too.
   - id: E7
     producer: REMORA
     consumer: Probity
@@ -147,6 +197,18 @@ edges:
     property: bounded_observed_surface_matches_governed_set
     contract: runtime-surface-e7-v0.1
     declared: SPECIFIED
+  - id: E7-EXCL
+    producer: REMORA
+    consumer: Probity
+    artifact: runtime observation bundle
+    property: exclusive_effect_path
+    contract: runtime-surface-e7-v0.1
+    declared: SPECIFIED
+    note: >-
+      The second claim of the E7 contract, given its own edge on 2026-10-26.
+      An observed alternative path can contradict it; absence of one
+      establishes it only with independently established path-inventory
+      completeness. No interop-result-v1 record exists for it.
   - id: E8
     producer: AgentAvow
     consumer: REMORA

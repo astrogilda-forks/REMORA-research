@@ -1193,6 +1193,13 @@ def _limit_guard() -> Any:
         return None
     if not path or not ledger:
         raise ValueError("REMORA_LIMITS_FILE and REMORA_LIMITS_LEDGER are set together")
+    from remora.enforcement.cumulative_limits import ledger_topology_problem
+
+    problem = ledger_topology_problem(
+        ledger, authority_dsn=_os.environ.get("REMORA_PG_DSN", "").strip(),
+        scope=_os.environ.get("REMORA_LIMITS_LEDGER_SCOPE", "").strip())
+    if problem:
+        raise ValueError(problem)
     if _LIMIT_GUARD is None or _LIMIT_GUARD[0] != settings:
         import yaml
 
@@ -1303,6 +1310,29 @@ def _cam_digest() -> str | None:
     return str(report.manifest_digest) if report is not None else None
 
 
+def _cam_mode_refusal() -> str | None:
+    """Why the loaded manifest does not let a dispatch run, or None.
+
+    RMR-AUD-26-004: with a manifest loaded, the capabilities that authorize
+    a dispatch (``DISPATCH_AUTHORITY``, plus CAP-031 while cumulative limits
+    are configured) must be effective ENFORCE. A manifest named by
+    ``REMORA_CAM_FILE`` that did not load (a bad signature, an unreadable
+    file) refuses as ``cam_not_loaded`` instead of running as if none were
+    configured. Without ``REMORA_CAM_FILE`` nothing changes.
+    """
+    from remora.governance.capability_activation import (
+        DISPATCH_AUTHORITY,
+        dispatch_mode_refusal,
+    )
+    from servers import api as api_mod
+
+    report = getattr(api_mod, "CAPABILITY_ACTIVATION", None)
+    if report is None:
+        return "cam_not_loaded" if _os.environ.get("REMORA_CAM_FILE", "").strip() else None
+    required = DISPATCH_AUTHORITY + (("CAP-031",) if _limit_guard() is not None else ())
+    return dispatch_mode_refusal(report, required)
+
+
 def _limits_policy_hash() -> str | None:
     """The digest of the cumulative-limit policy in force, or None without one."""
     from servers import api as api_mod
@@ -1360,7 +1390,14 @@ def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
     dispatch (``GovernedToolDispatcher.bind_limit_guard``) is what holds.
     """
     guard = _limit_guard()
-    if guard is None or not guard.governs(req.tool_name):
+    if guard is None:
+        return
+    # The preview can read the plant through the deployment's observer, with
+    # the call's own argument as the resource. The signed contract is checked
+    # first, so nothing is read on behalf of a call it refuses, and the
+    # refusal names the contract rather than the meter. Raises 409.
+    _resolve_toolspec(req.tool_name, req.arguments, req.target_environment)
+    if not guard.governs(req.tool_name):
         return
     refusal = guard.preview(tenant=tenant, principal=principal, tool_name=req.tool_name,
                             arguments=req.arguments)
@@ -1730,6 +1767,25 @@ def _capability_or_refuse(tool_call: Any, principal: str, tenant: str) -> None:
         raise HTTPException(status_code=409, detail=str(block["refusal"]))
 
 
+def _stop_or_refuse(tenant: str) -> None:
+    """Refuse while the operator has stopped execution for ``tenant``, before
+    an approval or a token is spent (P0 item 7).
+
+    The dispatcher refuses a stopped dispatch too, but by then ``/execute``
+    has consumed the approval and ``/execute-accepted`` the token, so the
+    work could not run after ``/resume``. Read here first: 409
+    ``execution_stopped``, or 503 ``execution_stop_unverifiable`` when the
+    store cannot answer. A stop set after this read is still refused by the
+    dispatcher, with the approval spent; the window is one request.
+    """
+    try:
+        stopped = _execution_stopped(tenant)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="execution_stop_unverifiable") from exc
+    if stopped:
+        raise HTTPException(status_code=409, detail="execution_stopped")
+
+
 def _require_capability_set() -> bool:
     """Refuse any lease without a capability digest: when the BindingPolicy
     marks capability_set REQUIRED, or ``REMORA_REQUIRE_CAPABILITY_SET`` is set."""
@@ -1982,6 +2038,8 @@ def _tool_dispatcher() -> GovernedToolDispatcher | None:
                 # this process runs under. Bound always, so a lease minted
                 # under a manifest refuses where none is loaded.
                 dispatcher.bind_cam_digest(_cam_digest)
+                # RMR-AUD-26-004: the effective modes, not only the digest.
+                dispatcher.bind_mode_gate(_cam_mode_refusal)
                 spec = _os.environ.get("REMORA_TOOL_REGISTRY_MODULE", "").strip()
                 if spec:
                     import importlib
@@ -3623,7 +3681,12 @@ def _dispatch_under_lease_fenced(
                          "Poll the proposal lifecycle for the outcome."},
     **_AUTH_RESPONSES,
     404: {"model": ErrorDetail, "description": "Review item not found for this tenant."},
-    409: {"model": ErrorDetail, "description": "Item not in an executable state."},
+    409: {"model": ErrorDetail, "description": "Item not in an executable state, or "
+                                               "execution is stopped (execution_stopped); "
+                                               "a stopped item stays approved."},
+    503: {"model": ErrorDetail, "description": "The stop flag could not be read "
+                                               "(execution_stop_unverifiable); nothing "
+                                               "was spent."},
 })
 def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONResponse:
     """Execute a previously approved item under full re-gating.
@@ -3642,6 +3705,7 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
     api_mod._require_tenant_capability(role, tenant, "execute")
     _task_or_refuse(req.tool_call)
     _capability_or_refuse(req.tool_call, principal, tenant)
+    _stop_or_refuse(tenant)
     reconcile_stale_dispatches(tenant)  # FT-02 lazy sweep (see assess)
     # Issue #82: async mode answers 202 after durable authorization; the
     # dispatch half belongs to the standalone worker
@@ -3711,7 +3775,12 @@ def execute(req: ExecuteRequest, request: Request) -> dict[str, Any] | JSONRespo
     **_AUTH_RESPONSES,
     409: {"model": ErrorDetail,
           "description": "Token refused: replayed/consumed, payload binding "
-                         "mismatch, expired, wrong audience, or not an ACCEPT."},
+                         "mismatch, expired, wrong audience, or not an ACCEPT; "
+                         "or execution is stopped (execution_stopped), with the "
+                         "token unspent."},
+    503: {"model": ErrorDetail,
+          "description": "The stop flag could not be read "
+                         "(execution_stop_unverifiable); the token is unspent."},
 })
 def execute_accepted(req: ExecuteAcceptedRequest, request: Request) -> dict[str, Any]:
     """Execute a directly-ACCEPTed proposal under its single-use token.
@@ -3741,6 +3810,7 @@ def execute_accepted(req: ExecuteAcceptedRequest, request: Request) -> dict[str,
     api_mod._require_tenant_capability(role, tenant, "execute")
     _task_or_refuse(req.tool_call)
     _capability_or_refuse(req.tool_call, principal, tenant)
+    _stop_or_refuse(tenant)
     reconcile_stale_dispatches(tenant)
 
     try:

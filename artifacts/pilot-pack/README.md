@@ -52,3 +52,94 @@ past the hourly cap are refused at assess, before any decision
 `limit_exceeded`). The plant is simulated and the run is on one host. The
 manifest records the commit as `local` because the battery runs where git is
 unavailable; the table above names the commit.
+
+## Fault injection through the whole chain
+
+`deploy/ot-pilot/run_fault_injection.py` breaks the running pilot while it
+works and records what the chain did. It drives the API over HTTP and the
+stack through `docker compose`. Each fault states what the system
+must do, and a fault that does otherwise is reported as a failure.
+
+1. The API restarts between an approval and its execution.
+2. A spent grant is replayed after a restart.
+3. Cumulative limits are checked across a restart.
+4. PostgreSQL is stopped during a governed write.
+5. Four executions of one approval race each other.
+6. The same write is proposed and approved twice.
+7. Execution is stopped between an approval and its execution.
+8. A tool fails after dispatch began.
+9. An approver is revoked after approving.
+10. PostgreSQL stays stopped until Docker marks the API unhealthy (added
+    with the readiness healthcheck; it runs fifth, after fault 4).
+
+Every run records the configuration it ran against: the sha256 of the
+compose file, Dockerfile, limit policy, work orders, plant registry and
+semantic bundle, the API image id, the commit and the policy hash. Two runs
+with the same fingerprint ran the same deployment. Each run also measures
+latency by route, writes completed against writes intended, refusals of
+writes that should have run, and the human steps the run needed.
+
+| Run | Built from | Faults | Writes | Chains |
+|---|---|---|---|---|
+| [`runs/fault-injection-2026-10-26-before-fixes/`](runs/fault-injection-2026-10-26-before-fixes/) | master `92aa1e3e` with this runner, the compose file and the plant registry copied in; fingerprint `f8c7d3f7` | 7 of 9 as specified | 7 of 8 | both valid, 44 execution records |
+| [`runs/fault-injection-2026-10-26/`](runs/fault-injection-2026-10-26/) | `fcdb1e2b`: master `e6e5a765` (#1079, #1080) with this runner, configuration files unmodified; fingerprint `ff870253` | 9 of 9 as specified | 8 of 8, no false refusals, 14 human steps | both valid, 44 execution records |
+| [`runs/fault-injection-2026-10-26-b6d8841f/`](runs/fault-injection-2026-10-26-b6d8841f/) | `dd5ae6db`: master `2594d08b` with the Dockerfile healthcheck on `/v1/ready` and fault 10; fingerprint `b79463b6` | 10 of 10 as specified | 8 of 8, no false refusals, 14 human steps | both valid, 44 execution records |
+
+The first run found two defects, and both were fixed before the second run:
+
+- **The stop spent the approval.** A stop between approval and execution
+  held, and no effect ran, but `/execute` spent the approval. The item
+  answered 409 after the resume (#1079).
+- **A store outage was a bare 500.** With PostgreSQL stopped, assess and
+  execute refused without an effect, but both answered a bare 500 that a
+  client cannot tell from a defect (#1080). In the second run they answer
+  503: assess with `durable_state_unavailable`, and execute with
+  `execution_stop_unverifiable`, because it now reads the stop flag first.
+  After recovery the approved write ran once, from the plant's starting
+  value.
+
+The same run directory holds a battery run on a fresh stack with the same
+configuration: 16 of 16 cases, 6 side effects, both chains valid
+(`battery-same-configuration.json`).
+
+The third run checks what an orchestrator sees during an outage. Before it,
+the image's healthcheck probed `/v1/health`, which stays 200 while
+PostgreSQL is down, so Docker kept calling the API healthy while it could
+only refuse. The healthcheck now probes `/v1/ready`. With PostgreSQL
+stopped, readiness answered 503 `not_ready` after 2.7 s, liveness stayed
+200, and Docker marked the API unhealthy after 55 s (five failed probes ten
+seconds apart). The container kept running with no restart. After
+PostgreSQL started, readiness returned in 2.0 s and Docker's health in
+7.4 s. Compose has no restart policy, so "unhealthy" gates `depends_on` and
+restarts nothing.
+
+The faults also show what holds:
+
+- An approval survives a restart, and a spent grant stays spent.
+- The limit ledger still counts a move made before the restart.
+- Exactly one of four racing executions runs.
+- A revoked approver's approval is invalidated.
+- A tool that fails after dispatch began leaves the outcome UNKNOWN and its
+  limit reservation held. A reviewer then resolves it, and the resolution is
+  checked against the plant's log (`ot_registry.check_limit_evidence`,
+  `REMORA_LIMITS_EVIDENCE_MODULE`). Before this runner the pilot had no
+  evidence reader, so such a reservation could never be released.
+
+What the runs do not show:
+
+- **A proposal approved twice runs twice.** The pilot's limit policy
+  declares no idempotency keys. Closing that needs the policy re-signed with
+  `idempotency.key_arguments` and `REMORA_REQUIRE_IDEMPOTENCY=1`, and the
+  signing key is held by the pilot's limit authority, not this repository.
+- **The setup is minimal.** The plant is simulated in the API process and
+  resets on a restart. There is one host, one replica and the SQLite limit
+  ledger. Since 2026-10-26 the compose file declares this with
+  `REMORA_LIMITS_LEDGER_SCOPE=single_host`. Without that line the API refuses
+  to start, because the rest of its authority state is on PostgreSQL. The
+  runs above predate the line, and their fingerprints name the earlier compose
+  file. A pilot on more than one host needs a PostgreSQL ledger.
+- **The latencies are not a performance claim.** They come from one local
+  Docker host. Calls made while PostgreSQL was down are reported apart, under
+  `[fault window]`.
+- **`GET /v1/health` reports only liveness.** It answers `ok` while the store
+  is down.

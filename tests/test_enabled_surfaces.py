@@ -311,7 +311,7 @@ def test_every_route_is_classified_into_a_surface(monkeypatch) -> None:
     )
 
     known_execution_and_infra = {
-        "/", "/v1/health", "/metrics", "/v1/metrics", "/openapi.json",
+        "/", "/v1/health", "/v1/ready", "/metrics", "/v1/metrics", "/openapi.json",
         "/docs", "/docs/oauth2-redirect", "/redoc",
         "/v1/envelope/{request_id}", "/v1/audit/{request_id}",
         "/v1/audit/chain/verify", "/v1/review", "/v1/follow-up",

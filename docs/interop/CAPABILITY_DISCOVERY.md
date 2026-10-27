@@ -8,10 +8,16 @@ evidence points to current repository records. The
 source of truth for wiring depth, and the [claim register](../assurance/claim_register_v1.yaml)
 remains the source of truth for research claims.
 
-The declaration describes the repository, not a deployment. A per-deployment
-activation manifest that references it, without restating it, is proposed in
-[unified capability execution v1.1](../design/unified-capability-execution-v1.1.md) §3.
-It is not implemented.
+The declaration describes the repository, not a deployment. The per-deployment
+capability activation manifest of
+[unified capability execution v1.1](../design/unified-capability-execution-v1.1.md) §3
+(ADR-UE-03) is implemented in `remora/governance/activation_manifest.py` and
+`remora/governance/capability_activation.py`. A signed manifest requests a
+mode per capability and the effective mode is reported at
+`GET /v1/system/capabilities`. No shipped deployment loads a manifest yet, so
+every effective mode there is `NOT_ESTABLISHED`, and only
+`REMORA_REQUIRE_LIMITS` has been migrated to agree with it. The manifest does
+not restate this declaration and does not change it.
 
 ## Workflow discovery
 
@@ -289,7 +295,8 @@ The Federation-facing
 is generated from that register and listed by the stable interop index. Pin
 confirmation, execution records, independence, claim results, production
 evidence and Federation adoption remain separate statuses. E7 has pinned
-fixtures but no external run record. It does not establish
+fixtures and two external Probity run records (2026-10-08 and 2026-10-09)
+that meet the independence contract for those fixtures. They do not establish
 `runtime_capability_surface_completeness`; no independent observation,
 production status or Federation adoption is implied.
 

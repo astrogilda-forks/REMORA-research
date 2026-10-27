@@ -46,10 +46,10 @@ in your way:
   including companies** (¶6): run REMORA observer-only (decisions
   logged, never enforced) to evaluate or research it, for up to 90
   days; enough for a real research pilot. See
-  [docs/validation/pilot_evaluation_protocol_v1.md](docs/validation/pilot_evaluation_protocol_v1.md)
+  [docs/validation/pilot_evaluation_protocol_v1.md](../docs/validation/pilot_evaluation_protocol_v1.md)
   for the evaluation framework.
 - **Contributions are welcome** under
-  [docs/10-contributing.md](docs/10-contributing.md); and negative
+  [docs/10-contributing.md](../docs/10-contributing.md); and negative
   results are first-class here: falsifying one of our claims is a
   valued contribution, not an attack.
 

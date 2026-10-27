@@ -13,7 +13,12 @@ proposed from implemented from independently reproduced.
     (no flag)   write the matrix
     --check     exit 1 if the committed matrix differs from what the records yield
 
-Derivation, per edge: PRIOR_RECORD stays as declared with its link; an edge
+Derivation, per edge: an edge names one claim of one contract (its
+``property``), and only records for that ``(contract_id, claim_id)`` pair
+count, so a result for one claim can neither raise nor contradict another
+claim of the same contract. Every claim of a contract with an edge needs its
+own edge, and every record must fall on exactly one edge; the generator
+refuses otherwise. PRIOR_RECORD stays as declared with its link; an edge
 with no record keeps its declared stage; any CONTRADICTED record wins; else
 the highest independence level among ESTABLISHED records names the status
 (L0 AUTHOR_RUN, L1 REPRODUCED, L2 SECOND_IMPLEMENTATION, L3 and L4
@@ -55,7 +60,8 @@ def derive(edge: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, Any
     """Status and its supporting facts for one edge."""
     if edge["declared"] == "PRIOR_RECORD":
         return {"status": "PRIOR_RECORD", "records": 0, "level": "", "result": "", "evaluators": ""}
-    mine = [r for r in records if r["contract_id"] == edge.get("contract")]
+    mine = [r for r in records
+            if r["contract_id"] == edge.get("contract") and r["claim"] == edge["property"]]
     if not mine:
         return {"status": edge["declared"], "records": 0, "level": "", "result": "", "evaluators": ""}
     results = {r["status"] for r in mine}
@@ -73,11 +79,53 @@ def derive(edge: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, Any
     return {"status": status, "records": len(mine), "level": level, "result": result, "evaluators": ", ".join(evaluators)}
 
 
+def coverage_problems(edges: list[dict[str, Any]], records: list[dict[str, Any]],
+                      claims_by_contract: dict[str, list[str]]) -> list[str]:
+    """Why the edges do not partition the contracts' claims and the records.
+
+    Before 2026-10-26 an edge counted every record of its contract, so the
+    single_use_authorization records sat on E-ECB and three effect-evidence-v2
+    claims on E-EE-V2. A later result for one claim would have moved the
+    status shown for another.
+    """
+    problems: list[str] = []
+    seen: dict[tuple[str, str], str] = {}
+    for edge in edges:
+        contract = edge.get("contract")
+        if not contract:
+            continue
+        pair = (contract, edge["property"])
+        if edge["property"] not in claims_by_contract.get(contract, []):
+            problems.append(f"{edge['id']}: {edge['property']!r} is not a claim of {contract}")
+        if pair in seen:
+            problems.append(f"{edge['id']}: {pair} is already the edge {seen[pair]}")
+        seen[pair] = edge["id"]
+    for contract in sorted({c for c, _ in seen}):
+        for claim in claims_by_contract.get(contract, []):
+            if (contract, claim) not in seen:
+                problems.append(f"{contract}: claim {claim!r} has no edge")
+    for record in records:
+        pair = (record["contract_id"], record["claim"])
+        if pair not in seen:
+            problems.append(f"record for {pair} falls on no edge")
+    return problems
+
+
+def _claims_by_contract(index: dict[str, Any]) -> dict[str, list[str]]:
+    return {
+        c["id"]: [x["claim_id"] for x in json.loads((ROOT / c["claim_packet"]).read_text(encoding="utf-8"))["claims"]]
+        for c in index["contracts"]
+    }
+
+
 def render() -> str:
     manifest = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
     index = json.loads(INDEX.read_text(encoding="utf-8"))
     lifecycle = {c["id"]: c["lifecycle"] for c in index["contracts"]}
     records = load_records()
+    problems = coverage_problems(manifest["edges"], records, _claims_by_contract(index))
+    if problems:
+        raise SystemExit("interop edges do not partition the claims:\n  " + "\n  ".join(problems))
     external_rows = []
     for contract in index["contracts"]:
         for record in contract.get("external_runs", []):
@@ -113,7 +161,8 @@ def render() -> str:
         "record. `AUTHOR_RUN` is an L0 self-test by the producer and advances no",
         "contract. `REPRODUCED` (L1), `SECOND_IMPLEMENTATION` (L2) and",
         "`INDEPENDENTLY_ESTABLISHED` (L3 or L4) name the highest independence level",
-        "among ESTABLISHED records. One CONTRADICTED record makes the edge",
+        "among ESTABLISHED records. An edge is one claim of one contract and counts",
+        "only that claim's records. One CONTRADICTED record makes the edge",
         "`CONTRADICTED` whatever else exists. `PRIOR_RECORD` points at an earlier",
         "record written before the result schema. `EXPERIMENTAL` marks an edge whose",
         "counterpart format is assumed rather than confirmed. No status implies",

@@ -4,7 +4,7 @@
 - Deciders: repository owner, on the maintainer's recommendation
 - Related: `docs/design/scoped-evidence-obligations-v1.md`,
   `docs/design/verification-plan-v2.md`, `remora/toolcall/runtime_profile.py`,
-  `scripts/check_release_profiles.py`, `tests/test_intent_claim_boundaries.py`
+  `check_release_profiles()` in `scripts/check_document_governance.py`, `tests/test_intent_claim_boundaries.py`
 
 ## Context
 

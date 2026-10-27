@@ -41,7 +41,7 @@ runtime's own `artifactDigest`. Nothing under federation-port's tree changes.
 Four behaviours at `92d5078` that a reader of the contract would not expect.
 None produced a second side effect; the idempotency key held in all four.
 CP-F1 and CP-F4 are one fault reached two ways, found as such by the TLA+
-model in [`formal/tla`](../../../formal/tla/README.md): a later attempt's
+model in [`formal/tla`](../../../formal/README.md): a later attempt's
 failed-and-retriable outcome overrides an earlier attempt that may have
 reached the provider.
 
@@ -58,7 +58,9 @@ reproduced and reviewed by the maintainer and merged on 2026-10-08 as
 `3a2f6ce`, with nine regression tests (E1 to E9). After review it also made
 the deadline an authorization expiry: nothing is dispatched after it, and an
 operation still `unknown` waits with `reconciliation_required`. Read-only
-reconciliation is not in V0; it is open as aeoess/federation-port#2. The four
+reconciliation is not in V0; it is open as aeoess/federation-port#2, with an
+author-written v1 candidate merged under `v1-candidates/reconciliation` as
+aeoess/federation-port#9 (`9e85e96`), which leaves `src/` unchanged. The four
 probes now assert the corrected behaviour at `3a2f6ce`.
 
 ## How strong the probes are

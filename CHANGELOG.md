@@ -4,6 +4,145 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Limits: the signed contract refuses a call before the limit preview reads the plant
+
+- `/v1/execution/assess` ran the advisory limit preview before the ToolSpec check. A call the signed contract would refuse still reached the deployment's observer module, with the agent's own argument as the resource: an unknown zone, a path string, any target. The refusal also named the meter (`limit_observation_unavailable`, `limit_exceeded`, `limit_coverage_unknown`) instead of the contract violation.
+- In the autonomous-ot-control testbed the observer put that string into a URL path on the plant's read API. Every such call was still refused, but the plant was read on its behalf.
+- `_limits_or_refuse` now resolves the signed spec first whenever a limit guard is configured. Calls the contract admits are previewed exactly as before. A value of the wrong type is now refused as `toolspec_arguments_schema_invalid`, and three tests that expected the meter's reason were updated.
+- Tests: `tests/limits/test_limits_preview_after_contract.py` (7). Thirteen capabilities were rebound to the code commit.
+### ToolSpec: the closure digest covers the deployment's own sibling modules (Q3.4)
+
+- A `closure-sha256:` callable digest followed only the root module's own top-level package. A registry module that calls a local package to perform its effect, such as `ot_registry` calling `adapter.actuation`, recorded that package as the constant `unresolved`. Editing the effect code left the signed digest byte-identical, so registration verified a spec that no longer named the code that runs.
+- `remora/toolcall/callable_digest.py` now follows any top-level module or package that resolves to source and belongs to no installed distribution, identifying it by content as the design (Q3.4: every module "inside the deployment") states. Distributions are still named by version and the standard library by interpreter version. A name that resolves to nothing stays `unresolved`.
+- A bundle signed with a closure digest over such a registry gets a different digest and must be re-signed. No bundle in this repository attests one; `remora init-review` signs source-span digests.
+- Found while wiring the autonomous-ot-control testbed. Tests: `tests/test_callable_closure_digest.py` (+3).
+### SDK: a deferred audit reference no longer breaks a successful approval
+
+- The server answers an approval with `audit.deferred: true` and a null `sequence_no` and `entry_hash` when the event is enqueued on the transition's own transaction (REM-047). `AuditRef.from_payload` called `int(None)` on it, so `RemoraClient.approve` raised `TypeError` after the approval had been recorded, and the caller could not tell that it had.
+- `AuditRef` now carries `deferred` and `idempotency_key`, and both index fields may be `None`. A response with no index that does not say it is deferred, with its key, is refused as malformed rather than read as pending.
+- Found by the first live governed run of the autonomous-ot-control testbed against `9b1763ca`. Tests: `tests/test_sdk_client.py` (+6). The public API snapshot is unchanged.
+### Assurance: a fault-scenario crosswalk, and a process-split fixture that refused to start (RMR-AUD-26-011)
+
+- `docs/assurance/fault_scenario_crosswalk_v1.md` maps the adversarial review's scenario classes to the tests and OT pilot runs that exercise them. For each it records whether real PostgreSQL, a restart or several processes are involved, and what each returned on 2026-10-26: `2594d08b`, one Windows host, PostgreSQL 16 in a container.
+  - The scenario classes are retry, grant and nonce, store outage, stop, UNKNOWN, limits, tenants, API and SDK, CAM, and alternative ingress.
+  - Two hosts, a network partition, a real plant and other orchestrators are `NOT_RUN`.
+  - The review's F1 to F15 are `NOT_ESTABLISHED`, because their definitions are not in the findings file.
+- `tests/conformance/_executor.py` passed both `REMORA_PG_DSN` and `REMORA_CHAIN_DB` to `AuthorityEpochs`, which takes exactly one. With PostgreSQL exported in a developer's shell, the SQLite process-split tests inherited it and their executors refused to start.
+  - The executor now prefers the DSN, as the server does, and the three SQLite-chain tests clear it for their children. The file passes in both modes: 14 passed and 2 skipped without PostgreSQL, 16 passed with it.
+  - CI did not see the defect, because its PostgreSQL job runs only the tests named `postgres`.
+### SDK: a post-send failure on a state-changing call is not retryable, and the async client binds recorded effects
+
+- A capability audit of 2026-10-26 found two gaps in `remora.sdk`. Neither client retries on its own; both concern what the clients tell the caller.
+- **Retry flag.** A read timeout or dropped connection on a non-execution POST (`approve`, `reject`, `record_effect`, `resolve_unknown`) raised `RemoraUnavailableError` with `retryable=True`, although the request may already have been applied. It now raises the same type with `retryable=False`, and a message saying to read the state before sending again.
+  - Connect-stage failures, which send nothing, and GETs stay retryable.
+  - Execute paths still raise `UnknownExecutionStateError`.
+  - The class default is unchanged, so existing `except` clauses still match.
+- **Async parity.** The async `record_effect` posted the verification without its dispatch binding (`tool_call_hash`, `grant_jti`), which the sync client reads from the proposal's lifecycle. Both now share `dispatch_binding` and `bind_verification`.
+- Tests: `tests/test_review_sdk_transport_errors.py` (+10), and `tests/test_sdk_async_client.py`, whose async wire test now requires the binding. The public API snapshot is unchanged.
+### Governance: the activation manifest's effective modes gate dispatch (RMR-AUD-26-004, ADR-UE-03 slice 6)
+
+- A loaded manifest reached the dispatcher only as a digest. Effective modes were computed and reported, but nothing at the execution boundary read them, so a manifest setting the lease dispatch to `SHADOW` still let every lease run.
+- `remora/governance/capability_activation.py` now states the mode contract (`MODE_CONTRACT`): only `ENFORCE` authorizes an effect at dispatch. `dispatch_mode_refusal` requires the capabilities that authorize every dispatch to be effective `ENFORCE`: CAP-003 and CAP-013, plus CAP-031 while limits are configured. An absent capability counts as `DISABLED`.
+- `GovernedToolDispatcher.bind_mode_gate` reads the gate on every dispatch, after the digest check and before the nonce, so a refusal spends nothing (`capability_not_enforcing:<CAP>:<mode>`). A gate that raises refuses as `cam_mode_unverifiable`.
+- A manifest named by `REMORA_CAM_FILE` that did not load now refuses every dispatch (`cam_not_loaded`) instead of running as if none were set.
+- Without `REMORA_CAM_FILE` nothing changes, and no shipped deployment loads a manifest. No mode can raise a decision.
+- Still open: the per-capability mode snapshot in the decision record; strict profiles implying `REMORA_CAM_REQUIRED`, which waits for the owner's timing; further flag migrations.
+- Tests: `tests/test_cam_dispatch_mode_gate.py` (24). In `tests/test_cam_lease_binding.py`, the API fixture's report now carries effective modes.
+### Limits: a host-local ledger beside shared authority state must be declared (RMR-AUD-26-010)
+
+- The OT pilot keeps its cumulative-limit ledger in a SQLite file while its other authority state is on PostgreSQL. That holds on one host. A second API host joining the same PostgreSQL would keep its own budget and could spend the whole limit. The strict profiles already refused the pairing, but the OT pilot runs the research profile.
+- Under every profile, the execution API now refuses to start with a SQLite `REMORA_LIMITS_LEDGER` beside `REMORA_PG_DSN`, unless `REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs executors (`cumulative_limits.ledger_topology_problem`). Any other scope value is refused. A PostgreSQL ledger, or authority state on SQLite too, needs nothing.
+- The OT pilot's compose file declares `single_host`. Verified on the stack:
+  - with the line, the battery passes 16 of 16;
+  - without it, the API exits 1 and names the problem.
+- The committed fault-injection runs predate the line, and their fingerprints name the earlier compose file. No shared ledger is introduced, and no ledger data is migrated.
+- Tests: `tests/limits/test_limits_ledger_topology.py` (10). The limits suites in the PostgreSQL CI jobs pass against a local PostgreSQL 16.
+### WS1: strict profiles require atomic admission when WS1 enforces (RMR-AUD-26-003)
+
+- On legacy admission the WS1 re-gate and the grant spend are separate steps. Evidence that lapses between them is still spent: control 2b in `tests/test_ws1_gate_controls.py` records that as the documented residual. The M4 ADR said the strict profile must refuse it, and nothing did.
+- `review` and `controlled_pilot` now refuse to start with `REMORA_WS1_MODE=enforce` unless `REMORA_WS1_ADMISSION=atomic` (`remora/toolcall/runtime_profile.py::_check_ws1_admission`). Atomic admission's own prerequisites, a transactional store and `REMORA_MAX_CLOCK_SKEW_MS`, are still refused at import when missing, and there is no fallback to legacy.
+- WS1 `off` and `shadow` are unchanged, because shadow changes no decision. So is the research profile, where control 2b still documents the residual.
+- Migration: a strict deployment that enforces WS1 on legacy admission refuses to start until it sets `REMORA_WS1_ADMISSION=atomic`, and it needs PostgreSQL or SQLite for that. No shipped deployment does this.
+- Tests: `tests/test_runtime_profile.py` (+13).
+### Deploy: the container healthcheck probes readiness (RMR-AUD-26-005)
+
+- The OT pilot and reference images probed `/v1/health`, which answers `ok` while PostgreSQL is down. Docker therefore reported the API healthy while it could only refuse. Both images now probe `/v1/ready`, and `/v1/health` stays liveness. Neither compose file sets a restart policy, so "unhealthy" restarts nothing and only gates `depends_on`.
+- `run_fault_injection.py` gains a tenth fault, which keeps PostgreSQL stopped until Docker marks the API unhealthy. The run at `dd5ae6db` (`artifacts/pilot-pack/runs/fault-injection-2026-10-26-b6d8841f/`, fingerprint `b79463b6`) is 10 of 10:
+  - readiness answered 503 `not_ready` after 2.7 s while liveness stayed 200;
+  - Docker marked the API unhealthy after 55 s, and the container kept running with no restart;
+  - after PostgreSQL started, readiness returned in 2.0 s and health in 7.4 s;
+  - 8 of 8 writes ran, both chains are valid.
+- Not checked: any orchestrator other than Docker and compose on one host.
+- Tests: `tests/test_ot_fault_injection.py` (+6): both Dockerfiles probe `/v1/ready`, neither compose file restarts, the `docker inspect` reader, and the order of the new fault.
+### Documentation: the API path count and the nonce store's history (RMR-AUD-26-007, RMR-AUD-26-009)
+
+- `docs/07-api-reference.md` said "OpenAPI 3.1, 41 paths" after `GET /v1/ready` made it 42 (43 operations). The count is now left to the schema. `tests/test_api_count_claims.py` refuses any live document that states an OpenAPI path or operation count differing from `schemas/openapi.json`, and pins the IFC-11 row's "28 routes" for the execution API. On master's text before this change it finds the 41.
+- The `remora/enforcement/nonce_store.py` docstring described the per-process lease ledger as the current state. It now dates that to before #351 (2026-08-24). It then says how `_lease_nonce_store` builds the durable store from `REMORA_PG_DSN`, `REMORA_CHAIN_DB` or `REMORA_STATE_ENDPOINT`, and that without them the in-process ledger and its per-process limit remain. It also says what is tested: SQLite, a real PostgreSQL server, and separate processes on one host. Dispatchers on separate hosts have not been run. No code changed.
+### Documentation: statements that outlived the controlled-pilot decision, and a gate against the next one
+
+- An external documentation review of 2026-10-26 found active documents still describing the state before the owner decision of 2026-10-25. Each finding was checked against master, and these were corrected:
+  - `remora-capabilities-v1.yaml` gave `SHADOW_PILOT` as the current release profile, and said no external run exists for `fresh-authority-v1`. One exists: Probity, second implementation, not independent, fixtures only. `externally_reproduced` stays false.
+  - `CAPABILITY_DISCOVERY.md` said E7 has no external run record. It has two.
+  - `plain_language_overview.md` called shadow mode the current profile.
+  - `external_review_panel_v1.md` listed open REM-021 as a blocker for its own level B sign-off. Level B is how REM-021 is completed, and it is not a precondition of the owner's `CONTROLLED_PILOT`.
+  - The atlas data said REM-023 is `IN_PROGRESS`; it is `DONE`. The atlas page is a dated snapshot of `d94eecf9`, and its header and summary now say "at d94eecf9" instead of "current" and "today", and link to the change.
+  - `best_practice_gap_audit_v1.md` called REM-021 the shadow-mode exit gate.
+  - The ADR-UE-03 status marks its "no code implements the manifest" as describing the time of acceptance.
+- SDD v1.1 gains "Implementation status, 2026-10-26". It is a table of what changed since `d94eecf9`, and the registers win where they disagree with it. The specification text is unchanged.
+- `check_document_governance.py` gains a HARD check. A canonical, generated or supporting document that names a profile as current must name the declared `current_profile`. On master before this change it finds both the capability declaration and the atlas. `tests/test_document_governance.py` (+3).
+- Two of the review's findings did not hold:
+  - `docs/sdk.md`, `PRODUCT_PACKAGING.md`, `SECURITY_OVERVIEW.md`, `DEPLOYMENT_OPTIONS.md`, `product_truth_contract.yaml` and the conformance benchmark are all registered, and no file under `docs/` lacks an entry.
+  - Register coverage stays advisory by design.
+
+### Interop matrix: one edge per claim, and the Federation documents brought up to date
+
+- An external review of 2026-10-26 found that `scripts/build_interop_matrix.py` counted every record of an edge's contract, whatever its claim. E-ECB and E-ECB-V1-1 carried the `single_use_authorization` records, and E-EE-V2 carried three other `effect-evidence-v2` claims (8 records where 2 belong to the row). A later independent or contradicting result for one claim would have moved the row of another.
+- An edge now counts only records for its `(contract, claim)` pair. Every claim of a contract with an edge needs its own edge, every record must fall on exactly one, and the generator refuses otherwise. Six edges are added: E-ECB-SU, E-ECB-V1-1-SU, E-EE-V2-CALL, E-EE-V2-DEC, E-EE-V2-OBS and E7-EXCL (`exclusive_effect_path`, no record, `SPECIFIED`). No derived status changed, because every affected record is L0. No record, fixture or package digest is touched.
+- `FEDERATION.yaml` no longer says that no contract reached `EXTERNALLY_VERIFIED`: `runtime-surface-e7-v0.1` has, for its fixture premises only. `CAPABILITY_DISCOVERY.md` describes the implemented activation manifest instead of calling it proposed, without claiming that any deployment loads one. `FEDERATION.md` keeps its 2026-10-04 maturity snapshot and records what has happened since, raising no level.
+- Tests: two in `tests/test_interop_result_contract.py`. A result for one claim leaves another claim's row unchanged, and the edges partition every claim and every record.
+- `FEDERATION_BRIDGE.md` and the contract-probes README now record that the read-only reconciliation candidate was merged upstream as aeoess/federation-port#9 (`9e85e96`, 2026-10-14) under `v1-candidates/`, written by REMORA's maintainer and outside the v0 runtime. Issue #2 stays open, and the components stay pinned to `3a2f6ce`. Checked on 2026-10-26: `src/` is unchanged between `3a2f6ce` and `9e85e96`. `reproduce.sh` gives 193 of 193 at the pin, and the candidate's own script gives 19 of 19 plus 54 of 54 upstream at `9e85e96`. Both are author runs.
+### API: a readiness probe that reads the durable store
+
+- Fault injection on the OT pilot stopped PostgreSQL while `GET /v1/health` kept answering `ok`, so an orchestrator would have kept routing writes to a process that could only refuse them. `/v1/health` stays a liveness probe.
+- `GET /v1/ready` connects to `REMORA_PG_DSN` (or opens `REMORA_CHAIN_DB` read-only, never creating it) with a two-second bound. It answers 200 `ready`, or 503 `not_ready` with `checks.durable_state: unavailable`, and never the driver's message. Without a durable store it reports `not_configured`, and for the Worker state endpoint alone `not_checked`.
+- It takes no token, so one answer is reused for a second rather than opening a connection per unauthenticated request.
+- Exercised on the OT pilot stack: 200 with PostgreSQL up, 503 within 2.7 s with it stopped, 200 again after it started. The pilot's compose healthcheck still probes liveness; its committed fault-injection evidence pins those files byte for byte.
+- `tests/test_readiness_probe.py` (14).
+
+### Research control matrix: bound to the capability register, with lines for cumulative limits and capability activation
+
+- An external review of 2026-10-26 found the matrix dated 2026-10-18 and silent on the cumulative limits (CAP-031) and the capability activation manifest (ADR-UE-03). Both are now research lines: RES-025 (escrow-style reservation before the effect, O'Neil 1986) and RES-026 (fail-safe defaults for activation, Saltzer and Schroeder 1975), each with code, tests, evidence, a scope boundary and a section in `docs/09-related-work.md` (§17, §18). RES-026 states that no shipped deployment loads a manifest yet.
+- A line may name the capability register entries its research grounds (`capabilities:`); `scripts/generate_research_control_matrix.py` refuses an unregistered id, and the generated view adds a capability → research index. Twelve lines name one. The view states that matrix maturity, register status and the manifest's effective mode are three different statements and that naming a capability inherits none of its status. No maturity was changed.
+### OT pilot: fault injection through the whole chain, a frozen configuration and operator measurements
+
+- `deploy/ot-pilot/run_fault_injection.py` injects nine faults into the running pilot over HTTP and `docker compose`:
+  - a restart between approval and execution;
+  - a replay of a spent grant after a restart;
+  - limits across a restart;
+  - PostgreSQL stopped during a governed write;
+  - four racing executions of one approval;
+  - the same proposal approved twice;
+  - a stop between approval and execution;
+  - a tool failing after dispatch began;
+  - an approver revoked after approving.
+- Each run freezes the configuration it ran against: the file digests, the API image id, the commit and the policy hash, with one fingerprint over them. It also measures latency by route (calls made during a fault are counted apart), writes completed against writes intended, false refusals and human steps.
+- Two runs are committed under `artifacts/pilot-pack/runs/`:
+  - before the fixes, 7 of 9: the stop spent the approval, and a store outage answered a bare 500;
+  - after #1079 and #1080, 9 of 9, with 8 of 8 writes, no false refusals and both chains valid. The same directory holds a battery run at 16 of 16 on that configuration.
+- The pilot gains a second admin token (`ot-supervisor`), because a principal cannot revoke themself, and `actor_id` on every token. It also gains `REMORA_LIMITS_EVIDENCE_MODULE: ot_registry`, whose `check_limit_evidence` answers from the plant's log and refuses to answer for an operation older than the plant process. Without it, an unknown outcome's reservation could never be resolved.
+- Still open: a proposal approved twice runs twice, because the pilot's limit policy declares no idempotency keys. Re-signing it needs the pilot limit authority's key.
+- `tests/test_ot_fault_injection.py` (17): the fingerprint, the measurements and the plant evidence checker.
+
+### A PostgreSQL outage answers 503 `durable_state_unavailable`, not a bare 500
+
+- Found by the OT pilot's fault-injection run on 2026-10-26: with Postgres stopped, `/v1/execution/assess` and `/v1/execution/execute` refused and nothing executed, but both answered 500 "An internal error occurred". The catch-all handler in `servers/api.py` now answers 503 `durable_state_unavailable`, with the same correlation id, when the exception is a PostgreSQL driver's `OperationalError` (psycopg v3 or psycopg2). Other errors, SQL errors and SQLite's `OperationalError` included, stay 500. Neither body carries the driver's message.
+- `tests/test_durable_state_outage_503.py` (5).
+### A stop no longer spends the approval or the ACCEPT token it refuses
+
+- Found by the OT pilot's fault-injection run on 2026-10-26: an approved item executed while the operator had stopped execution was refused by the dispatcher, but `/v1/execution/execute` had already consumed the approval and recorded the dispatch as REFUSED, so after `/resume` the same item answered 409 and had to be proposed and approved again. The documentation said a stop refuses before anything is spent.
+- `/v1/execution/execute` and `/v1/execution/execute-accepted` now read the stop flag before they touch the approval or the token: 409 `execution_stopped`, 503 `execution_stop_unverifiable` when the store cannot answer. The approval or token runs after the resume. The dispatcher's own check stays; a stop set between the read and the dispatch is still refused there, with the approval spent. Both responses are declared in `schemas/openapi.json`.
+- `tests/test_execution_stop_spends_nothing.py` (3): the approval stays APPROVED and runs once after the resume, the unanswerable store is 503 with nothing spent, and the ACCEPT token redeems after the resume.
+
 ### Environment flags and the activation manifest must agree: `REMORA_REQUIRE_LIMITS` first (ADR-UE-03 slice 5)
 
 - `FLAG_AGREEMENTS` in `remora/governance/capability_activation.py` holds the flags migrated so far, one per change. The first is `REMORA_REQUIRE_LIMITS` against CAP-031 (cumulative limits): set, the manifest must request CAP-031 enforcing (`ENFORCE`, `VERIFY`); unset, it must not. A loaded manifest that disagrees refuses startup, whether or not `REMORA_CAM_REQUIRED` is set, so neither the flag nor the manifest silently wins. A manifest that leaves CAP-031 out is not compared.

@@ -166,11 +166,12 @@ html{scroll-behavior:smooth}
   <div class="eyebrow">Report · REMORA-research · SDD v1.1</div>
   <h1>REMORA Capability Atlas</h1>
   <p class="lede">All 32 registered capabilities: what they do, how mature they are, what depends on what, and what changes if SDD v1.1 for unified capability execution is adopted. Register facts and assessments are kept apart: assessments are marked <span class="tag">assessment</span>.</p>
+  <p class="lede">This page describes master at d94eecf9 (2026-10-24). Since then the declared profile is <code>CONTROLLED_PILOT</code> by owner decision (2026-10-25) and REM-023 is DONE; REM-021 gates <code>EXTERNALLY_VERIFIED</code> and <code>PRODUCTION</code>, not the pilot. The SDD's <a href="unified-capability-execution-v1.1.md#implementation-status-2026-10-26">implementation status</a> records what has changed.</p>
   <div class="meta">
     <span><b>Source</b> master <a href="https://github.com/darklordVirtual/REMORA-research/tree/d94eecf916dda6ee7cd8598e100a2ee64b690958">d94eecf9</a></span>
     <span><b>SDD</b> <a href="https://github.com/darklordVirtual/REMORA-research/pull/1053">darklordVirtual/REMORA-research#1053</a></span>
     <span><b>Date</b> 2026-10-24</span>
-    <span><b>Current profile</b> SHADOW_PILOT</span>
+    <span><b>Profile at source</b> SHADOW_PILOT (<code>CONTROLLED_PILOT</code> declared since 2026-10-25)</span>
     <span><b>Data</b> docs/design/unified-capability-execution-v1.1-atlas.yaml</span>
   </div>
 </div></header>
@@ -184,12 +185,12 @@ html{scroll-behavior:smooth}
   <div class="tiles">
     <div class="tile"><span class="big">32</span><span class="lbl">registered capabilities (CAP-001 to CAP-031 and CAP-META)</span></div>
     <div class="tile"><span class="big">0</span><span class="lbl">at ENFORCED_PRODUCTION or EXTERNALLY_VERIFIED today</span></div>
-    <div class="tile"><span class="big">SHADOW_PILOT</span><span class="lbl">current release profile: the permitted rung, not evidence of an operating pilot. CONTROLLED_PILOT is not offered</span></div>
+    <div class="tile"><span class="big">SHADOW_PILOT</span><span class="lbl">release profile at d94eecf9: the permitted rung, not evidence of an operating pilot. CONTROLLED_PILOT was not offered then</span></div>
     <div class="tile"><span class="big" id="t-crit">–</span><span class="lbl">capabilities assessed as critical for a controlled pilot <span class="tag">assessment</span></span></div>
   </div>
   <ol class="findings">
     <li><span><b>REMORA is stronger than SDD v1.0 suggested.</b> CAP-015, CAP-019 and CAP-021 already have runtime callers, most authority stores have a Postgres backend, and the release workflow can produce an SBOM and a Sigstore attestation. SDD v1.1 describes these as extensions, not new work. That the workflow exists does not prove that a given release was built and verified.</span></li>
-    <li><span><b>A controlled pilot is NO-GO today.</b> The existing gate requires REM-021 (independent human review, not started) and REM-023 (RBAC follow-through, in progress). CAP-031 had six open pilot blockers at the source revision, and the cumulative ledger exists on one host only.</span></li>
+    <li><span><b>A controlled pilot was NO-GO at d94eecf9.</b> The gate then required REM-021 (independent human review, not started) and REM-023 (RBAC follow-through, in progress). CAP-031 had six open pilot blockers at the source revision, and the cumulative ledger exists on one host only.</span></li>
     <li><span><b>Implementation alone does not yield CONTROLLED_PILOT.</b> The highest realistic rung is CONTROLLED_PILOT for one named configuration, and that additionally requires independent human review (REM-021) and deployment evidence. LIMITED_ENFORCEMENT additionally requires REM-024 and REM-030 and operating evidence. PRODUCTION requires external verification (CAP-001 EXTERNALLY_VERIFIED) and lies outside the SDD. <span class="tag">assessment</span></span></li>
     <li><span><b>The largest single risk is an unknown bypass route.</b> Runtime surface completeness (CAP-022) is NOT_ESTABLISHED; a process with its own credentials makes every other guarantee local. <span class="tag">assessment</span></span></li>
     <li><span><b>Activation must be described per capability and profile.</b> In the supported, enforcing execution configuration the token, payload binding and dispatch are on the path; durable audit, strict signature checking and actual isolation still depend on configuration. Other capabilities are opt-in behind flags or policy. Executed actions, spent tokens and chain records cannot be rolled back. Budget history is not deleted; a reservation can only be released through a documented resolution once it is established that the effect did not happen.</span></li>
@@ -246,7 +247,7 @@ html{scroll-behavior:smooth}
   <p class="prose"><span>The profiles in <code>release_profiles_v1.yaml</code> build on each other. The table shows what each profile requires, the status today and whether the SDD work can close the requirement.</span></p></div>
   <div class="tbl"><table><thead><tr><th>Profile</th><th>Requirement</th><th>Today</th><th>With the full SDD <span class="tag">assessment</span></th></tr></thead><tbody>
     <tr><td><b>RESEARCH_REFERENCE</b></td><td>REM-014, REM-019</td><td><span class="pill st-good"><i></i>Met</span></td><td>Unchanged</td></tr>
-    <tr><td><b>SHADOW_PILOT</b></td><td>CAP-001 WIRED_API_PATH, CAP-005 PERSISTED_ATOMIC, CAP-011 IMPLEMENTED_LIBRARY</td><td><span class="pill st-good"><i></i>Current profile</span></td><td>Unchanged; all 32 become visible and honestly classified</td></tr>
+    <tr><td><b>SHADOW_PILOT</b></td><td>CAP-001 WIRED_API_PATH, CAP-005 PERSISTED_ATOMIC, CAP-011 IMPLEMENTED_LIBRARY</td><td><span class="pill st-good"><i></i>Profile at d94eecf9</span></td><td>Unchanged; all 32 become visible and honestly classified</td></tr>
     <tr><td><b>CONTROLLED_PILOT</b></td><td>REM-020, REM-021, REM-022, REM-023; CAP-003/004/007/009 WIRED_API_PATH; CAP-008 WIRED_REFERENCE_PATH</td><td><span class="pill st-crit"><i></i>Blocked: REM-021, REM-023</span></td><td><span class="pill st-warn"><i></i>Possible</span> for one named configuration. Beyond implementation it requires REM-021 and REM-023 closed, the G-gates passed and deployment evidence</td></tr>
     <tr><td><b>LIMITED_ENFORCEMENT</b></td><td>REM-024, REM-030; CAP-003/004 ENFORCED_PRODUCTION; CAP-007 PERSISTED_ATOMIC</td><td><span class="pill st-crit"><i></i>Blocked</span></td><td><span class="pill st-serious"><i></i>Possible later</span> after pilot operation and independent validation of interception</td></tr>
     <tr><td><b>PRODUCTION</b></td><td>REM-025, REM-031, all P0–P3; CAP-001 EXTERNALLY_VERIFIED; CAP-005 ENFORCED_PRODUCTION</td><td><span class="pill st-crit"><i></i>Blocked</span></td><td><span class="pill st-none"><i></i>Outside the SDD</span> requires external verification and a compliance package</td></tr>
@@ -256,7 +257,7 @@ html{scroll-behavior:smooth}
 
 <section id="pilot"><div class="wrap">
   <div class="sechead"><span class="secnum">07</span><h2>Readiness for a pilot</h2>
-  <p class="prose"><span>SHADOW_PILOT is the current release profile. It states the permitted maturity rung, not that a shadow pilot is actually in operation. Tier C (controlled enforcement) is not ready. The gates below are the SDD's G01–G12, mapped to existing requirements.</span></p></div>
+  <p class="prose"><span>SHADOW_PILOT was the release profile at d94eecf9. It states the permitted maturity rung, not that a shadow pilot is actually in operation. Tier C (controlled enforcement) is not ready. The gates below are the SDD's G01–G12, mapped to existing requirements.</span></p></div>
   <div class="tbl"><table><thead><tr><th>Gate</th><th>Mapping</th><th>Status at d94eecf9</th><th>What is missing</th></tr></thead><tbody id="gates"></tbody></table></div>
   <div class="two">
     <div class="card"><h3>Immediate NO-GO</h3><ul>

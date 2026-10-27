@@ -236,6 +236,7 @@ Several topics have more than one document. This table says which to open.
 | [best_practice_gap_audit_v1.md](assurance/best_practice_gap_audit_v1.md) | Research-practice gap audit |
 | [development_review_log_v1.md](assurance/development_review_log_v1.md) | Development review log |
 | [external_review_panel_v1.md](assurance/external_review_panel_v1.md) | External review panel record |
+| [fault_scenario_crosswalk_v1.md](assurance/fault_scenario_crosswalk_v1.md) | Failure scenarios of the 2026-10-26 review mapped to tests and pilot runs, with what each returned and what was not run |
 | [independent_review_protocol_v1.md](assurance/independent_review_protocol_v1.md) | Independent review protocol |
 | [ai_assisted_adversarial_security_review_v1.md](assurance/ai_assisted_adversarial_security_review_v1.md) | Historical adversarial security review |
 | [red_team_plan_v1.md](assurance/red_team_plan_v1.md) | Red-team plan |

@@ -10,8 +10,9 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 41 paths). CI fails on drift between it and the routes, so it is
-the authority for request and response shapes; this document explains them.
+(OpenAPI 3.1). CI fails on drift between it and the routes, so it is the
+authority for request and response shapes, and for how many there are; this
+document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
 path to a 200 before the strict-profile prerequisites are configured:
@@ -35,6 +36,7 @@ AUTH="Authorization: Bearer ${REMORA_API_BEARER_TOKEN}"
 
 # 1. Is it up, and what policy is it running?
 curl -s localhost:8000/v1/health
+curl -s localhost:8000/v1/ready
 curl -s localhost:8000/v1/policy/version -H "$AUTH"
 
 # 2. Gate a proposed tool call.
@@ -228,6 +230,20 @@ none of them set, the in-process `NonceLedger` remains and a lease is
 single-use per process rather than globally. That is the library and research
 configuration. A deployment running more than one dispatcher must configure a
 backend.
+
+When the PostgreSQL store stops answering, a request that needs it answers
+503 `durable_state_unavailable` with a `correlation_id`. The driver raised
+`OperationalError` (psycopg v3 or psycopg2), and nothing was decided or
+executed. The request can be retried once the store is back. Other unhandled
+errors stay 500, and neither body carries the driver's message.
+`GET /v1/health` is a liveness probe and does not read the store.
+`GET /v1/ready` is the readiness probe. It connects to `REMORA_PG_DSN` (or
+opens `REMORA_CHAIN_DB` read-only) with a two-second bound and answers 200
+`ready`, or 503 `not_ready` with `checks.durable_state: unavailable` while the
+store does not answer. It reports `not_configured` without a durable store and
+`not_checked` for the Worker state endpoint alone, which it does not reach. It
+takes no token, so one answer is reused for a second instead of opening a
+connection per request.
 
 ---
 
@@ -482,7 +498,7 @@ only the checks that ran (RMR-CR-007). The control-plane
 `verification_scope: linkage_only` and `signature_status: NOT_CHECKED`. RBAC: `assess`/`execute` capabilities gate assess/execute;
 `review` gates approve; `read` gates audit. `review` also gates `POST /revoke-principal`, which withdraws a principal's authority after the fact. An approval that principal granted is invalidated at the execution re-gate, not rewritten. The chain therefore shows both the approval and the revocation. With `REMORA_WS1_ADMISSION=atomic`, `review` also gates `POST /revoke-authority`. It revokes or reinstates a WS1 evidence source (`source:<id>`) by advancing its authority epoch under the admission lock, together with an `authority_revoked` or `authority_reinstated` audit event. Evidence read before the change no longer admits. Without the mode the route answers 409. In that mode an admitted call is checked again just before it is sent. A change committed after the admission refuses the send: `tool_execution.refusal_reason` is `permit_refused` and `permit_refusal` names the cause. `tool_execution.permit` records the check, and `at_effect: NOT_ESTABLISHED` marks that a revocation during the send is not seen.
 
-`review` also gates `POST /v1/execution/stop` and `POST /v1/execution/resume`, the operator's stop switch (SDD unified capability execution v1.1, P0 item 7; gate G10). A stop writes one durable flag for the tenant: the authority-epoch subject `execution:stop`, in the store the lease nonce ledger uses (`REMORA_PG_DSN` or `REMORA_CHAIN_DB`). An `execution_stopped` event commits in the same transaction. While it is set the authority mints nothing (`execution_stopped`). Every governed dispatcher, in this process or in a separate execution domain reading the same store, refuses before anything is spent: no nonce, no limit reservation, no recorder intent. A lease refused this way runs after the resume if it has not expired. A call already past its nonce finishes, because effects cannot be undone; nothing executed is touched and no evidence is deleted. A store that cannot answer refuses as `execution_stop_unverifiable`. `GET /v1/execution/stop` (`read`) returns the flag and the epoch of the last change. A deployment on `REMORA_STATE_ENDPOINT` alone has no epoch store and therefore no stop; the routes answer 409 and the dispatcher binds no check.
+`review` also gates `POST /v1/execution/stop` and `POST /v1/execution/resume`, the operator's stop switch (SDD unified capability execution v1.1, P0 item 7; gate G10). A stop writes one durable flag for the tenant: the authority-epoch subject `execution:stop`, in the store the lease nonce ledger uses (`REMORA_PG_DSN` or `REMORA_CHAIN_DB`). An `execution_stopped` event commits in the same transaction. While it is set the authority mints nothing (`execution_stopped`). Every governed dispatcher, in this process or in a separate execution domain reading the same store, refuses before anything is spent: no nonce, no limit reservation, no recorder intent. A lease refused this way runs after the resume if it has not expired. `/v1/execution/execute` and `/v1/execution/execute-accepted` read the flag before they touch the approval or the token and answer 409 `execution_stopped` (503 `execution_stop_unverifiable`), so a stopped approval or ACCEPT token also runs after the resume. A stop set between that read and the dispatch is refused by the dispatcher, with the approval spent. A call already past its nonce finishes, because effects cannot be undone; nothing executed is touched and no evidence is deleted. A store that cannot answer refuses as `execution_stop_unverifiable`. `GET /v1/execution/stop` (`read`) returns the flag and the epoch of the last change. A deployment on `REMORA_STATE_ENDPOINT` alone has no epoch store and therefore no stop; the routes answer 409 and the dispatcher binds no check.
 
 **Rejection, effects and the proposal trail.** `POST /reject` (`review`)
 refuses a pending review item terminally and requires a `reason`. The
@@ -636,7 +652,10 @@ by other means changes a decision.
 
 **WS1 execution preconditions (#953, opt-in, default off):**
 `REMORA_WS1_MODE` is `off`, `shadow` or `enforce`; any other value refuses
-startup. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
+startup. Under the `review` and `controlled_pilot` runtime profiles, `enforce`
+also requires `REMORA_WS1_ADMISSION=atomic`: legacy admission spends the grant
+after the WS1 re-gate, so evidence that lapsed in between would still be
+spent. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
 exposing `build_ws1_deployment()`: the precondition registry, verifiers,
 resolvers, read capabilities, monitor profile and budget. `/assess` then runs
 the WS1 loop after every other component, records it under `ws1` in the chain
@@ -663,7 +682,12 @@ On Postgres every ledger transaction takes one advisory lock. Two hosts
 reserving against the same limit are therefore serialized, as one host's
 SQLite transactions are, and the schema is created on first open under that
 lock.
-Either one without the other refuses startup.
+Either one without the other refuses startup. A SQLite ledger beside
+authority state on `REMORA_PG_DSN` refuses startup under every profile unless
+`REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs
+executors. That pairing is the shape a second executor host can join, and that
+host would keep its own budget. With the authority state on SQLite as well,
+nothing needs declaring.
 
 The policy has four parts. `meters` says what one call of a tool consumes. A
 `sum` meter reads an amount argument, a `count` meter charges `per_call`, and
@@ -1087,6 +1111,20 @@ restart-proven by test.
   effective mode, reasons and premise results, and the manifest's digest and
   whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`.
   No signer key id or credential is returned.
+- **Effective modes at dispatch.** With a manifest loaded, every dispatch
+  requires the capabilities that authorize it to be effective `ENFORCE`:
+  CAP-003 (the signed grant) and CAP-013 (lease dispatch), plus CAP-031 while
+  cumulative limits are configured. Any other mode refuses before the nonce,
+  so nothing is spent: `capability_not_enforcing:<CAP>:<mode>`, and a
+  capability absent from the manifest counts as `DISABLED`. Only `ENFORCE`
+  authorizes an effect. `VERIFY` sends outcomes to human review on the
+  decision path, and `SHADOW`, `EVIDENCE_ONLY`, `OFFLINE`, `DISABLED` and
+  `BLOCKED` authorize nothing (`MODE_CONTRACT` in
+  `remora/governance/capability_activation.py`). A manifest named by
+  `REMORA_CAM_FILE` that did not load, for example on a bad signature,
+  refuses every dispatch as `cam_not_loaded`. Without `REMORA_CAM_FILE`
+  nothing changes. Other capabilities are not checked at dispatch, because
+  most are evidence, research or observation mechanisms.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.

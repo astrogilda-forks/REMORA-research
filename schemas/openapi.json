@@ -1468,6 +1468,36 @@
         "title": "PolicyDecision",
         "type": "object"
       },
+      "ReadinessResponse": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "backend",
+          "checks"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
       "ReceiptSignatureModel": {
         "additionalProperties": false,
         "description": "A detached Ed25519 signature under ``REMORA/EFFECT-RECEIPT/v1``.",
@@ -2981,7 +3011,7 @@
                 }
               }
             },
-            "description": "Item not in an executable state."
+            "description": "Item not in an executable state, or execution is stopped (execution_stopped); a stopped item stays approved."
           },
           "422": {
             "content": {
@@ -2992,6 +3022,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The stop flag could not be read (execution_stop_unverifiable); nothing was spent."
           }
         },
         "summary": "Execute",
@@ -3056,7 +3096,7 @@
                 }
               }
             },
-            "description": "Token refused: replayed/consumed, payload binding mismatch, expired, wrong audience, or not an ACCEPT."
+            "description": "Token refused: replayed/consumed, payload binding mismatch, expired, wrong audience, or not an ACCEPT; or execution is stopped (execution_stopped), with the token unspent."
           },
           "422": {
             "content": {
@@ -3067,6 +3107,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            },
+            "description": "The stop flag could not be read (execution_stop_unverifiable); the token is unspent."
           }
         },
         "summary": "Execute Accepted",
@@ -4576,6 +4626,39 @@
         "summary": "Policy Version",
         "tags": [
           "governance"
+        ]
+      }
+    },
+    "/v1/ready": {
+      "get": {
+        "description": "Readiness probe: 503 ``not_ready`` while the durable store is down.\n\n``/v1/health`` is liveness and answers ``ok`` while the process runs.\nThis route connects to ``REMORA_PG_DSN`` (or opens ``REMORA_CHAIN_DB``\nread-only) with a two-second bound and reports only ``ok`` or\n``unavailable``, never the driver's message. No token: an orchestrator\nmust be able to ask. An answer is reused for one second.",
+        "operationId": "ready_v1_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "The durable store does not answer."
+          }
+        },
+        "security": [],
+        "summary": "Ready",
+        "tags": [
+          "infrastructure"
         ]
       }
     },

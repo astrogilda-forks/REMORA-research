@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Version | 1.1-draft, 2026-10-24 |
-| Status | PROPOSED at `d94eecf9`; progress since: P0 items 1 to 8 merged (#1053 to #1057, #1063), ADR-UE-03 accepted (#1065) with its first slice (#1068), IFC-11 for the repository's surfaces (#1066), IFC-12 slice 1 (#1067), `CONTROLLED_PILOT` by owner decision (#1070). The text below is the specification as written. |
+| Status | PROPOSED at `d94eecf9`; progress since: P0 items 1 to 8 merged (#1053 to #1057, #1063), ADR-UE-03 accepted (#1065) with its first slice (#1068), IFC-11 for the repository's surfaces (#1066), IFC-12 slice 1 (#1067), `CONTROLLED_PILOT` by owner decision (#1070). The text below is the specification as written; [Implementation status, 2026-10-26](#implementation-status-2026-10-26) records what has changed. |
 | Owner | REMORA research: architecture and release governance |
 | Source revision | `d94eecf916dda6ee7cd8598e100a2ee64b690958` |
 | Supersedes | 1.0-draft (source revision `58ca22d46ace1ee82b6a741fdd29d4823d5fe07f`) |
@@ -14,6 +14,28 @@
 Status: proposed specification. This is not an implementation report, a security certification, or permission to turn on 32 enforcement mechanisms. All MUST/SHOULD requirements below are targets for new work and need tests and sign-off.
 
 The source snapshot is `master` at `d94eecf9` on 2026-10-24, the merge of PR #1052 (budget idempotency/reservation lifecycle). v1.0 was pinned to `58ca22d4`, before that merge; the corrections are listed in [Revision history](#revision-history). Where this SDD says "exists", it names the file; where it says "proposed", nothing by that name exists at `d94eecf9`.
+
+## Implementation status, 2026-10-26
+
+This section is added after the fact and changes nothing below it. The
+specification keeps its `d94eecf9` premises, and where those differ from
+`master` this section says so. Where it disagrees with
+`docs/assurance/release_profiles_v1.yaml` or
+`docs/assurance/remediation_register.yaml`, those registers win.
+
+| Topic | At `d94eecf9` (as written below) | On `master`, 2026-10-26 |
+|---|---|---|
+| Release profile | `SHADOW_PILOT` declared; `CONTROLLED_PILOT` not offered | `CONTROLLED_PILOT` declared since 2026-10-25 by owner decision `OD-2026-10-25-controlled-pilot` (#1070); `PRODUCT_PACKAGING.md` offers it as a bounded pilot |
+| REM-021 independent review | `NOT_STARTED`, read as a pilot blocker | `NOT_STARTED`; gates `EXTERNALLY_VERIFIED` and `PRODUCTION`, not the pilot |
+| REM-023 RBAC follow-through | `IN_PROGRESS` | `DONE` (2026-10-25, on its code criteria); external RBAC confirmation open under REM-021 |
+| P0 repair order (§10) | not started | items 1 to 8 merged (#1053 to #1057, #1063) |
+| ADR-UE-03 / CAM (§3) | proposed | accepted (#1065); slices 1 to 4 merged (#1068, #1075 to #1077), slice 5 for `REMORA_REQUIRE_LIMITS` only (#1078); no shipped deployment loads a manifest |
+| Cumulative limits (§5, CAP-031) | pilot blockers listed in §5 | each item's status is recorded in `NEGATIVE_RESULTS.md` §97 |
+| Fault injection on the OT pilot (§9) | not run | nine faults on one frozen configuration (#1083): 7 of 9 before #1079 (stop spent the approval) and #1080 (outage answered 500), 9 of 9 after; `GET /v1/ready` added (#1086) |
+| Duplicate approved proposals in the OT pilot | not measured | still run twice: the pilot limit policy declares no idempotency keys, and re-signing it needs the owner's limit authority |
+
+What none of this establishes: independent review, production readiness,
+multi-host operation, or coverage of all 32 capabilities.
 
 ## Executive decision
 

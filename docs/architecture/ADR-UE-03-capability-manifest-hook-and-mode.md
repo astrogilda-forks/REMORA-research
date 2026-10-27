@@ -5,8 +5,11 @@
   ([unified capability execution v1.1](../design/unified-capability-execution-v1.1.md)
   §13, decision ADR-UE-03). The seven particulars below stand as written;
   the two choices the proposal left open are resolved under "Owner
-  resolution". No code implements the manifest yet; the slices at the end
-  are the work.
+  resolution". When this was accepted no code implemented the manifest;
+  the slices at the end were the work. Context below describes `master` as
+  it was then. Slices 1 to 4 have since landed (#1068, #1075 to #1077), and
+  slice 5 for its first flag, `REMORA_REQUIRE_LIMITS` (#1078). The record of
+  each is at the end. No shipped deployment loads a manifest.
 - Deciders: repository owner, security
 - Related: SDD §3 (Capability Activation Contract), §6 (read-only API
   contracts) and §10 (phase P1 "Inventory + CAM"). The
@@ -180,6 +183,25 @@ open choices:
    `remora/governance/capability_activation.py`). A loaded manifest that
    disagrees refuses startup, required or not. The flow-control flag has no
    capability of its own in the register, so it waits for one.
+6. Effective modes at the execution boundary (RMR-AUD-26-004). Delivered
+   2026-10-26: `MODE_CONTRACT` and `dispatch_mode_refusal` in
+   `remora/governance/capability_activation.py`,
+   `GovernedToolDispatcher.bind_mode_gate`, and `_cam_mode_refusal` in
+   `servers/execution_api.py`. With a manifest loaded, CAP-003 and CAP-013,
+   plus CAP-031 while limits are configured, must be effective `ENFORCE`
+   for a dispatch to run, and the refusal comes before the nonce. A
+   configured manifest that did not load refuses as `cam_not_loaded`. Tests
+   are in `tests/test_cam_dispatch_mode_gate.py`.
+
+Still open:
+
+- Item 3's per-capability snapshot of effective modes in the decision record
+  and evidence. The record carries the digest only.
+- Item 4's strict-profile startup refusal without a complete manifest. It is
+  still opt-in through `REMORA_CAM_REQUIRED=1`, and making it implied by
+  `review` and `controlled_pilot` would stop every strict deployment that has
+  no manifest. That needs the owner's timing.
+- The remaining flag migrations of item 7.
 
 ## What this ADR does not decide
 
