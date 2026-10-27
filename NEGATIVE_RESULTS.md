@@ -433,7 +433,8 @@ At the time of seeding (2026-06-26), the `deployment_status = "SHADOW_ONLY"` and
 
 **Gap 1, Closed 2026-06-27 (gate logic fixed 2026-06-27).** `n_harmful_independent = 169`
 as of 2026-06-27. 84 aradhye + 84 CaiZhiTech harmful episodes seeded via
-`scripts/aromer_seed_harmful_episodes.py`. A 36-case holdout was saved to
+`scripts/aromer_seed_harmful_episodes.py` (main implementation repository; not
+committed here). A 36-case holdout was saved to
 `artifacts/aromer/harmful_seed_holdout.json` (raw holdout file not committed to
 this repo; its evaluation results are committed as
 `artifacts/aromer/harmful_seed_holdout_eval.json`, n_cases=36). The worker now computes n_harmful_independent
@@ -459,7 +460,8 @@ is blocked on Cloudflare Workers AI beta access.
 <!-- finding-status: superseded -->
 
 When the AROMER world model is initialized from replay arena episodes via
-`scripts/aromer_seed_benign_outcomes.py`, concentrated benign correct_accept
+`scripts/aromer_seed_benign_outcomes.py` (main implementation repository; not
+committed here), concentrated benign correct_accept
 seeds fill the sliding 200-episode window with seeded entries. This temporarily
 drives `benign_review_rate = 0%` in the window metric and the quality gate to
 `INSUFFICIENT_SAFETY_EVIDENCE` (harmful cases pushed out of the window).
@@ -483,7 +485,8 @@ window, not new false accepts.
 **Provenance note:** The world model Bayesian priors updated by seeding ARE real
 improvements, p_harm for benign contexts drops from 0.50 (uniform) to 0.10–0.20
 (medium-confidence posterior), reducing future VERIFY rate for those contexts. The
-seeding methodology is documented in `scripts/aromer_seed_benign_outcomes.py`.
+seeding methodology is documented in `scripts/aromer_seed_benign_outcomes.py` in
+the main implementation repository.
 
 ---
 
