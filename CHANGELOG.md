@@ -4,6 +4,11 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### SDK: a deferred audit reference no longer breaks a successful approval
+
+- The server answers an approval with `audit.deferred: true` and a null `sequence_no` and `entry_hash` when the event is enqueued on the transition's own transaction (REM-047). `AuditRef.from_payload` called `int(None)` on it, so `RemoraClient.approve` raised `TypeError` after the approval had been recorded, and the caller could not tell that it had.
+- `AuditRef` now carries `deferred` and `idempotency_key`, and both index fields may be `None`. A response with no index that does not say it is deferred, with its key, is refused as malformed rather than read as pending.
+- Found by the first live governed run of the autonomous-ot-control testbed against `9b1763ca`. Tests: `tests/test_sdk_client.py` (+6). The public API snapshot is unchanged.
 ### Assurance: a fault-scenario crosswalk, and a process-split fixture that refused to start (RMR-AUD-26-011)
 
 - `docs/assurance/fault_scenario_crosswalk_v1.md` maps the adversarial review's scenario classes to the tests and OT pilot runs that exercise them. For each it records whether real PostgreSQL, a restart or several processes are involved, and what each returned on 2026-10-26: `2594d08b`, one Windows host, PostgreSQL 16 in a container.
