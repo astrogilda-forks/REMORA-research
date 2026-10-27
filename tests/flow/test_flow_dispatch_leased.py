@@ -585,7 +585,7 @@ def test_a_commit_that_outlasts_the_fence_ttl_still_holds_the_context(executor):
     import time
 
     import remora.enforcement.lease as lease_mod
-    from remora.flow.labeler import FlowLabeler
+    import remora.flow.labeler as labeler_mod
 
     context_id = _context(executor)
     calls = [dict(_call(context_id), arguments={"work_order_id": f"WO-{i}", "status": "closed"})
@@ -594,7 +594,7 @@ def test_a_commit_that_outlasts_the_fence_ttl_still_holds_the_context(executor):
     ttl = 1.0
     executor.monkeypatch.setattr(lease_mod, "DEFAULT_LEASE_TTL_SECONDS", ttl)
     persisting, proceed = threading.Event(), threading.Event()
-    real_label_result = FlowLabeler.label_result
+    real_label_result = labeler_mod.FlowLabeler.label_result
     seen: list[int] = []
 
     def blocked_label_result(self, *args, **kwargs):
@@ -604,7 +604,7 @@ def test_a_commit_that_outlasts_the_fence_ttl_still_holds_the_context(executor):
             assert proceed.wait(timeout=30)
         return real_label_result(self, *args, **kwargs)
 
-    executor.monkeypatch.setattr(FlowLabeler, "label_result", blocked_label_result)
+    executor.monkeypatch.setattr(labeler_mod.FlowLabeler, "label_result", blocked_label_result)
     first: dict = {}
     worker = threading.Thread(
         target=lambda: first.update(_post(executor, leases[0], call=calls[0]).json()))
@@ -633,7 +633,7 @@ def test_the_final_commit_is_refused_when_the_fence_lapsed_in_the_same_step(exec
 
     import servers.execution_api as exec_mod
     from remora.flow import context as context_mod
-    from remora.flow.labeler import FlowCommitFailed, FlowLabeler, commit_labeled_result
+    import remora.flow.labeler as labeler_mod
 
     context_id = _context(executor)
     call = _call(context_id)
@@ -650,9 +650,9 @@ def test_the_final_commit_is_refused_when_the_fence_lapsed_in_the_same_step(exec
     real_time = time.time
     executor.monkeypatch.setattr(
         context_mod, "time", SimpleNamespace(time=lambda: real_time() + 60))
-    with pytest.raises(FlowCommitFailed) as refused:
-        commit_labeled_result(
-            FlowLabeler(), WO_FLOW, contexts=contexts, handles=handles, tenant_id="acme",
+    with pytest.raises(labeler_mod.FlowCommitFailed) as refused:
+        labeler_mod.commit_labeled_result(
+            labeler_mod.FlowLabeler(), WO_FLOW, contexts=contexts, handles=handles, tenant_id="acme",
             principal="employee-1", context_id=context_id, proposal_id="p-late",
             arguments=call["arguments"], raw_result={"ok": True}, expected_epoch=state.epoch,
             dispatch_id=dispatch_id)
