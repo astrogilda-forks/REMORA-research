@@ -1390,7 +1390,14 @@ def _limits_or_refuse(req: Any, tenant: str, principal: str) -> None:
     dispatch (``GovernedToolDispatcher.bind_limit_guard``) is what holds.
     """
     guard = _limit_guard()
-    if guard is None or not guard.governs(req.tool_name):
+    if guard is None:
+        return
+    # The preview can read the plant through the deployment's observer, with
+    # the call's own argument as the resource. The signed contract is checked
+    # first, so nothing is read on behalf of a call it refuses, and the
+    # refusal names the contract rather than the meter. Raises 409.
+    _resolve_toolspec(req.tool_name, req.arguments, req.target_environment)
+    if not guard.governs(req.tool_name):
         return
     refusal = guard.preview(tenant=tenant, principal=principal, tool_name=req.tool_name,
                             arguments=req.arguments)
