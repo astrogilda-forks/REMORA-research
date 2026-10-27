@@ -97,14 +97,14 @@ in the schema file and here:
   another fence, a renewal) is contention. The loser refuses as
   `flow_dispatch_contended`, which §3.8 does not name. A fence of the same
   proposal on another hop (the authority forwarding to the execution
-  domain) does not contend with itself; an expired fence is ignored, and the
-  holder renews its own while the tool runs and through the commit and
+  domain) does not contend with itself, and an expired fence is ignored.
+  The holder renews its own while the tool runs and through the commit and
   release. A commit whose fence lapsed refuses as
-  `flow_dispatch_fence_expired`, which §3.8 does not name either; the
-  ownership check is the same compare-and-swap append that records the
-  commit (`FlowContextStore.raise_label(dispatch_id=...)`). An expired fence
-  cannot reverse an external side effect the tool already caused: it
-  withholds the result and refuses the competing call, nothing more.
+  `flow_dispatch_fence_expired`, which §3.8 does not name either. The
+  ownership check is the append that records the commit
+  (`FlowContextStore.raise_label(dispatch_id=...)`). An expired fence cannot
+  reverse an external side effect the tool already caused. It withholds the
+  result and refuses the competing call, nothing more.
 
 - IFC-12 (first slice): the recipient set is bound as a signed lease field
   (`flow_recipients_digest`) beside the IFC-06 fields and compared by
