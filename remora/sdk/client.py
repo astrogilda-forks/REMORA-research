@@ -240,11 +240,7 @@ class RemoraClient:
         """
         body = verification.to_dict()
         if not body.get("tool_call_hash") or not body.get("grant_jti"):
-            dispatch = self._dispatch_binding(proposal_id)
-            body.setdefault("tool_call_hash", "")
-            body.setdefault("grant_jti", "")
-            body["tool_call_hash"] = body["tool_call_hash"] or dispatch[0]
-            body["grant_jti"] = body["grant_jti"] or dispatch[1]
+            body = bind_verification(body, self._dispatch_binding(proposal_id))
         payload = self._request(
             "POST", f"/v1/execution/proposals/{proposal_id}/effect",
             json=body,
@@ -255,16 +251,8 @@ class RemoraClient:
 
     def _dispatch_binding(self, proposal_id: str) -> tuple[str, str]:
         """(tool_call_hash, grant_jti) of this proposal's latest dispatch."""
-        trail = self._request(
-            "GET", f"/v1/execution/proposals/{proposal_id}/lifecycle")
-        call_hash = jti = ""
-        for event in trail.get("events") or []:
-            if event.get("event") != "execution_result":
-                continue
-            payload = event.get("payload") or event
-            call_hash = str(payload.get("tool_call_hash") or call_hash)
-            jti = str(payload.get("grant_jti") or jti)
-        return call_hash, jti
+        return dispatch_binding(self._request(
+            "GET", f"/v1/execution/proposals/{proposal_id}/lifecycle"))
 
     def get_proposal(self, proposal_id: str) -> ProposalView:
         """The decision and current state of one proposal."""
@@ -337,7 +325,7 @@ class RemoraClient:
                 method, path, json=json_body, headers=self._headers,
             )
         except httpx.HTTPError as exc:
-            raise transport_error_for(exc, path) from exc
+            raise transport_error_for(exc, path, method) from exc
         if response.status_code >= 400:
             raise self._error_for(response)
         return success_body(response, path)
@@ -345,6 +333,30 @@ class RemoraClient:
     @staticmethod
     def _error_for(response: httpx.Response) -> RemoraError:
         return error_for_response(response)
+
+
+def dispatch_binding(trail: dict[str, Any]) -> tuple[str, str]:
+    """(tool_call_hash, grant_jti) of the latest dispatch in a lifecycle trail.
+
+    Shared by the sync and async clients, so a settled verdict names the
+    dispatch it observed whichever client records it.
+    """
+    call_hash = jti = ""
+    for event in trail.get("events") or []:
+        if event.get("event") != "execution_result":
+            continue
+        payload = event.get("payload") or event
+        call_hash = str(payload.get("tool_call_hash") or call_hash)
+        jti = str(payload.get("grant_jti") or jti)
+    return call_hash, jti
+
+
+def bind_verification(body: dict[str, Any], dispatch: tuple[str, str]) -> dict[str, Any]:
+    """``body`` with the dispatch binding filled in where it is missing."""
+    body = dict(body)
+    body["tool_call_hash"] = body.get("tool_call_hash") or dispatch[0]
+    body["grant_jti"] = body.get("grant_jti") or dispatch[1]
+    return body
 
 
 #: Paths whose request may already have caused a side effect on the server.
@@ -364,22 +376,34 @@ _PRE_SEND_ERRORS: "tuple[type[Exception], ...]" = (
 )
 
 
-def transport_error_for(exc: Exception, path: str) -> RemoraError:
+def transport_error_for(exc: Exception, path: str, method: str = "GET") -> RemoraError:
     """Map a transport failure to the typed hierarchy.
 
     On the execution paths a failure AFTER the request may have reached the
     server (read timeout, dropped connection) leaves the outcome
     undeterminable; that is :class:`UnknownExecutionStateError` and is never
     retryable, because re-running is the one move the execution layer must
-    not make. Connect-stage failures and every non-execution call stay
-    :class:`RemoraUnavailableError`.
+    not make. Connect-stage failures stay :class:`RemoraUnavailableError`,
+    retryable: nothing was sent. On any other call that is not a GET (an
+    approval, a rejection, a recorded effect, a limit resolution) the same
+    post-send failure is a :class:`RemoraUnavailableError` with
+    ``retryable=False``: the request may have been applied, so its state is
+    read before it is sent again.
     """
-    if path in _EXECUTION_PATHS and not isinstance(exc, _PRE_SEND_ERRORS):
+    pre_send = isinstance(exc, _PRE_SEND_ERRORS)
+    if path in _EXECUTION_PATHS and not pre_send:
         return UnknownExecutionStateError(
             f"execution outcome unknown: transport failed after the request "
             f"was sent ({type(exc).__name__}: {exc}); do not re-run, reconcile "
             f"through the proposal lifecycle",
         )
+    if not pre_send and method.upper() != "GET":
+        error = RemoraUnavailableError(
+            f"REMORA control plane unreachable after the request was sent "
+            f"({type(exc).__name__}: {exc}); it may have been applied, so read "
+            f"its state before sending it again")
+        error.retryable = False
+        return error
     return RemoraUnavailableError(f"REMORA control plane unreachable: {exc}")
 
 

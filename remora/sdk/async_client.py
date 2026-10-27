@@ -23,7 +23,13 @@ except ImportError as exc:  # pragma: no cover - exercised only without extra
         'AsyncRemoraClient requires httpx; install with pip install "remora[sdk]"'
     ) from exc
 
-from remora.sdk.client import error_for_response, success_body, transport_error_for
+from remora.sdk.client import (
+    bind_verification,
+    dispatch_binding,
+    error_for_response,
+    success_body,
+    transport_error_for,
+)
 from remora.sdk.effects import EffectVerificationView
 from remora.sdk.models import (
     ApprovalResult,
@@ -155,11 +161,18 @@ class AsyncRemoraClient:
         named in the record, and only its hashes cross the boundary — the
         observed values stay with you.
 
-        Recorded exactly as reported, mismatches included.
+        Recorded exactly as reported, mismatches included. A settled verdict
+        names the dispatch it observed, read from the proposal's lifecycle
+        as :meth:`RemoraClient.record_effect` does.
         """
+        body = verification.to_dict()
+        if not body.get("tool_call_hash") or not body.get("grant_jti"):
+            trail = await self._request(
+                "GET", f"/v1/execution/proposals/{proposal_id}/lifecycle")
+            body = bind_verification(body, dispatch_binding(trail))
         payload = await self._request(
             "POST", f"/v1/execution/proposals/{proposal_id}/effect",
-            json=verification.to_dict(),
+            json=body,
         )
         return EffectVerificationView.from_payload(
             {**verification.to_dict(), **payload}
@@ -215,7 +228,7 @@ class AsyncRemoraClient:
                 method, path, json=json_body, headers=self._headers,
             )
         except httpx.HTTPError as exc:
-            raise transport_error_for(exc, path) from exc
+            raise transport_error_for(exc, path, method) from exc
         if response.status_code >= 400:
             raise error_for_response(response)
         return success_body(response, path)
