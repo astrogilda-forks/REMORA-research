@@ -32,16 +32,16 @@ SDK, CAM, alternative ingress), not F-numbers. Mapping F1 to F15 onto them is
 | Grant and nonce single use | `test_lease_nonce_durability.py`, `test_gate_token_nonce_mutation_contract.py`, `test_gate_replay_properties.py`, `test_nonce_store_consumed.py`; PG: `test_enforcement_ledgers_postgres.py` | no / PG | simulated | replacement store | one | 89 passed; with PG, 11 passed |
 | Single use across processes | `conformance/test_execution_boundary_process_split.py` | no / PG | local HTTP effect | executor restart | three on one host | 14 passed, 2 skipped; with PG, 16 passed (after the fixture fix below) |
 | Durable store outage | `test_durable_state_outage_503.py`; PG: `test_postgres_outbox_fault_injection.py`; OT pilot fault 4 | simulated / PG | simulated plant | no | one | 5 passed; with PG, 7 passed; OT pilot `fault-injection-2026-10-26`, 9 of 9 |
-| Orchestrator view of an outage | OT pilot fault 10 | PG stopped | none | no | one container | 10 of 10 in the run of #1089 (pending review) |
+| Orchestrator view of an outage | OT pilot fault 10 | PG stopped | none | no | one container | 10 of 10 in the run of #1089 (merged) |
 | Stop switch | `test_execution_stop.py`, `test_execution_stop_spends_nothing.py`; the process-split p9 test; OT pilot fault 7 | no / PG | simulated | across restart (p9) | one / three | 11 passed; p9 is in the process-split row |
 | Effect outcome UNKNOWN | `test_unknown_execution_state.py`, `limits/test_limits_resolve_route.py`, `test_none_is_unknown_not_safe.py`; OT pilot fault 8 | no | simulated | no | one | 60 passed |
 | Cumulative limits | `tests/limits/`; PG: `limits/test_limits_postgres.py`; OT pilot fault 3 | no / PG | simulated | across restart (pilot) | one; two executors on one PG (PG tests) | 253 passed, 41 skipped, 1 failed; with PG, 7 passed. The failure, `test_a_naive_iso_timestamp_is_read_as_utc`, is local to Windows, and CI passes it |
-| Ledger topology | `limits/test_limits_ledger_topology.py` | no | none | no | one | in #1092 (pending review) |
+| Ledger topology | `limits/test_limits_ledger_topology.py` | no | none | no | one | in #1092 (merged) |
 | Cross-tenant isolation | `test_cross_tenant_argument_boundary.py`, `test_rbac_isolation.py`, `test_evidence_admission_isolation.py` | no | simulated | no | one | 20 passed |
 | API and SDK contract | `test_openapi_export.py`, `test_sdk_integration.py` (in-process ASGI), `test_sdk_client.py`, `test_sdk_async_client.py`, `test_sdk_public_api.py` | no | simulated | no | one | 51 passed, 1 failed. The failure is the export's package version string, 0.11.0 locally against 0.12.0 committed, an installation artefact that CI passes |
-| CAM mismatch and modes | `test_cam_lease_binding.py`, `test_capability_activation.py`, `test_activation_manifest.py` | no | simulated | no | one | 98 passed; mode gate at dispatch in #1093 (pending review) |
+| CAM mismatch and modes | `test_cam_lease_binding.py`, `test_capability_activation.py`, `test_activation_manifest.py` | no | simulated | no | one | 98 passed; mode gate at dispatch in #1093 (merged) |
 | Alternative ingress (MCP, routes) | `flow/test_mediation_surface.py`, `test_mcp_remora.py`, `test_mcp_tool_contracts.py`; `scripts/check_flow_mediation_surface.py` | no | none | no | one | 89 passed; the surface check passes (28 routes, 3 dispatching) |
-| WS1 atomic admission | PG: `test_atomic_admission.py`, `test_review_admission_grant_withheld.py` | PG | simulated | no | one; contention on one PG | 94 passed; strict-profile requirement in #1091 (pending review) |
+| WS1 atomic admission | PG: `test_atomic_admission.py`, `test_review_admission_grant_withheld.py` | PG | simulated | no | one; contention on one PG | 94 passed; strict-profile requirement in #1091 (merged) |
 
 ## Not run
 
