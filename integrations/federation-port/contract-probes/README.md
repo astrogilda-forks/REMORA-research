@@ -41,7 +41,7 @@ runtime's own `artifactDigest`. Nothing under federation-port's tree changes.
 Four behaviours at `92d5078` that a reader of the contract would not expect.
 None produced a second side effect; the idempotency key held in all four.
 CP-F1 and CP-F4 are one fault reached two ways, found as such by the TLA+
-model in [`formal/tla`](../../../formal/tla/README.md): a later attempt's
+model in [`formal/tla`](../../../formal/README.md): a later attempt's
 failed-and-retriable outcome overrides an earlier attempt that may have
 reached the provider.
 

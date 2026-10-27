@@ -127,7 +127,7 @@ Replaced claims are kept in [superseded claims](docs/assurance/superseded_claims
 ## More to run
 
 ```bash
-python -m pytest tests/ -q                     # the deterministic suite (about 10,800 tests)
+python -m pytest tests/ -q                     # the deterministic suite (about 13,100 tests)
 python scripts/demo_industrial_maintenance.py  # a worked operational scenario
 python -m remora doctor                        # check the local configuration
 ```
