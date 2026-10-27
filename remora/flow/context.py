@@ -33,6 +33,7 @@ import base64
 import contextlib
 import json
 import secrets
+import time
 import threading
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -56,6 +57,7 @@ __all__ = [
     "FlowContextState",
     "FlowContextStore",
     "FlowContextUnknown",
+    "FlowDispatchFenceLost",
     "FlowEvent",
     "FlowEventStore",
     "FlowInvariantViolation",
@@ -95,6 +97,17 @@ class FlowContextUnknown(RemoraError, LookupError):
     """No such context for this tenant and principal."""
 
     code = "flow_context_unknown"
+    category = "governance"
+
+
+class FlowDispatchFenceLost(RemoraError, RuntimeError):
+    """The dispatch fence a commit relies on is no longer held unexpired.
+
+    Another proposal may have begun in the context while the hold had lapsed,
+    so the holder's result must not become visible.
+    """
+
+    code = "flow_dispatch_fence_expired"
     category = "governance"
 
 
@@ -533,19 +546,41 @@ class FlowContextStore:
                          parent_context_id=parent_context_id)
 
     def raise_label(self, tenant_id: str, principal: str, context_id: str,
-                    label: Label) -> FlowContextState:
-        """Raise the context's label to its join with ``label`` (commit before return)."""
+                    label: Label, *, dispatch_id: str | None = None) -> FlowContextState:
+        """Raise the context's label to its join with ``label`` (commit before return).
+
+        With ``dispatch_id`` (the fence the caller holds, IFC-06) the commit
+        is bound to that fence: the hold must be present and unexpired in the
+        very state the append is conditioned on, so the append succeeds only
+        if no event (a competing dispatch included) landed after that state.
+        A label that needs no raise appends the hold's renewal instead, so
+        the ownership check is a compare-and-swap in both cases. A hold that
+        is gone or expired raises :class:`FlowDispatchFenceLost`.
+        """
         for _ in range(_MAX_RETRIES):
             state = self.load(tenant_id, principal, context_id)
+            held = None
+            if dispatch_id is not None:
+                at = time.time()
+                held = next((o for o in state.open_dispatches
+                             if o.dispatch_id == dispatch_id and o.expires_at > at), None)
+                if held is None:
+                    raise FlowDispatchFenceLost(
+                        "the dispatch fence lapsed before the result was committed")
             new = join(state.label, label)
             if new == state.label:
-                return state
-            if not flows_to(new, state.model_principal):
-                raise FlowInvariantViolation(
-                    "the raise would show data to a model provider that may not read it")
+                if held is None:
+                    return state
+                event = FlowEvent("dispatch", {
+                    "dispatch_id": held.dispatch_id, "proposal_id": held.proposal_id,
+                    "expires_at": held.expires_at})
+            else:
+                if not flows_to(new, state.model_principal):
+                    raise FlowInvariantViolation(
+                        "the raise would show data to a model provider that may not read it")
+                event = FlowEvent("raise", {"label": label_payload(new)})
             if self._store.append_if(tenant_id=tenant_id, context_id=context_id,
-                                     expected_seq=state.seq,
-                                     event=FlowEvent("raise", {"label": label_payload(new)})):
+                                     expected_seq=state.seq, event=event):
                 return self.load(tenant_id, principal, context_id)
         raise FlowStoreUnavailable("flow label raise lost every retry under contention")
 

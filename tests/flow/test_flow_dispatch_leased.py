@@ -571,3 +571,89 @@ def test_a_commit_whose_fence_expired_withholds_the_result(executor):
     body = first["tool_execution"]
     assert body["executed"] is True and "result" not in body, body
     assert body.get("result_withheld") == "flow_dispatch_fence_expired", body
+
+
+def test_a_commit_that_outlasts_the_fence_ttl_still_holds_the_context(executor):
+    """The owner's reproduction (REMORA-research#1085): the tool returns, then
+    persisting the result blocks past the fence TTL. The renewal stays on
+    until the commit and the release finish, so a competing dispatch in the
+    same context is refused as flow_dispatch_contended and its tool never
+    runs; once the commit is released, the first call's result is visible and
+    exactly one tool call was recorded. Before the renewal outlived the
+    commit, the hold expired here, the second call ran, and both did."""
+    import threading
+    import time
+
+    import remora.enforcement.lease as lease_mod
+    from remora.flow.labeler import FlowLabeler
+
+    context_id = _context(executor)
+    calls = [dict(_call(context_id), arguments={"work_order_id": f"WO-{i}", "status": "closed"})
+             for i in (1, 2)]
+    leases = [_lease(executor, call) for call in calls]
+    ttl = 1.0
+    executor.monkeypatch.setattr(lease_mod, "DEFAULT_LEASE_TTL_SECONDS", ttl)
+    persisting, proceed = threading.Event(), threading.Event()
+    real_label_result = FlowLabeler.label_result
+    seen: list[int] = []
+
+    def blocked_label_result(self, *args, **kwargs):
+        seen.append(1)
+        if len(seen) == 1:
+            persisting.set()
+            assert proceed.wait(timeout=30)
+        return real_label_result(self, *args, **kwargs)
+
+    executor.monkeypatch.setattr(FlowLabeler, "label_result", blocked_label_result)
+    first: dict = {}
+    worker = threading.Thread(
+        target=lambda: first.update(_post(executor, leases[0], call=calls[0]).json()))
+    try:
+        worker.start()
+        assert persisting.wait(timeout=30), "the first dispatch never reached its commit"
+        time.sleep(2 * ttl)
+        second = _post(executor, leases[1], call=calls[1]).json()["tool_execution"]
+        assert (second["executed"], second.get("refusal_reason")) == (
+            False, "flow_dispatch_contended"), second
+        assert len(executor.registry.CALLS) == 1   # only the first call's tool has run
+    finally:
+        proceed.set()
+        worker.join(timeout=30)
+    assert first["tool_execution"]["executed"] is True
+    assert "result" in first["tool_execution"], first
+    assert len(executor.registry.CALLS) == 1
+
+
+def test_the_final_commit_is_refused_when_the_fence_lapsed_in_the_same_step(executor):
+    """The ownership check is the append that records the commit, not a read
+    before it: the hold is judged in the state the append is conditioned on.
+    Here the hold expires between the early check and the append (the clock
+    jumps once), so the commit is refused and the result withheld."""
+    import time
+
+    import servers.execution_api as exec_mod
+    from remora.flow import context as context_mod
+    from remora.flow.labeler import FlowCommitFailed, FlowLabeler, commit_labeled_result
+
+    context_id = _context(executor)
+    call = _call(context_id)
+    contexts, handles = exec_mod._flow_contexts(), exec_mod._flow_handles()
+    seq = contexts.load("acme", "employee-1", context_id).seq
+    now = time.time()
+    dispatch_id = contexts.begin_dispatch(
+        "acme", "employee-1", context_id, expected_seq=seq, proposal_id="p-late",
+        expires_at=now + 5, now=now)
+    assert dispatch_id is not None
+    state = contexts.load("acme", "employee-1", context_id)
+    # Only the store's clock jumps; the early check in the labeler still sees
+    # the hold as live, so the refusal below can only come from the append.
+    real_time = time.time
+    executor.monkeypatch.setattr(
+        context_mod, "time", SimpleNamespace(time=lambda: real_time() + 60))
+    with pytest.raises(FlowCommitFailed) as refused:
+        commit_labeled_result(
+            FlowLabeler(), WO_FLOW, contexts=contexts, handles=handles, tenant_id="acme",
+            principal="employee-1", context_id=context_id, proposal_id="p-late",
+            arguments=call["arguments"], raw_result={"ok": True}, expected_epoch=state.epoch,
+            dispatch_id=dispatch_id)
+    assert str(refused.value) == "flow_dispatch_fence_expired"

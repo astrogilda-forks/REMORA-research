@@ -3375,8 +3375,13 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     so two calls judged at the same epoch cannot both run, and a raise that
     lands while the holder runs still withholds the holder's result. The
     fence is renewed while the tool runs, so a tool running past the lease
-    TTL still holds the context; a commit whose fence lapsed anyway refuses
-    as ``flow_dispatch_fence_expired``.
+    TTL still holds the context, and the renewal stays on until the commit
+    and the release finish, so a slow commit does not outlive the fence; a
+    commit whose fence lapsed anyway refuses as ``flow_dispatch_fence_expired``,
+    decided in the same compare-and-swap that records the commit. The fence
+    cannot reverse an external side effect the tool already caused: an
+    expired fence withholds the result and refuses the competing call, nothing
+    more.
 
     The returned commit labels the raw result, persists the handles it mints,
     raises the context label, releases the fence and only then hands back the
@@ -3424,9 +3429,10 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
     if dispatch_id is None:
         return "flow_dispatch_contended", None, None, None, None
     # The fence's expiry bounds a process that dies mid-call, not a call that
-    # is still running: renewed every third of the TTL until the commit or the
-    # release, so a tool running past the TTL keeps the context. A renewal
-    # that finds the hold gone stops; the commit then refuses.
+    # is still running: renewed every third of the TTL until the release, which
+    # runs only after the commit finishes, so neither a tool nor a slow commit
+    # outlives the hold. A renewal that finds the hold gone stops; the commit
+    # then refuses.
     ttl = float(DEFAULT_LEASE_TTL_SECONDS)
     stop_renewing = _threading.Event()
 
@@ -3462,7 +3468,6 @@ def _flow_at_dispatch(tenant: str, tool_call: ToolCallRequest, expected: tuple[i
                             dispatch_id, context_id, exc_info=True)
 
     def commit(raw: Any) -> tuple[Any, dict[str, Any]]:
-        stop_renewing.set()
         try:
             done = commit_labeled_result(
                 FlowLabeler(), flow, contexts=contexts, handles=handles, tenant_id=tenant,

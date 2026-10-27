@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from remora.capabilities.resource import ResourceRefused, canonical_resource
+from remora.flow.context import FlowDispatchFenceLost
 from remora.flow.handles import HandleRecord, handle_token, new_handle_id
 from remora.flow.label import (
     BOTTOM,
@@ -371,7 +372,17 @@ def commit_labeled_result(
         raw_sha256 = hashlib.sha256(raw_bytes).hexdigest()
         if handles is not None and labeled.handles:
             handles.put_all(labeled.handles)
-        updated = contexts.raise_label(tenant_id, principal, context_id, labeled.raise_label)
+        if dispatch_id is None:
+            updated = contexts.raise_label(tenant_id, principal, context_id, labeled.raise_label)
+        else:
+            # The final ownership check and the raise are one compare-and-swap
+            # in the store: the append lands only if the fence is still held
+            # unexpired in the state it is conditioned on.
+            updated = contexts.raise_label(tenant_id, principal, context_id, labeled.raise_label,
+                                           dispatch_id=dispatch_id)
+    except FlowDispatchFenceLost:
+        failed = True
+        reason = "flow_dispatch_fence_expired"
     except Exception:
         failed = True
     # Raise outside the handler: neither cause nor implicit exception context
