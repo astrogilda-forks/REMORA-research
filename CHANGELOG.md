@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### ToolSpec: the closure digest covers the deployment's own sibling modules (Q3.4)
+
+- A `closure-sha256:` callable digest followed only the root module's own top-level package. A registry module that calls a local package to perform its effect, such as `ot_registry` calling `adapter.actuation`, recorded that package as the constant `unresolved`. Editing the effect code left the signed digest byte-identical, so registration verified a spec that no longer named the code that runs.
+- `remora/toolcall/callable_digest.py` now follows any top-level module or package that resolves to source and belongs to no installed distribution, identifying it by content as the design (Q3.4: every module "inside the deployment") states. Distributions are still named by version and the standard library by interpreter version. A name that resolves to nothing stays `unresolved`.
+- A bundle signed with a closure digest over such a registry gets a different digest and must be re-signed. No bundle in this repository attests one; `remora init-review` signs source-span digests.
+- Found while wiring the autonomous-ot-control testbed. Tests: `tests/test_callable_closure_digest.py` (+3).
 ### Assurance: a fault-scenario crosswalk, and a process-split fixture that refused to start (RMR-AUD-26-011)
 
 - `docs/assurance/fault_scenario_crosswalk_v1.md` maps the adversarial review's scenario classes to the tests and OT pilot runs that exercise them. For each it records whether real PostgreSQL, a restart or several processes are involved, and what each returned on 2026-10-26: `2594d08b`, one Windows host, PostgreSQL 16 in a container.
