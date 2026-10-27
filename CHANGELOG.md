@@ -10,6 +10,17 @@ This file lists externally relevant changes by release. Fine-grained development
 - In the autonomous-ot-control testbed the observer put that string into a URL path on the plant's read API. Every such call was still refused, but the plant was read on its behalf.
 - `_limits_or_refuse` now resolves the signed spec first whenever a limit guard is configured. Calls the contract admits are previewed exactly as before. A value of the wrong type is now refused as `toolspec_arguments_schema_invalid`, and three tests that expected the meter's reason were updated.
 - Tests: `tests/limits/test_limits_preview_after_contract.py` (7). Thirteen capabilities were rebound to the code commit.
+### ToolSpec: the closure digest covers the deployment's own sibling modules (Q3.4)
+
+- A `closure-sha256:` callable digest followed only the root module's own top-level package. A registry module that calls a local package to perform its effect, such as `ot_registry` calling `adapter.actuation`, recorded that package as the constant `unresolved`. Editing the effect code left the signed digest byte-identical, so registration verified a spec that no longer named the code that runs.
+- `remora/toolcall/callable_digest.py` now follows any top-level module or package that resolves to source and belongs to no installed distribution, identifying it by content as the design (Q3.4: every module "inside the deployment") states. Distributions are still named by version and the standard library by interpreter version. A name that resolves to nothing stays `unresolved`.
+- A bundle signed with a closure digest over such a registry gets a different digest and must be re-signed. No bundle in this repository attests one; `remora init-review` signs source-span digests.
+- Found while wiring the autonomous-ot-control testbed. Tests: `tests/test_callable_closure_digest.py` (+3).
+### SDK: a deferred audit reference no longer breaks a successful approval
+
+- The server answers an approval with `audit.deferred: true` and a null `sequence_no` and `entry_hash` when the event is enqueued on the transition's own transaction (REM-047). `AuditRef.from_payload` called `int(None)` on it, so `RemoraClient.approve` raised `TypeError` after the approval had been recorded, and the caller could not tell that it had.
+- `AuditRef` now carries `deferred` and `idempotency_key`, and both index fields may be `None`. A response with no index that does not say it is deferred, with its key, is refused as malformed rather than read as pending.
+- Found by the first live governed run of the autonomous-ot-control testbed against `9b1763ca`. Tests: `tests/test_sdk_client.py` (+6). The public API snapshot is unchanged.
 ### Assurance: a fault-scenario crosswalk, and a process-split fixture that refused to start (RMR-AUD-26-011)
 
 - `docs/assurance/fault_scenario_crosswalk_v1.md` maps the adversarial review's scenario classes to the tests and OT pilot runs that exercise them. For each it records whether real PostgreSQL, a restart or several processes are involved, and what each returned on 2026-10-26: `2594d08b`, one Windows host, PostgreSQL 16 in a container.
