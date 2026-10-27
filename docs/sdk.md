@@ -281,7 +281,7 @@ never on detail strings.
 | `InvalidRequestError` | `invalid_request` | 422 |
 | `RateLimitedError` | `rate_limited` | 429 (`retry_after` when the server says) |
 | `ServerError` | `server_error` | 5xx (`request_id` for correlation) |
-| `RemoraUnavailableError` | `unavailable` | transport failure |
+| `RemoraUnavailableError` | `unavailable` | transport failure; `retryable` only when nothing was sent, or on a GET (a read timeout on an approval, rejection, recorded effect or limit resolution may have been applied, so read its state first) |
 | `RemoraError` | `remora_error` | base class / unmapped status |
 | `BindingRefusedError` | `binding_refused` | 409 — the presented call is not the one authorized |
 | `ReplayRefusedError` | `replay_refused` | 409 — the grant was already consumed (the effect may have happened) |

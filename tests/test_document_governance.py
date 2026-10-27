@@ -491,3 +491,36 @@ def test_the_live_index_links_every_live_registered_document() -> None:
     errors: list[str] = []
     mod.check_index_completeness(errors)
     assert errors == [], errors
+
+
+_PROFILES = ["RESEARCH_REFERENCE", "SHADOW_PILOT", "CONTROLLED_PILOT", "LIMITED_ENFORCEMENT", "PRODUCTION"]
+
+
+def test_a_live_document_naming_another_profile_as_current_is_found() -> None:
+    """External review 2026-10-26: these two statements outlived the owner
+    decision of 2026-10-25 because no check read them."""
+    mod = _load_module()
+    capabilities = "      reason: Current release profile is SHADOW_PILOT and deployment status is SHADOW_ONLY.\n"
+    atlas = "    <span><b>Current profile</b> SHADOW_PILOT</span>\n"
+    assert mod.current_profile_mentions(capabilities, _PROFILES) == [(1, "SHADOW_PILOT")]
+    assert mod.current_profile_mentions(atlas, _PROFILES) == [(1, "SHADOW_PILOT")]
+    assert mod.current_profile_mentions("`SHADOW_PILOT` (current profile)", _PROFILES) == [(1, "SHADOW_PILOT")]
+
+
+def test_a_dated_statement_is_not_read_as_current() -> None:
+    mod = _load_module()
+    for text in (
+        "SHADOW_PILOT was the release profile at d94eecf9.",
+        "<span><b>Profile at source</b> SHADOW_PILOT</span>",
+        "The current profile is unchanged. SHADOW_PILOT remains offered.",
+    ):
+        assert mod.current_profile_mentions(text, _PROFILES) == [], text
+
+
+def test_the_declared_profile_passes_and_the_live_repo_has_no_other() -> None:
+    mod = _load_module()
+    errors: list[str] = []
+    mod.check_current_profile_statements(errors)
+    assert errors == []
+    assert mod.current_profile_mentions(
+        "The current release profile is CONTROLLED_PILOT.", _PROFILES) == [(1, "CONTROLLED_PILOT")]

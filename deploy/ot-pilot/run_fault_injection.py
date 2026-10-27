@@ -12,8 +12,8 @@ Usage, from the repository root, on a fresh stack::
 The battery (``run_ot_battery.py``) shows what the system does when nothing
 goes wrong. This runner breaks things while it works: it restarts the API
 between an approval and its execution, stops PostgreSQL in the middle of a
-governed write, races four executions of one approval, proposes the same
-write twice, revokes an approver, stops execution, and runs a tool that fails
+governed write and keeps it stopped until Docker marks the API unhealthy,
+races four executions of one approval, proposes the same write twice, revokes an approver, stops execution, and runs a tool that fails
 after dispatch began. Each fault states what the system must do, and the
 report says whether it did. A fault that does not behave as stated is a
 FAILURE, printed as one.
@@ -138,6 +138,36 @@ def wait_store(timeout_s: int = 120) -> bool:
             return True
         time.sleep(1)
     return False
+
+
+def container_state(inspect_json: str) -> dict[str, Any]:
+    """Health, running flag and restart count from ``docker inspect`` output."""
+    state = (json.loads(inspect_json) or [{}])[0]
+    return {
+        "health": ((state.get("State") or {}).get("Health") or {}).get("Status"),
+        "running": (state.get("State") or {}).get("Running"),
+        "restart_count": state.get("RestartCount"),
+        "started_at": (state.get("State") or {}).get("StartedAt"),
+    }
+
+
+def api_container() -> dict[str, Any]:
+    cid = compose("ps", "-q", "api").strip()
+    done = subprocess.run(["docker", "inspect", cid], capture_output=True, text=True,
+                          timeout=60, check=False)
+    if done.returncode != 0:
+        raise RuntimeError(f"docker inspect failed: {done.stderr.strip()[-300:]}")
+    return container_state(done.stdout)
+
+
+def wait_until(predicate: Callable[[], bool], timeout_s: int) -> float | None:
+    """Seconds until ``predicate`` held, or None at the timeout."""
+    start = time.time()
+    while time.time() - start < timeout_s:
+        if predicate():
+            return round(time.time() - start, 1)
+        time.sleep(1)
+    return None
 
 
 # ── Configuration fingerprint ───────────────────────────────────────────────
@@ -301,6 +331,36 @@ def f_store_outage_during_execute(rec: dict) -> bool:
             and result.get("old_setpoint") == 120.0 and s_replay == 409)
 
 
+def f_readiness_follows_the_store(rec: dict) -> bool:
+    """The orchestrator's view: liveness stays up, readiness and the Docker
+    health status go down with the store and come back, and nothing restarts."""
+    before = api_container()
+    compose("stop", "postgres")
+    IN_FAULT_WINDOW.set()
+    try:
+        rec["not_ready_after_s"] = wait_until(lambda: _call("GET", "/v1/ready", AGENT, None)[0] == 503, 30)
+        rec["live_during"] = _call("GET", "/v1/health", AGENT, None)[0]
+        ready_status, ready_body = _call("GET", "/v1/ready", AGENT, None)
+        rec.update(ready_during=ready_status, ready_body_during=ready_body)
+        rec["unhealthy_after_s"] = wait_until(lambda: api_container()["health"] == "unhealthy", 120)
+        during = api_container()
+    finally:
+        IN_FAULT_WINDOW.clear()
+        compose("start", "postgres")
+    rec["ready_after_s"] = wait_until(lambda: _call("GET", "/v1/ready", AGENT, None)[0] == 200, 120)
+    rec["healthy_after_s"] = wait_until(lambda: api_container()["health"] == "healthy", 120)
+    after = api_container()
+    rec.update(container_before=before, container_during=during, container_after=after)
+    body = ready_body if isinstance(ready_body, dict) else {}
+    return (rec["not_ready_after_s"] is not None and rec["live_during"] == 200
+            and ready_status == 503 and body.get("status") == "not_ready"
+            and body.get("checks") == {"durable_state": "unavailable"}
+            and rec["unhealthy_after_s"] is not None and during["running"] is True
+            and rec["ready_after_s"] is not None and rec["healthy_after_s"] is not None
+            and before["restart_count"] == after["restart_count"]
+            and before["started_at"] == after["started_at"])
+
+
 def f_concurrent_executions_of_one_approval(rec: dict) -> bool:
     tc = tool_call("create_work_order", {"wo_id": "WO-1404"}, "WO-1205")
     item = approved_item(tc)
@@ -404,6 +464,8 @@ FAULTS = [
           f_limits_survive_restart, intended_writes=1),
     Fault("PostgreSQL stopped during a governed write", "503, no effect; runs once after recovery",
           f_store_outage_during_execute, intended_writes=1),
+    Fault("PostgreSQL stopped until the API is unhealthy", "ready 503, live 200, unhealthy, no restart",
+          f_readiness_follows_the_store),
     Fault("Four concurrent executions of one approval", "exactly one runs",
           f_concurrent_executions_of_one_approval, intended_writes=1),
     Fault("The same proposal made and approved twice", "two operations (no key declared)",

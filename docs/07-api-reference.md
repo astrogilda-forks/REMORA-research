@@ -10,8 +10,9 @@ fails.
 ## The HTTP surface, concretely
 
 The machine-readable contract is [`schemas/openapi.json`](../schemas/openapi.json)
-(OpenAPI 3.1, 41 paths). CI fails on drift between it and the routes, so it is
-the authority for request and response shapes; this document explains them.
+(OpenAPI 3.1). CI fails on drift between it and the routes, so it is the
+authority for request and response shapes, and for how many there are; this
+document explains them.
 
 A first round-trip against a development-profile server, which is the shortest
 path to a 200 before the strict-profile prerequisites are configured:
@@ -651,7 +652,10 @@ by other means changes a decision.
 
 **WS1 execution preconditions (#953, opt-in, default off):**
 `REMORA_WS1_MODE` is `off`, `shadow` or `enforce`; any other value refuses
-startup. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
+startup. Under the `review` and `controlled_pilot` runtime profiles, `enforce`
+also requires `REMORA_WS1_ADMISSION=atomic`: legacy admission spends the grant
+after the WS1 re-gate, so evidence that lapsed in between would still be
+spent. A mode other than off needs `REMORA_WS1_DEPLOYMENT_MODULE`, a module
 exposing `build_ws1_deployment()`: the precondition registry, verifiers,
 resolvers, read capabilities, monitor profile and budget. `/assess` then runs
 the WS1 loop after every other component, records it under `ws1` in the chain
@@ -678,7 +682,12 @@ On Postgres every ledger transaction takes one advisory lock. Two hosts
 reserving against the same limit are therefore serialized, as one host's
 SQLite transactions are, and the schema is created on first open under that
 lock.
-Either one without the other refuses startup.
+Either one without the other refuses startup. A SQLite ledger beside
+authority state on `REMORA_PG_DSN` refuses startup under every profile unless
+`REMORA_LIMITS_LEDGER_SCOPE=single_host` declares that one host runs
+executors. That pairing is the shape a second executor host can join, and that
+host would keep its own budget. With the authority state on SQLite as well,
+nothing needs declaring.
 
 The policy has four parts. `meters` says what one call of a tool consumes. A
 `sum` meter reads an amount argument, a `count` meter charges `per_call`, and
@@ -1102,6 +1111,20 @@ restart-proven by test.
   effective mode, reasons and premise results, and the manifest's digest and
   whether it was signed. Without a manifest every mode is `NOT_ESTABLISHED`.
   No signer key id or credential is returned.
+- **Effective modes at dispatch.** With a manifest loaded, every dispatch
+  requires the capabilities that authorize it to be effective `ENFORCE`:
+  CAP-003 (the signed grant) and CAP-013 (lease dispatch), plus CAP-031 while
+  cumulative limits are configured. Any other mode refuses before the nonce,
+  so nothing is spent: `capability_not_enforcing:<CAP>:<mode>`, and a
+  capability absent from the manifest counts as `DISABLED`. Only `ENFORCE`
+  authorizes an effect. `VERIFY` sends outcomes to human review on the
+  decision path, and `SHADOW`, `EVIDENCE_ONLY`, `OFFLINE`, `DISABLED` and
+  `BLOCKED` authorize nothing (`MODE_CONTRACT` in
+  `remora/governance/capability_activation.py`). A manifest named by
+  `REMORA_CAM_FILE` that did not load, for example on a bad signature,
+  refuses every dispatch as `cam_not_loaded`. Without `REMORA_CAM_FILE`
+  nothing changes. Other capabilities are not checked at dispatch, because
+  most are evidence, research or observation mechanisms.
 
 Wiring status per module is authoritative in
 `docs/assurance/capability_register_v1.yaml`.
