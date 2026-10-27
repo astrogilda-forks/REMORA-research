@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### ToolSpec: the closure digest covers the deployment's own sibling modules (Q3.4)
+
+- A `closure-sha256:` callable digest followed only the root module's own top-level package. A registry module that calls a local package to perform its effect, such as `ot_registry` calling `adapter.actuation`, recorded that package as the constant `unresolved`. Editing the effect code left the signed digest byte-identical, so registration verified a spec that no longer named the code that runs.
+- `remora/toolcall/callable_digest.py` now follows any top-level module or package that resolves to source and belongs to no installed distribution, identifying it by content as the design (Q3.4: every module "inside the deployment") states. Distributions are still named by version and the standard library by interpreter version. A name that resolves to nothing stays `unresolved`.
+- A bundle signed with a closure digest over such a registry gets a different digest and must be re-signed. No bundle in this repository attests one; `remora init-review` signs source-span digests.
+- Found while wiring the autonomous-ot-control testbed. Tests: `tests/test_callable_closure_digest.py` (+3).
 ### SDK: a deferred audit reference no longer breaks a successful approval
 
 - The server answers an approval with `audit.deferred: true` and a null `sequence_no` and `entry_hash` when the event is enqueued on the transition's own transaction (REM-047). `AuditRef.from_payload` called `int(None)` on it, so `RemoraClient.approve` raised `TypeError` after the approval had been recorded, and the caller could not tell that it had.
