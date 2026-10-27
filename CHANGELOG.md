@@ -4,6 +4,12 @@ This file lists externally relevant changes by release. Fine-grained development
 
 ## Unreleased
 
+### Limits: the signed contract refuses a call before the limit preview reads the plant
+
+- `/v1/execution/assess` ran the advisory limit preview before the ToolSpec check. A call the signed contract would refuse still reached the deployment's observer module, with the agent's own argument as the resource: an unknown zone, a path string, any target. The refusal also named the meter (`limit_observation_unavailable`, `limit_exceeded`, `limit_coverage_unknown`) instead of the contract violation.
+- In the autonomous-ot-control testbed the observer put that string into a URL path on the plant's read API. Every such call was still refused, but the plant was read on its behalf.
+- `_limits_or_refuse` now resolves the signed spec first whenever a limit guard is configured. Calls the contract admits are previewed exactly as before. A value of the wrong type is now refused as `toolspec_arguments_schema_invalid`, and three tests that expected the meter's reason were updated.
+- Tests: `tests/limits/test_limits_preview_after_contract.py` (7). Thirteen capabilities were rebound to the code commit.
 ### ToolSpec: the closure digest covers the deployment's own sibling modules (Q3.4)
 
 - A `closure-sha256:` callable digest followed only the root module's own top-level package. A registry module that calls a local package to perform its effect, such as `ot_registry` calling `adapter.actuation`, recorded that package as the constant `unresolved`. Editing the effect code left the signed digest byte-identical, so registration verified a spec that no longer named the code that runs.
